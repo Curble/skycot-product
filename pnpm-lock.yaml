@@ -680,6 +680,9 @@ importers:
       effect:
         specifier: 4.0.5
         version: 4.0.5
+      lucide-react:
+        specifier: ^0.564.0
+        version: 0.564.0(react@19.3.0)
       react:
         specifier: 'catalog:'
         version: 19.3.0
