@@ -1,0 +1,427 @@
+/* Settings, onboarding, automations and people screens. Composes the tokens
+   and primitives in apple.css (System Settings grouped lists, sheets) and the
+   shell layout in shell.css; nothing here restyles a primitive. */
+
+/* ---------------------------------------------------------------------------
+   Settings window: section list + detail pane
+   ------------------------------------------------------------------------- */
+.fm-settings {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.fm-settings--stack {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.fm-settings__nav {
+  padding: 14px 10px;
+  border-right: 1px solid var(--fm-sep);
+  background: var(--fm-bg-window);
+  overflow-y: auto;
+}
+.fm-settings--stack .fm-settings__nav {
+  border-right: 0;
+  padding: 0 16px 16px;
+  background: transparent;
+}
+.fm-settings--stack .fm-settings__nav .fm-list {
+  background: var(--fm-bg-fill);
+  border-radius: var(--fm-radius-md);
+}
+.fm-settings__nav .fm-listrow {
+  border-top: 0;
+  border-radius: var(--fm-radius);
+  padding: 7px 10px;
+}
+.fm-settings--stack .fm-settings__nav .fm-listrow {
+  border-radius: 0;
+  padding: 10px 12px;
+}
+.fm-settings--stack .fm-settings__nav .fm-listrow + .fm-listrow {
+  border-top: 0.5px solid var(--fm-sep);
+}
+.fm-settings__nav .fm-listrow--selected {
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+}
+.fm-settings__nav .fm-listrow--selected .fm-listrow__subtitle,
+.fm-settings__nav .fm-listrow--selected .fm-listrow__chevron {
+  color: inherit;
+  opacity: 0.85;
+}
+.fm-settings__glyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+.fm-settings__glyph--blue {
+  background: linear-gradient(180deg, #5ab0ff, #0a84ff);
+}
+.fm-settings__glyph--green {
+  background: linear-gradient(180deg, #5fd37a, #30b24f);
+}
+.fm-settings__glyph--orange {
+  background: linear-gradient(180deg, #ffb340, #ff9500);
+}
+.fm-settings__glyph--grey {
+  background: linear-gradient(180deg, #9a9aa0, #6e6e73);
+}
+.fm-settings__glyph--red {
+  background: linear-gradient(180deg, #ff6b61, #ff3b30);
+}
+.fm-settings__glyph--purple {
+  background: linear-gradient(180deg, #c084fc, #8e44ec);
+}
+
+.fm-settings__detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--fm-bg-content);
+}
+.fm-settings__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 24px 6px;
+}
+.fm-settings--stack .fm-settings__header {
+  padding: 14px 16px 6px;
+}
+.fm-settings__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.fm-settings__panes {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 720px;
+  padding: 10px 24px 28px;
+}
+.fm-settings--stack .fm-settings__panes {
+  padding: 8px 16px 24px;
+}
+
+/* System Settings grouped list */
+.fm-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fm-group__title {
+  margin: 0 0 2px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--fm-label-2);
+}
+.fm-group__footer {
+  margin: 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-group .fm-list {
+  background: var(--fm-bg-fill);
+}
+.fm-group .fm-listrow__trailing {
+  gap: 8px;
+}
+/* Status sentences ("Signed in as …") are worth a third line here. */
+.fm-group .fm-listrow__subtitle,
+.fm-onboarding .fm-listrow__subtitle {
+  -webkit-line-clamp: 4;
+}
+.fm-setting-block {
+  padding: 12px 12px 10px;
+}
+.fm-setting-warning {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fm-orange-ink);
+}
+
+/* Native selects and textareas dressed like fm-field */
+.fm-select {
+  min-height: 28px;
+  padding: 3px 26px 3px 10px;
+  border: 1px solid var(--fm-button-line);
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-bg-button)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236e6e73' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  box-shadow: var(--fm-shadow-button);
+  color: var(--fm-label);
+  font: inherit;
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.fm-select:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+.fm-select--block {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  font-size: 14px;
+}
+.fm-textarea {
+  display: block;
+  min-height: 84px;
+  padding: 8px 12px;
+  resize: vertical;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.fm-field--time {
+  width: auto;
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.fm-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fm-label-2);
+}
+
+/* Code the person copies */
+.fm-code {
+  font-family: var(--fm-mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--fm-bg-fill-2);
+  color: var(--fm-label);
+  overflow-wrap: anywhere;
+}
+.fm-code--block {
+  display: block;
+  padding: 8px 10px;
+  margin: 6px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: var(--fm-radius-sm);
+}
+.fm-code--wrap {
+  white-space: normal;
+}
+.fm-prewrap {
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Providers
+   ------------------------------------------------------------------------- */
+.fm-provider-badge {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--fm-bg-fill-2);
+  color: var(--fm-label);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.fm-provider-badge--codex {
+  background: #10a37f;
+  color: #fff;
+}
+.fm-provider-badge--antigravity {
+  background: linear-gradient(135deg, #4285f4, #34a853 55%, #fbbc05 80%, #ea4335);
+  color: #fff;
+}
+.fm-provider-badge--claudeAgent {
+  background: var(--fm-provider);
+  color: #fff;
+}
+.fm-provider-runs {
+  font-weight: 400;
+  color: var(--fm-label-2);
+}
+
+/* The two-step "how to" card under a provider row */
+.fm-howto {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border-top: 0.5px solid var(--fm-sep);
+  background: var(--fm-bg-card);
+  font-size: 13px;
+}
+.fm-howto--flat {
+  border-top: 0.5px solid var(--fm-sep);
+}
+.fm-howto__lede {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-howto__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fm-howto__step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.fm-howto__num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.fm-howto__step--done .fm-howto__num {
+  background: var(--fm-green);
+}
+.fm-howto__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.fm-howto__body .fm-code--block {
+  width: 100%;
+  margin: 0;
+}
+.fm-howto__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   Onboarding sheet
+   ------------------------------------------------------------------------- */
+.fm-onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fm-onboarding__inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border-top: 0.5px solid var(--fm-sep);
+  background: var(--fm-bg-card);
+}
+.fm-onboarding__inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.fm-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+}
+.fm-steps__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fm-label-4);
+}
+.fm-steps__dot--on {
+  background: var(--fm-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Automations / People
+   ------------------------------------------------------------------------- */
+.fm-screen-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.fm-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.fm-daypicker {
+  display: inline-flex;
+  gap: 4px;
+}
+.fm-daypicker__day {
+  min-width: 36px;
+  padding: 4px 6px;
+  border: 1px solid var(--fm-button-line);
+  border-radius: 999px;
+  background: var(--fm-bg-button);
+  color: var(--fm-label);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fm-daypicker__day--on {
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
+  color: var(--fm-on-accent);
+}
+.fm-sheet-inset {
+  padding: 10px 12px 12px;
+}
+
+@media (max-width: 699px) {
+  .fm-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Rows whose trailing side holds controls drop them under the text; rows with
+     only a chevron or pill stay on one line. */
+  .fm-group .fm-listrow:has(.fm-listrow__trailing button),
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) {
+    grid-template-columns: auto 1fr;
+  }
+  .fm-group .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing,
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing {
+    grid-column: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

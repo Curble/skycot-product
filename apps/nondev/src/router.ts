@@ -15,7 +15,27 @@ export type Route =
   | { readonly name: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId }
   | { readonly name: "automations" }
   | { readonly name: "people" }
+  /** System Settings-style screen; `section` is null for the list on a phone. */
+  | { readonly name: "settings"; readonly section: SettingsSection | null }
+  /** First-run onboarding, re-enterable from Settings. */
+  | { readonly name: "welcome" }
   | { readonly name: "not-found"; readonly path: string };
+
+export const SETTINGS_SECTIONS = [
+  "assistants",
+  "autonomy",
+  "sharing",
+  "mac",
+  "appearance",
+  "privacy",
+  "advanced",
+  "about",
+] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+
+function isSettingsSection(value: string): value is SettingsSection {
+  return (SETTINGS_SECTIONS as ReadonlyArray<string>).includes(value);
+}
 
 export function parseRoute(hash: string): Route {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -38,9 +58,16 @@ export function parseRoute(hash: string): Route {
         return { name: "automations" };
       case "people":
         return { name: "people" };
+      case "settings":
+        return { name: "settings", section: null };
+      case "welcome":
+        return { name: "welcome" };
       default:
         break;
     }
+  }
+  if (segments[0] === "settings" && segments.length === 2 && isSettingsSection(segments[1]!)) {
+    return { name: "settings", section: segments[1] };
   }
   if (segments[0] === "thread" && segments.length === 3) {
     return {
@@ -56,6 +83,12 @@ export const HOME_HREF = "#/";
 export const NEW_HREF = "#/new";
 export const AUTOMATIONS_HREF = "#/automations";
 export const PEOPLE_HREF = "#/people";
+export const SETTINGS_HREF = "#/settings";
+export const WELCOME_HREF = "#/welcome";
+
+export function settingsHref(section: SettingsSection): string {
+  return `#/settings/${section}`;
+}
 
 export function threadHref(environmentId: EnvironmentId, threadId: ThreadId): string {
   return `#/thread/${encodeURIComponent(environmentId)}/${encodeURIComponent(threadId)}`;
