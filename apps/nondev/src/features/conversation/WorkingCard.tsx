@@ -15,6 +15,7 @@ import * as DateTime from "effect/DateTime";
 import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
 import { useElapsedLabel } from "../../app/useElapsed";
+import { describeDecision } from "../../plain/approvals";
 import { progress } from "../../plain/copy";
 import {
   describeTurnItem,
@@ -77,17 +78,6 @@ export function waitedMillis(
     );
   }
   return total;
-}
-
-/**
- * Requests the engine answered on the person's behalf carry a note once
- * approval rules land server-side. Read defensively: the field is optional
- * today and absent on older servers.
- */
-export function decisionNoteOf(request: unknown): string | null {
-  if (typeof request !== "object" || request === null) return null;
-  const note = (request as { readonly decisionNote?: unknown }).decisionNote;
-  return typeof note === "string" && note.trim().length > 0 ? note.trim() : null;
 }
 
 export function WorkingCard({
@@ -184,12 +174,18 @@ export function WorkingCard({
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
   const detailLines = narrated.map(({ item, narration }) => {
-    const note = "requestId" in item ? decisionNoteOf(requests.get(item.requestId)) : null;
+    // The headline already says "SKYCOT rules allowed …" for policy answers;
+    // the technical line names who decided so the log reads the same way.
+    const request = "requestId" in item ? requests.get(item.requestId) : undefined;
+    const decision = request ? describeDecision(request) : null;
     return {
       key: item.id,
       time: shortTime(item.startedAt ?? item.updatedAt),
-      label: note ? `${narration.headline} · ${note}` : narration.headline,
-      text: narration.technical,
+      label: narration.headline,
+      text:
+        decision?.decidedBy === "policy"
+          ? `${narration.technical}\n— ${decision.label}`
+          : narration.technical,
       tone:
         narration.status === "failed"
           ? ("failed" as const)

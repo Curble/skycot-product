@@ -19,6 +19,7 @@ import {
   type ApprovalCard,
   type ApprovalOption,
   type ApprovalRisk,
+  describeDecision,
   describeRuntimeRequest,
 } from "../../../plain/approvals";
 import { projectAtomOrEmpty } from "../../../state/projects";
@@ -26,7 +27,6 @@ import { Banner } from "../../../ui/Banner";
 import { Bubble } from "../../../ui/Bubble";
 import { Button } from "../../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader, type CardIconTone } from "../../../ui/Card";
-import { decisionNoteOf } from "../WorkingCard";
 import { Disclosure } from "./Disclosure";
 import { type DispatchDecision, useDecisionDispatcher } from "./dispatch";
 import { InlineReply } from "./InlineReply";
@@ -89,24 +89,11 @@ function decidedLine(
   const pending = request ? request.status === "pending" : PENDING_ITEM_STATUS.has(item.status);
   if (pending) return null;
   if (item.type === "approval_request") {
-    // Answered by the server's approval rules, not by a person: say so calmly.
-    if (decisionNoteOf(request) !== null && request?.decision !== "decline") {
-      return `Allowed by SKYCOT rules${stamp}`;
-    }
-    switch (request?.decision) {
-      case "accept":
-        return `You allowed this once${stamp}`;
-      case "acceptForSession":
-        return `You allowed this for the rest of the conversation${stamp}`;
-      case "acceptAlways":
-        return `You allowed this for the whole project${stamp}`;
-      case "decline":
-        return `You said no${stamp}`;
-      case "cancel":
-        return `You stopped the assistant${stamp}`;
-      default:
-        return `No longer needed${stamp}`;
-    }
+    const decision = request ? describeDecision(request) : null;
+    // Answered by the server's SKYCOT rules, not by a person: say so calmly;
+    // the rule detail sits under "Show details".
+    if (decision?.decidedBy === "policy") return `Allowed by SKYCOT rules${stamp}`;
+    return `${decision?.label ?? "No longer needed"}${stamp}`;
   }
   if (request?.answers !== undefined) return `You answered${stamp}`;
   if (request?.status === "resolved" || item.status === "completed")
@@ -160,7 +147,7 @@ export function RequestCard({
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
   });
   const decided = decidedLine(item, request);
-  const decisionNote = decisionNoteOf(request);
+  const decision = request ? describeDecision(request) : null;
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -251,7 +238,9 @@ export function RequestCard({
               </div>
             ) : null}
             <Disclosure>
-              {decisionNote ? <p className="fm-details__empty">Decision: {decisionNote}</p> : null}
+              {decision?.decidedBy === "policy" ? (
+                <p className="fm-details__empty">Decision: {decision.label}.</p>
+              ) : null}
               <pre className="fm-details__pre">
                 <code>{card.technical}</code>
               </pre>
