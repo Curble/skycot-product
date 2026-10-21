@@ -471,3 +471,26 @@ describe("describeResetTime (QA-P2-1-12)", () => {
     );
   });
 });
+
+describe("classifyCommand — check loops (QA-P2-2-13)", () => {
+  it("says what a read-only loop checked, not that it printed messages", () => {
+    expect(
+      classifyCommand(
+        `for file in *.html; do if curl --fail --silent "file://$PWD/$file" > /dev/null; then printf 'PASS %s\\n' "$file"; else printf 'FAIL %s\\n' "$file"; fi; done`,
+      ).past,
+    ).toBe("Checked that every page opens");
+    expect(
+      classifyCommand(
+        `for f in index.html menu.html book.html; do head -c 50 "$f" > /dev/null && echo "$f opens"; done`,
+      ).past,
+    ).toBe("Checked that 3 pages open");
+  });
+
+  it("keeps the real steps of a loop that changes files", () => {
+    expect(classifyCommand(`for f in *.html; do rm "$f"; done`).risk).toBe("high");
+  });
+
+  it("drops echo next to real work", () => {
+    expect(classifyCommand("pnpm test && echo done").past).toBe("Ran the project's checks");
+  });
+});

@@ -11,6 +11,7 @@ import type {
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 import {
@@ -52,6 +53,7 @@ import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } fr
 import { latestReviewable } from "../review";
 import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
+import { waitedMillis, type AskItem } from "./WorkingCard";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -145,8 +147,32 @@ export function ConversationView({
   const startedAt = shell
     ? resolveThreadWorkingStartedAt({ latestRun: shell.latestRun, runtime: shell.runtime })
     : null;
+  // Time spent waiting on the person is not work: the strip's clock matches the
+  // Working card's (QA-P2-2-14).
+  const runStart = startedAt ?? shell?.latestRun?.startedAt ?? null;
+  const requestsById =
+    projection === null
+      ? null
+      : new Map(projection.runtimeRequests.map((request) => [request.id, request]));
+  const waited =
+    projection !== null && requestsById !== null && latestRunId !== null && runStart !== null
+      ? waitedMillis(
+          projection.turnItems.filter(
+            (item): item is AskItem =>
+              item.runId === latestRunId &&
+              (item.type === "approval_request" || item.type === "user_input_request") &&
+              // Only waits inside the clock's window; an activity clock may already start after them.
+              (requestsById.get(item.requestId)?.createdAt === undefined ||
+                DateTime.toEpochMillis(requestsById.get(item.requestId)!.createdAt) >=
+                  Date.parse(runStart)),
+          ),
+          requestsById,
+        )
+      : 0;
   const elapsed = useElapsedLabel(
-    startedAt ?? shell?.latestRun?.startedAt ?? null,
+    runStart === null || waited === 0
+      ? runStart
+      : new Date(Date.parse(runStart) + waited).toISOString(),
     shell?.latestRun?.completedAt ?? null,
     active,
   );

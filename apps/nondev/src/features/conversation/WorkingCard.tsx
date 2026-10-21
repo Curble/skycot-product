@@ -63,7 +63,7 @@ function finishedTitle(status: OrchestrationV2Run["status"] | undefined, refused
  * keeps ticking (the strip shows the same figure), which is honest enough for
  * a Polish item without a second timer.
  */
-type AskItem = Extract<
+export type AskItem = Extract<
   OrchestrationV2TurnItem,
   { type: "approval_request" } | { type: "user_input_request" }
 >;

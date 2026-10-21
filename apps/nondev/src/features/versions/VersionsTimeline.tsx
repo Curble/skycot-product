@@ -156,22 +156,16 @@ export function VersionsTimeline({
 /**
  * The change note under "Version N". The line counts sit on their own line so
  * a two-line clamp never cuts them mid-number (QA-P2-3-08); the full sentence
- * stays in the tooltip and the Restore sheet.
+ * stays in the Restore sheet.
  */
 function RailLabel({ label }: { readonly label: string }) {
   const match = /^(.*?)\s*(\(\+\d+ \/ −\d+ lines?\))$/.exec(label);
   if (match === null) {
-    return (
-      <span className="fm-tm__label" title={label}>
-        {label}
-      </span>
-    );
+    return <span className="fm-tm__label">{label}</span>;
   }
   return (
     <>
-      <span className="fm-tm__label" title={label}>
-        {match[1]}
-      </span>
+      <span className="fm-tm__label">{match[1]}</span>
       <span className="fm-tm__counts">{match[2]}</span>
     </>
   );

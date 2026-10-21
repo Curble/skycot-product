@@ -1286,6 +1286,65 @@ const TOUCH_ORDER: Record<CommandClassification["touches"], number> = {
   "something live": 3,
 };
 
+const PRINTS = new Set(["print a message"]);
+
+/** `head x > /dev/null`, `cmd 2>&1`: where the output goes is not a file the step touches. */
+function withoutQuietRedirects(segment: string): string {
+  return segment.replace(/\s+\d*>{1,2}\s*(?:\/dev\/null|&\d)(?=\s|$)/g, "");
+}
+
+/** Read-only steps a check loop is made of. */
+const CHECK_KINDS: ReadonlySet<NarrationKind> = new Set<NarrationKind>(["read", "search", "test"]);
+const LOOP_PLUMBING = /^(if|then|else|elif|fi|test|\[|true|false|echo|printf|:)$/;
+
+/**
+ * `for f in *.html; do curl --fail "file://…/$f"; printf PASS; done` is one
+ * intent — "checked every page" — not "printed a message" twice (QA-P2-2-13).
+ * Only read-only loops are folded; anything that changes files keeps its steps.
+ */
+function describeReadOnlyLoop(command: string): CommandClassification | null {
+  const match = /^for\s+(\w+)\s+in\s+(.+?);\s*do\s+([\s\S]+?);?\s*done\s*$/.exec(command);
+  if (match === null) return null;
+  const list = match[2]!.trim();
+  const body = match[3]!;
+  const steps = splitShellSegments(body.replace(/\b(then|else|do)\b/g, ";"))
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .filter((segment) => !LOOP_PLUMBING.test(segment.split(/\s+/)[0] ?? ""));
+  const looksAtFiles = steps.every((segment) => {
+    if (/^curl\b/.test(segment)) return /file:\/\//.test(segment) && !/\s-(o|O)\b/.test(segment);
+    const classified = classifySegment(withoutQuietRedirects(segment));
+    return classified !== null && CHECK_KINDS.has(classified.kind) && classified.risk === "low";
+  });
+  if (!looksAtFiles) return null;
+  // A loop that only shows files (`cat "$f"`) is reading, not checking.
+  const checks =
+    /\/dev\/null|\b(PASS|FAIL|OK|opens?)\b/.test(body) ||
+    steps.some((segment) => /^(curl|test|\[)/.test(segment));
+  if (!checks) return null;
+  const items = list.split(/\s+/).filter((item) => item.length > 0);
+  const pages = items.every((item) => /\.html?$/i.test(item));
+  const what =
+    items.length === 1 && /\*/.test(items[0]!)
+      ? pages
+        ? "every page"
+        : "every matching file"
+      : pages
+        ? pluralize(items.length, "page")
+        : pluralize(items.length, "file");
+  const opens = steps.some((segment) => /^(curl|head|test|\[)/.test(segment)) || steps.length === 0;
+  const tail = opens ? (what === "every page" ? " opens" : " open") : "";
+  return {
+    kind: "test",
+    risk: "low",
+    past: `Checked that ${what}${tail}`,
+    present: `Checking that ${what}${tail}`,
+    infinitive: `check that ${what}${tail}`,
+    program: "for",
+    touches: "only this project",
+  };
+}
+
 /**
  * Narrates a shell command in plain English and grades its risk. Multi-step commands
  * (`a && b`) report the riskiest step's risk and list the steps.
@@ -1294,9 +1353,14 @@ export function classifyCommand(command: string): CommandClassification {
   const unwrapped = unwrapShellWrapper(command.trim());
   const trimmed = unwrapped.replace(HEREDOC_PATTERN, "").trim();
   const whole = SQL_DESTRUCTIVE_PATTERN.test(trimmed) || PIPE_TO_SHELL_PATTERN.test(trimmed);
-  const classified = splitShellSegments(trimmed)
-    .map(classifySegment)
+  const loop = describeReadOnlyLoop(trimmed);
+  if (loop !== null && !whole) return loop;
+  const all = splitShellSegments(trimmed)
+    .map((segment) => classifySegment(withoutQuietRedirects(segment)))
     .filter((c): c is CommandClassification => c !== null);
+  // `echo done`, `printf 'PASS'` next to real work is plumbing, not a step.
+  const work = all.filter((c) => !PRINTS.has(c.infinitive));
+  const classified = work.length > 0 ? work : all;
   if (classified.length === 0) {
     return {
       kind: "command",
