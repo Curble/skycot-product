@@ -18,9 +18,16 @@ import {
   restoreExplainerFor,
   type VersionEntry,
 } from "../../plain/versions";
+import { useEffect } from "react";
 import { environmentThreads } from "../../state/threads";
 import { useKeptVersions, type KeptVersionRecord } from "../review/keptVersions";
 import { numberVersions, rootScopeIds } from "../review/turnReview";
+import {
+  rememberUndonePoints,
+  undonePointOf,
+  useUndonePoints,
+  type UndonePoint,
+} from "./undonePoints";
 
 export interface KeptMark {
   readonly sha: string;
@@ -169,11 +176,18 @@ export function decorateTimeline(
         candidate.number !== null &&
         Date.parse(candidate.timestamp) <= Date.parse(entry.timestamp),
     );
+    // The alias also takes the twin's time: "Version 1 (20:07)" must read the
+    // same in the Undo sheet as in the rail (QA-P2-3-01).
     const aliased =
       entry.kind === "restore point" && entry.fileCount === 0 && twin
-        ? { ...entry, number: twin.number, label: twin.label }
-        : entry;
-    byId.set(entry.id, blockPastKept(aliased));
+        ? {
+            ...blockPastKept(entry),
+            number: twin.number,
+            label: twin.label,
+            timestamp: twin.timestamp,
+          }
+        : blockPastKept(entry);
+    byId.set(entry.id, aliased);
   }
   for (const entry of finished) byId.set(entry.id, entry);
   // Newest first for the rail.
@@ -183,20 +197,43 @@ export function decorateTimeline(
   };
 }
 
+/** An undone point the engine has pruned, back as the "undone" row it was. */
+function undoneEntry(point: UndonePoint): VersionEntry {
+  return {
+    id: point.id,
+    kind: "restore point",
+    kindLabel: copy.restorePoint,
+    label: point.label,
+    timestamp: point.timestamp,
+    fileCount: point.fileCount,
+    canRestore: false,
+    restoreExplainer: restoreExplainerFor(UNDONE_BLOCKER),
+    technical: point.technical,
+    isCurrent: false,
+  };
+}
+
 export function buildTimeline(
   projection: OrchestrationV2ThreadProjection | null,
   shell: EnvironmentThreadShell | null,
   kept: ReadonlyArray<KeptVersionRecord>,
+  undone: ReadonlyArray<UndonePoint> = [],
 ): VersionsTimeline {
   const canRollbackFiles = canRollbackFilesFor(shell);
   if (projection === null) {
     return { entries: [], numbers: new Map(), byId: new Map(), canRollbackFiles };
   }
-  const plain = buildVersionsTimeline(
+  const fromEngine = buildVersionsTimeline(
     projection.checkpoints,
     { canRollbackFiles, commits: kept },
     { rootScopeIds: rootScopeIds(projection) },
   );
+  // Undone points keep their row and their number after the engine prunes them.
+  const present = new Set(fromEngine.map((entry) => entry.id));
+  const plain = [
+    ...fromEngine,
+    ...undone.filter((point) => !present.has(point.id)).map(undoneEntry),
+  ];
   const { entries, byId } = decorateTimeline(plain, kept);
   const numbers = new Map<string, number>();
   for (const entry of entries) if (entry.number !== null) numbers.set(entry.id, entry.number);
@@ -212,7 +249,17 @@ export function useVersionsTimeline(
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
   const kept = useKeptVersions(threadId);
-  return buildTimeline(projection, shell, kept);
+  const undone = useUndonePoints(threadId);
+  const timeline = buildTimeline(projection, shell, kept, undone);
+  const newlyUndone = timeline.entries
+    .filter(
+      (entry) => entry.undone && entry.fileCount > 0 && !undone.some((p) => p.id === entry.id),
+    )
+    .map(undonePointOf);
+  useEffect(() => {
+    if (newlyUndone.length > 0) rememberUndonePoints(threadId, newlyUndone);
+  }, [threadId, newlyUndone]);
+  return timeline;
 }
 
 /**

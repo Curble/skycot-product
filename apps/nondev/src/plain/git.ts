@@ -251,3 +251,37 @@ export const ADVANCED_TERMS: Readonly<Record<PlainGitIntent, string>> = {
   sendForReview: copy.sendForReview.advanced,
   putItLive: copy.putItLive.advanced,
 };
+
+/**
+ * The commit a Keep makes: the request as the subject (git shows the first line
+ * in every log), cut at a word to fit 72 characters with no "…", and the full
+ * request in the body whenever the subject could not hold all of it, then the
+ * plain summary. Nothing the person asked for is dropped.
+ */
+export function keepCommitMessage(
+  request: string | null | undefined,
+  summary: string | null,
+): {
+  readonly subject: string;
+  readonly message: string;
+} {
+  const full = (request ?? "").trim();
+  const firstLine = full.split(/\r?\n/)[0]?.trim() ?? "";
+  const source = (firstLine.length > 0 ? firstLine : (summary ?? "Changes from SKYCOT")).replace(
+    /\.$/,
+    "",
+  );
+  let subject = source;
+  if (subject.length > 72) {
+    const cut = subject.slice(0, 72);
+    const space = cut.lastIndexOf(" ");
+    subject = (space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:—-]+$/, "");
+  }
+  const bodyParts: Array<string> = [];
+  if (firstLine.length > 0 && (subject !== source || full !== firstLine)) bodyParts.push(full);
+  if (summary) bodyParts.push(summary);
+  return {
+    subject,
+    message: bodyParts.length > 0 ? `${subject}\n\n${bodyParts.join("\n\n")}` : subject,
+  };
+}

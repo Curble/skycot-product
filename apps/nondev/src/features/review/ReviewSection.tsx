@@ -30,7 +30,7 @@ import {
   type ChangeArea,
   type WhatChanged,
 } from "../../plain/changes";
-import { planGitIntent } from "../../plain/git";
+import { keepCommitMessage, planGitIntent } from "../../plain/git";
 import { describeCheckpoint } from "../../plain/versions";
 import { copy } from "../../plain";
 import { projectAtomOrEmpty } from "../../state/projects";
@@ -164,15 +164,13 @@ export function ReviewSection({
   const filePaths = what.groups.flatMap((group) => group.files.map((file) => file.path));
   // The commit reads like the request that caused it ("Make the button bigger…"),
   // with the plain summary underneath; git shows the first line in every log.
-  const request = projection.messages
-    .find((message) => message.role === "user" && message.runId === checkpoint.runId)
-    ?.text.trim()
-    .split(/\r?\n/)[0]
-    ?.trim();
-  const subjectSource = (request && request.length > 0 ? request : what.summary).replace(/\.$/, "");
-  const commitSubject =
-    subjectSource.length > 72 ? `${subjectSource.slice(0, 71).trimEnd()}…` : subjectSource;
-  const commitMessage = `${commitSubject}\n\n${what.summary}`;
+  const request = projection.messages.find(
+    (message) => message.role === "user" && message.runId === checkpoint.runId,
+  )?.text;
+  const { subject: commitSubject, message: commitMessage } = keepCommitMessage(
+    request,
+    what.summary,
+  );
   const plan = planGitIntent("keepThisVersion", {
     cwd: cwd ?? "",
     currentBranch: gitStatus.data?.refName ?? shell?.branch ?? null,

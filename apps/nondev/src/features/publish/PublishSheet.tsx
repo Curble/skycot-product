@@ -36,7 +36,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CREW_NAME } from "../../brand";
-import { copy, describeStackedResult } from "../../plain";
+import { copy, describeStackedResult, keepCommitMessage } from "../../plain";
 import { ConfettiBurst } from "../../themes/Confetti";
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { possessive, useCrew } from "../../themes/useCrew";
@@ -652,22 +652,14 @@ function commitMessageFor(
   summary: string | null,
 ): string {
   // The latest real request, not a note added while the Crew worked.
-  const request = projection?.turnItems
-    .findLast(
-      (item): item is Extract<OrchestrationV2TurnItem, { type: "user_message" }> =>
-        item.type === "user_message" &&
-        item.inputIntent !== "steer" &&
-        item.inputIntent !== "promoted_queued_to_steer" &&
-        item.inputIntent !== "queued_turn",
-    )
-    ?.text.trim()
-    .split(/\r?\n/)[0]
-    ?.trim();
-  const source = (
-    request && request.length > 0 ? request : (summary ?? "Changes from SKYCOT")
-  ).replace(/\.$/, "");
-  const subject = source.length > 72 ? `${source.slice(0, 71).trimEnd()}…` : source;
-  return summary ? `${subject}\n\n${summary}` : subject;
+  const request = projection?.turnItems.findLast(
+    (item): item is Extract<OrchestrationV2TurnItem, { type: "user_message" }> =>
+      item.type === "user_message" &&
+      item.inputIntent !== "steer" &&
+      item.inputIntent !== "promoted_queued_to_steer" &&
+      item.inputIntent !== "queued_turn",
+  )?.text;
+  return keepCommitMessage(request, summary).message;
 }
 
 function formatUploadTime(iso: string): string {

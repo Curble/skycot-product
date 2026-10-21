@@ -2,7 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { checkpoint } from "../../plain/fixtures.test-helpers";
 import { buildVersionsTimeline } from "../../plain/versions";
-import { decorateTimeline, START_LABEL, UNDONE_BLOCKER } from "./timeline";
+import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
+
+import { buildTimeline, decorateTimeline, START_LABEL, UNDONE_BLOCKER } from "./timeline";
 
 const at = (minute: number) => `2026-10-21T09:${String(minute).padStart(2, "0")}:00.000Z`;
 const start = checkpoint({ id: "c0", ordinalWithinScope: 0, capturedAt: at(0), files: [] });
@@ -26,6 +28,8 @@ describe("decorateTimeline", () => {
     // The hidden empty point borrows the start line's number for Undo sheets.
     expect(byId.get("c0b")?.number).toBe(1);
     expect(byId.get("c0b")?.label).toBe(START_LABEL);
+    // …and its time, so the Undo sheet's "Version 1 (time)" matches the rail (QA-P2-3-01).
+    expect(byId.get("c0b")?.timestamp).toBe(at(0));
   });
 
   it("folds a kept version into its restore point and blocks restores past it", () => {
@@ -67,5 +71,34 @@ describe("decorateTimeline", () => {
 
   it("shows nothing when no version changed files", () => {
     expect(decorateTimeline(buildVersionsTimeline([start, gap]), []).entries).toEqual([]);
+  });
+
+  it("keeps an undone point's row and number after the engine prunes it (QA-P2-3-07)", () => {
+    const three = checkpoint({
+      id: "c3",
+      ordinalWithinScope: 4,
+      capturedAt: at(20),
+      files: [{ path: "book.html", kind: "M", additions: 1, deletions: 1 }],
+    });
+    const projection = {
+      checkpoints: [start, one, three],
+      checkpointScopes: [{ id: "scope-root", kind: "root_run" }],
+    } as unknown as OrchestrationV2ThreadProjection;
+    const undone = [
+      {
+        id: "c2",
+        label: "Changed 1 file: 1 page (+2 / −1 lines)",
+        timestamp: at(10),
+        fileCount: 1,
+        technical: "checkpoint c2",
+      },
+    ];
+    const timeline = buildTimeline(projection, { worktreePath: "/w" } as never, [], undone);
+    expect(timeline.entries.map((e) => [e.id, e.number, e.undone])).toEqual([
+      ["c3", 4, false],
+      ["c2", 3, true],
+      ["c1", 2, false],
+      ["c0", 1, false],
+    ]);
   });
 });

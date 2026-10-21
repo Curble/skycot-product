@@ -48,10 +48,18 @@ export function VersionsRailSlot({
   // strip's Show button instead of falling to the page body.
   const showWrap = useRef<HTMLSpanElement>(null);
   const focusShowNext = useRef(false);
+  // …and showing it again unmounts the Show button, so focus lands on Hide (QA-P2-3-02).
+  const hideWrap = useRef<HTMLDivElement>(null);
+  const focusHideNext = useRef(false);
   useEffect(() => {
-    if (!focusShowNext.current || mode === "open") return;
-    focusShowNext.current = false;
-    showWrap.current?.querySelector("button")?.focus();
+    if (focusShowNext.current && mode !== "open") {
+      focusShowNext.current = false;
+      showWrap.current?.querySelector("button")?.focus();
+    }
+    if (focusHideNext.current && mode === "open") {
+      focusHideNext.current = false;
+      hideWrap.current?.querySelector("button")?.focus();
+    }
   }, [mode]);
   const timeline = (
     <VersionsTimeline
@@ -65,7 +73,7 @@ export function VersionsRailSlot({
   if (mode === "open") {
     return (
       <InspectorPanel label="Versions">
-        <div className="fm-versions__head">
+        <div className="fm-versions__head" ref={hideWrap}>
           <h3 className="fm-inspector__title">Versions</h3>
           <IconButton
             icon={PanelRightClose}
@@ -86,8 +94,10 @@ export function VersionsRailSlot({
   const openSheetOrRail = () => {
     // Room for the rail and it is collapsed: reopen it. Narrower: the same
     // timeline comes up as a sheet.
-    if (expandable) setVersionsRailOpen(true);
-    else setSheetOpen(true);
+    if (expandable) {
+      focusHideNext.current = true;
+      setVersionsRailOpen(true);
+    } else setSheetOpen(true);
   };
   const button = (
     <span ref={showWrap} style={{ display: "contents" }}>

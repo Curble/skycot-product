@@ -24,6 +24,7 @@ import type { WhatChanged } from "../../plain/changes";
 import { useKeptVersions } from "../review/keptVersions";
 import { rootCheckpoints } from "../review/turnReview";
 import { buildTimeline } from "../versions/timeline";
+import { useUndonePoints } from "../versions/undonePoints";
 import {
   changesFromDiff,
   changesFromWorkingTree,
@@ -168,7 +169,10 @@ export function usePublishData(input: {
   const rolledBackRuns = new Set(
     (projection?.runs ?? []).filter((run) => run.status === "rolled_back").map((run) => run.id),
   );
-  const numbers = projection ? buildTimeline(projection, shell, kept).numbers : new Map();
+  const undonePoints = useUndonePoints(threadId);
+  const numbers = projection
+    ? buildTimeline(projection, shell, kept, undonePoints).numbers
+    : new Map();
   const reversedKept = kept.flatMap((record) => {
     if (!record.checkpointId || !projection) return [];
     const checkpoint = projection.checkpoints.find((c) => c.id === record.checkpointId);

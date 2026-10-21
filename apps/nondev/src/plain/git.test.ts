@@ -9,6 +9,7 @@ import {
   mergeBlockers,
   planGitIntent,
   type GitContext,
+  keepCommitMessage,
 } from "./git";
 
 const base: GitContext = {
@@ -232,5 +233,31 @@ describe("describeStackedResult", () => {
     expect(describeStackedResult(result)).toBe(
       "Nothing new to keep, so the latest kept version went up to the online copy.",
     );
+  });
+});
+
+describe("keepCommitMessage (QA-P2-3-06)", () => {
+  const long =
+    "Put the footer back to how it was before the opening hours were added, on every page";
+
+  it("cuts a long request at a word with no ellipsis and keeps all of it in the body", () => {
+    const { subject, message } = keepCommitMessage(
+      long,
+      "Changed 3 files: 3 pages (+3 / −3 lines).",
+    );
+    expect(subject.length).toBeLessThanOrEqual(72);
+    expect(subject).not.toContain("…");
+    expect(long.startsWith(subject)).toBe(true);
+    expect(message).toBe(`${subject}\n\n${long}\n\nChanged 3 files: 3 pages (+3 / −3 lines).`);
+  });
+
+  it("does not repeat a request that fits on the first line", () => {
+    expect(keepCommitMessage("Make the button bigger.", "Changed 1 file.").message).toBe(
+      "Make the button bigger\n\nChanged 1 file.",
+    );
+  });
+
+  it("falls back to the summary without a request", () => {
+    expect(keepCommitMessage(undefined, "Changed 1 file.").subject).toBe("Changed 1 file");
   });
 });
