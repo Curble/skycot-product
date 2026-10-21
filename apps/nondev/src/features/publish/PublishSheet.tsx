@@ -337,6 +337,7 @@ function PublishSheetBody({
           number={1}
           title="Quick safety check"
           state="done"
+          badge={safetyBadge(safety.lines)}
           trailing={safety.summary}
           expanded={phase === "choose"}
         >
@@ -484,10 +485,18 @@ function PublishSheetBody({
   );
 }
 
+/** A tick would claim the check passed; the badge says what the rows say. */
+function safetyBadge(lines: ReadonlyArray<SafetyLine>): StepBadgeState {
+  if (lines.some((line) => line.state === "fail")) return "fail";
+  if (lines.some((line) => line.state === "warn")) return "warn";
+  return lines.length > 0 && lines.every((line) => line.state === "ok") ? "done" : "number";
+}
+
 function StepGroup({
   number,
   title,
   state,
+  badge,
   trailing,
   expanded,
   danger = false,
@@ -498,6 +507,8 @@ function StepGroup({
   readonly number: number;
   readonly title: ReactNode;
   readonly state: "done" | "now" | "todo";
+  /** Overrides the badge drawn for a finished step whose outcome was not a plain success. */
+  readonly badge?: StepBadgeState;
   readonly trailing?: ReactNode;
   readonly expanded: boolean;
   readonly danger?: boolean;
@@ -517,7 +528,7 @@ function StepGroup({
     <section className={classes} aria-label={`Step ${number}`}>
       <header className="fm-pub-group__head">
         <StepBadge
-          state={state}
+          state={state === "done" && badge ? badge : state}
           label={state === "done" ? "Done" : state === "now" ? "Current step" : "Upcoming step"}
         >
           {number}

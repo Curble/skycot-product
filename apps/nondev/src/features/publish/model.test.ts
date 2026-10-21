@@ -1,8 +1,10 @@
 import type {
+  OrchestrationV2Checkpoint,
   OrchestrationV2TurnItem,
   SourceControlProviderKind,
   ThreadPullRequestLink,
   VcsStatusResult,
+  RunId,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -14,6 +16,7 @@ import {
   publishReadiness,
   resolveLiveChoice,
   resolveReviewChoice,
+  latestTurnCount,
 } from "./model";
 import { describeTurnDiff } from "../../plain/changes";
 
@@ -267,5 +270,19 @@ describe("buildSafetyCheck", () => {
       operationsKnown: true,
     });
     expect(check.lines.at(-1)!.state).toBe("fail");
+  });
+});
+
+describe("latestTurnCount", () => {
+  const checkpoint = (runId: string, appRunOrdinal: number) =>
+    ({ runId, appRunOrdinal }) as unknown as OrchestrationV2Checkpoint;
+  const run = (id: string, status: "rolled_back") => ({ id: id as RunId, status });
+  it("skips turns the user undid, since the engine rolled the thread back past them", () => {
+    const checkpoints = [checkpoint("run-1", 1), checkpoint("run-2", 2)];
+    expect(latestTurnCount(checkpoints)).toBe(2);
+    expect(latestTurnCount(checkpoints, [run("run-2", "rolled_back")])).toBe(1);
+    expect(
+      latestTurnCount(checkpoints, [run("run-1", "rolled_back"), run("run-2", "rolled_back")]),
+    ).toBeNull();
   });
 });

@@ -219,4 +219,18 @@ describe("describeStackedResult", () => {
     });
     expect(describeStackedResult(result)).toBe("Nothing new to keep.");
   });
+
+  it("reads as one sentence when only the upload happened", () => {
+    const result = decodeStackedResult({
+      action: "commit_push",
+      branch: { status: "skipped_not_requested" },
+      commit: { status: "skipped_no_changes" },
+      push: { status: "pushed", branch: "foreman/christmas-menu-3fa2" },
+      pr: { status: "skipped_not_requested" },
+      toast: { title: "Done", cta: { kind: "none" } },
+    });
+    expect(describeStackedResult(result)).toBe(
+      "Nothing new to keep, so the latest kept version went up to the online copy.",
+    );
+  });
 });

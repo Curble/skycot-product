@@ -106,7 +106,7 @@ export function usePublishData(input: {
       : null,
   );
 
-  const turnCount = projection ? latestTurnCount(projection.checkpoints) : null;
+  const turnCount = projection ? latestTurnCount(projection.checkpoints, projection.runs) : null;
   const diffQuery = useEnvironmentQuery(
     input.wantChanges && turnCount !== null && turnCount > 0
       ? orchestrationEnvironment.fullThreadDiff({

@@ -225,9 +225,15 @@ export function describeStackedResult(result: GitRunStackedActionResult): string
   const parts: Array<string> = [];
   if (result.branch.status === "created")
     parts.push(`started a draft line${result.branch.name ? ` (${result.branch.name})` : ""}`);
+  const nothingNew = result.commit.status === "skipped_no_changes";
   if (result.commit.status === "created") parts.push("kept this version");
-  else if (result.commit.status === "skipped_no_changes") parts.push("nothing new to keep");
-  if (result.push.status === "pushed") parts.push("uploaded it to the online copy");
+  else if (nothingNew && result.push.status !== "pushed") parts.push("nothing new to keep");
+  if (result.push.status === "pushed")
+    parts.push(
+      nothingNew
+        ? "nothing new to keep, so the latest kept version went up to the online copy"
+        : "uploaded it to the online copy",
+    );
   else if (result.push.status === "skipped_up_to_date")
     parts.push("the online copy was already up to date");
   if (result.pr.status === "created")

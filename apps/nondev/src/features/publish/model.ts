@@ -3,6 +3,7 @@
 // action each plain choice maps to. No React, no atoms; tested in model.test.ts.
 import type {
   OrchestrationV2Checkpoint,
+  OrchestrationV2Run,
   OrchestrationV2TurnItem,
   ProjectScript,
   PullRequestDetail,
@@ -204,12 +205,22 @@ export interface ChangeSource {
   readonly pending: boolean;
 }
 
+/**
+ * The newest turn whose changes still stand. An undone turn's checkpoint keeps
+ * its ordinal, but the engine has rolled the thread back past it, so asking for
+ * that range fails and its changes are not what would be published.
+ */
 export function latestTurnCount(
   checkpoints: ReadonlyArray<OrchestrationV2Checkpoint>,
+  runs: ReadonlyArray<Pick<OrchestrationV2Run, "id" | "status">> = [],
 ): number | null {
+  const rolledBack = new Set(
+    runs.filter((run) => run.status === "rolled_back").map((run) => run.id),
+  );
   let max: number | null = null;
   for (const checkpoint of checkpoints) {
     if (checkpoint.appRunOrdinal === null) continue;
+    if (checkpoint.runId !== null && rolledBack.has(checkpoint.runId)) continue;
     if (max === null || checkpoint.appRunOrdinal > max) max = checkpoint.appRunOrdinal;
   }
   return max;
