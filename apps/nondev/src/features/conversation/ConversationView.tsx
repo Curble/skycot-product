@@ -131,8 +131,13 @@ export function ConversationView({
             {projectName ? ` · ${projectName}` : ""}
           </span>
           <span className="fm-conv-header__presence">
-            {status ? status.presence : "Connecting…"}
-            {shell?.worktreePath ? " · working in a private copy" : ""}
+            {status === null
+              ? "Connecting…"
+              : shell?.worktreePath
+                ? // The private copy is the reassurance that matters; keep the
+                  // first clause ("Working", "Waiting for you") and drop the rest.
+                  `${status.presence.split(" · ")[0]} · in a private copy of your project`
+                : status.presence}
           </span>
         </div>
         <div className="fm-conv-header__tools">

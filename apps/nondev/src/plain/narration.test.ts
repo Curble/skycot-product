@@ -53,7 +53,7 @@ describe("classifyCommand", () => {
       "/bin/zsh -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"'\"",
       "read",
       "low",
-      "Ran 2 steps: look around the project files and list the project's files",
+      "Ran 2 steps: looked around the project files and listed the project's files",
     ],
     [
       "/bin/zsh -lc 'for file in index.html menu.html book.html style.css; do cat \"$file\"; done'",
@@ -74,6 +74,13 @@ describe("classifyCommand", () => {
       "Fetched something from the internet (api.example.com)",
     ],
     ["python3 scripts/import_data.py", "command", "medium", 'Ran the "import data" script'],
+    [
+      'python3 -c \'import re; print(re.sub("a", "b", open("menu.html").read()))\'',
+      "command",
+      "medium",
+      "Ran a short python3 program",
+    ],
+    ["node -e 'console.log(1)'", "command", "medium", "Ran a short node program"],
     ["rm build/cache.json", "command", "medium", "Deleted the cache data file"],
   ])("%s → %s/%s", (command, kind, risk, past) => {
     const classified = classifyCommand(command);

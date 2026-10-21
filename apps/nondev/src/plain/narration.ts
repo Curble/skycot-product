@@ -1337,7 +1337,9 @@ function classifySegment(segment: string): CommandClassification | null {
     );
   }
   if (SCRIPT_PROGRAMS.has(base)) {
-    const script = stripFlags(args)[0];
+    // `python3 -c "…"`, `node -e "…"` and quoted one-liners are inline code, not a file.
+    const inline = args.some((arg) => /^(-c|-e|--eval|-p|--print)$/.test(arg));
+    const script = inline ? undefined : stripFlags(args).find((arg) => !/\s/.test(arg));
     const what = script ? `the "${humanizeFileName(script)}" script` : `a short ${base} program`;
     if (PAYMENT_PATTERN.test(segment)) {
       return make(
@@ -1422,6 +1424,8 @@ export function classifyCommand(command: string): CommandClassification {
     TOUCH_ORDER[b.touches] > TOUCH_ORDER[a.touches] ? b : a,
   ).touches;
   const steps = classified.map((c) => c.infinitive);
+  const lower = (text: string) =>
+    text.length === 0 ? text : text[0]!.toLowerCase() + text.slice(1);
   const kinds = new Set(classified.map((c) => c.kind));
   const kind: NarrationKind =
     kinds.size === 1
@@ -1433,8 +1437,8 @@ export function classifyCommand(command: string): CommandClassification {
   return {
     kind,
     risk: whole && riskiest.risk !== "high" ? "high" : riskiest.risk,
-    past: `Ran ${pluralize(steps.length, "step")}: ${joinList(steps)}`,
-    present: `Running ${pluralize(steps.length, "step")}: ${joinList(steps)}`,
+    past: `Ran ${pluralize(steps.length, "step")}: ${joinList(classified.map((c) => lower(c.past)))}`,
+    present: `Running ${pluralize(steps.length, "step")}: ${joinList(classified.map((c) => lower(c.present)))}`,
     infinitive: `run ${pluralize(steps.length, "step")}: ${joinList(steps)}`,
     program: classified[0]!.program,
     touches,
@@ -1653,6 +1657,21 @@ export function describeTurnItem(
       };
     }
     case "command_execution": {
+      // The engine logs its own worktree set-up as a command named "Preparing workspace".
+      if (/^preparing workspace$/i.test(item.input.trim())) {
+        const status = narrationStatus(item.status);
+        return {
+          headline: tense(
+            status,
+            "Made a private copy of the project",
+            "Making a private copy of the project",
+            "About to make a private copy of the project",
+          ),
+          kind: "other",
+          status,
+          technical: item.output?.trim() || item.input,
+        };
+      }
       const classified = classifyCommand(item.input);
       const status = narrationStatus(item.status);
       const bare = tense(
