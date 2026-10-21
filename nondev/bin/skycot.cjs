@@ -14,9 +14,9 @@
  * use upstream's `~/.t3` state directory and `t3code://` scheme.
  */
 require("../brand/env.cjs");
+const NodeChildProcess = require("node:child_process");
 const NodePath = require("node:path");
 const NodeFS = require("node:fs");
-const NodeURL = require("node:url");
 
 const bin = NodePath.join(__dirname, "../../apps/server/dist/bin.mjs");
 if (!NodeFS.existsSync(bin)) {
@@ -25,9 +25,23 @@ if (!NodeFS.existsSync(bin)) {
   );
   process.exit(2);
 }
-import(NodeURL.pathToFileURL(bin).href).catch((error) => {
-  process.stderr.write(
-    `skycot: failed to start the server: ${error && error.stack ? error.stack : String(error)}\n`,
-  );
+
+// bin.mjs only runs its CLI when it is the process entry point (`import.meta.main`); a dynamic
+// import() from here loads every module and exits 0 without output. So re-exec Node on it. The
+// child inherits process.env, which env.cjs has already branded.
+const child = NodeChildProcess.spawn(process.execPath, [bin, ...process.argv.slice(2)], {
+  stdio: "inherit",
+});
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+  });
+}
+child.on("error", (error) => {
+  process.stderr.write(`skycot: failed to start the server: ${error.message}\n`);
   process.exit(1);
+});
+child.on("exit", (code, signal) => {
+  if (signal) process.kill(process.pid, signal);
+  else process.exit(code ?? 1);
 });
