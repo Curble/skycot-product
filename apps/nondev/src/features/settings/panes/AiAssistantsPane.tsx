@@ -129,7 +129,7 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
         />
         <ListRow
           title="Run the welcome steps again"
-          subtitle="The short first-run guide: assistant, folder, autonomy."
+          subtitle="The short first-run guide: assistant, folder, autonomy, look."
           href={WELCOME_HREF}
           chevron
         />
