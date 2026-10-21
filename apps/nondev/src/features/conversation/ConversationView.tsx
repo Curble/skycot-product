@@ -373,8 +373,8 @@ function HandsOffStrip({
     <div className="fm-handsoff" role="alert">
       <ShieldAlert size={15} strokeWidth={2} aria-hidden />
       <span className="fm-handsoff__text">
-        <b>Hands-off: nothing is being checked.</b> {crew.builder.name} can delete files, publish or spend
-        without asking you first.
+        <b>Hands-off: nothing is being checked.</b> {crew.builder.name} can delete files, publish or
+        spend without asking you first.
         {state === "failed" ? " The switch didn't go through — try again." : ""}
       </span>
       {canOperate ? (
