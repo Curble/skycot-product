@@ -589,7 +589,7 @@ TERMS = f'''{nav()}
   <h2>11. Contact</h2>
   <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
 
-  <p class="meta">Open questions for the lawyer: the registered address to publish; whether a separate early-access or beta agreement is preferable; export-control and age wording; the liability cap once pricing exists; and whether any of our own code will be published under an open licence.</p>
+  <p class="meta">Open questions for the lawyer: whether a separate early-access or beta agreement is preferable; export-control and age wording; the liability cap once pricing exists; and whether any of our own code will be published under an open licence.</p>
 </div></main>
 '''
 write("terms.html", head("Terms of use · SKYCOT", "Draft terms of use for the SKYCOT app and website, for legal review before launch.") + TERMS + FOOTER)
