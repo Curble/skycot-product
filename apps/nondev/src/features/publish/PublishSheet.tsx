@@ -32,7 +32,6 @@ import { Button } from "../../ui/Button";
 import { Pill } from "../../ui/Pill";
 import { Sheet } from "../../ui/Sheet";
 import { StepBadge, type StepBadgeState } from "../../ui/StepBadge";
-import { useEscapeToClose } from "../versions/useEscapeToClose";
 import {
   HONESTY_NOTE,
   SETTINGS_HREF,
@@ -143,7 +142,6 @@ function PublishSheetBody({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [reviewerName, setReviewerName] = useState<string | null>(null);
-  useEscapeToClose(!busy, onClose);
 
   // The choice cards unmount when a step changes, which would drop focus to
   // the page body (and Escape with it); focus follows to the current step's

@@ -10,7 +10,6 @@ import { IconButton } from "../../ui/Button";
 import { InspectorPanel } from "../../ui/InspectorPanel";
 import { Sheet } from "../../ui/Sheet";
 import { setVersionsRailOpen } from "./railState";
-import { useEscapeToClose } from "./useEscapeToClose";
 import { VersionsTimeline } from "./VersionsTimeline";
 
 const LEDE = "Every change is a point you can step back to, like Time Machine for this project.";
@@ -45,7 +44,6 @@ export function VersionsRailSlot({
   const shell = useAtomValue(environmentThreadShells.threadShellAtom({ environmentId, threadId }));
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const [sheetOpen, setSheetOpen] = useState(false);
-  useEscapeToClose(sheetOpen, () => setSheetOpen(false));
   // Hiding the rail unmounts its Hide button; keyboard focus moves to the
   // strip's Show button instead of falling to the page body.
   const showWrap = useRef<HTMLSpanElement>(null);
