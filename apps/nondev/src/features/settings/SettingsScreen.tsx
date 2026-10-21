@@ -120,27 +120,20 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
     </section>
   ) : null;
 
+  // The nav and the detail keep their child positions at every width, so a
+  // window dragged across the one-column breakpoint re-lays the pane out
+  // instead of remounting it: an open sheet or a half-typed form survives.
   return (
     <div className={`fm-settings${columns === 1 ? " fm-settings--stack" : ""}`}>
-      {columns === 1 ? (
-        active === null ? (
-          <>
-            <header className="fm-settings__header">
-              <h2 className="fm-settings__title">Settings</h2>
-              <span className="fm-settings__header-spacer" />
-              {done}
-            </header>
-            {nav}
-          </>
-        ) : (
-          detail
-        )
-      ) : (
-        <>
-          {nav}
-          {detail}
-        </>
-      )}
+      {columns === 1 && active === null ? (
+        <header className="fm-settings__header">
+          <h2 className="fm-settings__title">Settings</h2>
+          <span className="fm-settings__header-spacer" />
+          {done}
+        </header>
+      ) : null}
+      {columns === 1 && active !== null ? null : nav}
+      {detail}
     </div>
   );
 }

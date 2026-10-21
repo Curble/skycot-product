@@ -10,8 +10,6 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { useState } from "react";
-
 import { ADVANCED_MODE_LABEL } from "../brand";
 import {
   AUTOMATIONS_HREF,
@@ -29,10 +27,9 @@ import { useCrew } from "../themes/useCrew";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
-import { AdvancedModeSheet } from "./AdvancedModeSheet";
-import { OpenFolderSheet } from "./OpenFolderSheet";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
+import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
@@ -49,8 +46,7 @@ export function AppSidebar({
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const projects = useAtomValue(environmentProjects.projectsAtom);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
-  const [folderSheetOpen, setFolderSheetOpen] = useState(false);
-  const [advancedSheetOpen, setAdvancedSheetOpen] = useState(false);
+  const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
 
@@ -132,7 +128,15 @@ export function AppSidebar({
             icon={FolderPlus}
             label="Open a folder…"
             muted
-            onClick={() => setFolderSheetOpen(true)}
+            onClick={() => {
+              if (!primaryEnvironmentId) return;
+              const environmentId = primaryEnvironmentId;
+              sheets.openFolder({
+                environmentId,
+                onOpened: (projectId) =>
+                  showList(() => shell.setProjectKey(projectKeyOf({ environmentId, projectId }))),
+              });
+            }}
           />
         </SidebarSection>
 
@@ -192,32 +196,12 @@ export function AppSidebar({
         {family.enabled ? null : (
           <div className="fm-sidebar__footer-row">
             {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
-            <Button
-              size="sm"
-              variant="quiet"
-              icon={Wrench}
-              block
-              onClick={() => setAdvancedSheetOpen(true)}
-            >
+            <Button size="sm" variant="quiet" icon={Wrench} block onClick={sheets.openAdvanced}>
               Open {ADVANCED_MODE_LABEL}…
             </Button>
           </div>
         )}
       </footer>
-
-      {primaryEnvironmentId ? (
-        <OpenFolderSheet
-          open={folderSheetOpen}
-          onClose={() => setFolderSheetOpen(false)}
-          environmentId={primaryEnvironmentId}
-          onOpened={(projectId) =>
-            showList(() =>
-              shell.setProjectKey(projectKeyOf({ environmentId: primaryEnvironmentId, projectId })),
-            )
-          }
-        />
-      ) : null}
-      <AdvancedModeSheet open={advancedSheetOpen} onClose={() => setAdvancedSheetOpen(false)} />
     </nav>
   );
 }
