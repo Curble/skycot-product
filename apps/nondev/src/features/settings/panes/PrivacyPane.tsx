@@ -87,7 +87,7 @@ export function PrivacyPane({ environmentId }: { readonly environmentId: Environ
 
       <SettingsGroup
         title="Your AI accounts"
-        footer="Signing in to ChatGPT, Google or Claude happens on their websites. Foreman keeps the sign-in token on this Mac and never sees your password."
+        footer="Signing in to ChatGPT, Google or Claude happens on their websites. SKYCOT keeps the sign-in token on this Mac and never sees your password."
       >
         <ListRow
           title="What the assistants can see"

@@ -50,7 +50,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
     <>
       <SettingsGroup
         title="This computer"
-        footer="Foreman runs on this computer and keeps every project here. Nothing is stored anywhere else unless you send it for review or put it live."
+        footer="SKYCOT runs on this computer and keeps every project here. Nothing is stored anywhere else unless you send it for review or put it live."
       >
         <ListRow
           leading={<StepBadge state="ok" icon={Laptop} />}
@@ -98,7 +98,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
                 ? exposure.advertisedHost
                   ? `Other devices on your network can connect via ${exposure.advertisedHost}.`
                   : "Other devices on your network can connect."
-                : "Nothing outside this computer can reach Foreman."
+                : "Nothing outside this computer can reach SKYCOT."
               : "Open Advanced mode to see whether phones or other computers can connect."
           }
           trailing={

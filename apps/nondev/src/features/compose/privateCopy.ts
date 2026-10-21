@@ -8,7 +8,7 @@ export const PRIVATE_COPY_COPY = {
   /** Shown while `git init` + the first commit run on a folder that had no history. */
   settingUp: "Setting up version tracking…",
   makingCopy: "Making a private copy…",
-  initExplainer: "Foreman will start tracking changes so you can undo.",
+  initExplainer: "SKYCOT will start tracking changes so you can undo.",
   firstVersion: (projectTitle: string) => `Start keeping versions of ${projectTitle}`,
   undoOff: "Undo is off for this conversation.",
 } as const;
@@ -26,7 +26,7 @@ export function folderReadiness(status: VcsStatusResult): FolderReadiness {
 }
 
 /**
- * `foreman/christmas-menu-page-3fa2`: the request's first words, Git-safe,
+ * `skycot/christmas-menu-page-3fa2`: the request's first words, Git-safe,
  * plus a short token so two conversations about the same thing never collide.
  */
 export function branchNameFor(request: string, token: string): string {
@@ -47,7 +47,7 @@ export function branchNameFor(request: string, token: string): string {
       .replace(/[^a-z0-9]/gi, "")
       .slice(0, 4)
       .toLowerCase() || "0000";
-  return `foreman/${slug}-${suffix}`;
+  return `skycot/${slug}-${suffix}`;
 }
 
 const STOP_WORDS = new Set([
@@ -77,7 +77,7 @@ const STOP_WORDS = new Set([
 export function plainPrivateCopyProblem(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
   if (/user\.name|user\.email|who you are|identity unknown|author identity/i.test(message))
-    return "Git doesn't know your name and email yet, so Foreman can't save versions here.";
+    return "Git doesn't know your name and email yet, so SKYCOT can't save versions here.";
   if (
     /invalid reference|not a valid object|unborn|does not have any commits|no commits yet/i.test(
       message,
@@ -88,5 +88,5 @@ export function plainPrivateCopyProblem(cause: unknown): string {
     return "A private copy with this name already exists.";
   if (/scope|permission|unauthori/i.test(message))
     return "This connection isn't allowed to make a private copy.";
-  return "Foreman couldn't make a private copy of the project.";
+  return "SKYCOT couldn't make a private copy of the project.";
 }

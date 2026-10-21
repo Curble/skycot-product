@@ -12,7 +12,7 @@ export interface KeptVersionRecord extends KeptVersion {
   readonly checkpointId?: string;
 }
 
-const KEY_PREFIX = "foreman:kept-versions:";
+const KEY_PREFIX = "skycot:kept-versions:";
 const EMPTY: ReadonlyArray<KeptVersionRecord> = [];
 
 const listeners = new Set<() => void>();

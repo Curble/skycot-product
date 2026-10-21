@@ -7,8 +7,8 @@ set unless the version string has a `-nightly.` suffix, which ours never does.
 
 This folder holds the fork's identity:
 
-- `../brand.json` — names and identifiers (single source of truth; placeholder values until the CEO
-  picks the final name).
+- `../brand.json` — names and identifiers (single source of truth; product name SKYCOT, chosen
+  21 October 2026; "Foreman" was the build-time placeholder).
 - `env.cjs` — turns `brand.json` into `T3CODE_*` environment defaults at process start. Loaded by
   `apps/desktop/src/boot.ts` (seam `brand-boot`), and via `node --import ./nondev/brand/env.cjs …`
   for the build script and the CLI. See `node nondev/scripts/apply-brand.ts` for the full table.
@@ -65,15 +65,15 @@ Leaving these as upstream's blueprint icons is harmless: packaged builds never u
 
 ### Strings that still say "T3 Code" in the desktop shell (cosmetic, not identifiers)
 
-These are left as upstream wrote them because they are not identifiers and a placeholder name
-should not spread into a 4,000-line file. Revisit once the final name is chosen:
+These are left as upstream wrote them because they are not identifiers and a brand name should
+not spread into a 4,000-line file. Revisit before the first public build:
 
 - `scripts/build-desktop-artifact.ts` mac `extendInfo` usage descriptions (camera, microphone,
   screen capture, local network prompts begin with "T3 Code …"), the protocol display `name:
 "T3 Code"`, Linux `executableName`/`StartupWMClass: "t3code"`, `maintainer`, `synopsis`.
 - `apps/desktop/src/window/DesktopApplicationMenu.ts:77` "T3 Code <version> is currently the
   newest version available." (the menus themselves use `environment.displayName`, so they already
-  say Foreman).
+  say SKYCOT).
 - `apps/desktop/src/app/DesktopEnvironment.ts` / `DesktopEarlyElectronStartup.ts` `linuxWmClass`
   (Linux only), and Linux-only cache/data subfolders named `t3code` under XDG dirs.
 - Server-side strings ("T3 Code server is ready.", MCP tool descriptions, generated READMEs) are
@@ -95,7 +95,7 @@ should not spread into a 4,000-line file. Revisit once the final name is chosen:
 - `--check` verifies the tracked exports match the project without writing.
 - The `dev` exports are also copied into `apps/web/public` (the stock client's favicon).
 
-So for Foreman: open `assets/prod/app-icon.icon` in Icon Composer, replace the `text.svg` /
+So for SKYCOT: open `assets/prod/app-icon.icon` in Icon Composer, replace the `text.svg` /
 `background.svg` layers with our artwork, run `vp run icons:export`, export the macOS PNG by hand,
 commit the changed binaries under `assets/prod/**`.
 

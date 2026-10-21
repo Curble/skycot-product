@@ -167,7 +167,7 @@ export function ProviderRow({
         icon={LogOut}
         iconTone="orange"
         title={`Sign out of ${entry.brand}?`}
-        description={`${entry.runs} will stop working in Foreman until you sign in again. Nothing in your projects changes.`}
+        description={`${entry.runs} will stop working in SKYCOT until you sign in again. Nothing in your projects changes.`}
         actions={
           <>
             <Button onClick={() => setSignOutOpen(false)}>Stay signed in</Button>
@@ -223,7 +223,7 @@ export function ProviderInstructions({
       <p className="fm-howto__lede">
         {entry.brand} doesn't let apps sign in for you yet, so this takes two short commands in
         Terminal (the Mac's built-in text window). Copy each one, paste it into Terminal and press
-        Return. Foreman notices as soon as you're signed in.
+        Return. SKYCOT notices as soon as you're signed in.
       </p>
       <ol className="fm-howto__steps">
         {installCommand ? (
@@ -250,8 +250,7 @@ export function ProviderInstructions({
             <div className="fm-howto__body">
               <b>Sign in to your {entry.brand} account.</b>
               <span className="fm-help">
-                This opens {entry.brand}'s website so you can sign in. Nothing is typed into
-                Foreman.
+                This opens {entry.brand}'s website so you can sign in. Nothing is typed into SKYCOT.
               </span>
               <code className="fm-code fm-code--block">{loginCommand}</code>
               <CopyButton text={loginCommand} />

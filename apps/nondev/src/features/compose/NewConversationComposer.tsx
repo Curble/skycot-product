@@ -216,16 +216,16 @@ function ComposerField({
   > => {
     const first = await refreshStatus({ environmentId, input: { cwd } });
     if (first._tag === "Failure") {
-      console.warn("[foreman] git status failed:", squashAtomCommandFailure(first));
-      return { reason: "Foreman couldn't read this folder's history." };
+      console.warn("[skycot] git status failed:", squashAtomCommandFailure(first));
+      return { reason: "SKYCOT couldn't read this folder's history." };
     }
     let readiness = folderReadiness(first.value);
     if (readiness.kind === "needs-init") {
       setPhase(PRIVATE_COPY_COPY.settingUp);
       const inited = await initRepository({ environmentId, input: { cwd } });
       if (inited._tag === "Failure") {
-        console.warn("[foreman] git init failed:", squashAtomCommandFailure(inited));
-        return { reason: "Foreman couldn't start tracking changes in this folder." };
+        console.warn("[skycot] git init failed:", squashAtomCommandFailure(inited));
+        return { reason: "SKYCOT couldn't start tracking changes in this folder." };
       }
       const committed = await commitAll({
         actionId: randomUUID(),
@@ -233,12 +233,12 @@ function ComposerField({
         commitMessage: PRIVATE_COPY_COPY.firstVersion(project.title),
       });
       if (committed._tag === "Failure") {
-        console.warn("[foreman] first commit failed:", squashAtomCommandFailure(committed));
+        console.warn("[skycot] first commit failed:", squashAtomCommandFailure(committed));
         return { reason: plainPrivateCopyProblem(squashAtomCommandFailure(committed)) };
       }
       const again = await refreshStatus({ environmentId, input: { cwd } });
       if (again._tag === "Failure")
-        return { reason: "Foreman couldn't read this folder's history." };
+        return { reason: "SKYCOT couldn't read this folder's history." };
       readiness = folderReadiness(again.value);
     }
     if (readiness.kind !== "ready") {
@@ -309,7 +309,7 @@ function ComposerField({
       // The copy couldn't be made (an empty repository, a clashing branch…):
       // still start the conversation, straight in the folder, and say so.
       const cause = squashAtomCommandFailure(started);
-      console.warn("[foreman] private copy failed, starting in the folder instead:", cause);
+      console.warn("[skycot] private copy failed, starting in the folder instead:", cause);
       await deleteThread({ environmentId, input: { threadId } });
       note = plainPrivateCopyProblem(cause);
       threadId = newThreadId();
@@ -371,7 +371,7 @@ function titleSeedFrom(text: string): string {
 function calm(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   // The screen stays plain-language; the real cause goes to the console for whoever debugs.
-  console.warn("[foreman] starting a conversation failed:", error);
+  console.warn("[skycot] starting a conversation failed:", error);
   if (/scope|permission|not allowed|unauthori/i.test(message)) {
     return "This connection isn't allowed to start conversations.";
   }

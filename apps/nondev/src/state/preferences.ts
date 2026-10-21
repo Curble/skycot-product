@@ -5,8 +5,8 @@ import { useSyncExternalStore } from "react";
 
 import type { Autonomy } from "../features/compose/autonomy";
 
-const LAST_PROJECT_KEY = "foreman:last-project";
-const AUTONOMY_KEY = "foreman:autonomy";
+const LAST_PROJECT_KEY = "skycot:last-project";
+const AUTONOMY_KEY = "skycot:autonomy";
 
 export interface ProjectRef {
   readonly environmentId: EnvironmentId;

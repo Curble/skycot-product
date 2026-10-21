@@ -225,7 +225,7 @@ describe("describeStackedResult", () => {
       action: "commit_push",
       branch: { status: "skipped_not_requested" },
       commit: { status: "skipped_no_changes" },
-      push: { status: "pushed", branch: "foreman/christmas-menu-3fa2" },
+      push: { status: "pushed", branch: "skycot/christmas-menu-3fa2" },
       pr: { status: "skipped_not_requested" },
       toast: { title: "Done", cta: { kind: "none" } },
     });

@@ -16,24 +16,24 @@ const status = (over: Partial<VcsStatusResult>): VcsStatusResult =>
   }) as VcsStatusResult;
 
 describe("branchNameFor", () => {
-  it("turns the request into a short Git-safe branch under foreman/", () => {
+  it("turns the request into a short Git-safe branch under skycot/", () => {
     expect(
       branchNameFor(
         "Add a 'Christmas menu' page with three placeholder dishes, link it from the nav",
         "3fa2b1c9",
       ),
-    ).toBe("foreman/christmas-menu-page-three-placeholder-3fa2");
+    ).toBe("skycot/christmas-menu-page-three-placeholder-3fa2");
   });
 
   it("falls back when the request has no usable words", () => {
-    expect(branchNameFor("!!! ???", "ABCDEF")).toBe("foreman/conversation-abcd");
-    expect(branchNameFor("", "")).toBe("foreman/conversation-0000");
+    expect(branchNameFor("!!! ???", "ABCDEF")).toBe("skycot/conversation-abcd");
+    expect(branchNameFor("", "")).toBe("skycot/conversation-0000");
   });
 
   it("uses only the first line and never produces Git-illegal characters", () => {
     const branch = branchNameFor("Fix the “Book a table” button\nand more detail here", "9z");
-    expect(branch).toBe("foreman/fix-book-table-button-9z");
-    expect(branch).toMatch(/^foreman\/[a-z0-9-]+$/);
+    expect(branch).toBe("skycot/fix-book-table-button-9z");
+    expect(branch).toMatch(/^skycot\/[a-z0-9-]+$/);
   });
 });
 
@@ -61,7 +61,7 @@ describe("plainPrivateCopyProblem", () => {
       /no saved version/,
     );
     expect(plainPrivateCopyProblem("boom")).toBe(
-      "Foreman couldn't make a private copy of the project.",
+      "SKYCOT couldn't make a private copy of the project.",
     );
   });
 });

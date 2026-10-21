@@ -1,4 +1,4 @@
-/* Foreman design tokens and primitive styles.
+/* SKYCOT design tokens and primitive styles.
    Source of truth: docs/nondev/design-explorations/2026-10-21/narrow-1-apple-messages.html.
    Light is the default; `html.dark` (set by index.html from the stock theme keys and kept in
    sync by app/theme.ts) switches every token. Components in src/ui own these classes; app and

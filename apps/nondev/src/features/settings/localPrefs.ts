@@ -40,7 +40,7 @@ export function useStoredString(key: string): string | null {
   );
 }
 
-export const ONBOARDING_KEY = "foreman:onboarding";
+export const ONBOARDING_KEY = "skycot:onboarding";
 export type OnboardingState = "done" | "skipped" | null;
 
 export function readOnboardingState(): OnboardingState {
@@ -55,7 +55,7 @@ export function useOnboardingState(): OnboardingState {
   return raw === "done" || raw === "skipped" ? raw : null;
 }
 
-export const HANDS_OFF_MINUTES_KEY = "foreman:hands-off-minutes";
+export const HANDS_OFF_MINUTES_KEY = "skycot:hands-off-minutes";
 
 export function readHandsOffMinutes(fallback: number): number {
   const raw = read(HANDS_OFF_MINUTES_KEY);

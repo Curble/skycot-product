@@ -2,7 +2,7 @@
 // storage can be blocked, so reads are guarded and "open" is the default.
 import { useSyncExternalStore } from "react";
 
-const KEY = "foreman:versions-rail";
+const KEY = "skycot:versions-rail";
 const listeners = new Set<() => void>();
 
 function read(): boolean {

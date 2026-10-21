@@ -50,7 +50,7 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
     <>
       <SettingsGroup
         title="Which AI do you pay for?"
-        footer="Green means ready. Signing in happens on the provider's own website; Foreman never sees your password."
+        footer="Green means ready. Signing in happens on the provider's own website; SKYCOT never sees your password."
       >
         {primary.map((entry) => (
           <ProviderRow

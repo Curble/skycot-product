@@ -27,7 +27,7 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
     <>
       <SettingsGroup
         title="GitHub"
-        footer="GitHub is where kept versions go when you send them for review. Foreman reads the account your Mac is already signed in with; it doesn't store a password."
+        footer="GitHub is where kept versions go when you send them for review. SKYCOT reads the account your Mac is already signed in with; it doesn't store a password."
       >
         <ListRow
           leading={
@@ -71,7 +71,7 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
         {github && !github.signedIn ? (
           <div className="fm-howto fm-howto--flat">
             <p className="fm-howto__lede">
-              Foreman can't sign you in to GitHub itself yet. Paste this into Terminal (the Mac's
+              SKYCOT can't sign you in to GitHub itself yet. Paste this into Terminal (the Mac's
               built-in text window), press Return and follow GitHub's questions. Come back here when
               it says you're logged in.
             </p>
@@ -94,7 +94,7 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
 
       <SettingsGroup
         title="Versions"
-        footer="Git is the tool that keeps every version of your project. Foreman uses it quietly; you only ever see Keep this version and Restore."
+        footer="Git is the tool that keeps every version of your project. SKYCOT uses it quietly; you only ever see Keep this version and Restore."
       >
         <ListRow
           leading={
