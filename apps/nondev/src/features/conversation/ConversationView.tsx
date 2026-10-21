@@ -9,7 +9,7 @@ import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 import { ChevronLeft, Clock, MessageSquareDashed, Square } from "lucide-react";
-import { useEffect, useEffectEvent, useState } from "react";
+import { type ComponentType, lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
 
 import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -34,8 +34,30 @@ import { Pill } from "../../ui/Pill";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
+import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { describeThreadStatus } from "./status";
 import { Timeline } from "./Timeline";
+
+interface ReviewSectionProps {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+}
+
+// The review feature ships separately. Resolve it through a glob so this file
+// builds whether or not features/review/ReviewSection.tsx exists yet; when it
+// does, it mounts between the strip and the stream.
+const reviewSectionModules = import.meta.glob<{
+  readonly default?: ComponentType<ReviewSectionProps>;
+  readonly ReviewSection?: ComponentType<ReviewSectionProps>;
+}>("../review/ReviewSection.tsx");
+const loadReviewSection = Object.values(reviewSectionModules)[0];
+const ReviewSection: ComponentType<ReviewSectionProps> | null = loadReviewSection
+  ? lazy(async () => {
+      const module = await loadReviewSection();
+      const Component = module.ReviewSection ?? module.default;
+      return { default: Component ?? (() => null) };
+    })
+  : null;
 
 /**
  * One conversation: contact header, status strip, the stream, and the reply
@@ -80,6 +102,17 @@ export function ConversationView({
 
   const projectName = project?.title ?? null;
 
+  const [publishOpen, setPublishOpen] = useState(false);
+  const publish = usePublishOverview({
+    environmentId,
+    threadId,
+    shell,
+    project,
+    projection,
+    active,
+    canOperate,
+  });
+
   return (
     <>
       <header className="fm-conv-header">
@@ -103,6 +136,7 @@ export function ConversationView({
         </div>
         <div className="fm-conv-header__tools">
           {active ? <StopButton environmentId={environmentId} threadId={threadId} /> : null}
+          <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           {project ? <ProjectAvatar project={project} size="md" /> : null}
         </div>
       </header>
@@ -120,6 +154,12 @@ export function ConversationView({
           ) : null}
           <span>·</span>
           <span>{autonomyLabel(autonomyForRuntimeMode(shell.runtimeMode))}</span>
+          {publish.status ? (
+            <>
+              <span>·</span>
+              <PublishStatusPill status={publish.status} />
+            </>
+          ) : null}
           {active ? (
             <span className="fm-strip__grow">
               <ProgressBar value={1} max={1} thin label="Working" tone="accent" />
@@ -132,6 +172,12 @@ export function ConversationView({
         <Banner tone="warning">
           <b>This conversation didn't load fully.</b> Trying again…
         </Banner>
+      ) : null}
+
+      {ReviewSection ? (
+        <Suspense fallback={null}>
+          <ReviewSection environmentId={environmentId} threadId={threadId} />
+        </Suspense>
       ) : null}
 
       {projection === null ? (
@@ -167,6 +213,16 @@ export function ConversationView({
         threadId={threadId}
         shell={shell}
         active={active}
+      />
+
+      <PublishSheet
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        environmentId={environmentId}
+        threadId={threadId}
+        shell={shell}
+        project={project}
+        projection={projection}
       />
     </>
   );
