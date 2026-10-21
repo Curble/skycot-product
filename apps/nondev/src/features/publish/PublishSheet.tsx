@@ -25,6 +25,9 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CREW_NAME } from "../../brand";
 import { copy, describeStackedResult } from "../../plain";
+import { ConfettiBurst } from "../../themes/Confetti";
+import { CrewAvatar } from "../../themes/CrewAvatar";
+import { possessive, useCrew } from "../../themes/useCrew";
 import { threadEnvironment } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
@@ -130,6 +133,7 @@ function PublishSheetBody({
     wantChanges: true,
   });
   const projectName = project?.title ?? null;
+  const crew = useCrew();
 
   const [phase, setPhase] = useState<Phase>("choose");
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -329,13 +333,23 @@ function PublishSheetBody({
       description="Nothing leaves your Mac until you press a button below. Each step is one plain question."
       initialFocus="body"
       dismissOnBackdrop={!busy}
+      sober={confirmingLive}
       actions={actions}
       note={phase === "confirm" && choice === "live" ? copy.git.neverPushLive : undefined}
     >
       <div className="fm-pub">
         <StepGroup
           number={1}
-          title="Quick safety check"
+          title={
+            crew.named ? (
+              <span className="fm-crew-kicker">
+                <CrewAvatar role="checker" size="sm" />
+                {possessive(crew.checker.name)} quick check
+              </span>
+            ) : (
+              "Quick safety check"
+            )
+          }
           state="done"
           badge={safetyBadge(safety.lines)}
           trailing={safety.summary}
@@ -346,7 +360,11 @@ function PublishSheetBody({
               <SafetyRow key={line.text} line={line} />
             ))}
           </ul>
-          <p className="fm-pub-help">{HONESTY_NOTE}</p>
+          <p className="fm-pub-help fm-tip">
+            {crew.named
+              ? `${crew.checker.name} looks for the things that bite people before they go live, and can still miss some. For anything that matters a lot, ask a person to review first.`
+              : HONESTY_NOTE}
+          </p>
         </StepGroup>
 
         <StepGroup
@@ -447,24 +465,29 @@ function PublishSheetBody({
         <StepGroup
           number={4}
           title={
-            outcome === null
-              ? "Result"
-              : outcome.kind === "live"
-                ? "It's live."
-                : outcome.kind === "keep"
-                  ? "Kept on this Mac."
-                  : outcome.kind === "script"
-                    ? `${CREW_NAME} is on it.`
-                    : reviewerName
-                      ? `Sent to ${reviewerName} for review.`
-                      : outcome.openedReview
-                        ? "Sent for review."
-                        : "Uploaded the draft line."
+            outcome === null ? (
+              "Result"
+            ) : outcome.kind === "live" ? (
+              <span className="fm-marker-underline fm-marker-underline--green">
+                {crew.playful ? "It's live! 🎉" : "It's live."}
+              </span>
+            ) : outcome.kind === "keep" ? (
+              "Kept on this Mac."
+            ) : outcome.kind === "script" ? (
+              `${CREW_NAME} is on it.`
+            ) : reviewerName ? (
+              `Sent to ${reviewerName} for review.`
+            ) : outcome.openedReview ? (
+              "Sent for review."
+            ) : (
+              "Uploaded the draft line."
+            )
           }
           state={phase === "done" ? "done" : "todo"}
           success={phase === "done"}
           expanded={phase === "done"}
         >
+          {outcome?.kind === "live" ? <ConfettiBurst /> : null}
           {outcome ? (
             <ResultBody
               outcome={outcome}

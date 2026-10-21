@@ -3,8 +3,8 @@
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { CircleAlert } from "lucide-react";
 
-import { CREW_NAME } from "../../../brand";
 import { describeTurnItem } from "../../../plain/narration";
+import { useCrew } from "../../../themes/useCrew";
 import { Bubble, TypingIndicator } from "../../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../../ui/Card";
 import { Disclosure } from "./Disclosure";
@@ -35,12 +35,15 @@ export function UserBubble({ item }: { readonly item: UserMessage }) {
 }
 
 export function CrewBubble({ item }: { readonly item: AssistantMessage }) {
+  const crew = useCrew();
   if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
   return (
     <Bubble
       author="crew"
       meta={
-        item.streaming ? `${CREW_NAME} is typing…` : shortTime(item.completedAt ?? item.updatedAt)
+        item.streaming
+          ? `${crew.builder.name} is typing…`
+          : shortTime(item.completedAt ?? item.updatedAt)
       }
     >
       <Markdown text={item.text} />
@@ -68,7 +71,7 @@ export function ErrorNote({
         : null;
   return (
     <Bubble author="crew" full meta={shortTime(item.updatedAt)}>
-      <div className="fm-approval fm-approval--high">
+      <div className="fm-approval fm-approval--high" data-sober="">
         <Card label="Something went wrong">
           <CardHeader
             icon={CircleAlert}

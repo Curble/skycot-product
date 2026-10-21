@@ -84,6 +84,7 @@ export function RestoreSheet({
       title={title}
       icon={RotateCcw}
       iconTone="red"
+      sober
       description={restoreConfirmation(entry, formatVersionTime)}
       actions={
         <>

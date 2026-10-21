@@ -16,7 +16,6 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useElapsedLabel } from "../../app/useElapsed";
-import { CREW_NAME } from "../../brand";
 import { HOME_HREF } from "../../router";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
@@ -25,7 +24,8 @@ import {
   environmentThreadShells,
   threadEnvironment,
 } from "../../state/threads";
-import { Avatar } from "../../ui/Avatar";
+import { CrewAvatar } from "../../themes/CrewAvatar";
+import { useCrew } from "../../themes/useCrew";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
 import { TypingIndicator } from "../../ui/Bubble";
@@ -67,6 +67,8 @@ export function ConversationView({
   const projection = state ? Option.getOrNull(state.data) : null;
   const status = shell ? describeThreadStatus(shell) : null;
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
+  const crew = useCrew();
+  const crewName = crew.builder.name;
 
   const visit = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -124,10 +126,10 @@ export function ConversationView({
             onClick={() => (window.location.hash = HOME_HREF)}
           />
         ) : null}
-        <Avatar kind="crew" size="lg" />
+        <CrewAvatar role="builder" size="lg" />
         <div className="fm-conv-header__who">
           <span className="fm-conv-header__name">
-            {CREW_NAME}
+            {crewName}
             {projectName ? ` · ${projectName}` : ""}
           </span>
           <span className="fm-conv-header__presence">
@@ -202,7 +204,7 @@ export function ConversationView({
       ) : projection.turnItems.length === 0 ? (
         <div className="fm-stream">
           <EmptyState icon={MessageSquareDashed} title="Nothing has been said yet">
-            Say what you'd like done and {CREW_NAME} will show you a plan first.
+            Say what you'd like done and {crewName} will show you a plan first.
           </EmptyState>
         </div>
       ) : (
@@ -217,7 +219,7 @@ export function ConversationView({
             !projection.turnItems.some(
               (item) => item.type === "assistant_message" && item.streaming,
             ) ? (
-              <TypingIndicator meta={`${CREW_NAME} is working…`} />
+              <TypingIndicator meta={`${crewName} is working…`} />
             ) : null
           }
         />
@@ -285,6 +287,7 @@ function ReplyComposer({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const crew = useCrew();
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
 
@@ -340,7 +343,7 @@ function ReplyComposer({
           label="Reply"
           foot={{
             left: active
-              ? `Replies while ${CREW_NAME} is working get picked up at the next step.`
+              ? `Replies while ${crew.builder.name} is working get picked up at the next step.`
               : "Return to send · Shift-Return for a new line",
             right: sending ? "Sending…" : "",
           }}

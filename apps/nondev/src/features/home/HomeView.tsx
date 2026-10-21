@@ -2,10 +2,10 @@ import { useAtomValue } from "@effect/atom-react";
 import { ListTodo, Sparkles } from "lucide-react";
 
 import { useShellState } from "../../app/ShellState";
-import { CREW_NAME } from "../../brand";
 import { threadHref } from "../../router";
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../../state/catalog";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
+import { useCrew } from "../../themes/useCrew";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
@@ -20,6 +20,7 @@ import { NewConversationComposer } from "../compose/NewConversationComposer";
  */
 export function HomeView() {
   const shell = useShellState();
+  const crew = useCrew();
   const rows = useAtomValue(conversationRowsAtom);
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
@@ -47,8 +48,10 @@ export function HomeView() {
         <div className="fm-home__inner">
           <div>
             <h2 className="fm-home__greeting">
-              {greeting()}
-              {firstName(label) ? `, ${firstName(label)}` : ""}.
+              <span className="fm-marker-underline">
+                {greeting()}
+                {firstName(label) ? `, ${firstName(label)}` : ""}.
+              </span>
             </h2>
             <p className="fm-home__sub">{summarySentence(working, waiting, ready, rows.length)}</p>
           </div>
@@ -74,12 +77,12 @@ export function HomeView() {
               ) : null}
             </Card>
             <div className="fm-home__side">
-              <Card label="Tip">
+              <Card label="Tip" tip>
                 <CardHeader
                   icon={Sparkles}
                   tone="grey"
                   title="Tip"
-                  subtitle={`Say it like you'd text a staff member. “Add a Christmas menu page” beats describing how to build one. ${CREW_NAME} will show you a plan before touching anything.`}
+                  subtitle={`Say it like you'd text a staff member. “Add a Christmas menu page” beats describing how to build one. ${crew.builder.name} will show you a plan before touching anything.`}
                 />
               </Card>
             </div>

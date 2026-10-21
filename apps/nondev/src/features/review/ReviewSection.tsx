@@ -230,7 +230,9 @@ export function ReviewSection({
         <CardHeader
           icon={Receipt}
           tone="green"
-          title="What changed"
+          title={
+            <span className="fm-marker-underline fm-marker-underline--green">What changed</span>
+          }
           subtitle={[
             versionNumber ? `Version ${versionNumber}` : "Restore point",
             when,

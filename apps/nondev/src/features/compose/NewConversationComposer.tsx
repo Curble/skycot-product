@@ -8,7 +8,7 @@ import { useState } from "react";
 import { newMessageId, newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
-import { CREW_NAME } from "../../brand";
+import { CrewName } from "../../themes/CrewName";
 import { navigate, threadHref } from "../../router";
 import { environmentProjects } from "../../state/projects";
 import {
@@ -109,7 +109,9 @@ export function NewConversationComposer({
               ))
             }
           </Popover>
-          <span className="fm-composer__label">How much should {CREW_NAME} do on its own?</span>
+          <span className="fm-composer__label">
+            How much should <CrewName /> do on its own?
+          </span>
           <SegmentedControl
             label="Autonomy"
             size="sm"
