@@ -1,0 +1,31 @@
+{
+  "name": "@t3tools/skycot-rules",
+  "private": true,
+  "description": "SKYCOT hard rules: the one rule table the server policy and the plain client both evaluate. Pure TypeScript, no runtime dependencies, Hermes-safe.",
+  "type": "module",
+  "exports": {
+    "./rules": {
+      "types": "./src/rules.ts",
+      "import": "./src/rules.ts"
+    },
+    "./shell": {
+      "types": "./src/shell.ts",
+      "import": "./src/shell.ts"
+    },
+    "./files": {
+      "types": "./src/files.ts",
+      "import": "./src/files.ts"
+    },
+    "./decision": {
+      "types": "./src/decision.ts",
+      "import": "./src/decision.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc-rs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  }
+}
