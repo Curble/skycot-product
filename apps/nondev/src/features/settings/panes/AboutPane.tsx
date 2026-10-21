@@ -8,7 +8,7 @@ import { APP_VERSION } from "~/branding";
 // The MIT licence's one condition is that its text travels with every copy of
 // the software, so the About pane bundles the repository's LICENSE verbatim.
 import mitLicenseText from "../../../../../../LICENSE?raw";
-import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../../../brand";
+import { ADVANCED_MODE_LABEL, COPYRIGHT_LINE, PRODUCT_NAME } from "../../../brand";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
@@ -82,7 +82,7 @@ export function AboutPane({ environmentId }: { readonly environmentId: Environme
   const [noticesOpen, setNoticesOpen] = useState(false);
   return (
     <>
-      <SettingsGroup title={PRODUCT_NAME}>
+      <SettingsGroup title={PRODUCT_NAME} footer={`${COPYRIGHT_LINE}, Melbourne, Australia.`}>
         <ListRow
           leading={<StepBadge state="now" icon={Hammer} />}
           title={PRODUCT_NAME}

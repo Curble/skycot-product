@@ -3,6 +3,11 @@
 // `productName` in nondev/brand.json (the desktop/build side of the brand).
 export const PRODUCT_NAME = "SKYCOT";
 
+/** The registered company behind SKYCOT; SKYCOT is its registered business name. */
+export const COMPANY_NAME = "Curble Pty Ltd";
+
+export const COPYRIGHT_LINE = `© 2026 ${COMPANY_NAME}, trading as ${PRODUCT_NAME}`;
+
 /** The assistant as a contact: "Crew · Little Fern Café website". */
 export const CREW_NAME = "Crew";
 

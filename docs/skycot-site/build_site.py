@@ -283,7 +283,7 @@ FOOTER = '''<footer><div class="wrap">
     </ul>
   </div>
   <p class="legal">SKYCOT is based on <a href="https://github.com/pingdotgg/t3code">T3 Code</a>, © T3 Tools Inc., used under the MIT licence. SKYCOT is not affiliated with or endorsed by T3 Tools Inc. Claude, Codex, Cursor and Gemini are products of their respective owners; SKYCOT is not affiliated with Anthropic, OpenAI, Anysphere or Google. Screenshots show an early build with a sample project.<br>
-  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd. <span style="opacity:.7">Draft: legal pages await review and are not yet in force.</span></p>
+  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading as SKYCOT. <span style="opacity:.7">Draft: legal pages await review and are not yet in force.</span></p>
 </div></footer>
 </body></html>
 '''
@@ -480,7 +480,7 @@ def home_body(variant):
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
     <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="open-source.html">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
-    <details><summary>Who makes it?</summary><p>SKYCOT is made by Curble Pty Ltd in Melbourne, Australia, run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
+    <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
   </div>
 </div></section>
 '''
@@ -609,7 +609,7 @@ OSS = f'''{nav()}
   <h2>What this means for you</h2>
   <ul>
     <li>The licence notice above ships inside every copy of SKYCOT (in the installer and under Settings → About → Open-source licences) and must stay there.</li>
-    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions, and the SKYCOT name, are © 2026 Curble Pty Ltd; see the <a href="terms.html">terms of use</a>. Whether our additions will also be published under an open licence is a decision still to be made and will be announced here.</li>
+    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions, and the SKYCOT name, are © 2026 Curble Pty Ltd (trading as SKYCOT); see the <a href="terms.html">terms of use</a>. Whether our additions will also be published under an open licence is a decision still to be made and will be announced here.</li>
     <li>SKYCOT does not ship T3 Code's release pipeline, install scripts or telemetry configuration; our builds are published by Curble Pty Ltd from our own repository.</li>
   </ul>
 

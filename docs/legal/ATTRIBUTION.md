@@ -1,7 +1,7 @@
 # Canonical attribution text
 
-Use these exact wordings. "SKYCOT" is the product name; replace "SKYCOT Pty Ltd" with the legal
-entity once Mark confirms it (see GO-LIVE-CHECKLIST.md).
+Use these exact wordings. "SKYCOT" is the product and a registered business name of Curble Pty Ltd,
+the company that owns and sells it (confirmed by Mark, 22 October 2026).
 
 ## One line (website footer, download page, app store "about" field)
 
@@ -15,7 +15,7 @@ Link "T3 Code" to https://github.com/pingdotgg/t3code and "MIT License" to the l
 
 ```
 SKYCOT <version>
-© 2026 SKYCOT Pty Ltd, Melbourne, Australia · www.skycot.com
+© 2026 Curble Pty Ltd, trading as SKYCOT, Melbourne, Australia · www.skycot.com
 
 Based on T3 Code · © T3 Tools Inc. · MIT License
 https://github.com/pingdotgg/t3code

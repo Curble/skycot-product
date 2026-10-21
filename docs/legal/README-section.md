@@ -28,11 +28,11 @@ branding layer, and keeps every other change to upstream to the handful of one-l
 
 ## Licence
 
-The T3 Code portions are © T3 Tools Inc., MIT License. SKYCOT's additions are © 2026 SKYCOT and
+The T3 Code portions are © T3 Tools Inc., MIT License. SKYCOT's additions are © 2026 Curble Pty Ltd (trading as SKYCOT) and
 released under the same MIT License (see [`LICENSE`](./LICENSE)).
 
 <!-- If Mark decides to keep SKYCOT's additions proprietary, replace the last sentence with:
-"SKYCOT's additions (apps/nondev, nondev/) are © 2026 SKYCOT Pty Ltd, all rights reserved; see
+"SKYCOT's additions (apps/nondev, nondev/) are © 2026 Curble Pty Ltd (trading as SKYCOT), all rights reserved; see
 LICENSE-SKYCOT." and add that file. The T3 Code portions remain MIT either way. -->
 
 ---
