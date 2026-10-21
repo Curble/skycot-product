@@ -14,7 +14,7 @@ export function AdvancedPane() {
     <>
       <SettingsGroup
         title={ADVANCED_MODE_LABEL}
-        footer={`Everything you do in ${PRODUCT_NAME} is also visible there, in developer language. Coming back is one click: the address ending in /simple/.`}
+        footer={`Everything you do in ${PRODUCT_NAME} is also visible there, in developer language. To come back, use “Back to ${PRODUCT_NAME}” at the bottom of its sidebar.`}
       >
         <ListRow
           leading={<StepBadge state="todo" icon={Wrench} />}

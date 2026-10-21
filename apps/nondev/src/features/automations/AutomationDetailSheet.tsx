@@ -8,7 +8,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { serverEnvironment } from "../../state/server";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
-import { List, ListRow } from "../../ui/ListRow";
+import { List, ListExtra, ListRow } from "../../ui/ListRow";
 import { Sheet } from "../../ui/Sheet";
 import { CopyButton } from "../settings/CopyButton";
 import { describeRelative, describeSchedule } from "./schedule";
@@ -156,12 +156,14 @@ export function AutomationDetailSheet({
                 task.webhook.url ? <CopyButton text={task.webhook.url} label="Copy" /> : null
               }
             />
-            <div className="fm-sheet-inset">
-              <Banner tone="warning">
-                This address is a key. Anyone who has it can start this automation. Share it only
-                with the app that should trigger it.
-              </Banner>
-            </div>
+            <ListExtra>
+              <div className="fm-sheet-inset">
+                <Banner tone="warning">
+                  This address is a key. Anyone who has it can start this automation. Share it only
+                  with the app that should trigger it.
+                </Banner>
+              </div>
+            </ListExtra>
           </>
         ) : null}
       </List>

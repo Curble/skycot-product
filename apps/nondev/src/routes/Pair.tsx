@@ -32,6 +32,7 @@ export function PairRoute({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const autoSubmitAttemptedRef = useRef(false);
+  const fieldRef = useRef<HTMLInputElement>(null);
 
   const submitCredential = async (nextCredential: string) => {
     setIsSubmitting(true);
@@ -43,6 +44,10 @@ export function PairRoute({
     setIsSubmitting(false);
     if (submitError !== null) {
       setProblem(calmPairingError(submitError));
+      // The field is read-only while submitting, never disabled, so focus
+      // stays; selecting the rejected code makes retyping one keystroke.
+      fieldRef.current?.focus();
+      fieldRef.current?.select();
       return;
     }
     startTransition(() => {
@@ -76,18 +81,20 @@ export function PairRoute({
       </span>
       <h1 className="fm-standalone__title">Connect to your Mac</h1>
       <p className="fm-standalone__text">
-        {PRODUCT_NAME} talks to the engine running on your Mac. Paste the connection code it gave
-        you, or open the link it printed, and you're in.
+        {PRODUCT_NAME} talks to the part of it that runs on your Mac. Paste the connection code it
+        gave you, or open the link it printed, and you're in.
       </p>
       <form className="fm-standalone__form" onSubmit={(event) => void handleSubmit(event)}>
         <TextField
           label="Connection code"
           mono
+          inputRef={fieldRef}
           autoCapitalize="none"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          disabled={isSubmitting}
+          readOnly={isSubmitting}
+          aria-busy={isSubmitting}
           placeholder="Paste the code here"
           value={credential}
           onChange={(event) => setCredential(event.currentTarget.value)}
@@ -108,7 +115,7 @@ export function PairRoute({
       </form>
       <div className="fm-standalone__foot">
         {acceptsTokens
-          ? "On the Mac that runs the engine, type “t3 pair” in Terminal. It prints a link you can open on this device, or a code to paste above."
+          ? `On the Mac that runs ${PRODUCT_NAME}, open Terminal (the Mac's built-in text window) and type “t3 pair”. It prints a link you can open on this device, or a code to paste above.`
           : "This Mac expects a trusted connection code before the app can connect. Ask whoever set it up."}
       </div>
     </StandalonePage>

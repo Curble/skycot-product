@@ -15,7 +15,7 @@ import {
 import { ADVANCED_MODE_LABEL } from "../../brand";
 import { isElectron } from "../../app/platform";
 import { Button } from "../../ui/Button";
-import { ListRow } from "../../ui/ListRow";
+import { ListExtra, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { Sheet } from "../../ui/Sheet";
 import { CopyButton } from "./CopyButton";
@@ -159,7 +159,9 @@ export function ProviderRow({
         trailing={trailing}
       />
       {instructionsOpen && flow === "instructions" ? (
-        <ProviderInstructions driver={driver} provider={provider} settings={settings} os={os} />
+        <ListExtra>
+          <ProviderInstructions driver={driver} provider={provider} settings={settings} os={os} />
+        </ListExtra>
       ) : null}
       <Sheet
         open={signOutOpen}

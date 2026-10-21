@@ -1,25 +1,20 @@
-import { applyTheme, resolveIsDark } from "../../../app/theme";
+import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { SegmentedControl } from "../../../ui/SegmentedControl";
 import { useAppearanceMode, writeAppearanceMode, type AppearanceMode } from "../localPrefs";
 import { SettingsGroup } from "../SettingsGroup";
 
 export function AppearancePane() {
   const mode = useAppearanceMode();
-  const choose = (next: AppearanceMode) => {
-    writeAppearanceMode(next);
-    // Same-tab storage writes don't fire `storage`; repaint now.
-    applyTheme(resolveIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches));
-  };
   return (
     <SettingsGroup
       title="Appearance"
-      footer="System follows your Mac's light and dark setting. This is shared with Advanced mode."
+      footer={`System follows your Mac's light and dark setting. Your choice here also applies in ${ADVANCED_MODE_LABEL}.`}
     >
       <div className="fm-setting-block">
         <SegmentedControl<AppearanceMode>
           label="Appearance"
           value={mode}
-          onChange={choose}
+          onChange={writeAppearanceMode}
           block
           options={[
             { value: "system", label: "System" },

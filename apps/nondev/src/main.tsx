@@ -6,7 +6,7 @@ import "./index.css";
 import { AppAtomRegistryProvider } from "~/rpc/atomRegistry";
 
 import { App } from "./App";
-import { applyPlatformClasses } from "./app/platform";
+import { applyPlatformClasses, writeUiMode } from "./app/platform";
 import { startThemeSync } from "./app/theme";
 import { FAVICON_DATA_URI, PRODUCT_NAME } from "./brand";
 
@@ -26,6 +26,9 @@ export const startup = Promise.resolve().then(() => {
   applyBranding();
   applyPlatformClasses();
   startThemeSync();
+  // Being here is choosing the simple interface; the stock UI reads this to
+  // offer the way back.
+  writeUiMode("simple");
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <AppAtomRegistryProvider>

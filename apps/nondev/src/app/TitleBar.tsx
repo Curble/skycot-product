@@ -15,12 +15,15 @@ export function TitleBar({
   columns,
   detail,
   trailing,
+  showSearch = true,
 }: {
   readonly columns: Columns;
   /** "› Little Fern Café website" */
   readonly detail?: string | null;
   /** Pills at the right: provider, linked phone. */
   readonly trailing?: ReactNode;
+  /** The search box filters the conversation list, so it hides on screens without one. */
+  readonly showSearch?: boolean;
 }) {
   const shell = useShellState();
   return (
@@ -39,14 +42,16 @@ export function TitleBar({
       </h1>
       <span className="fm-titlebar__spacer" />
       {trailing}
-      <div className="fm-titlebar__search">
-        <SearchField
-          value={shell.search}
-          onChange={shell.setSearch}
-          placeholder="Search conversations"
-          label="Search conversations"
-        />
-      </div>
+      {showSearch ? (
+        <div className="fm-titlebar__search">
+          <SearchField
+            value={shell.search}
+            onChange={shell.setSearch}
+            placeholder="Search conversations"
+            label="Search conversations"
+          />
+        </div>
+      ) : null}
     </header>
   );
 }

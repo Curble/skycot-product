@@ -25,15 +25,22 @@ import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
-import { List, ListRow } from "../../ui/ListRow";
+import { List, ListExtra, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { Sheet } from "../../ui/Sheet";
 import { StepBadge } from "../../ui/StepBadge";
 import { TextField } from "../../ui/TextField";
-import { AUTONOMY_LEVELS } from "../../plain/autonomy";
-import { ALWAYS_ASKS, AUTONOMY_OPTIONS, runtimeModeFor, type Autonomy } from "../compose/autonomy";
-import { writeOnboardingState } from "../settings/localPrefs";
+import { AUTONOMY_LEVELS, describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
+import {
+  AUTONOMY_OPTIONS,
+  autonomyLevelOf,
+  PLAIN_AUTONOMY_OPTIONS,
+  plainAutonomyOrDefault,
+  runtimeModeFor,
+  type Autonomy,
+} from "../compose/autonomy";
+import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
 import {
   PROVIDER_CATALOG,
   anyProviderReady,
@@ -41,6 +48,7 @@ import {
   providerForDriver,
 } from "../settings/providerCatalog";
 import { ProviderRow } from "../settings/ProviderRows";
+import { plainFolderPath } from "../../app/folders";
 
 type Step = "assistant" | "work" | "autonomy" | "done";
 const STEPS: ReadonlyArray<Step> = ["assistant", "work", "autonomy", "done"];
@@ -54,7 +62,7 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
   work: {
     icon: FolderOpen,
     title: "Where's your work?",
-    description: `${CREW_NAME} only ever works inside a folder you choose. Open the one that holds your website or app, or start something new.`,
+    description: `${CREW_NAME} only ever works inside a folder you choose. Open the one that holds just this website or app, or start something new.`,
   },
   autonomy: {
     icon: ShieldCheck,
@@ -87,11 +95,14 @@ export function OnboardingSheet({
     onClose();
     navigate(HOME_HREF);
   };
+  // Escape and the backdrop cancel: they never turn an earlier "done" into
+  // "skipped", and a first run that is cancelled simply stays skippable.
+  const cancel = () => finish(readOnboardingState() === "done" ? "done" : "skipped");
 
   return (
     <Sheet
       open
-      onClose={() => finish("skipped")}
+      onClose={cancel}
       icon={meta.icon}
       iconTone={step === "autonomy" ? "orange" : "blue"}
       title={meta.title}
@@ -100,12 +111,11 @@ export function OnboardingSheet({
       dismissOnBackdrop={false}
       actions={
         <>
-          <span className="fm-steps" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
+          <span className="fm-steps" role="img" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
             {STEPS.map((entry, position) => (
               <span
                 key={entry}
                 className={`fm-steps__dot${position <= index ? " fm-steps__dot--on" : ""}`}
-                aria-hidden
               />
             ))}
           </span>
@@ -170,6 +180,7 @@ function AssistantStep({ environmentId }: { readonly environmentId: EnvironmentI
           trailing={
             moreOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
           }
+          expanded={moreOpen}
           onClick={() => setMoreOpen((value) => !value)}
         />
         {moreOpen
@@ -235,7 +246,7 @@ function WorkStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
               key={project.id}
               leading={<ProjectAvatar project={project} size="sm" />}
               title={project.title}
-              subtitle={<code className="fm-code">{project.workspaceRoot}</code>}
+              subtitle={plainFolderPath(project.workspaceRoot)}
               trailing={<StepBadge state="done" label="Ready" />}
             />
           ))}
@@ -254,35 +265,38 @@ function WorkStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
           title="Start something new"
           subtitle={`${CREW_NAME} makes a fresh folder for it.`}
           chevron
+          expanded={newOpen}
           onClick={() => setNewOpen((value) => !value)}
         />
         {newOpen ? (
-          <div className="fm-onboarding__inline">
-            <TextField
-              label="What's it called?"
-              placeholder="Little Fern Café website"
-              value={name}
-              autoFocus
-              onChange={(event) => setName(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void startNew();
-              }}
-            />
-            <div className="fm-onboarding__inline-actions">
-              <Button size="sm" onClick={() => setNewOpen(false)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => void startNew()}
-                disabled={busy || name.trim().length === 0}
-              >
-                {busy ? "Creating…" : "Create"}
-              </Button>
+          <ListExtra>
+            <div className="fm-onboarding__inline">
+              <TextField
+                label="What's it called?"
+                placeholder="Little Fern Café website"
+                value={name}
+                autoFocus
+                onChange={(event) => setName(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void startNew();
+                }}
+              />
+              <div className="fm-onboarding__inline-actions">
+                <Button size="sm" onClick={() => setNewOpen(false)} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => void startNew()}
+                  disabled={busy || name.trim().length === 0}
+                >
+                  {busy ? "Creating…" : "Create"}
+                </Button>
+              </div>
+              {problem ? <Banner tone="warning">{problem}</Banner> : null}
             </div>
-            {problem ? <Banner tone="warning">{problem}</Banner> : null}
-          </div>
+          </ListExtra>
         ) : null}
       </List>
       <OpenFolderSheet
@@ -298,15 +312,14 @@ function WorkStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
 }
 
 function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const [autonomy, setAutonomy] = useState<Autonomy>(readAutonomy);
+  // Plain surfaces offer only the levels that keep a safety promise.
+  const [autonomy, setAutonomy] = useState<Autonomy>(() => plainAutonomyOrDefault(readAutonomy()));
   const settings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
+  const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
+  const policyEnforced = config?.skycotPolicy === true;
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
-  const info =
-    autonomy === "ask-first"
-      ? AUTONOMY_LEVELS.askMeFirst
-      : autonomy === "carefully"
-        ? AUTONOMY_LEVELS.justDoItCarefully
-        : AUTONOMY_LEVELS.fullyHandsOff;
+  const level = autonomyLevelOf(autonomy);
+  const info = AUTONOMY_LEVELS[level];
 
   const choose = (next: Autonomy) => {
     setAutonomy(next);
@@ -324,19 +337,18 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
         value={autonomy}
         onChange={choose}
         block
-        options={AUTONOMY_OPTIONS.map((option) => ({
+        wrap
+        options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
           value: option.value,
           label: option.label,
           ...(option.tag ? { tag: option.tag } : {}),
         }))}
       />
       <p className="fm-help">
-        <b>{info.label}.</b> {info.description} {info.hint}
+        <b>{info.label}.</b> {describeAutonomyLevel(level, { policyEnforced })} {info.hint}
       </p>
       {info.warning ? <Banner tone="warning">{info.warning}</Banner> : null}
-      <p className="fm-help">
-        Whatever you choose, {CREW_NAME} always asks before {ALWAYS_ASKS}
-      </p>
+      <p className="fm-help">{hardRulesStatement(policyEnforced, PRODUCT_NAME)}</p>
     </div>
   );
 }

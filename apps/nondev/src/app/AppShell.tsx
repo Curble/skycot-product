@@ -6,11 +6,14 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { documentTitle } from "../brand";
 // Side effect: registers the "What changed" card for checkpoint turn items.
 import "../features/review";
+import { catalogEntryFor } from "../features/settings/providerCatalog";
+import { sectionLabel } from "../features/settings/sections";
 import {
   useRoomForRail,
   useVersionsRailOpen,
@@ -20,14 +23,11 @@ import {
 import { HOME_HREF, NEW_HREF, navigate, type Route } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { projectAtomOrEmpty } from "../state/projects";
-import {
-  providerDisplayName,
-  resolveDefaultModelSelection,
-  providerForSelection,
-} from "../state/providers";
+import { resolveDefaultModelSelection, providerForSelection } from "../state/providers";
 import { serverEnvironment } from "../state/server";
 import { environmentThreadShells } from "../state/threads";
 import { Pill } from "../ui/Pill";
+import { useModal } from "../ui/useModal";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { ConversationList } from "./ConversationList";
 import { AppSidebar } from "./Sidebar";
@@ -68,6 +68,8 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   const showList = conversationRoute && !(columns === 1 && route.name !== "home");
   const showContent = !(columns === 1 && route.name === "home");
 
+  // One place owns the window title, derived from the route, so no screen can
+  // leave a stale title behind when it unmounts.
   const detail = useTitleDetail(selectedEnvironmentId, selectedThreadId, route);
   useEffect(() => {
     document.title = documentTitle(detail ?? undefined);
@@ -91,7 +93,12 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
 
   return (
     <div className="fm-shell" data-columns={columns} data-inspector={railMode}>
-      <TitleBar columns={columns} detail={detail} trailing={<ProviderPill />} />
+      <TitleBar
+        columns={columns}
+        detail={detail}
+        trailing={<ProviderPill />}
+        showSearch={conversationRoute}
+      />
       <ConnectionBanner />
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
         {columns === 3 ? <AppSidebar route={route} /> : null}
@@ -102,7 +109,11 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
             onCompose={compose}
           />
         ) : null}
-        {showContent ? <main className="fm-content">{children}</main> : null}
+        {showContent ? (
+          <main className="fm-content" tabIndex={-1}>
+            {children}
+          </main>
+        ) : null}
         {route.name === "thread" && showContent ? (
           <VersionsRailSlot
             environmentId={route.environmentId}
@@ -119,6 +130,11 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   );
 }
 
+/**
+ * The sidebar as a modal drawer at two columns or fewer. Portalled next to the
+ * sheets so the rest of the app can be made inert while it is open; focus moves
+ * to its first item and returns to the "Show sidebar" button on close.
+ */
 function SidebarDrawer({
   route,
   onClose,
@@ -126,20 +142,23 @@ function SidebarDrawer({
   readonly route: Route;
   readonly onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useModal(drawerRef, { open: true, onClose, initialFocus: "first" });
+  return createPortal(
     <>
       <div className="fm-drawer-backdrop" onClick={onClose} aria-hidden />
-      <div className="fm-drawer" role="dialog" aria-label="Sidebar">
+      <div
+        ref={drawerRef}
+        className="fm-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sidebar"
+        tabIndex={-1}
+      >
         <AppSidebar route={route} onNavigate={onClose} />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 
@@ -155,13 +174,28 @@ function useTitleDetail(
   );
   const thread = threadId ? shellIndex.get(threadId) : undefined;
   const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: thread?.projectId }));
-  if (route.name === "automations") return "Automations";
-  if (route.name === "people") return "People";
-  if (route.name === "new") return "New conversation";
-  return project?.title ?? null;
+  switch (route.name) {
+    case "automations":
+      return "Automations";
+    case "people":
+      return "People";
+    case "new":
+      return "New conversation";
+    case "welcome":
+      return "Welcome";
+    case "settings":
+      return route.section ? `${sectionLabel(route.section)} — Settings` : "Settings";
+    case "not-found":
+      return "Not found";
+    case "thread":
+      return project?.title ?? null;
+    case "home":
+    case "pair":
+      return null;
+  }
 }
 
-/** "Using Claude", from the provider a new conversation would start with. */
+/** "Using ChatGPT", from the provider a new conversation would start with, named the way Settings names it. */
 function ProviderPill() {
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
@@ -173,7 +207,7 @@ function ProviderPill() {
   if (environmentId === null || providers === null) return null;
   const provider = providerForSelection(providers, resolveDefaultModelSelection(providers, null));
   if (provider === null) return null;
-  return <Pill tone="provider">Using {providerDisplayName(provider)}</Pill>;
+  return <Pill tone="provider">Using {catalogEntryFor(String(provider.driver)).brand}</Pill>;
 }
 
 const EMPTY_THREAD_INDEX_ATOM = Atom.make<ReadonlyMap<ThreadId, OrchestrationV2ThreadShell>>(

@@ -4,7 +4,8 @@ import { Laptop, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ADVANCED_MODE_LABEL } from "../../../brand";
-import { advancedModeUrl, isElectron } from "../../../app/platform";
+import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
+import { isElectron } from "../../../app/platform";
 import { environmentCatalog } from "../../../state/catalog";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
@@ -26,6 +27,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
   const label =
     catalog.entries.get(environmentId)?.target.label ?? config?.environment.label ?? "This Mac";
   const [exposure, setExposure] = useState<DesktopServerExposureState | null>(null);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
 
   useEffect(() => {
     const bridge = window.desktopBridge;
@@ -57,7 +59,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
           title={label}
           subtitle={
             config
-              ? `${os ? OS_NAMES[os] : "Unknown system"}${machine ? ` · ${machine}` : ""} · engine ${config.environment.serverVersion}`
+              ? `${os ? OS_NAMES[os] : "Unknown system"}${machine ? ` · ${machine}` : ""} · SKYCOT ${config.environment.serverVersion}`
               : "Connecting…"
           }
         />
@@ -90,7 +92,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
               ? remoteOn
                 ? "Reachable from your other devices"
                 : "Only this computer"
-              : "Managed in Advanced mode"
+              : `Managed in ${ADVANCED_MODE_LABEL}`
           }
           subtitle={
             exposure
@@ -99,7 +101,7 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
                   ? `Other devices on your network can connect via ${exposure.advertisedHost}.`
                   : "Other devices on your network can connect."
                 : "Nothing outside this computer can reach SKYCOT."
-              : "Open Advanced mode to see whether phones or other computers can connect."
+              : `Open ${ADVANCED_MODE_LABEL} to see whether phones or other computers can connect.`
           }
           trailing={
             exposure ? (
@@ -107,16 +109,19 @@ export function YourMacPane({ environmentId }: { readonly environmentId: Environ
                 {remoteOn ? "On" : "Off"}
               </Pill>
             ) : (
-              <Button
-                size="sm"
-                onClick={() => window.location.assign(`${advancedModeUrl()}settings/connections`)}
-              >
-                Open
+              <Button size="sm" onClick={() => setConnectionsOpen(true)}>
+                Open…
               </Button>
             )
           }
         />
       </SettingsGroup>
+      <AdvancedModeSheet
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        path="settings/connections"
+        reason="Remote access is set up on its Connections page."
+      />
     </>
   );
 }

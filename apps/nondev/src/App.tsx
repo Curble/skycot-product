@@ -4,7 +4,11 @@ import { Atom } from "effect/reactivity";
 import { Laptop, SearchX, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { resolveInitialServerAuthGateState } from "~/environments/primary/auth";
+import {
+  peekPairingTokenFromUrl,
+  resolveInitialServerAuthGateState,
+  stripPairingTokenFromUrl,
+} from "~/environments/primary/auth";
 
 import { AppShell } from "./app/AppShell";
 import { PRODUCT_NAME } from "./brand";
@@ -56,6 +60,16 @@ export function App() {
   const route = useRoute();
   const gate = useAuthGate();
   const columns = useColumns();
+  const authenticated = gate.status === "resolved" && gate.state.status === "authenticated";
+
+  // A pairing link opened in a browser that is already paired: the token was
+  // consumed (or ignored) by the gate, so it must not stay in the address bar
+  // where a bookmark or a share would re-send it.
+  useEffect(() => {
+    if (!authenticated || route.name !== "pair") return;
+    if (peekPairingTokenFromUrl() !== null) stripPairingTokenFromUrl();
+    navigate(HOME_HREF);
+  }, [authenticated, route.name]);
 
   if (gate.status === "loading") {
     return (
@@ -106,7 +120,7 @@ export function App() {
           case "new":
           case "pair":
           case "welcome":
-            return <HomeRoute />;
+            return <HomeRoute showBack={route.name === "new" && columns === 1} />;
           case "settings":
             return <SettingsScreen section={route.section} />;
           case "thread":
@@ -127,12 +141,13 @@ export function App() {
                 <span className="fm-standalone__icon fm-standalone__icon--muted" aria-hidden>
                   <SearchX size={30} strokeWidth={1.6} />
                 </span>
-                <h1 className="fm-standalone__title">There's nothing here</h1>
+                {/* An h2: the title bar already carries the page's h1. */}
+                <h2 className="fm-standalone__title">There's nothing here</h2>
                 <p className="fm-standalone__text">
                   That link doesn't go anywhere in {PRODUCT_NAME}.
                 </p>
                 <div className="fm-standalone__actions">
-                  <Button variant="primary" onClick={() => (window.location.hash = HOME_HREF)}>
+                  <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
                     Go home
                   </Button>
                 </div>

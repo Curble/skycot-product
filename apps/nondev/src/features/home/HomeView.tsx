@@ -1,15 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
-import { ListTodo, Sparkles } from "lucide-react";
+import { ChevronLeft, ListTodo, Sparkles } from "lucide-react";
 
 import { useShellState } from "../../app/ShellState";
+import { useConnected } from "../../app/useConnection";
 import { CREW_NAME } from "../../brand";
-import { threadHref } from "../../router";
-import { enabledEnvironmentIdsAtom, environmentCatalog } from "../../state/catalog";
+import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
+import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
+import { summarySentence } from "./summary";
 
 /**
  * Home: a greeting, every live or attention-needing job in one sentence each,
@@ -18,14 +20,10 @@ import { NewConversationComposer } from "../compose/NewConversationComposer";
  * made-up numbers. Mount `AllowanceMeter` in `.fm-home__side` when a cheap
  * source exists.
  */
-export function HomeView() {
+export function HomeView({ showBack = false }: { readonly showBack?: boolean }) {
   const shell = useShellState();
   const rows = useAtomValue(conversationRowsAtom);
-  const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
-  const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
-  const label = environmentIds[0]
-    ? catalog.entries.get(environmentIds[0])?.target.label
-    : undefined;
+  const connected = useConnected();
 
   const active = rows.filter(
     (row) =>
@@ -45,12 +43,21 @@ export function HomeView() {
     <>
       <div className="fm-home">
         <div className="fm-home__inner">
+          {showBack ? (
+            <div className="fm-home__nav">
+              <IconButton
+                icon={ChevronLeft}
+                label="Back to conversations"
+                onClick={() => navigate(HOME_HREF)}
+              />
+            </div>
+          ) : null}
           <div>
-            <h2 className="fm-home__greeting">
-              {greeting()}
-              {firstName(label) ? `, ${firstName(label)}` : ""}.
-            </h2>
-            <p className="fm-home__sub">{summarySentence(working, waiting, ready, rows.length)}</p>
+            {/* No name: the only label the client has is the Mac's, and "Good evening, iMac" is worse than none. */}
+            <h2 className="fm-home__greeting">{greeting()}.</h2>
+            <p className="fm-home__sub">
+              {summarySentence(working, waiting, ready, rows.length, connected)}
+            </p>
           </div>
           <div className="fm-home__grid">
             <Card label="Today, across every project">
@@ -59,7 +66,9 @@ export function HomeView() {
                 title="Today, across every project"
                 subtitle={
                   active.length === 0
-                    ? "Nothing is running or waiting on you right now."
+                    ? connected
+                      ? "Nothing is running or waiting on you right now."
+                      : "Your jobs appear once your Mac is reachable."
                     : "Tap any row to open its conversation."
                 }
               />
@@ -119,32 +128,6 @@ function greeting(now = new Date()): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-}
-
-// No user identity reaches the client yet; the environment label (the Mac's
-// name) is the closest thing. A label like "Mark's MacBook" yields "Mark".
-function firstName(label: string | undefined): string | null {
-  if (!label) return null;
-  const match = /^([A-Za-z][A-Za-z'’-]*)/.exec(label.trim());
-  if (!match) return null;
-  const word = match[1]!.replace(/['’]s$/i, "");
-  return word.length > 1 ? word : null;
-}
-
-function summarySentence(working: number, waiting: number, ready: number, total: number): string {
-  if (total === 0) return "Nothing is on the go yet. Start a conversation below.";
-  const parts: string[] = [];
-  if (working > 0) parts.push(`${count(working, "job is", "jobs are")} running`);
-  if (waiting > 0) parts.push(`${count(waiting, "is", "are")} waiting on you`);
-  if (ready > 0) parts.push(`${count(ready, "is", "are")} ready to look at`);
-  if (parts.length === 0) return "All quiet. Nothing is running or waiting on you.";
-  const sentence = parts.join(", ");
-  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
-}
-
-function count(n: number, one: string, many: string): string {
-  const word = n === 1 ? "One" : String(n);
-  return `${word} ${n === 1 ? one : many}`;
 }
 
 function lowerFirst(text: string): string {

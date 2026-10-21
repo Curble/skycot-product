@@ -3,11 +3,12 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { Github, GitBranch } from "lucide-react";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
+import { useState } from "react";
 
 import { ADVANCED_MODE_LABEL } from "../../../brand";
-import { advancedModeUrl } from "../../../app/platform";
+import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
 import { Button } from "../../../ui/Button";
-import { ListRow } from "../../../ui/ListRow";
+import { ListExtra, ListRow } from "../../../ui/ListRow";
 import { Pill } from "../../../ui/Pill";
 import { StepBadge } from "../../../ui/StepBadge";
 import { CopyButton } from "../CopyButton";
@@ -22,6 +23,7 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
   const failed = discovery._tag === "Failure";
   const github = gitHubStatusOf(result);
   const git = gitInstalled(result);
+  const [tokenSheetOpen, setTokenSheetOpen] = useState(false);
 
   return (
     <>
@@ -69,26 +71,22 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
           }
         />
         {github && !github.signedIn ? (
-          <div className="fm-howto fm-howto--flat">
-            <p className="fm-howto__lede">
-              SKYCOT can't sign you in to GitHub itself yet. Paste this into Terminal (the Mac's
-              built-in text window), press Return and follow GitHub's questions. Come back here when
-              it says you're logged in.
-            </p>
-            <code className="fm-code fm-code--block">{GITHUB_LOGIN_COMMAND}</code>
-            <div className="fm-howto__actions">
-              <CopyButton text={GITHUB_LOGIN_COMMAND} />
-              <Button
-                size="sm"
-                variant="quiet"
-                onClick={() =>
-                  window.location.assign(`${advancedModeUrl()}settings/source-control`)
-                }
-              >
-                Paste a token in {ADVANCED_MODE_LABEL} instead
-              </Button>
+          <ListExtra>
+            <div className="fm-howto fm-howto--flat">
+              <p className="fm-howto__lede">
+                SKYCOT can't sign you in to GitHub itself yet. Paste this into Terminal (the Mac's
+                built-in text window), press Return and follow GitHub's questions. Come back here
+                when it says you're logged in.
+              </p>
+              <code className="fm-code fm-code--block">{GITHUB_LOGIN_COMMAND}</code>
+              <div className="fm-howto__actions">
+                <CopyButton text={GITHUB_LOGIN_COMMAND} />
+                <Button size="sm" variant="quiet" onClick={() => setTokenSheetOpen(true)}>
+                  Paste a token in {ADVANCED_MODE_LABEL} instead…
+                </Button>
+              </div>
             </div>
-          </div>
+          </ListExtra>
         ) : null}
       </SettingsGroup>
 
@@ -128,6 +126,12 @@ export function SharingPane({ environmentId }: { readonly environmentId: Environ
           chevron
         />
       </SettingsGroup>
+      <AdvancedModeSheet
+        open={tokenSheetOpen}
+        onClose={() => setTokenSheetOpen(false)}
+        path="settings/source-control"
+        reason="Pasting a GitHub token is done on its Source control page."
+      />
     </>
   );
 }

@@ -1,22 +1,15 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import {
-  Bot,
-  ChevronLeft,
-  Info,
-  Laptop,
-  Lock,
-  type LucideIcon,
-  Share2,
-  ShieldCheck,
-  SunMoon,
-  Wrench,
-} from "lucide-react";
-import { useEffect } from "react";
+import { ChevronLeft, Laptop } from "lucide-react";
 
 import { useColumns } from "../../app/useColumns";
-import { ADVANCED_MODE_LABEL, documentTitle } from "../../brand";
-import { SETTINGS_HREF, settingsHref, type SettingsSection } from "../../router";
+import {
+  HOME_HREF,
+  SETTINGS_HREF,
+  navigate,
+  settingsHref,
+  type SettingsSection,
+} from "../../router";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
@@ -29,63 +22,15 @@ import { AutonomyPane } from "./panes/AutonomyPane";
 import { PrivacyPane } from "./panes/PrivacyPane";
 import { SharingPane } from "./panes/SharingPane";
 import { YourMacPane } from "./panes/YourMacPane";
+import { SECTIONS } from "./sections";
 
-interface SectionMeta {
-  readonly id: SettingsSection;
-  readonly label: string;
-  readonly summary: string;
-  readonly icon: LucideIcon;
-  readonly tone: "blue" | "green" | "orange" | "grey" | "red" | "purple";
-}
+export { SECTIONS } from "./sections";
 
-export const SECTIONS: ReadonlyArray<SectionMeta> = [
-  {
-    id: "assistants",
-    label: "AI assistants",
-    summary: "ChatGPT, Google, Claude",
-    icon: Bot,
-    tone: "blue",
-  },
-  {
-    id: "autonomy",
-    label: "Autonomy & safety",
-    summary: "How much it does alone",
-    icon: ShieldCheck,
-    tone: "green",
-  },
-  {
-    id: "sharing",
-    label: "Sharing & review",
-    summary: "GitHub and reviewers",
-    icon: Share2,
-    tone: "purple",
-  },
-  {
-    id: "mac",
-    label: "Your Mac",
-    summary: "This computer, remote access",
-    icon: Laptop,
-    tone: "grey",
-  },
-  {
-    id: "appearance",
-    label: "Appearance",
-    summary: "Light, dark, system",
-    icon: SunMoon,
-    tone: "orange",
-  },
-  { id: "privacy", label: "Privacy", summary: "What leaves this Mac", icon: Lock, tone: "green" },
-  {
-    id: "advanced",
-    label: ADVANCED_MODE_LABEL,
-    summary: "Developer interface",
-    icon: Wrench,
-    tone: "grey",
-  },
-  { id: "about", label: "About", summary: "Version and credits", icon: Info, tone: "blue" },
-];
-
-/** System Settings: a section list on the left, one calm pane on the right. */
+/**
+ * System Settings: a section list on the left, one calm pane on the right.
+ * The window title is derived from the route in AppShell, not set here, so
+ * leaving Settings never leaves a stale title behind.
+ */
 export function SettingsScreen({ section }: { readonly section: SettingsSection | null }) {
   const columns = useColumns();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
@@ -93,9 +38,12 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
   const active: SettingsSection | null = section ?? (columns === 1 ? null : "assistants");
   const meta = SECTIONS.find((entry) => entry.id === active) ?? null;
 
-  useEffect(() => {
-    document.title = documentTitle(meta ? `${meta.label} — Settings` : "Settings");
-  }, [meta]);
+  // The only way out of Settings used to be the browser's Back button.
+  const done = (
+    <Button variant="primary" size="sm" onClick={() => navigate(HOME_HREF)}>
+      Done
+    </Button>
+  );
 
   const nav = (
     <nav className="fm-settings__nav" aria-label="Settings sections">
@@ -132,9 +80,11 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
             Settings
           </Button>
         ) : null}
-        <h1 id="fm-settings-title" className="fm-settings__title">
+        <h2 id="fm-settings-title" className="fm-settings__title">
           {meta.label}
-        </h1>
+        </h2>
+        <span className="fm-settings__header-spacer" />
+        {done}
       </header>
       <div className="fm-settings__panes">
         {environmentId === null ? (
@@ -154,7 +104,9 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
         active === null ? (
           <>
             <header className="fm-settings__header">
-              <h1 className="fm-settings__title">Settings</h1>
+              <h2 className="fm-settings__title">Settings</h2>
+              <span className="fm-settings__header-spacer" />
+              {done}
             </header>
             {nav}
           </>

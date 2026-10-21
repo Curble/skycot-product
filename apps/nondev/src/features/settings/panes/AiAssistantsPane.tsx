@@ -7,16 +7,12 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { WELCOME_HREF } from "../../../router";
-import {
-  providerDisplayName,
-  providerForSelection,
-  resolveDefaultModelSelection,
-} from "../../../state/providers";
+import { providerForSelection, resolveDefaultModelSelection } from "../../../state/providers";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
 import { Pill } from "../../../ui/Pill";
-import { PROVIDER_CATALOG, providerForDriver } from "../providerCatalog";
+import { PROVIDER_CATALOG, catalogEntryFor, providerForDriver } from "../providerCatalog";
 import { ProviderBadge, ProviderRow } from "../ProviderRows";
 import { SettingsGroup } from "../SettingsGroup";
 
@@ -45,6 +41,8 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
     providers,
     resolveDefaultModelSelection(providers, null),
   );
+  // One name everywhere: the brand the person pays for, as the rows above say it.
+  const defaultEntry = defaultProvider ? catalogEntryFor(String(defaultProvider.driver)) : null;
 
   return (
     <>
@@ -68,20 +66,16 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
       <SettingsGroup
         title="Used by default"
         footer={
-          defaultProvider
-            ? `New conversations start with ${providerDisplayName(defaultProvider)}, the first assistant that is ready. Pick a different one for a single conversation in ${ADVANCED_MODE_LABEL}.`
+          defaultEntry
+            ? `New conversations start with ${defaultEntry.brand}, the first assistant that is ready. Pick a different one for a single conversation in ${ADVANCED_MODE_LABEL}.`
             : "Once an assistant is ready it will be used for new conversations."
         }
       >
-        {defaultProvider ? (
+        {defaultProvider && defaultEntry ? (
           <ListRow
             leading={<ProviderBadge driver={String(defaultProvider.driver)} />}
-            title={providerDisplayName(defaultProvider)}
-            subtitle={
-              defaultProvider.models.find((model) => model.isDefault)?.name ??
-              defaultProvider.models[0]?.name ??
-              "Ready"
-            }
+            title={defaultEntry.brand}
+            subtitle={`${defaultEntry.runs}. Ready.`}
             trailing={
               <Pill tone="provider" size="sm">
                 Default
@@ -100,6 +94,7 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
           trailing={
             moreOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
           }
+          expanded={moreOpen}
           onClick={() => setMoreOpen((value) => !value)}
         />
         {moreOpen

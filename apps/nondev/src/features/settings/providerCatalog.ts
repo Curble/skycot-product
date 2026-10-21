@@ -43,14 +43,15 @@ export const PROVIDER_CATALOG: ReadonlyArray<ProviderCatalogEntry> = [
     driver: "antigravity",
     brand: "Google",
     runs: "Antigravity, from Google",
-    summary: "Uses your Google account. Installed and signed in for you.",
+    summary: "Uses your Google account. SKYCOT can install it and sign you in from here.",
     primary: true,
   },
   {
     driver: "claudeAgent",
     brand: "Claude",
     runs: "Claude Code, from Anthropic",
-    summary: "Uses your Claude Pro or Max plan. Two short commands in Terminal, once.",
+    summary:
+      "Uses your Claude Pro or Max plan. Two short commands in Terminal (the Mac's built-in text window), once.",
     primary: true,
   },
   { driver: "cursor", brand: "Cursor", runs: "Cursor's agent", summary: "", primary: false },
@@ -124,7 +125,7 @@ export function statusSentence(provider: ServerProvider | undefined): string {
     case "checking":
       return "Checking…";
     case "disabled":
-      return "Switched off in Advanced mode.";
+      return "Switched off. Turn it on to use it here.";
     case "install":
       return "Not on this Mac yet.";
     case "signIn":

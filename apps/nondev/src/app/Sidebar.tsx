@@ -8,24 +8,31 @@ import {
   MessageCircle,
   Settings,
   User,
+  Wrench,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { ADVANCED_MODE_LABEL } from "../brand";
-import { AUTOMATIONS_HREF, PEOPLE_HREF, SETTINGS_HREF, navigate, type Route } from "../router";
+import {
+  AUTOMATIONS_HREF,
+  HOME_HREF,
+  PEOPLE_HREF,
+  SETTINGS_HREF,
+  navigate,
+  type Route,
+} from "../router";
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf } from "../state/conversations";
 import { environmentProjects } from "../state/projects";
 import { Avatar } from "../ui/Avatar";
-import { IconButton } from "../ui/Button";
+import { Button, IconButton } from "../ui/Button";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
-import { Switch } from "../ui/Switch";
 import { AdvancedModeSheet } from "./AdvancedModeSheet";
 import { OpenFolderSheet } from "./OpenFolderSheet";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
 
-/** Source list: smart folders, projects, automations, people, then the user and the Advanced switch. */
+/** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
   route,
   onNavigate,
@@ -41,7 +48,6 @@ export function AppSidebar({
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const [folderSheetOpen, setFolderSheetOpen] = useState(false);
   const [advancedSheetOpen, setAdvancedSheetOpen] = useState(false);
-  const advancedLabelId = useId();
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
@@ -64,6 +70,13 @@ export function AppSidebar({
     apply();
     onNavigate?.();
   };
+  // Filters and projects describe the conversation list, so choosing one from
+  // Settings, Automations or People also goes back to that list.
+  const showList = (apply: () => void) =>
+    select(() => {
+      apply();
+      if (!conversationRoute) navigate(HOME_HREF);
+    });
 
   return (
     <nav className="fm-sidebar" aria-label="Sidebar">
@@ -74,21 +87,21 @@ export function AppSidebar({
             label="All conversations"
             count={rows.length}
             selected={conversationRoute && shell.filter === "all" && shell.projectKey === null}
-            onClick={() => select(() => shell.setFilter("all"))}
+            onClick={() => showList(() => shell.setFilter("all"))}
           />
           <SidebarItem
             icon={CircleAlert}
             label="Waiting for you"
             count={waiting}
             selected={conversationRoute && shell.filter === "waiting"}
-            onClick={() => select(() => shell.setFilter("waiting"))}
+            onClick={() => showList(() => shell.setFilter("waiting"))}
           />
           <SidebarItem
             icon={CheckCircle2}
             label="Ready to look at"
             count={ready}
             selected={conversationRoute && shell.filter === "ready"}
-            onClick={() => select(() => shell.setFilter("ready"))}
+            onClick={() => showList(() => shell.setFilter("ready"))}
           />
         </SidebarSection>
 
@@ -106,7 +119,7 @@ export function AppSidebar({
                 count={countsByProject.get(key) ?? 0}
                 attention={attentionByProject.has(key)}
                 selected={conversationRoute && shell.projectKey === key}
-                onClick={() => select(() => shell.setProjectKey(key))}
+                onClick={() => showList(() => shell.setProjectKey(key))}
               />
             );
           })}
@@ -121,7 +134,7 @@ export function AppSidebar({
         <SidebarSection title="Automations">
           <SidebarItem
             icon={Bell}
-            label="Scheduled jobs"
+            label="Automations"
             selected={route.name === "automations"}
             href={AUTOMATIONS_HREF}
           />
@@ -152,16 +165,16 @@ export function AppSidebar({
           />
         </div>
         <div className="fm-sidebar__footer-row">
-          <span id={advancedLabelId}>
-            {ADVANCED_MODE_LABEL}
-            <span className="fm-sidebar__footer-sub">developer tools</span>
-          </span>
-          <Switch
-            checked={advancedSheetOpen}
-            onChange={(next) => setAdvancedSheetOpen(next)}
-            label={ADVANCED_MODE_LABEL}
-            labelledBy={advancedLabelId}
-          />
+          {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
+          <Button
+            size="sm"
+            variant="quiet"
+            icon={Wrench}
+            block
+            onClick={() => setAdvancedSheetOpen(true)}
+          >
+            Open {ADVANCED_MODE_LABEL}…
+          </Button>
         </div>
       </footer>
 
@@ -171,7 +184,7 @@ export function AppSidebar({
           onClose={() => setFolderSheetOpen(false)}
           environmentId={primaryEnvironmentId}
           onOpened={(projectId) =>
-            select(() =>
+            showList(() =>
               shell.setProjectKey(projectKeyOf({ environmentId: primaryEnvironmentId, projectId })),
             )
           }

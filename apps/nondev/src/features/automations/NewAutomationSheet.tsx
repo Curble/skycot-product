@@ -14,7 +14,7 @@ import { serverEnvironment } from "../../state/server";
 import { environmentThreadShells } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
-import { List, ListRow } from "../../ui/ListRow";
+import { List, ListExtra, ListRow } from "../../ui/ListRow";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { Sheet } from "../../ui/Sheet";
 import { StepBadge } from "../../ui/StepBadge";
@@ -73,13 +73,7 @@ export function NewAutomationSheet({
     .slice(0, 20);
   const schedule = webhook ? { type: "webhook" as const, signature: null } : buildSchedule(draft);
   const trimmedPrompt = prompt.trim();
-  const derivedTitle =
-    title.trim() ||
-    trimmedPrompt
-      .split("\n")[0]!
-      .slice(0, 60)
-      .replace(/[.:!?]\s*$/, "") ||
-    "Automation";
+  const derivedTitle = title.trim() || titleFromPrompt(trimmedPrompt);
   const ready =
     project !== null &&
     modelSelection !== null &&
@@ -290,6 +284,11 @@ export function NewAutomationSheet({
                 </>
               )}
             </div>
+            {draft.preset === "custom" && draft.weekdays.length === 0 ? (
+              <p className="fm-help fm-form__hint" role="status">
+                Pick at least one day.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -328,6 +327,11 @@ export function NewAutomationSheet({
               </select>
             )
           ) : null}
+          {destination === "same" && threads.length > 0 && threadId.length === 0 ? (
+            <p className="fm-help fm-form__hint" role="status">
+              Choose a conversation above.
+            </p>
+          ) : null}
         </div>
 
         <List label="Autonomy">
@@ -345,6 +349,7 @@ export function NewAutomationSheet({
             trailing={
               moreOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
             }
+            expanded={moreOpen}
             onClick={() => setMoreOpen((value) => !value)}
           />
           {moreOpen ? (
@@ -361,12 +366,14 @@ export function NewAutomationSheet({
                 }
               />
               {webhook ? (
-                <div className="fm-sheet-inset">
-                  <Banner tone="warning">
-                    The address you'll get is a key: anyone who has it can start this automation. It
-                    replaces the schedule above.
-                  </Banner>
-                </div>
+                <ListExtra>
+                  <div className="fm-sheet-inset">
+                    <Banner tone="warning">
+                      The address you'll get is a key: anyone who has it can start this automation.
+                      It replaces the schedule above.
+                    </Banner>
+                  </div>
+                </ListExtra>
               ) : null}
             </>
           ) : null}
@@ -381,4 +388,21 @@ export function NewAutomationSheet({
       </div>
     </Sheet>
   );
+}
+
+/**
+ * A title from the first line of the request, cut at a word boundary so the
+ * placeholder never ends mid-word ("…summarise nothi").
+ */
+export function titleFromPrompt(prompt: string): string {
+  const line =
+    prompt
+      .split("\n")[0]
+      ?.trim()
+      .replace(/[.:!?]\s*$/, "") ?? "";
+  if (line.length === 0) return "Automation";
+  if (line.length <= 60) return line;
+  const cut = line.slice(0, 60);
+  const atWord = cut.lastIndexOf(" ");
+  return `${(atWord > 30 ? cut.slice(0, atWord) : cut).replace(/[,;:\s]+$/, "")}…`;
 }

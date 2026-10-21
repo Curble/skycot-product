@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ThreadId } from "@t3tools/contracts";
-import { MessageSquareDashed, SquarePen } from "lucide-react";
+import { Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
 
 import { navigate, threadHref } from "../router";
 import { conversationRowsAtom, filterRows, type ConversationRow } from "../state/conversations";
@@ -10,6 +10,7 @@ import { SearchField } from "../ui/SearchField";
 import { dateGroup, formatRowTime, type DateGroup } from "../features/conversation/status";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
+import { useConnected } from "./useConnection";
 import type { Columns } from "./useColumns";
 
 const GROUP_ORDER: ReadonlyArray<DateGroup> = ["Today", "Yesterday", "This week", "Earlier"];
@@ -26,6 +27,7 @@ export function ConversationList({
 }) {
   const shell = useShellState();
   const rows = useAtomValue(conversationRowsAtom);
+  const connected = useConnected();
   const visible = filterRows(rows, shell.filter, shell.projectKey, shell.search);
   const now = new Date();
   const groups = new Map<DateGroup, ConversationRow[]>();
@@ -35,6 +37,8 @@ export function ConversationList({
     if (list) list.push(row);
     else groups.set(group, [row]);
   }
+  // An empty list before the engine has answered is "not loaded", not "nothing".
+  const waitingForData = rows.length === 0 && !connected;
 
   return (
     <section className="fm-list-column" aria-label="Conversations">
@@ -59,14 +63,18 @@ export function ConversationList({
         </div>
       ) : null}
       <div className="fm-list-column__scroll">
-        {visible.length === 0 ? (
+        {waitingForData ? (
+          <EmptyState icon={Laptop} title="Waiting for your Mac…">
+            Your conversations appear as soon as it's reachable.
+          </EmptyState>
+        ) : visible.length === 0 ? (
           <EmptyState icon={MessageSquareDashed} title={emptyTitle(shell.filter, shell.search)}>
             {emptyText(shell.filter, shell.search, rows.length)}
           </EmptyState>
         ) : (
           GROUP_ORDER.filter((group) => groups.has(group)).map((group) => (
             <div key={group}>
-              {groups.size > 1 ? <div className="fm-list-column__group">{group}</div> : null}
+              <div className="fm-list-column__group">{group}</div>
               {groups.get(group)!.map((row) => (
                 <ConversationRowButton
                   key={`${row.shell.environmentId}:${row.shell.id}`}
