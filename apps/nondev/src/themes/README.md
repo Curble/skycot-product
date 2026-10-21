@@ -47,7 +47,7 @@ Plain-English authoring guide: [`docs/nondev/THEMES.md`](../../../../docs/nondev
   `animation-fill-mode: forwards`.
 - Component code never hard-codes a colour or radius; it reads a token. The glyph
   gradients, `--fm-on-status`, `--fm-on-bubble-me`, `--fm-knob`, `--fm-code-bg`,
-  `--fm-ink`, `--fm-marker*`, `--fm-paper-dot`, `--fm-sidebar-hover` and
+  `--fm-ink`, `--fm-marker*` (`--fm-marker-ink` is the text colour on a marker highlight, dark in both modes for a yellow pen), `--fm-paper-dot`, `--fm-sidebar-hover` and
   `--fm-font-label` exist so themes can reach every surface.
 
 ## Verifying

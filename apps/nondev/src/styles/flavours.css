@@ -257,23 +257,23 @@ html[data-flavour-borders="sketch"] .fm-seg__option[aria-checked="true"] {
 }
 html[data-flavour-borders="sketch"] .fm-seg__option[aria-checked="true"] .fm-seg__tag {
   background: var(--fm-marker);
-  color: var(--fm-ink);
+  /* Not --fm-ink: in dark mode the ink is cream and the marker stays yellow. */
+  color: var(--fm-marker-ink);
 }
+/* Same 40×24 target as the plain switch; only the pen changes. */
 html[data-flavour-borders="sketch"] .fm-switch {
   border: 2px solid var(--fm-ink);
-  width: 34px;
-  height: 20px;
 }
 html[data-flavour-borders="sketch"] .fm-switch__knob {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   top: 2px;
   left: 2px;
   background: var(--fm-ink);
   box-shadow: none;
 }
 html[data-flavour-borders="sketch"] .fm-switch[aria-checked="true"] .fm-switch__knob {
-  left: 16px;
+  left: 18px;
 }
 html[data-flavour-borders="sketch"] .fm-empty__icon,
 html[data-flavour-borders="sketch"] .fm-standalone__icon {

@@ -63,6 +63,7 @@ export const TOKEN_NAMES = [
   "--fm-provider",
   "--fm-marker",
   "--fm-marker-soft",
+  "--fm-marker-ink",
   "--fm-crew-builder",
   "--fm-crew-checker",
   // Bubbles and code

@@ -59,6 +59,8 @@
   --fm-provider: #d97757;
   --fm-marker: #ffcc00;
   --fm-marker-soft: rgba(255, 204, 0, 0.25);
+  /* Text written on a marker highlight; dark in both modes because the marker stays yellow. */
+  --fm-marker-ink: #1d1d1f;
   --fm-crew-builder: #007aff;
   --fm-crew-checker: #34c759;
 
@@ -144,6 +146,7 @@ html.dark {
   --fm-red-ink: #ff6961;
   --fm-marker: #ffd60a;
   --fm-marker-soft: rgba(255, 214, 10, 0.22);
+  --fm-marker-ink: #1d1d1f;
   --fm-crew-builder: #0a84ff;
   --fm-crew-checker: #30d158;
 
