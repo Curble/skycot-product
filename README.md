@@ -1,3 +1,10 @@
+<!-- nondev-seam: readme-attribution — SKYCOT's attribution block; everything below it is upstream's README, unchanged. -->
+
+> **SKYCOT** (https://www.skycot.com) is a plain-language interface for running coding agents, built for business owners rather than developers. It is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc., used under the [MIT License](./LICENSE); upstream's copyright and licence are preserved in [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
+> The engine, provider connectors and the full developer interface ("Advanced mode") are T3 Code's work; SKYCOT adds the `apps/nondev` client and the `nondev/` branding layer, and keeps every other change to upstream to the one-line seams listed in [`SEAM-MANIFEST.md`](./SEAM-MANIFEST.md). SKYCOT's additions are © 2026 SKYCOT, released under the same MIT License.
+> "T3" and "T3 Code" are names of T3 Tools Inc. SKYCOT is an independent product and is **not affiliated with or endorsed by** T3 Tools Inc. Report SKYCOT issues in this repository, not to T3.
+> The install commands below (`t3.codes/install.sh`, `brew install --cask t3-code`, `winget install T3Tools.T3Code`, `npx t3`) install **T3 Code**, not SKYCOT; SKYCOT downloads are at https://www.skycot.com.
+
 # T3 Code
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
