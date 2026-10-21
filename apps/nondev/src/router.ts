@@ -24,6 +24,7 @@ export type Route =
 export const SETTINGS_SECTIONS = [
   "assistants",
   "autonomy",
+  "family",
   "sharing",
   "mac",
   "appearance",

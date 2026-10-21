@@ -6,6 +6,7 @@ import { useConnected } from "../../app/useConnection";
 import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
+import { useFamily } from "../family/FamilyProvider";
 import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
@@ -25,6 +26,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const crew = useCrew();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
+  const family = useFamily();
 
   const active = rows.filter(
     (row) =>
@@ -54,9 +56,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
             </div>
           ) : null}
           <div>
-            {/* No name: the only label the client has is the Mac's, and "Good evening, iMac" is worse than none. */}
+            {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
             <h2 className="fm-home__greeting">
-              <span className="fm-marker-underline">{greeting()}.</span>
+              <span className="fm-marker-underline">
+                {greeting()}
+                {family.enabled && family.profile.childName ? `, ${family.profile.childName}` : ""}.
+              </span>
             </h2>
             <p className="fm-home__sub">
               {summarySentence(working, waiting, ready, rows.length, connected)}

@@ -14,11 +14,14 @@ import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { ListRow, List } from "../../ui/ListRow";
+import { useFamily } from "../family/FamilyProvider";
+import { familyCopy } from "../family/copy";
 import { AboutPane } from "./panes/AboutPane";
 import { AdvancedPane } from "./panes/AdvancedPane";
 import { AiAssistantsPane } from "./panes/AiAssistantsPane";
 import { AppearancePane } from "./panes/AppearancePane";
 import { AutonomyPane } from "./panes/AutonomyPane";
+import { FamilyPane } from "./panes/FamilyPane";
 import { PrivacyPane } from "./panes/PrivacyPane";
 import { SharingPane } from "./panes/SharingPane";
 import { YourMacPane } from "./panes/YourMacPane";
@@ -35,8 +38,11 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
   const columns = useColumns();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
+  const family = useFamily();
+  // The Family profile hides the developer-tools section; Settings › Family keeps the one way in.
+  const sections = family.enabled ? SECTIONS.filter((entry) => entry.id !== "advanced") : SECTIONS;
   const active: SettingsSection | null = section ?? (columns === 1 ? null : "assistants");
-  const meta = SECTIONS.find((entry) => entry.id === active) ?? null;
+  const meta = sections.find((entry) => entry.id === active) ?? null;
 
   // The only way out of Settings used to be the browser's Back button.
   const done = (
@@ -48,7 +54,7 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
   const nav = (
     <nav className="fm-settings__nav" aria-label="Settings sections">
       <List plain label="Settings sections">
-        {SECTIONS.map((entry) => (
+        {sections.map((entry) => (
           <ListRow
             key={entry.id}
             leading={
@@ -67,7 +73,23 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
     </nav>
   );
 
-  const detail = meta ? (
+  const hiddenAdvanced = family.enabled && active === "advanced";
+  const detail = hiddenAdvanced ? (
+    <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
+      <header className="fm-settings__header">
+        <h2 id="fm-settings-title" className="fm-settings__title">
+          Family
+        </h2>
+        <span className="fm-settings__header-spacer" />
+        {done}
+      </header>
+      <div className="fm-settings__panes">
+        <EmptyState icon={Laptop} title={`Hidden by the ${familyCopy.title}`}>
+          A parent can open the developer tools from Settings › Family with the parent code.
+        </EmptyState>
+      </div>
+    </section>
+  ) : meta ? (
     <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
       <header className="fm-settings__header">
         {columns === 1 ? (
@@ -135,6 +157,8 @@ function Pane({
       return <AiAssistantsPane environmentId={environmentId} />;
     case "autonomy":
       return <AutonomyPane environmentId={environmentId} />;
+    case "family":
+      return <FamilyPane environmentId={environmentId} />;
     case "sharing":
       return <SharingPane environmentId={environmentId} />;
     case "mac":

@@ -7,6 +7,7 @@ import {
   Share2,
   ShieldCheck,
   SunMoon,
+  Users,
   Wrench,
 } from "lucide-react";
 
@@ -37,6 +38,13 @@ export const SECTIONS: ReadonlyArray<SectionMeta> = [
     summary: "How much it does alone",
     icon: ShieldCheck,
     tone: "green",
+  },
+  {
+    id: "family",
+    label: "Family",
+    summary: "A safer setup for a child",
+    icon: Users,
+    tone: "orange",
   },
   {
     id: "sharing",
