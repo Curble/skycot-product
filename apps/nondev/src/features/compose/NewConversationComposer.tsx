@@ -1,10 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
+import type { ThreadId } from "@t3tools/contracts";
 import { AlertCircle, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { newMessageId, newThreadId } from "~/lib/utils";
+import { newMessageId, newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CREW_NAME } from "../../brand";
@@ -24,6 +25,7 @@ import {
 import { serverEnvironment } from "../../state/server";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import { threadEnvironment } from "../../state/threads";
+import { vcsActionManager, vcsEnvironment } from "../../state/vcs";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Kbd } from "../../ui/Kbd";
@@ -38,10 +40,19 @@ import {
   type Autonomy,
 } from "./autonomy";
 import { MessageField } from "./MessageField";
+import {
+  branchNameFor,
+  folderReadiness,
+  plainPrivateCopyProblem,
+  PRIVATE_COPY_COPY,
+} from "./privateCopy";
+import { rememberStartNote } from "./startNotes";
 
 /**
  * The Home compose box: project chip, autonomy choice, message. Sending creates
- * a thread in the chosen project, starts the first turn and opens it.
+ * a thread in the chosen project inside its own private copy (a Git worktree,
+ * which is what lets the engine undo and restore), starts the first turn and
+ * opens it.
  */
 export function NewConversationComposer({
   preferredProjectKey,
@@ -182,50 +193,134 @@ function ComposerField({
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const modelSelection = resolveDefaultModelSelection(providers, project);
   const provider = providerForSelection(providers, modelSelection);
-  const createThread = useAtomCommand(threadEnvironment.create, { reportFailure: false });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
+  const cwd = project.workspaceRoot;
+  const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, { reportFailure: false });
+  const initRepository = useAtomCommand(vcsEnvironment.init, { reportFailure: false });
+  const commitAll = useAtomCommand(vcsActionManager.runStackedAction({ environmentId, cwd }), {
+    reportFailure: false,
+  });
+  const [phase, setPhase] = useState<string | null>(null);
 
   const ready = canOperate && modelSelection !== null;
   const trimmed = text.trim();
 
+  /**
+   * The branch the private copy starts from, or the plain reason there can't
+   * be one. A folder with no history gets `git init` and a first saved version
+   * so there is something to copy.
+   */
+  const prepareFolder = async (): Promise<
+    { readonly baseBranch: string } | { readonly reason: string }
+  > => {
+    const first = await refreshStatus({ environmentId, input: { cwd } });
+    if (first._tag === "Failure") {
+      console.warn("[foreman] git status failed:", squashAtomCommandFailure(first));
+      return { reason: "Foreman couldn't read this folder's history." };
+    }
+    let readiness = folderReadiness(first.value);
+    if (readiness.kind === "needs-init") {
+      setPhase(PRIVATE_COPY_COPY.settingUp);
+      const inited = await initRepository({ environmentId, input: { cwd } });
+      if (inited._tag === "Failure") {
+        console.warn("[foreman] git init failed:", squashAtomCommandFailure(inited));
+        return { reason: "Foreman couldn't start tracking changes in this folder." };
+      }
+      const committed = await commitAll({
+        actionId: randomUUID(),
+        action: "commit",
+        commitMessage: PRIVATE_COPY_COPY.firstVersion(project.title),
+      });
+      if (committed._tag === "Failure") {
+        console.warn("[foreman] first commit failed:", squashAtomCommandFailure(committed));
+        return { reason: plainPrivateCopyProblem(squashAtomCommandFailure(committed)) };
+      }
+      const again = await refreshStatus({ environmentId, input: { cwd } });
+      if (again._tag === "Failure")
+        return { reason: "Foreman couldn't read this folder's history." };
+      readiness = folderReadiness(again.value);
+    }
+    if (readiness.kind !== "ready") {
+      return { reason: "This folder isn't on a named branch right now." };
+    }
+    return { baseBranch: readiness.baseBranch };
+  };
+
   const send = async (): Promise<string | null> => {
     if (!ready || trimmed.length === 0 || modelSelection === null) return null;
-    const threadId = newThreadId();
     const runtimeMode = runtimeModeFor(autonomy, provider);
     const createdAt = new Date().toISOString();
-    const created = await createThread({
-      environmentId,
-      input: {
-        threadId,
-        projectId: project.id,
-        // The engine requires a non-empty title; the server regenerates a better one later.
-        title: titleSeedFrom(trimmed),
-        modelSelection,
-        runtimeMode,
-        interactionMode: "default",
-        branch: null,
-        worktreePath: null,
-        createdAt,
-      },
-    });
-    if (created._tag === "Failure") return calm(squashAtomCommandFailure(created));
-    const started = await startTurn({
-      environmentId,
-      input: {
-        threadId,
-        message: { messageId: newMessageId(), role: "user", text: trimmed, attachments: [] },
-        modelSelection,
-        titleSeed: trimmed,
-        runtimeMode,
-        interactionMode: "default",
-        createdAt,
-      },
-    });
+    const message = {
+      messageId: newMessageId(),
+      role: "user",
+      text: trimmed,
+      attachments: [],
+    } as const;
+    const folder = await prepareFolder();
+    const privateCopy =
+      "baseBranch" in folder
+        ? { baseBranch: folder.baseBranch, branch: branchNameFor(trimmed, randomUUID()) }
+        : null;
+
+    const start = (threadId: ThreadId, worktree: typeof privateCopy) =>
+      startTurn({
+        environmentId,
+        input: {
+          threadId,
+          message,
+          modelSelection,
+          titleSeed: trimmed,
+          runtimeMode,
+          interactionMode: "default",
+          createdAt,
+          bootstrap: {
+            createThread: {
+              projectId: project.id,
+              // The engine requires a non-empty title; the server regenerates a better one later.
+              title: titleSeedFrom(trimmed),
+              modelSelection,
+              runtimeMode,
+              interactionMode: "default",
+              branch: worktree?.baseBranch ?? null,
+              worktreePath: null,
+              createdAt,
+            },
+            ...(worktree
+              ? {
+                  prepareWorktree: {
+                    projectCwd: cwd,
+                    baseBranch: worktree.baseBranch,
+                    branch: worktree.branch,
+                    requireWorktree: true,
+                  },
+                }
+              : {}),
+            runSetupScript: true,
+          },
+        },
+      });
+
+    let threadId = newThreadId();
+    setPhase(privateCopy ? PRIVATE_COPY_COPY.makingCopy : null);
+    let started = await start(threadId, privateCopy);
+    let note = "baseBranch" in folder ? null : folder.reason;
+    if (started._tag === "Failure" && privateCopy) {
+      // The copy couldn't be made (an empty repository, a clashing branch…):
+      // still start the conversation, straight in the folder, and say so.
+      const cause = squashAtomCommandFailure(started);
+      console.warn("[foreman] private copy failed, starting in the folder instead:", cause);
+      await deleteThread({ environmentId, input: { threadId } });
+      note = plainPrivateCopyProblem(cause);
+      threadId = newThreadId();
+      setPhase(null);
+      started = await start(threadId, null);
+    }
     if (started._tag === "Failure") {
       await deleteThread({ environmentId, input: { threadId } });
       return calm(squashAtomCommandFailure(started));
     }
+    if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
     writeLastProject({ environmentId, projectId: project.id });
     navigate(threadHref(environmentId, threadId));
     return null;
@@ -254,7 +349,11 @@ function ComposerField({
             <Kbd>Return</Kbd> for a new line
           </>
         ),
-        right: sending ? "Starting…" : provider ? `Using ${providerDisplayName(provider)}` : "",
+        right: sending
+          ? (phase ?? "Starting…")
+          : provider
+            ? `Using ${providerDisplayName(provider)}`
+            : "",
       }}
     />
   );

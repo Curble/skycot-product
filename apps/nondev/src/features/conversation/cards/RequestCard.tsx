@@ -144,7 +144,13 @@ export function RequestCard({
       : projection.runtimeRequests.find((r) => r.id === item.requestId);
   const card = describeRuntimeRequest(item, {
     ...(projectName === null ? {} : { projectName }),
-    ...(project ? { projectRoot: project.workspaceRoot } : {}),
+    // Files live in the thread's private copy when it has one; the project
+    // folder is only "outside" when neither matches.
+    ...(shell?.worktreePath
+      ? { projectRoot: shell.worktreePath }
+      : project
+        ? { projectRoot: project.workspaceRoot }
+        : {}),
     ...(request ? { responseCapability: request.responseCapability.type } : {}),
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
   });
