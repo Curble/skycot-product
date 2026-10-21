@@ -19,3 +19,30 @@ export function shouldShowOnboarding(
   if (providers === null) return false;
   return !anyProviderReady(providers);
 }
+
+export type Audience = "me" | "child";
+export type OnboardingStep = "who" | "family" | "assistant" | "work" | "autonomy" | "look" | "done";
+
+/**
+ * The steps in order for the chosen audience. "Who is this for?" is always
+ * first; the Family set-up step exists only on the child path, and only until
+ * a profile is on (re-running the steps then skips straight to the assistant).
+ */
+export function onboardingSteps(
+  audience: Audience | null,
+  familyEnabled = false,
+): ReadonlyArray<OnboardingStep> {
+  const family: OnboardingStep[] = audience === "child" && !familyEnabled ? ["family"] : [];
+  return ["who", ...family, "assistant", "work", "autonomy", "look", "done"];
+}
+
+/** Whether "Continue" is live on a step; the others never block. */
+export function canContinue(
+  step: OnboardingStep,
+  audience: Audience | null,
+  familyDraftReady: boolean,
+): boolean {
+  if (step === "who") return audience !== null;
+  if (step === "family") return familyDraftReady;
+  return true;
+}

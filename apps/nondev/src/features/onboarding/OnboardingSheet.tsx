@@ -8,9 +8,12 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  KeyRound,
   Palette,
   PartyPopper,
   ShieldCheck,
+  UserRound,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -25,7 +28,7 @@ import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/prefe
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
 import { ThemeGallery } from "../../themes/ThemeGallery";
-import { useActiveTheme } from "../../themes/store";
+import { readActiveThemeId, setActiveTheme, useActiveTheme } from "../../themes/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { List, ListExtra, ListRow } from "../../ui/ListRow";
@@ -43,6 +46,12 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "../compose/autonomy";
+import { FAMILY_THEME_ID, useEnableFamilyWithDefaults } from "../family/applyDefaults";
+import { familyCopy } from "../family/copy";
+import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/family";
+import { useFamily } from "../family/FamilyProvider";
+import { FamilySetupForm } from "../family/FamilySetupForm";
+import { canContinue, onboardingSteps, type Audience, type OnboardingStep } from "./onboarding";
 import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
 import {
   PROVIDER_CATALOG,
@@ -53,10 +62,20 @@ import {
 import { ProviderRow } from "../settings/ProviderRows";
 import { plainFolderPath } from "../../app/folders";
 
-type Step = "assistant" | "work" | "autonomy" | "look" | "done";
-const STEPS: ReadonlyArray<Step> = ["assistant", "work", "autonomy", "look", "done"];
+type Step = OnboardingStep;
 
 const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: string }> = {
+  who: {
+    icon: Users,
+    title: "Who is this for?",
+    description: `${PRODUCT_NAME} can be set up for you, or for a child you look after. The ${familyCopy.title} adds guardrails and a parent code; it can be turned off later in Settings → Family.`,
+  },
+  family: {
+    icon: KeyRound,
+    title: `Set up the ${familyCopy.title}`,
+    description:
+      "A first name for the greeting, and a parent code of 4 to 6 digits. The code guards publishing, automations, the developer tools and turning the profile off.",
+  },
   assistant: {
     icon: Bot,
     title: "Which AI do you already pay for?",
@@ -85,8 +104,11 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
   },
 };
 
+const FAMILY_AUTONOMY_DESCRIPTION = `Fixed by the ${familyCopy.title}: the assistant asks before every change and every command.`;
+
 /**
- * First-run onboarding as one macOS sheet with five short steps. Skippable at
+ * First-run onboarding as one macOS sheet with short steps: who it is for,
+ * (the Family set-up), assistant, folder, autonomy, look, done. Skippable at
  * every step; Settings → AI assistants → "Run the welcome steps again" reopens it.
  */
 export function OnboardingSheet({
@@ -96,9 +118,18 @@ export function OnboardingSheet({
   readonly environmentId: EnvironmentId;
   readonly onClose: () => void;
 }) {
-  const [step, setStep] = useState<Step>("assistant");
-  const index = STEPS.indexOf(step);
+  const family = useFamily();
+  // A profile that is already on cannot be undone from here (that needs the code in
+  // Settings › Family), so the steps start on the child path with the set-up done.
+  const [audience, setAudience] = useState<Audience | null>(family.enabled ? "child" : null);
+  const [draft, setDraft] = useState<FamilySetupDraft>(EMPTY_SETUP_DRAFT);
+  const [step, setStep] = useState<Step>("who");
+  const [finishing, setFinishing] = useState(false);
+  const enableFamily = useEnableFamilyWithDefaults(environmentId);
+  const steps = onboardingSteps(audience, family.enabled);
+  const index = Math.max(0, steps.indexOf(step));
   const meta = STEP_META[step];
+  const childPath = audience === "child";
   const finish = (state: "done" | "skipped") => {
     writeOnboardingState(state);
     onClose();
@@ -107,21 +138,34 @@ export function OnboardingSheet({
   // Escape and the backdrop cancel: they never turn an earlier "done" into
   // "skipped", and a first run that is cancelled simply stays skippable.
   const cancel = () => finish(readOnboardingState() === "done" ? "done" : "skipped");
+  // Only the final button turns the Family profile on; skipping half-way leaves nothing locked.
+  const complete = async () => {
+    if (finishing) return;
+    if (childPath && !family.enabled && setupReady(draft)) {
+      setFinishing(true);
+      await enableFamily({ childName: draft.childName, code: draft.code });
+      setFinishing(false);
+    }
+    finish("done");
+  };
 
   return (
     <Sheet
       open
       onClose={cancel}
       icon={meta.icon}
-      iconTone={step === "autonomy" ? "orange" : "blue"}
+      iconTone={step === "autonomy" ? "orange" : step === "family" ? "grey" : "blue"}
       title={meta.title}
-      description={meta.description}
+      description={
+        step === "autonomy" && childPath ? FAMILY_AUTONOMY_DESCRIPTION : meta.description
+      }
       wide
       dismissOnBackdrop={false}
+      sober={step === "family"}
       actions={
         <>
-          <span className="fm-steps" role="img" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
-            {STEPS.map((entry, position) => (
+          <span className="fm-steps" role="img" aria-label={`Step ${index + 1} of ${steps.length}`}>
+            {steps.map((entry, position) => (
               <span
                 key={entry}
                 className={`fm-steps__dot${position <= index ? " fm-steps__dot--on" : ""}`}
@@ -134,26 +178,142 @@ export function OnboardingSheet({
             </Button>
           ) : null}
           {index > 0 && step !== "done" ? (
-            <Button onClick={() => setStep(STEPS[index - 1]!)}>Back</Button>
+            <Button onClick={() => setStep(steps[index - 1]!)}>Back</Button>
           ) : null}
           {step === "done" ? (
-            <Button variant="primary" onClick={() => finish("done")}>
-              Open {PRODUCT_NAME}
+            <Button variant="primary" disabled={finishing} onClick={() => void complete()}>
+              {finishing ? "Setting up…" : `Open ${PRODUCT_NAME}`}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => setStep(STEPS[index + 1]!)}>
+            <Button
+              variant="primary"
+              disabled={!canContinue(step, audience, setupReady(draft))}
+              onClick={() => setStep(steps[index + 1]!)}
+            >
               Continue
             </Button>
           )}
         </>
       }
     >
+      {step === "who" ? (
+        <WhoStep audience={audience} onAudience={setAudience} familyEnabled={family.enabled} />
+      ) : null}
+      {step === "family" ? <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus /> : null}
       {step === "assistant" ? <AssistantStep environmentId={environmentId} /> : null}
       {step === "work" ? <WorkStep environmentId={environmentId} /> : null}
-      {step === "autonomy" ? <AutonomyStep environmentId={environmentId} /> : null}
-      {step === "look" ? <LookStep /> : null}
-      {step === "done" ? <DoneStep environmentId={environmentId} /> : null}
+      {step === "autonomy" ? (
+        childPath ? (
+          <FamilyAutonomyStep environmentId={environmentId} />
+        ) : (
+          <AutonomyStep environmentId={environmentId} />
+        )
+      ) : null}
+      {step === "look" ? <LookStep preselectWorkshop={childPath} /> : null}
+      {step === "done" ? (
+        <DoneStep
+          environmentId={environmentId}
+          {...(childPath
+            ? { familyFor: family.profile.childName ?? (draft.childName.trim() || null) }
+            : {})}
+        />
+      ) : null}
     </Sheet>
+  );
+}
+
+function WhoStep({
+  audience,
+  onAudience,
+  familyEnabled,
+}: {
+  readonly audience: Audience | null;
+  readonly onAudience: (audience: Audience) => void;
+  readonly familyEnabled: boolean;
+}) {
+  return (
+    <div className="fm-onboarding">
+      <div className="fm-who" role="radiogroup" aria-label="Who is this for?">
+        <WhoCard
+          icon={UserRound}
+          title="Me"
+          text="The usual set-up. Every autonomy level that keeps a safety promise, the developer tools a tap away."
+          checked={audience === "me"}
+          disabled={familyEnabled}
+          onClick={() => onAudience("me")}
+        />
+        <WhoCard
+          icon={Users}
+          title="A child I look after"
+          text={`${familyCopy.title}: the Workshop look, the assistant always asks first, the riskier modes and developer tools hidden, and a parent code for publishing and automations.`}
+          checked={audience === "child"}
+          onClick={() => onAudience("child")}
+        />
+      </div>
+      {familyEnabled ? (
+        <Banner tone="info">
+          The {familyCopy.title} is on {audience === "child" ? "for this browser" : ""}. To set{" "}
+          {PRODUCT_NAME} up for yourself, turn it off first in Settings → Family (parent code).
+        </Banner>
+      ) : (
+        <p className="fm-help">{familyCopy.honesty}</p>
+      )}
+    </div>
+  );
+}
+
+function WhoCard({
+  icon: Icon,
+  title,
+  text,
+  checked,
+  disabled = false,
+  onClick,
+}: {
+  readonly icon: LucideIcon;
+  readonly title: string;
+  readonly text: string;
+  readonly checked: boolean;
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      className={`fm-who__card${checked ? " fm-who__card--on" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="fm-who__icon" aria-hidden>
+        <Icon size={22} strokeWidth={1.7} />
+      </span>
+      <span className="fm-who__title">{title}</span>
+      <span className="fm-who__text">{text}</span>
+    </button>
+  );
+}
+
+function FamilyAutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
+  const policyEnforced = config?.skycotPolicy === true;
+  return (
+    <div className="fm-onboarding">
+      <List label="Autonomy">
+        <ListRow
+          leading={<StepBadge state="ok" icon={ShieldCheck} />}
+          title={`Always asks first (${familyCopy.title})`}
+          subtitle={`${describeAutonomyLevel("askMeFirst", { policyEnforced })} ${AUTONOMY_LEVELS.askMeFirst.hint} The riskier levels are hidden while the profile is on.`}
+          trailing={
+            <Pill tone="neutral" size="sm">
+              Fixed
+            </Pill>
+          }
+        />
+      </List>
+      <p className="fm-help">{hardRulesStatement(policyEnforced, PRODUCT_NAME)}</p>
+    </div>
   );
 }
 
@@ -363,8 +523,12 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
   );
 }
 
-function LookStep() {
+function LookStep({ preselectWorkshop }: { readonly preselectWorkshop: boolean }) {
   const theme = useActiveTheme();
+  // The child path arrives with Workshop already ticked; a look chosen earlier stands.
+  useEffect(() => {
+    if (preselectWorkshop && readActiveThemeId() === "classic") setActiveTheme(FAMILY_THEME_ID);
+  }, [preselectWorkshop]);
   return (
     <div className="fm-onboarding">
       <ThemeGallery compact showActions={false} label="Pick a look" />
@@ -376,7 +540,14 @@ function LookStep() {
   );
 }
 
-function DoneStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
+function DoneStep({
+  environmentId,
+  familyFor,
+}: {
+  readonly environmentId: EnvironmentId;
+  /** Undefined off the child path; the child's name (or null for none) on it. */
+  readonly familyFor?: string | null;
+}) {
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const projects = useAtomValue(environmentProjects.projectsAtom).filter(
     (project) => project.environmentId === environmentId,
@@ -416,13 +587,24 @@ function DoneStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
               : "Open a folder from the sidebar any time."
           }
         />
+        {familyFor !== undefined ? (
+          <ListRow
+            leading={<StepBadge state="done" />}
+            title={familyFor ? `${familyCopy.title} for ${familyFor}` : `${familyCopy.title} on`}
+            subtitle="Parent code set. Change it or turn the profile off in Settings → Family."
+          />
+        ) : null}
         <ListRow
           leading={<StepBadge state="done" />}
-          title={autonomyLabel ?? "Ask me first"}
-          subtitle="Your default autonomy. Change it in Settings → Autonomy & safety."
+          title={familyFor !== undefined ? "Ask me first" : (autonomyLabel ?? "Ask me first")}
+          subtitle={
+            familyFor !== undefined
+              ? `Fixed by the ${familyCopy.title}.`
+              : "Your default autonomy. Change it in Settings → Autonomy & safety."
+          }
           trailing={
             <Pill tone="neutral" size="sm">
-              Default
+              {familyFor !== undefined ? "Fixed" : "Default"}
             </Pill>
           }
         />
