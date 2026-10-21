@@ -8,8 +8,8 @@ import {
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { ChevronLeft, Clock, MessageSquareDashed, Square } from "lucide-react";
-import { type ComponentType, lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
+import { ChevronLeft, Clock, MessageSquareDashed, Receipt, Square } from "lucide-react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -34,30 +34,18 @@ import { Pill } from "../../ui/Pill";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
+import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
+import { latestReviewable } from "../review";
 import { describeThreadStatus } from "./status";
 import { Timeline } from "./Timeline";
 
-interface ReviewSectionProps {
-  readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
+/** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
+function scrollToCheckpoint(checkpointId: string) {
+  document
+    .querySelector(`[data-checkpoint-id="${CSS.escape(checkpointId)}"]`)
+    ?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
-
-// The review feature ships separately. Resolve it through a glob so this file
-// builds whether or not features/review/ReviewSection.tsx exists yet; when it
-// does, it mounts between the strip and the stream.
-const reviewSectionModules = import.meta.glob<{
-  readonly default?: ComponentType<ReviewSectionProps>;
-  readonly ReviewSection?: ComponentType<ReviewSectionProps>;
-}>("../review/ReviewSection.tsx");
-const loadReviewSection = Object.values(reviewSectionModules)[0];
-const ReviewSection: ComponentType<ReviewSectionProps> | null = loadReviewSection
-  ? lazy(async () => {
-      const module = await loadReviewSection();
-      const Component = module.ReviewSection ?? module.default;
-      return { default: Component ?? (() => null) };
-    })
-  : null;
 
 /**
  * One conversation: contact header, status strip, the stream, and the reply
@@ -102,6 +90,19 @@ export function ConversationView({
 
   const projectName = project?.title ?? null;
 
+  // When a run finishes with file changes, its What-changed card is the thing
+  // to read next: bring it into view once, and keep a pill in the strip that
+  // jumps back to it.
+  const latest = projection ? (latestReviewable(projection) ?? null) : null;
+  const latestId = latest?.id ?? null;
+  const seenLatest = useRef<string | null>(null);
+  useEffect(() => {
+    if (latestId === null || latestId === seenLatest.current) return;
+    seenLatest.current = latestId;
+    scrollToCheckpoint(latestId);
+  }, [latestId, seenLatest]);
+  const startNote = useStartNote(threadId);
+
   const [publishOpen, setPublishOpen] = useState(false);
   const publish = usePublishOverview({
     environmentId,
@@ -144,8 +145,19 @@ export function ConversationView({
       {shell && status ? (
         <div className="fm-strip">
           <Pill tone={status.tone} size="sm">
-            {status.headline}
+            {latestId !== null && status.kind === "ready" ? "Done" : status.headline}
           </Pill>
+          {latestId !== null && !active ? (
+            <Pill
+              tone="ok"
+              size="sm"
+              icon={Receipt}
+              label="Jump to what changed"
+              onClick={() => scrollToCheckpoint(latestId)}
+            >
+              Ready to look at
+            </Pill>
+          ) : null}
           {elapsed ? (
             <span className="fm-strip__time">
               <Clock size={13} strokeWidth={1.8} aria-hidden />
@@ -174,10 +186,8 @@ export function ConversationView({
         </Banner>
       ) : null}
 
-      {ReviewSection ? (
-        <Suspense fallback={null}>
-          <ReviewSection environmentId={environmentId} threadId={threadId} />
-        </Suspense>
+      {startNote && shell && shell.worktreePath === null ? (
+        <Banner tone="info">{startNote}</Banner>
       ) : null}
 
       {projection === null ? (

@@ -1,18 +1,13 @@
-// Engine access for the Publish flow. Mirrors apps/web's state/vcs.ts,
-// state/source-control.ts and state/orchestration.ts, but the pull-request
-// pieces are built directly from the RPC factories: this client's runtime has
-// no PullRequestDiffLoader layer, which `createPullRequestEnvironmentAtoms`
+// Engine access for the Publish flow. The Git and orchestration atoms are the
+// client-wide ones in src/state/vcs.ts; the pull-request pieces are built
+// directly from the RPC factories because this client's runtime has no
+// PullRequestDiffLoader layer, which `createPullRequestEnvironmentAtoms`
 // requires for diff loading we never do here.
 import {
   createEnvironmentRpcCommand,
   createEnvironmentRpcQueryAtomFamily,
 } from "@t3tools/client-runtime/state/runtime";
-import { createOrchestrationEnvironmentAtoms } from "@t3tools/client-runtime/state/orchestration";
 import { createSourceControlEnvironmentAtoms } from "@t3tools/client-runtime/state/source-control";
-import {
-  createVcsActionManager,
-  createVcsEnvironmentAtoms,
-} from "@t3tools/client-runtime/state/vcs";
 import {
   AuthSourceControlWriteScope,
   type EnvironmentId,
@@ -25,10 +20,9 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { connectionAtomRuntime } from "../../connection/runtime";
 import { environmentSession } from "../../state/session";
 
-export const vcsEnvironment = createVcsEnvironmentAtoms(connectionAtomRuntime);
-export const vcsActionManager = createVcsActionManager(connectionAtomRuntime);
+export { orchestrationEnvironment, vcsActionManager, vcsEnvironment } from "../../state/vcs";
+
 export const sourceControlEnvironment = createSourceControlEnvironmentAtoms(connectionAtomRuntime);
-export const orchestrationEnvironment = createOrchestrationEnvironmentAtoms(connectionAtomRuntime);
 
 export const pullRequestDetail = createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
   label: "nondev-publish:pull-request-detail",

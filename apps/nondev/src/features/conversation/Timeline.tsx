@@ -7,7 +7,7 @@
 // back to a quiet narrated line for anything unregistered.
 import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@t3tools/contracts";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { describeTurnItem } from "../../plain/narration";
 import { Bubble, DayDivider, TypingIndicator } from "../../ui/Bubble";
@@ -83,9 +83,37 @@ export function Timeline({
   const items = projection.turnItems;
   const startedAt = shell?.createdAt ?? null;
   const entries = groupTimelineItems(items);
+  const stream = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  // Follow the newest message like Messages does, but only while the reader is
+  // already at the bottom; scrolling up to re-read something pins the view.
+  const follow = useRef(true);
+  useEffect(() => {
+    const scroller = stream.current;
+    const content = inner.current;
+    if (!scroller || !content) return;
+    scroller.scrollTop = scroller.scrollHeight;
+    const observer = new ResizeObserver(() => {
+      if (follow.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+  const onScroll = () => {
+    const scroller = stream.current;
+    if (!scroller) return;
+    follow.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
+  };
   return (
-    <div className="fm-stream" role="log" aria-live="polite" aria-label="Conversation">
-      <div className="fm-stream__inner">
+    <div
+      ref={stream}
+      className="fm-stream"
+      role="log"
+      aria-live="polite"
+      aria-label="Conversation"
+      onScroll={onScroll}
+    >
+      <div ref={inner} className="fm-stream__inner">
         {startedAt ? <DayDivider>{formatDayDivider(startedAt)}</DayDivider> : null}
         {entries.map((entry) => {
           if (entry.kind === "work") {

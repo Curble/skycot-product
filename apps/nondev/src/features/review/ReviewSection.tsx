@@ -17,7 +17,7 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
 import { randomUUID } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
@@ -34,6 +34,7 @@ import { planGitIntent } from "../../plain/git";
 import { describeCheckpoint } from "../../plain/versions";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
+import { orchestrationEnvironment, vcsActionManager, vcsEnvironment } from "../../state/vcs";
 import { environmentThreads, environmentThreadShells } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
@@ -44,9 +45,7 @@ import { StepBadge } from "../../ui/StepBadge";
 import { RestoreSheet, plainRestoreProblem } from "../versions/RestoreSheet";
 import { formatVersionTime, useVersionsTimeline } from "../versions/timeline";
 import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
-import { pinReview, useHasPinnedReview } from "./pinnedReviews";
-import { reviewOrchestration, reviewVcs, reviewVcsActions } from "./state";
-import { latestReviewable, reviewTargetFor } from "./turnReview";
+import { reviewTargetFor } from "./turnReview";
 
 const CodeChanges = lazy(() => import("./CodeChanges"));
 
@@ -63,11 +62,11 @@ const AREA_ICON: Record<ChangeArea, LucideIcon> = {
  * per-area lines, calm flags, the real diff behind a disclosure, and the three
  * decisions — Keep (git commit), Undo (checkpoint rollback), Ask for a tweak.
  *
- * Standalone: it subscribes to the thread itself, so the publish agent can mount
- * it anywhere with just `{ environmentId, threadId }`; without `checkpointId` it
- * reviews the newest turn that changed files. Before/after pictures appear only
- * when the engine supplies them, which it does not yet — so nothing is shown in
- * their place.
+ * Standalone: it subscribes to the thread itself, so it can be mounted anywhere
+ * with just `{ environmentId, threadId }`; without `checkpointId` it reviews the
+ * newest turn that changed files. The stream mounts one per checkpoint (see
+ * registerCheckpoint.tsx). Before/after pictures appear only when the engine
+ * supplies them, which it does not yet — so nothing is shown in their place.
  */
 export function ReviewSection({
   environmentId,
@@ -85,23 +84,15 @@ export function ReviewSection({
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
   const target = projection ? reviewTargetFor(projection, threadId, checkpointId) : null;
-  const latestId = projection ? (latestReviewable(projection)?.id ?? null) : null;
-  const isLatest = target !== null && target.checkpoint.id === latestId;
-
-  // A card mounted without a checkpointId is the pinned "latest" review; the
-  // stream's copy of that same turn hides itself while one is mounted.
-  const pinnedHere = checkpointId === undefined;
-  useEffect(() => (pinnedHere ? pinReview(threadId) : undefined), [pinnedHere, threadId]);
-  const hasPinned = useHasPinnedReview(threadId);
 
   const timeline = useVersionsTimeline(environmentId, threadId, shell);
   const kept = useKeptVersions(threadId);
 
   const cwd = shell?.worktreePath ?? project?.workspaceRoot ?? null;
   const gitStatus = useEnvironmentQuery(
-    cwd === null ? null : reviewVcs.status({ environmentId, input: { cwd } }),
+    cwd === null ? null : vcsEnvironment.status({ environmentId, input: { cwd } }),
   );
-  const runKeep = useAtomCommand(reviewVcsActions.runStackedAction({ environmentId, cwd }), {
+  const runKeep = useAtomCommand(vcsActionManager.runStackedAction({ environmentId, cwd }), {
     reportFailure: false,
   });
 
@@ -112,17 +103,16 @@ export function ReviewSection({
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoRequested, setUndoRequested] = useState(false);
 
-  // The newest turn's diff loads at once (it tells new files from edited ones,
-  // which the checkpoint summary does not); older cards wait for the disclosure.
+  // The turn's diff loads with the card: the engine's checkpoint summary calls
+  // every file "modified", so only the diff can tell a new page from an edit.
   const diffInput = target?.diffInput ?? null;
   const diff = useEnvironmentQuery(
-    (showCode || isLatest) && diffInput !== null
-      ? reviewOrchestration.turnDiff({ environmentId, input: diffInput })
+    diffInput !== null
+      ? orchestrationEnvironment.turnDiff({ environmentId, input: diffInput })
       : null,
   );
 
   if (!projection || !target || target.checkpoint.files.length === 0) return null;
-  if (!pinnedHere && hasPinned && isLatest) return null;
   const { checkpoint, run, before } = target;
 
   const fromDiff = diff.data ? describeTurnDiff(diff.data.diff) : null;
@@ -138,14 +128,16 @@ export function ReviewSection({
 
   if (run?.status === "rolled_back") {
     return (
-      <Card label="What changed (undone)" tinted>
-        <CardHeader
-          icon={Undo2}
-          tone="grey"
-          title="Undone"
-          subtitle={`${what.summary} Everything is back to how it was before this change.`}
-        />
-      </Card>
+      <div className="fm-review" data-checkpoint-id={checkpoint.id}>
+        <Card label="What changed (undone)" tinted>
+          <CardHeader
+            icon={Undo2}
+            tone="grey"
+            title="Undone"
+            subtitle={`${what.summary} Everything is back to how it was before this change.`}
+          />
+        </Card>
+      </div>
     );
   }
 
@@ -234,7 +226,7 @@ export function ReviewSection({
         : "Keeping doesn't make it live — that's the next step."));
 
   return (
-    <>
+    <div className="fm-review" data-checkpoint-id={checkpoint.id}>
       <Card label="What changed">
         <CardHeader
           icon={Receipt}
@@ -366,7 +358,7 @@ export function ReviewSection({
         versionNumber={before ? (timeline.numbers.get(before.id) ?? null) : null}
         onRequested={() => setUndoRequested(true)}
       />
-    </>
+    </div>
   );
 }
 
