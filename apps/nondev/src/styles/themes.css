@@ -153,8 +153,21 @@
   position: absolute;
   left: 7%;
   bottom: 8%;
+  right: 46%;
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.fm-theme-card__crew-names {
+  font-size: calc(8px * var(--fm-text-scale));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--tc-text);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fm-theme-card__text {
   min-width: 0;
@@ -259,7 +272,9 @@
   font-weight: 500;
 }
 .fm-colour-field__value {
+  box-sizing: border-box;
   width: 100%;
+  min-height: 24px;
   margin-top: 2px;
   padding: 2px 6px;
   border: 1px solid var(--fm-sep);

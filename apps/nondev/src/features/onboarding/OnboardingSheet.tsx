@@ -28,7 +28,12 @@ import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/prefe
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
 import { ThemeGallery } from "../../themes/ThemeGallery";
-import { readActiveThemeId, setActiveTheme, useActiveTheme } from "../../themes/store";
+import {
+  readActiveThemeId,
+  setActiveTheme,
+  useActiveTheme,
+  useShownTheme,
+} from "../../themes/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { List, ListExtra, ListRow } from "../../ui/ListRow";
@@ -95,7 +100,7 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
     icon: Palette,
     title: "Pick a look",
     description:
-      "How the app looks is up to you; what it does never changes. Hover a card to try it on, click to keep it. You can change this any time in Settings → Appearance.",
+      "How the app looks is up to you; what it does never changes. Hover a card to try it on, click to keep it: a clicked look stays even if you skip the rest. You can change this any time in Settings → Appearance.",
   },
   done: {
     icon: PartyPopper,
@@ -245,7 +250,7 @@ function WhoStep({
         <WhoCard
           icon={Users}
           title="A child I look after"
-          text={`${familyCopy.title}: the Workshop look, the assistant always asks first, the riskier modes and developer tools hidden, and a parent code for publishing and automations.`}
+          text={`${familyCopy.title}: the Workshop look (unless you've picked another), the assistant always asks first, the riskier modes and developer tools hidden, and a parent code for publishing and automations.`}
           checked={audience === "child"}
           onClick={() => onAudience("child")}
         />
@@ -524,7 +529,8 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
 }
 
 function LookStep({ preselectWorkshop }: { readonly preselectWorkshop: boolean }) {
-  const theme = useActiveTheme();
+  // Follows a hover/focus preview too, so the sentence names the look on screen.
+  const theme = useShownTheme();
   // The child path arrives with Workshop already ticked; a look chosen earlier stands.
   useEffect(() => {
     if (preselectWorkshop && readActiveThemeId() === "classic") setActiveTheme(FAMILY_THEME_ID);

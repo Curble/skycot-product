@@ -88,8 +88,20 @@ export function readActiveTheme(): SkycotTheme {
   return themeById(readActiveThemeId()) ?? CLASSIC_THEME;
 }
 
+let previewing: SkycotTheme | null = null;
+
 export function useActiveTheme(): SkycotTheme {
   return useSyncExternalStore(subscribe, readActiveTheme, () => CLASSIC_THEME);
+}
+
+/** The theme on the page right now: a hover/focus/editor preview when there is one, else the stored choice. */
+export function readShownTheme(): SkycotTheme {
+  return previewing ?? readActiveTheme();
+}
+
+/** For copy that should follow a preview too (crew names, "the Paper look"), not only the saved choice. */
+export function useShownTheme(): SkycotTheme {
+  return useSyncExternalStore(subscribe, readShownTheme, () => CLASSIC_THEME);
 }
 
 export function useThemes(): ReadonlyArray<SkycotTheme> {
@@ -108,8 +120,6 @@ function paint(theme: SkycotTheme, mode: Mode) {
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (meta) meta.content = colors.toolbar;
 }
-
-let previewing: SkycotTheme | null = null;
 
 /** Puts `theme` on the page for the current mode without changing the stored choice. */
 function show(theme: SkycotTheme, mode: Mode = currentMode()) {
@@ -137,12 +147,14 @@ export function setActiveTheme(id: string): void {
 export function previewTheme(theme: SkycotTheme): void {
   previewing = theme;
   show(theme);
+  notify();
 }
 
 export function endPreview(): void {
   if (previewing === null) return;
   previewing = null;
   show(readActiveTheme());
+  notify();
 }
 
 export type ImportOutcome =

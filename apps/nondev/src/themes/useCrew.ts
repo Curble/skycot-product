@@ -3,7 +3,7 @@
 // so no screen ever shows an empty name.
 import { CREW_NAME } from "../brand";
 import type { SkycotTheme } from "./schema";
-import { useActiveTheme } from "./store";
+import { useShownTheme } from "./store";
 
 export interface CrewMember {
   readonly name: string;
@@ -57,5 +57,6 @@ export function possessive(name: string): string {
 }
 
 export function useCrew(): Crew {
-  return crewFor(useActiveTheme());
+  // The shown theme, so trying a look on (or typing a name in the editor) renames the crew at once.
+  return crewFor(useShownTheme());
 }

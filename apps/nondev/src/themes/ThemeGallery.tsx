@@ -1,12 +1,14 @@
 // The theme picker: live preview cards drawn from each theme's `preview`
-// colours and flavour, the active one ticked. Hovering or focusing a card tries
-// it on for a moment; clicking keeps it. Settings adds import / export / share /
-// duplicate under the grid; onboarding shows the compact grid alone.
+// colours and flavour, the active one ticked. A card tries its look on for as
+// long as the pointer or keyboard focus rests on it; clicking (Space, Enter)
+// keeps it. Settings adds import / export / share / duplicate / remove under the
+// grid; onboarding shows the compact grid alone.
 import { Check, Copy, Download, PencilLine, Trash2, Upload } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
+import { Sheet } from "../ui/Sheet";
 import { isBuiltInThemeId } from "./library";
 import { serializeTheme, type SkycotTheme } from "./schema";
 import {
@@ -19,9 +21,6 @@ import {
   useThemes,
 } from "./store";
 import { ThemeEditorSheet } from "./ThemeEditorSheet";
-
-/** How long a hover/focus preview stays before the real theme comes back. */
-export const PREVIEW_MS = 1500;
 
 export function ThemeGallery({
   compact = false,
@@ -37,38 +36,66 @@ export function ThemeGallery({
   const builtIn = themes.filter((theme) => isBuiltInThemeId(theme.id));
   const custom = themes.filter((theme) => !isBuiltInThemeId(theme.id));
   const [problems, setProblems] = useState<ReadonlyArray<string> | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // A notice may carry the theme it just removed, so Undo can bring it back.
+  const [notice, setNotice] = useState<{
+    readonly text: string;
+    readonly removed?: SkycotTheme;
+  } | null>(null);
   const [editing, setEditing] = useState<SkycotTheme | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const previewTimer = useRef<number | null>(null);
 
   // Leaving the gallery always puts the chosen theme back.
-  useEffect(
-    () => () => {
-      if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-      endPreview();
-    },
-    [],
-  );
+  useEffect(() => () => endPreview(), []);
 
+  // The preview lasts while the pointer or focus is on the card: no timer, so a
+  // keyboard user reading a card is not snapped back to the old look mid-thought.
   const startPreview = (theme: SkycotTheme) => {
-    if (theme.id === active.id) return;
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-    previewTheme(theme);
-    previewTimer.current = window.setTimeout(() => {
-      previewTimer.current = null;
-      endPreview();
-    }, PREVIEW_MS);
+    if (theme.id === active.id) endPreview();
+    else previewTheme(theme);
   };
-  const stopPreview = () => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-    previewTimer.current = null;
-    endPreview();
-  };
+  const stopPreview = () => endPreview();
   const choose = (theme: SkycotTheme) => {
     stopPreview();
     setActiveTheme(theme.id);
     setNotice(null);
+  };
+
+  // Radio-group keyboard pattern: one tab stop, arrows move (and preview), Space/Enter keep.
+  const moveWithin = (event: KeyboardEvent<HTMLDivElement>) => {
+    const delta =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : event.key === "Home"
+            ? -Infinity
+            : event.key === "End"
+              ? Infinity
+              : 0;
+    if (delta === 0) return;
+    const cards = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')];
+    const index = cards.findIndex((card) => card === document.activeElement);
+    if (cards.length === 0) return;
+    event.preventDefault();
+    const next = !Number.isFinite(delta)
+      ? delta < 0
+        ? 0
+        : cards.length - 1
+      : (Math.max(index, 0) + delta + cards.length) % cards.length;
+    cards[next]?.focus();
+  };
+
+  const remove = () => {
+    const theme = active;
+    removeCustomTheme(theme.id);
+    setConfirmRemove(false);
+    setNotice({ text: `Removed “${theme.name}”. Back to Classic.`, removed: theme });
+  };
+  const undoRemove = (theme: SkycotTheme) => {
+    const outcome = importTheme(theme);
+    if (outcome.ok) setActiveTheme(outcome.theme.id);
+    setNotice({ text: `“${theme.name}” is back under My themes.` });
   };
 
   const onImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -84,11 +111,11 @@ export function ThemeGallery({
       return;
     }
     setActiveTheme(outcome.theme.id);
-    setNotice(
-      outcome.replaced
+    setNotice({
+      text: outcome.replaced
         ? `Updated “${outcome.theme.name}” and switched to it.`
         : `Added “${outcome.theme.name}” to My themes and switched to it.`,
-    );
+    });
   };
 
   const exportActive = () => {
@@ -104,34 +131,42 @@ export function ThemeGallery({
   };
 
   const share = async () => {
+    setProblems(null);
     try {
       await navigator.clipboard.writeText(serializeTheme(active));
-      setNotice(
-        `Copied “${active.name}” as text. Paste it to a friend; they import it from this screen.`,
-      );
+      setNotice({
+        text: `Copied “${active.name}” as text. Paste it to a friend; they import it from this screen.`,
+      });
     } catch {
       setProblems(["Couldn't reach the clipboard. Use “Export this theme” instead."]);
     }
   };
 
-  const grid = (list: ReadonlyArray<SkycotTheme>) => (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className={`fm-themes${compact ? " fm-themes--compact" : ""}`}
-    >
-      {list.map((theme) => (
-        <ThemePreviewCard
-          key={theme.id}
-          theme={theme}
-          checked={theme.id === active.id}
-          onChoose={() => choose(theme)}
-          onPreviewStart={() => startPreview(theme)}
-          onPreviewEnd={stopPreview}
-        />
-      ))}
-    </div>
-  );
+  const grid = (list: ReadonlyArray<SkycotTheme>) => {
+    // The ticked card is the group's tab stop; a group without one (My themes
+    // while a built-in is active) offers its first card.
+    const tabStop = list.find((theme) => theme.id === active.id) ?? list[0];
+    return (
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className={`fm-themes${compact ? " fm-themes--compact" : ""}`}
+        onKeyDown={moveWithin}
+      >
+        {list.map((theme) => (
+          <ThemePreviewCard
+            key={theme.id}
+            theme={theme}
+            checked={theme.id === active.id}
+            tabbable={theme === tabStop}
+            onChoose={() => choose(theme)}
+            onPreviewStart={() => startPreview(theme)}
+            onPreviewEnd={stopPreview}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -162,12 +197,9 @@ export function ThemeGallery({
                 size="sm"
                 variant="destructive"
                 icon={Trash2}
-                onClick={() => {
-                  removeCustomTheme(active.id);
-                  setNotice(`Removed “${active.name}”. Back to Classic.`);
-                }}
+                onClick={() => setConfirmRemove(true)}
               >
-                Remove
+                Remove…
               </Button>
             )}
             <input
@@ -193,16 +225,45 @@ export function ThemeGallery({
           ) : null}
           {notice ? (
             <div className="fm-themes__problems">
-              <Banner tone="info">{notice}</Banner>
+              <Banner
+                tone="info"
+                action={
+                  notice.removed ? (
+                    <Button size="sm" onClick={() => undoRemove(notice.removed!)}>
+                      Undo
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {notice.text}
+              </Banner>
             </div>
           ) : null}
+          <Sheet
+            open={confirmRemove}
+            onClose={() => setConfirmRemove(false)}
+            icon={Trash2}
+            iconTone="red"
+            title={`Remove “${active.name}”?`}
+            description="It leaves My themes and this browser, and the look goes back to Classic. Export it first if you might want it later; Undo in the notice brings it back until you leave this screen."
+            sober
+            dismissOnBackdrop={false}
+            actions={
+              <>
+                <Button onClick={() => setConfirmRemove(false)}>Keep it</Button>
+                <Button variant="destructive" filled onClick={remove}>
+                  Remove
+                </Button>
+              </>
+            }
+          />
           {editing ? (
             <ThemeEditorSheet
               base={editing}
               onClose={() => setEditing(null)}
               onSaved={(theme) => {
                 setEditing(null);
-                setNotice(`Saved “${theme.name}” under My themes and switched to it.`);
+                setNotice({ text: `Saved “${theme.name}” under My themes and switched to it.` });
               }}
             />
           ) : null}
@@ -215,12 +276,15 @@ export function ThemeGallery({
 export function ThemePreviewCard({
   theme,
   checked,
+  tabbable = true,
   onChoose,
   onPreviewStart,
   onPreviewEnd,
 }: {
   readonly theme: SkycotTheme;
   readonly checked: boolean;
+  /** Roving tabindex: only one card in a group is in the Tab order. */
+  readonly tabbable?: boolean;
   readonly onChoose: () => void;
   readonly onPreviewStart?: () => void;
   readonly onPreviewEnd?: () => void;
@@ -245,6 +309,7 @@ export function ThemePreviewCard({
       type="button"
       role="radio"
       aria-checked={checked}
+      tabIndex={tabbable ? 0 : -1}
       aria-labelledby={`${id}-name`}
       aria-describedby={theme.description ? `${id}-desc` : undefined}
       className={classes}
@@ -265,10 +330,17 @@ export function ThemePreviewCard({
           <span className="fm-theme-card__crew" />
           <span className="fm-theme-card__me" />
         </span>
-        {theme.crew && theme.flavour.avatars === "characters" ? (
+        {theme.crew ? (
           <span className="fm-theme-card__faces">
-            <MiniFace color={theme.crew.builder.color} ink={theme.preview.text} />
-            <MiniFace color={theme.crew.checker.color} ink={theme.preview.text} />
+            {theme.flavour.avatars === "characters" ? (
+              <>
+                <MiniFace color={theme.crew.builder.color} ink={theme.preview.text} />
+                <MiniFace color={theme.crew.checker.color} ink={theme.preview.text} />
+              </>
+            ) : null}
+            <span className="fm-theme-card__crew-names">
+              {theme.crew.builder.name} · {theme.crew.checker.name}
+            </span>
           </span>
         ) : null}
         <span className="fm-theme-card__button" />

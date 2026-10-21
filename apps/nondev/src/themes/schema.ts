@@ -137,12 +137,20 @@ const TokenValue = Schema.String.check(
   }),
 );
 
+/**
+ * A pattern check whose failure reads as a sentence ("must be a colour such as
+ * …"), never the regular expression itself, which is what `Schema.isPattern`
+ * would print to a theme author.
+ */
+const shaped = (pattern: RegExp, what: string) =>
+  Schema.makeFilter((value: string) => pattern.test(value) || `must be ${what}`, { title: what });
+
 /** Plain colour for previews and the crew: hex, rgb(a), hsl(a) or a CSS colour word. */
 export const COLOR_PATTERN =
   /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s/]+\)|hsla?\([0-9.,%\sdeg/]+\)|[a-zA-Z]{3,24})$/;
 const Color = Schema.String.check(
   Schema.isMaxLength(64),
-  Schema.isPattern(COLOR_PATTERN, { title: "a colour such as #ff9500 or rgba(0,0,0,0.5)" }),
+  shaped(COLOR_PATTERN, "a colour such as #ff9500 or rgba(0,0,0,0.5)"),
 );
 
 const TokenSet = Schema.Record(Schema.Literals(TOKEN_NAMES), Schema.optional(TokenValue));
@@ -168,16 +176,12 @@ export const Flavour = Schema.Struct({
 export const SkycotTheme = Schema.Struct({
   format: Schema.Literal(THEME_FORMAT),
   id: Schema.String.check(
-    Schema.isPattern(/^[a-z0-9][a-z0-9-]{1,40}$/, {
-      title: "lowercase letters, digits and dashes, 2 to 41 characters",
-    }),
+    shaped(/^[a-z0-9][a-z0-9-]{1,40}$/, "lowercase letters, digits and dashes, 2 to 41 characters"),
   ),
   name: ShortText(60),
   author: Schema.optionalKey(ShortText(80)),
   description: Schema.optionalKey(ShortText(200)),
-  version: Schema.String.check(
-    Schema.isPattern(/^\d+(\.\d+){0,2}$/, { title: "a version like 1 or 1.2.0" }),
-  ),
+  version: Schema.String.check(shaped(/^\d+(\.\d+){0,2}$/, "a version like 1 or 1.2.0")),
   tokens: Schema.Struct({ light: TokenSet, dark: TokenSet }),
   flavour: Flavour,
   crew: Schema.optionalKey(Schema.Struct({ builder: CrewMember, checker: CrewMember })),
