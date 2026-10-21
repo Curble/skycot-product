@@ -1,10 +1,17 @@
 // Plain-language status for a conversation row and header, derived from the
 // shell (list) projection only, so the list never subscribes to full threads.
-// Belongs in apps/nondev/src/plain/ once that layer grows a shell mapper; the
-// wording follows plain/copy.ts `progress`.
+// Every sentence comes from plain/copy.ts `progress`; this file only decides
+// which one applies. Belongs in apps/nondev/src/plain/ once that layer grows a
+// shell mapper.
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 
+import { progress } from "../../plain/copy";
 import type { PillTone } from "../../ui/Pill";
+
+/** "Stopped." reads as a sentence; a list row wants the label "Stopped". */
+function label(sentence: string): string {
+  return sentence.replace(/[.…]+$/, "");
+}
 
 export type ConversationStatusKind =
   | "waiting"
@@ -62,15 +69,15 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
     case "starting":
       return {
         kind: "preparing",
-        headline: "Getting ready…",
-        presence: "Getting ready",
+        headline: progress.gettingReady,
+        presence: label(progress.gettingReady),
         tone: "working",
         attention: "none",
       };
     case "running":
       return {
         kind: "working",
-        headline: "Working on it…",
+        headline: progress.working,
         presence: "Working · your files are only changed inside this project",
         tone: "working",
         attention: "none",
@@ -90,7 +97,7 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
   if (run === null) {
     return {
       kind: "new",
-      headline: "Nothing has happened yet",
+      headline: label(progress.nothingYet),
       presence: "Ready when you are",
       tone: "neutral",
       attention: "none",
@@ -100,7 +107,7 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
     case "failed":
       return {
         kind: "failed",
-        headline: "Something went wrong — details inside",
+        headline: label(progress.somethingWentWrong),
         presence: "Stopped · something went wrong",
         tone: "danger",
         attention: "ready",
@@ -109,15 +116,15 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
     case "cancelled":
       return {
         kind: "stopped",
-        headline: "Stopped",
-        presence: "Stopped · ready when you are",
+        headline: label(progress.stopped),
+        presence: `${label(progress.stopped)} · ready when you are`,
         tone: "neutral",
         attention: "none",
       };
     case "rolled_back":
       return {
         kind: "done",
-        headline: "Restored to an earlier version",
+        headline: label(progress.restored),
         presence: "Restored · ready when you are",
         tone: "neutral",
         attention: "none",
@@ -134,7 +141,7 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
           }
         : {
             kind: "done",
-            headline: "Done",
+            headline: label(progress.allDone),
             presence: "Ready when you are",
             tone: "ok",
             attention: "none",
