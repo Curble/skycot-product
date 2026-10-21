@@ -265,6 +265,26 @@ function seams(): Seam[] {
       mechanism: "env seam",
     },
     {
+      id: "skycot-default-runtime-mode",
+      file: "packages/contracts/src/providerPolicy.ts",
+      constant: "DEFAULT_RUNTIME_MODE (threads that inherit the engine default)",
+      envName: "T3CODE_DEFAULT_RUNTIME_MODE",
+      upstreamDefault: '"full-access"',
+      effective: (e) => e.T3CODE_DEFAULT_RUNTIME_MODE!,
+      mechanism: "env seam",
+    },
+    {
+      id: "skycot-policy-reactor",
+      file: "apps/server/src/server.ts",
+      constant: "SKYCOT hard-rule policy (server answers what no rule matches)",
+      envName: "T3CODE_SKYCOT_POLICY",
+      // The marker comment carries the default: the reactor layer is a no-op unless the flag is "1".
+      upstreamDefault: "no-op layer unless T3CODE_SKYCOT_POLICY=1",
+      effective: (e) =>
+        e.T3CODE_SKYCOT_POLICY === "1" ? "enabled (hard rules enforced server-side)" : "off",
+      mechanism: "env seam",
+    },
+    {
       id: "telemetry-default-off",
       file: "apps/server/src/telemetry/AnalyticsService.ts",
       constant: "telemetry enabled when T3CODE_TELEMETRY_ENABLED is unset",
