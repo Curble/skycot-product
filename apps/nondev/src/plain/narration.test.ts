@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { items, turnItem } from "./fixtures.test-helpers";
 import {
+  askBeforeItsStep,
   classifyCommand,
   commandInputsOf,
   describeTurnItem,
@@ -617,5 +618,51 @@ describe("a failed step is never told as if it happened (N-4)", () => {
     expect(describeTurnItem(blocked).headline).toBe(
       "Tried to start a local preview of the site — it didn't work",
     );
+  });
+});
+
+describe("askBeforeItsStep — an ask reads before the step it allowed (S-3)", () => {
+  it("moves each ask above its own step and leaves everything else in event order", () => {
+    // Check A: Codex opens the step's item 1 ms before it asks.
+    const PUSH = "/bin/zsh -lc 'git push --set-upstream origin HEAD'";
+    const first = { driver: "codex", nativeId: "call_1", strength: "strong" };
+    const second = { ...first, nativeId: "call_2" };
+    const said = items.assistant("I'll push this branch to origin.");
+    const attempt = items.command(
+      PUSH,
+      { exitCode: 128 },
+      { status: "failed", nativeItemRef: first },
+    );
+    const policyAsk = items.approval("command", { prompt: PUSH }, { nativeItemRef: first });
+    const note = items.reasoning("**Escalating writable remote**");
+    const retry = items.command(PUSH, { exitCode: 0 }, { nativeItemRef: second });
+    const escalation = items.approval(
+      "command",
+      { prompt: "May I push this branch to the local origin repository?" },
+      { nativeItemRef: second },
+    );
+    const unrelated = items.approval("file-change", { prompt: "index.html" });
+    const order = askBeforeItsStep(
+      [said, attempt, policyAsk, note, retry, escalation, unrelated].map((item) => ({ item })),
+    ).map((entry) => entry.item.id);
+    expect(order).toEqual([
+      said.id,
+      policyAsk.id,
+      attempt.id,
+      note.id,
+      escalation.id,
+      retry.id,
+      unrelated.id,
+    ]);
+  });
+
+  it("keeps an ask that already reads first where it is", () => {
+    const ref = { driver: "codex", nativeId: "call_3", strength: "strong" };
+    const ask = items.approval("command", { prompt: "npm test" }, { nativeItemRef: ref });
+    const step = items.command("npm test", {}, { nativeItemRef: ref });
+    expect(askBeforeItsStep([{ item: ask }, { item: step }]).map((e) => e.item.id)).toEqual([
+      ask.id,
+      step.id,
+    ]);
   });
 });

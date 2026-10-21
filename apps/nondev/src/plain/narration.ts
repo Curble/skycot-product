@@ -80,6 +80,41 @@ function commandInputKey(ref: NativeItemRef): string | null {
   return ref === null || ref.nativeId === null ? null : `${ref.driver}:${ref.nativeId}`;
 }
 
+/**
+ * Puts each ask directly before the step it allowed. Codex opens the step's item a moment
+ * before it asks, so event order (and every timestamp but the decision) lists "Tried to
+ * upload … — it didn't work" above "SKYCOT rules allowed the assistant to upload …",
+ * although the answer came first and the step ran after it. Accepts any list whose entries
+ * carry an `item`, so callers can keep their narration alongside.
+ */
+export function askBeforeItsStep<Entry extends { readonly item: OrchestrationV2TurnItem }>(
+  entries: ReadonlyArray<Entry>,
+): Array<Entry> {
+  const asksByStep = new Map<string, Array<Entry>>();
+  for (const entry of entries) {
+    if (entry.item.type !== "approval_request") continue;
+    const key = commandInputKey(entry.item.nativeItemRef);
+    if (key !== null) asksByStep.set(key, [...(asksByStep.get(key) ?? []), entry]);
+  }
+  if (asksByStep.size === 0) return [...entries];
+  const ordered: Array<Entry> = [];
+  const placed = new Set<Entry>();
+  for (const entry of entries) {
+    if (placed.has(entry)) continue;
+    if (entry.item.type === "command_execution") {
+      const key = commandInputKey(entry.item.nativeItemRef);
+      for (const ask of key === null ? [] : (asksByStep.get(key) ?? [])) {
+        if (placed.has(ask)) continue;
+        ordered.push(ask);
+        placed.add(ask);
+      }
+    }
+    ordered.push(entry);
+    placed.add(entry);
+  }
+  return ordered;
+}
+
 /** The `commandInputs` map for a list of items. */
 export function commandInputsOf(
   items: ReadonlyArray<OrchestrationV2TurnItem>,

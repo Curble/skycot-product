@@ -19,6 +19,7 @@ import { describeDecision } from "../../plain/approvals";
 import { filesFromPrompt } from "../../plain/changes";
 import { progress } from "../../plain/copy";
 import {
+  askBeforeItsStep,
   commandInputsOf,
   describeTurnItem,
   progressHint,
@@ -221,7 +222,7 @@ export function WorkingCard({
       ];
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
-  const detailLines = narrated.map(({ item, narration }) => {
+  const detailLines = askBeforeItsStep(narrated).map(({ item, narration }) => {
     // The headline already says "SKYCOT rules allowed …" for policy answers;
     // the technical line names who decided so the log reads the same way.
     const request = "requestId" in item ? requests.get(item.requestId) : undefined;
@@ -240,6 +241,7 @@ export function WorkingCard({
           : narration.status === "denied"
             ? ("denied" as const)
             : undefined,
+      prose: narration.kind === "reasoning" || narration.kind === "message",
     };
   });
 
