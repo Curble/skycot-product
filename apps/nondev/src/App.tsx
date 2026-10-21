@@ -13,6 +13,7 @@ import {
 import { AppShell } from "./app/AppShell";
 import { PRODUCT_NAME } from "./brand";
 import { AutomationsScreen } from "./features/automations/AutomationsScreen";
+import { FamilyProvider } from "./features/family/FamilyProvider";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding } from "./features/onboarding/onboarding";
 import { PeopleScreen } from "./features/people/PeopleScreen";
@@ -112,50 +113,52 @@ export function App() {
   }
 
   return (
-    <AppShell route={route}>
-      <OnboardingGate route={route} />
-      {(() => {
-        switch (route.name) {
-          case "home":
-          case "new":
-          case "pair":
-          case "welcome":
-            return <HomeRoute showBack={route.name === "new" && columns === 1} />;
-          case "settings":
-            return <SettingsScreen section={route.section} />;
-          case "thread":
-            return (
-              <ThreadRoute
-                environmentId={route.environmentId}
-                threadId={route.threadId}
-                showBack={columns === 1}
-              />
-            );
-          case "automations":
-            return <AutomationsScreen />;
-          case "people":
-            return <PeopleScreen />;
-          case "not-found":
-            return (
-              <StandalonePage>
-                <span className="fm-standalone__icon fm-standalone__icon--muted" aria-hidden>
-                  <SearchX size={30} strokeWidth={1.6} />
-                </span>
-                {/* An h2: the title bar already carries the page's h1. */}
-                <h2 className="fm-standalone__title">There's nothing here</h2>
-                <p className="fm-standalone__text">
-                  That link doesn't go anywhere in {PRODUCT_NAME}.
-                </p>
-                <div className="fm-standalone__actions">
-                  <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
-                    Go home
-                  </Button>
-                </div>
-              </StandalonePage>
-            );
-        }
-      })()}
-    </AppShell>
+    <FamilyProvider>
+      <AppShell route={route}>
+        <OnboardingGate route={route} />
+        {(() => {
+          switch (route.name) {
+            case "home":
+            case "new":
+            case "pair":
+            case "welcome":
+              return <HomeRoute showBack={route.name === "new" && columns === 1} />;
+            case "settings":
+              return <SettingsScreen section={route.section} />;
+            case "thread":
+              return (
+                <ThreadRoute
+                  environmentId={route.environmentId}
+                  threadId={route.threadId}
+                  showBack={columns === 1}
+                />
+              );
+            case "automations":
+              return <AutomationsScreen />;
+            case "people":
+              return <PeopleScreen />;
+            case "not-found":
+              return (
+                <StandalonePage>
+                  <span className="fm-standalone__icon fm-standalone__icon--muted" aria-hidden>
+                    <SearchX size={30} strokeWidth={1.6} />
+                  </span>
+                  {/* An h2: the title bar already carries the page's h1. */}
+                  <h2 className="fm-standalone__title">There's nothing here</h2>
+                  <p className="fm-standalone__text">
+                    That link doesn't go anywhere in {PRODUCT_NAME}.
+                  </p>
+                  <div className="fm-standalone__actions">
+                    <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
+                      Go home
+                    </Button>
+                  </div>
+                </StandalonePage>
+              );
+          }
+        })()}
+      </AppShell>
+    </FamilyProvider>
   );
 }
 

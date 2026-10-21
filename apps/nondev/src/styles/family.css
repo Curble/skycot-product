@@ -1,0 +1,254 @@
+/* Family profile: set-up form, honesty box, code prompts, the locked autonomy
+   pill. Tokens from styles/apple.css; the code prompts are data-sober so
+   flavours.css leaves them plain in every theme. */
+
+/* ---- Larger text ---------------------------------------------------------
+   One attribute on <html>, one rule: every length in the app is in CSS px, so
+   zoom scales type, controls and spacing together. Viewport units are not
+   zoomed, so sheets still fit the window. */
+html[data-text="large"] {
+  zoom: 1.12;
+}
+
+/* ---- Set-up form ------------------------------------------------------- */
+.fm-family-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fm-family-setup__codes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-fill);
+}
+.fm-family-setup__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 499px) {
+  .fm-family-setup__row {
+    grid-template-columns: 1fr;
+  }
+}
+.fm-family-strength--weak {
+  color: var(--fm-orange-ink);
+}
+.fm-family-strength--strong {
+  color: var(--fm-green-ink);
+}
+
+/* ---- Honesty box --------------------------------------------------------- */
+.fm-family-honesty {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--fm-sep);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-card);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.fm-family-honesty--compact {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 599px) {
+  .fm-family-honesty {
+    grid-template-columns: 1fr;
+  }
+}
+.fm-family-honesty h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fm-label-2);
+}
+.fm-family-honesty ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fm-family-honesty li {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+.fm-family-honesty li svg {
+  flex: none;
+  margin-top: 3px;
+}
+.fm-family-honesty__col:first-child li svg {
+  color: var(--fm-green-ink);
+}
+.fm-family-honesty__col:last-child li svg {
+  color: var(--fm-label-3);
+}
+.fm-family-honesty__note {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--fm-sep-2);
+  color: var(--fm-label-2);
+  font-weight: 500;
+}
+
+/* ---- Code prompt --------------------------------------------------------- */
+.fm-family-code {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+}
+.fm-family-code .fm-field {
+  font-size: 18px;
+  letter-spacing: 0.3em;
+  font-family: var(--fm-mono);
+}
+.fm-family-code .fm-field::placeholder {
+  letter-spacing: 0.2em;
+}
+
+/* ---- Locked autonomy ----------------------------------------------------- */
+.fm-family-lock {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+.fm-family-lock__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fm-bg-fill-2);
+  color: var(--fm-label);
+  font-size: 12px;
+  font-weight: 600;
+}
+.fm-family-lock__note {
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+
+/* ---- Settings › Family status ------------------------------------------- */
+.fm-family-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+}
+.fm-family-status__glyph {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--fm-glyph-orange);
+  color: var(--fm-on-status);
+  flex: none;
+}
+.fm-family-status__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fm-family-status__text b {
+  font-size: 14px;
+}
+.fm-family-status__text small {
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-family-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border-top: 0.5px solid var(--fm-sep);
+  background: var(--fm-bg-card);
+}
+.fm-family-inline__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.fm-family-inline__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- Onboarding: who is this for? --------------------------------------- */
+.fm-who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 599px) {
+  .fm-who {
+    grid-template-columns: 1fr;
+  }
+}
+.fm-who__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  text-align: left;
+  border: 1.5px solid var(--fm-sep);
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-bg-card);
+  color: var(--fm-label);
+  cursor: pointer;
+  font: inherit;
+}
+.fm-who__card:hover:not(:disabled) {
+  border-color: var(--fm-label-3);
+}
+.fm-who__card:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+.fm-who__card--on,
+.fm-who__card--on:hover:not(:disabled) {
+  border-color: var(--fm-accent);
+  box-shadow: 0 0 0 3px var(--fm-accent-soft);
+}
+.fm-who__card:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fm-who__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--fm-bg-fill-2);
+  color: var(--fm-label);
+}
+.fm-who__card--on .fm-who__icon {
+  background: var(--fm-accent);
+  color: var(--fm-on-accent);
+}
+.fm-who__title {
+  font-family: var(--fm-font-label);
+  font-size: 15px;
+  font-weight: 700;
+}
+.fm-who__text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}

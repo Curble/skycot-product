@@ -75,3 +75,23 @@ export function writeAppearanceMode(mode: AppearanceMode) {
   writeThemeAppearanceMode(mode);
   for (const listener of listeners) listener();
 }
+
+// Larger text: one attribute on <html> (`data-text="large"`) that styles/family.css
+// turns into a 112% zoom. Default on for Family profiles; anyone can switch it.
+export const TEXT_SIZE_KEY = "skycot:text";
+export type TextSize = "normal" | "large";
+
+export function readTextSize(): TextSize {
+  return read(TEXT_SIZE_KEY) === "large" ? "large" : "normal";
+}
+export function applyTextSize(size: TextSize) {
+  if (size === "large") document.documentElement.setAttribute("data-text", "large");
+  else document.documentElement.removeAttribute("data-text");
+}
+export function writeTextSize(size: TextSize) {
+  write(TEXT_SIZE_KEY, size === "large" ? "large" : null);
+  applyTextSize(size);
+}
+export function useTextSize(): TextSize {
+  return useStoredString(TEXT_SIZE_KEY) === "large" ? "large" : "normal";
+}
