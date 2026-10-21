@@ -64,7 +64,7 @@ export const autonomy = {
  */
 export function hardRulesStatement(enforced: boolean, productName = "SKYCOT"): string {
   return enforced
-    ? `${productName} checks every step against these rules on this computer and stops to ask when one matches — in Ask me first and Just do it, carefully. Fully hands-off (Advanced mode) asks nothing.`
+    ? `${productName} checks every step against these rules on this computer and stops to ask when one matches — including any step that needs to reach outside the assistant's safe area — in Ask me first and Just do it, carefully. Fully hands-off (Advanced mode) asks nothing.`
     : `In Ask me first, ${productName} shows you a question before every step. In Just do it, carefully, the assistant itself decides when to ask, so these rules shape the warnings on cards but are not enforced. Fully hands-off (Advanced mode) asks nothing.`;
 }
 

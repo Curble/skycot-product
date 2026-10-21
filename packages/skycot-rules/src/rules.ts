@@ -732,7 +732,7 @@ function nonEmpty(text: string | undefined): string | undefined {
 
 /** "Allow Git to push this branch …?": a sentence for a person, not a command line. */
 function looksLikeReason(text: string): boolean {
-  return /\?$/.test(text) || /^[A-Z][a-z]+(\s+[\w'’,.-]+){3,}[.!]?$/.test(text);
+  return text.endsWith("?") || /^[A-Z][a-z]+(\s+[\w'’,.-]+){3,}[.!]?$/.test(text);
 }
 
 /**

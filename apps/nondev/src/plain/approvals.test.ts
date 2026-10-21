@@ -4,6 +4,7 @@ import {
   describeDecision,
   describeRuntimeRequest,
   isDestructiveCommand,
+  toolCallInputFor,
   type ApprovalCard,
 } from "./approvals";
 import { items, runtimeRequest } from "./fixtures.test-helpers";
@@ -464,5 +465,64 @@ describe("describeDecision", () => {
       describeDecision(runtimeRequest({ status: "resolved", decision: "decline" }))?.label,
     ).toBe("You said no");
     expect(describeDecision(runtimeRequest({ status: "pending" }))).toBeNull();
+  });
+});
+
+describe("leaving the sandbox (N-2) and naming the rule (N-5)", () => {
+  const PUSH = "/bin/zsh -lc 'git push --set-upstream origin skycot/upload-52d1'";
+  const REASON =
+    "Allow Git to push this branch to the local remote outside the workspace and set its upstream?";
+  const codexRef = { driver: "codex", nativeId: "exec-1", strength: "strong" };
+  const ask = (prompt: string) =>
+    items.approval("command", { prompt }, { nativeItemRef: codexRef });
+
+  it("asks before a Codex step leaves its safe area, once at a time", () => {
+    const card = describeRuntimeRequest(ask(REASON), {
+      projectRoot: "/Users/me/site",
+      toolCallInput: PUSH,
+    });
+    expect(card.title).toBe("May I step outside the safe area?");
+    expect(card.whatItWants).toBe(
+      "The assistant normally works inside a walled-off area of your Mac. This step needs to reach outside it. It wants to upload the saved versions to the online copy.",
+    );
+    expect(card.risk).toBe("medium");
+    expect(card.scope).toBe("your computer");
+    expect(card.ruleTitle).toBe("Stepping outside the assistant's safe area");
+    expect(decisions(card)).toEqual(["accept", "decline"]);
+    expect(card.technical).toContain(PUSH);
+    expect(card.technical).toContain(REASON);
+  });
+
+  it("is high, with the other rule named, when the step is risky anyway", () => {
+    const card = describeRuntimeRequest(ask(REASON), {
+      projectRoot: "/Users/me/site",
+      toolCallInput: "/bin/zsh -lc 'npx vercel --prod'",
+    });
+    expect(card.title).toBe("May I step outside the safe area?");
+    expect(card.risk).toBe("high");
+    expect(card.whyItMatters).toContain("puts something live");
+    expect(card.ruleTitle).toBe(
+      "Stepping outside the assistant's safe area · Putting anything live or publishing a package",
+    );
+    expect(decisions(card)).toEqual(["accept", "decline"]);
+  });
+
+  it("an ordinary Codex ask (prompt is the command) is not a sandbox card", () => {
+    const card = describeRuntimeRequest(ask(PUSH), { toolCallInput: PUSH });
+    expect(card.title).toBe("May I run this?");
+    expect(card.ruleTitle).toBeUndefined();
+  });
+
+  it("names the hard rule that held a deploy", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "npx vercel --prod" }));
+    expect(card.title).toBe("Careful — this can't be undone");
+    expect(card.ruleTitle).toBe("Putting anything live or publishing a package");
+  });
+
+  it("finds the command an ask is about by its native item", () => {
+    const command = items.command(PUSH, {}, { nativeItemRef: codexRef });
+    const other = items.command("ls", {}, { nativeItemRef: { ...codexRef, nativeId: "exec-2" } });
+    expect(toolCallInputFor(ask(REASON), [other, command])).toBe(PUSH);
+    expect(toolCallInputFor(items.approval("command"), [command])).toBeUndefined();
   });
 });

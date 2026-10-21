@@ -16,8 +16,13 @@ import {
   evaluateCommand,
   evaluateFileChange,
   evaluateFileRead,
+  hardRule,
   isDestructiveCommand,
+  readCommandAsk,
   type RuleEvaluation,
+  type RuleMatch,
+  SANDBOX_EXPLAINER,
+  withLeavesSandbox,
 } from "@t3tools/skycot-rules/rules";
 
 import { describeFile, filesFromPrompt, type PromptFile } from "./changes";
@@ -75,6 +80,11 @@ export interface ApprovalCard {
   readonly sizeOrCost?: string | undefined;
   readonly ifYouSayNo: string;
   readonly risk: ApprovalRisk;
+  /**
+   * The hard rule(s) that make this a question, in the words Settings uses ("Putting anything
+   * live or publishing a package"). Absent when no rule matched.
+   */
+  readonly ruleTitle?: string | undefined;
   /** Present only when risk is "high" or "blocked": the red line. */
   readonly warning?: string | undefined;
   readonly options: ReadonlyArray<ApprovalOption>;
@@ -109,6 +119,11 @@ export interface ApprovalContext {
   readonly handsOff?: boolean;
   /** The branch everyone sees, when known, so "push to live" can name it. */
   readonly defaultBranch?: string | null;
+  /**
+   * The command the ask is about, from its own `command_execution` item. Codex shows a reason
+   * in the prompt when the step must leave its sandbox, so the prompt alone is not the command.
+   */
+  readonly toolCallInput?: string;
 }
 
 const RISK_ORDER: Record<ApprovalRisk, number> = { low: 0, medium: 1, high: 2, blocked: 3 };
@@ -301,13 +316,49 @@ function withUndoWarning(lead: string, check: string = copy.checkTheCommand): st
 
 const READS_OUTSIDE_SCOPE = "Reads one file outside the project; changes nothing.";
 
+/**
+ * The exact command an approval is about: the `command_execution` item that shares its native
+ * item. Undefined when that item is not in the list (yet).
+ */
+export function toolCallInputFor(
+  item: Pick<ApprovalItem, "nativeItemRef">,
+  turnItems: ReadonlyArray<OrchestrationV2TurnItem>,
+): string | undefined {
+  const ref = item.nativeItemRef;
+  if (ref === null || ref.nativeId === null) return undefined;
+  const call = turnItems.find(
+    (candidate) =>
+      candidate.type === "command_execution" &&
+      candidate.nativeItemRef?.nativeId === ref.nativeId &&
+      candidate.nativeItemRef.driver === ref.driver,
+  );
+  return call?.type === "command_execution" ? call.input : undefined;
+}
+
+/** "Putting anything live or publishing a package", or two such titles joined. */
+export function ruleTitleFor(matches: ReadonlyArray<RuleMatch>): string | undefined {
+  const titles = [...new Set(matches.map((match) => match.rule.title))];
+  if (titles.length === 0) return undefined;
+  const shown = titles.slice(0, 2).join(" · ");
+  return titles.length > 2 ? `${shown} · and ${titles.length - 2} more` : shown;
+}
+
+const SANDBOX_RULE = hardRule("leaves-sandbox");
+
 function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
-  const command = item.prompt ?? "";
+  const ask = readCommandAsk({
+    driver: item.nativeItemRef?.driver,
+    prompt: item.prompt,
+    toolCallInput: ctx.toolCallInput,
+  });
+  const command = ask.command ?? (ask.leavesSandbox ? "" : (item.prompt ?? ""));
   const classified: CommandClassification = classifyCommand(command);
-  const rules: RuleEvaluation = evaluateCommand(command, {
+  const inside: RuleEvaluation = evaluateCommand(command, {
     projectRoot: ctx.projectRoot,
     defaultBranch: ctx.defaultBranch,
   });
+  const rules = ask.leavesSandbox ? withLeavesSandbox(inside, ask.sandboxReason) : inside;
+  const leavesSandbox = ask.leavesSandbox;
   // A match the rules weighed down (a rename, a push to an unknown branch) is a
   // question, not a "can't be undone" warning.
   const irreversible =
@@ -327,12 +378,17 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
     readsOutside !== undefined &&
     !irreversible &&
     !outsideOnly &&
+    !leavesSandbox &&
     rules.matches.every(
       (match) => match.rule.id === "reads-outside-project" || match.rule.id === "secrets",
     );
-  const whatItWants = readsOutside
-    ? `The assistant wants to read a file outside your project${readsOutside.detail ? ` (${readsOutside.detail})` : ""}.`
-    : `The assistant wants to ${classified.infinitive}.`;
+  const doing =
+    command.length > 0 ? classified.infinitive : "run a step it could not show in advance";
+  const whatItWants = leavesSandbox
+    ? `${SANDBOX_EXPLAINER} It wants to ${doing}.`
+    : readsOutside
+      ? `The assistant wants to read a file outside your project${readsOutside.detail ? ` (${readsOutside.detail})` : ""}.`
+      : `The assistant wants to ${classified.infinitive}.`;
   const packages = classified.packages ?? [];
   const sizeOrCost =
     classified.kind === "install"
@@ -356,23 +412,32 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
     rules.decision === "allow" &&
     classified.risk === "low" &&
     classified.touches === "only this project";
+  // The sandbox line is already the card's opening sentence; say what else matched.
+  const otherMatches = rules.matches.filter((match) => match.rule.id !== SANDBOX_RULE.id);
   const ruleLine =
-    rules.matches.length > 0 ? `This step ${describeMatches(rules.matches)}.` : undefined;
+    otherMatches.length > 0 ? `This step ${describeMatches(otherMatches)}.` : undefined;
   return finishCard(
     {
-      title: destructive
-        ? "Careful — this can't be undone"
-        : outsideOnly
-          ? "May I work outside the project?"
-          : readsOutsideOnly
-            ? "May I read a file outside the project?"
-            : "May I run this?",
+      title: leavesSandbox
+        ? "May I step outside the safe area?"
+        : destructive
+          ? "Careful — this can't be undone"
+          : outsideOnly
+            ? "May I work outside the project?"
+            : readsOutsideOnly
+              ? "May I read a file outside the project?"
+              : "May I run this?",
       whatItWants,
-      whyItMatters: ruleLine ?? whyCommandMatters(classified),
-      scope: readsOutside || outsideOnly ? "your computer" : classified.touches,
+      whyItMatters:
+        ruleLine ??
+        (leavesSandbox
+          ? "Outside the safe area it can reach the rest of your Mac and the internet, so SKYCOT asks every time."
+          : whyCommandMatters(classified)),
+      scope: readsOutside || outsideOnly || leavesSandbox ? "your computer" : classified.touches,
       sizeOrCost,
       ifYouSayNo: copy.ifNoCommand,
       risk,
+      ruleTitle: ruleTitleFor(rules.matches),
       warning: destructive
         ? withUndoWarning(
             classified.warning ?? "This command deletes, overwrites or publishes something.",
@@ -386,12 +451,19 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
         alwaysWhat,
         item.options,
         allowAlways,
-        readsOutsideOnly,
+        readsOutsideOnly || leavesSandbox,
       ),
-      technical: command,
+      technical:
+        ask.sandboxReason === undefined
+          ? command || (item.prompt ?? "")
+          : `${command || "(command not shown yet)"}\n\nThe assistant's reason: ${ask.sandboxReason}`,
     },
     ctx,
-    readsOutsideOnly ? READS_OUTSIDE_SCOPE : undefined,
+    readsOutsideOnly
+      ? READS_OUTSIDE_SCOPE
+      : leavesSandbox
+        ? "Runs outside the assistant's safe area, where it can reach the rest of this Mac."
+        : undefined,
   );
 }
 
@@ -496,6 +568,7 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileChange,
       risk,
+      ruleTitle: ruleTitleFor(rules.matches),
       warning: deletes
         ? withUndoWarning(`${deleteNoun} will be deleted.`, copy.checkTheFiles)
         : outside
@@ -542,6 +615,7 @@ function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): App
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileRead,
       risk,
+      ruleTitle: ruleTitleFor(rules.matches),
       options: buildApprovalOptions(
         item.requestId,
         risk,
@@ -575,6 +649,7 @@ function describeAppAccessApproval(item: ApprovalItem, ctx: ApprovalContext): Ap
       scope: "the internet",
       ifYouSayNo: copy.ifNoAppAccess,
       risk: "medium",
+      ruleTitle: hardRule("connected-app").title,
       options: buildApprovalOptions(item.requestId, "medium", `using ${app}`, item.options, false),
       technical: item.prompt ?? item.requestKind,
     },

@@ -65,6 +65,8 @@ describe("autonomy levels", () => {
     expect(hardRulesStatement(false)).toMatch(/not enforced/);
     expect(hardRulesStatement(false)).not.toMatch(/every mode/);
     expect(hardRulesStatement(true)).toMatch(/stops to ask when one matches/);
+    expect(hardRulesStatement(true)).toMatch(/outside the assistant's safe area/);
+    expect(hardRuleTitles()).toContain("Stepping outside the assistant's safe area");
     expect(hardRuleTitles()).toContain("Deleting files or folders");
     expect(hardRuleTitles().length).toBe(HARD_RULES.length);
   });

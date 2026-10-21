@@ -27,6 +27,7 @@ import {
   type ApprovalRisk,
   describeDecision,
   describeRuntimeRequest,
+  toolCallInputFor,
 } from "../../../plain/approvals";
 import { projectAtomOrEmpty } from "../../../state/projects";
 import { CrewAvatar } from "../../../themes/CrewAvatar";
@@ -172,6 +173,8 @@ export function RequestCard({
     item.type === "secret_request"
       ? undefined
       : projection.runtimeRequests.find((r) => r.id === item.requestId);
+  const toolCallInput =
+    item.type === "approval_request" ? toolCallInputFor(item, projection.turnItems) : undefined;
   const card = describeRuntimeRequest(item, {
     ...(projectName === null ? {} : { projectName }),
     // Files live in the thread's private copy when it has one; the project
@@ -183,6 +186,7 @@ export function RequestCard({
         : {}),
     ...(request ? { responseCapability: request.responseCapability.type } : {}),
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
+    ...(toolCallInput === undefined ? {} : { toolCallInput }),
   });
   const runEnded = askRunEnded(item, projection, shell);
   const decided = decidedLine(item, request, runEnded);
@@ -251,7 +255,12 @@ export function RequestCard({
             icon={Icon}
             tone={decided ? "grey" : tone}
             title={card.title}
-            subtitle={decided ?? "Waiting for you · nothing is pre-selected"}
+            subtitle={
+              decided ??
+              (card.ruleTitle
+                ? `${card.ruleTitle} · waiting for you`
+                : "Waiting for you · nothing is pre-selected")
+            }
           />
           <CardBody>
             <p className="fm-approval__what">{card.whatItWants}</p>
