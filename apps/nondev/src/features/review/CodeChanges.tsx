@@ -47,12 +47,14 @@ export default function CodeChanges({
     path: resolveFileDiffPath(fileDiff),
     fileDiff,
   }));
-  const items = files.map(({ id, fileDiff }) => ({
-    id,
-    type: "diff" as const,
-    fileDiff,
-    collapsed: !expanded.has(id),
-  }));
+  // Pierre re-reads a controlled item only when its `version` changes
+  // (CodeView.syncItemRecord). Without a version that tracks `collapsed`, a tap
+  // flipped the chevron but the viewer kept its folded record and the file body
+  // never mounted.
+  const items = files.map(({ id, fileDiff }) => {
+    const collapsed = !expanded.has(id);
+    return { id, type: "diff" as const, fileDiff, collapsed, version: collapsed ? 0 : 1 };
+  });
   const toggle = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current);
