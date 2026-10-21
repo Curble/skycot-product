@@ -4,12 +4,14 @@ import {
   type OrchestrationV2AppThread,
   type OrchestrationV2Command,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2Run,
   type OrchestrationV2RuntimeRequest,
   type OrchestrationV2TurnItem,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
   ProviderSessionId,
+  type RunId,
   type RuntimeMode,
   RuntimeRequestId,
   ThreadId,
@@ -23,10 +25,13 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
 import { SKYCOT_POLICY_NOTE } from "@t3tools/skycot-rules/decision";
+import { UNKNOWN_BRANCH_PUSH } from "@t3tools/skycot-rules/rules";
 
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import { GitCommandError } from "@t3tools/contracts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as SkycotPolicyReactor from "./SkycotPolicyReactor.ts";
 
 const CODEX = ProviderDriverKind.make("codex");
@@ -37,7 +42,11 @@ const REQUEST_ID = RuntimeRequestId.make("req-1");
 const SESSION_ID = ProviderSessionId.make("session-1");
 type RespondCommand = Extract<OrchestrationV2Command, { readonly type: "runtime-request.respond" }>;
 
-function thread(runtimeMode: RuntimeMode, worktreePath: string | null): OrchestrationV2AppThread {
+function thread(
+  runtimeMode: RuntimeMode,
+  worktreePath: string | null,
+  branch: string | null = null,
+): OrchestrationV2AppThread {
   return {
     createdBy: "user",
     creationSource: "web",
@@ -48,7 +57,7 @@ function thread(runtimeMode: RuntimeMode, worktreePath: string | null): Orchestr
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.5" },
     runtimeMode,
     interactionMode: "default",
-    branch: null,
+    branch,
     worktreePath,
     activeProviderThreadId: null,
     lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: THREAD_ID },
@@ -148,7 +157,24 @@ interface Scenario {
   readonly request?: OrchestrationV2RuntimeRequest;
   readonly items?: ReadonlyArray<OrchestrationV2TurnItem>;
   readonly enabled?: boolean;
+  /** What git says about the folder: its checked-out branch and the remote's default. */
+  readonly git?:
+    | { readonly branch: string | null; readonly defaultBranch: string | null }
+    | "broken";
+  /** Pending requests the recovery projection reports, for the Stop path. */
+  readonly pendingRequests?: ReadonlyArray<OrchestrationV2RuntimeRequest>;
+  /** Run statuses by id, for the "run no longer active" guard. */
+  readonly runs?: Readonly<Record<string, OrchestrationV2Run["status"]>>;
 }
+
+const gitFailure = (operation: string) =>
+  new GitCommandError({
+    operation,
+    command: "git",
+    cwd: "/work/site",
+    exitCode: 128,
+    detail: "no git",
+  });
 
 const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
   Effect.gen(function* () {
@@ -161,6 +187,59 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
         getRuntimeRequest: () => Effect.succeed(scenario.request ?? request("command")),
         getTurnItem: ({ itemId }) =>
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
+        getThreadRecords: (_threadId, _fields, filter) =>
+          Effect.succeed({
+            thread: scenario.thread ?? thread("auto-accept-edits", "/work/site"),
+            runs: Object.entries(scenario.runs ?? {})
+              .filter(([id]) => filter?.runIds === undefined || filter.runIds.includes(id as RunId))
+              .map(([id, status]) => ({ id, status }) as unknown as OrchestrationV2Run),
+            turnItems: items.filter(
+              (item) =>
+                (filter?.turnItemRunIds === undefined ||
+                  filter.turnItemRunIds.includes(item.runId)) &&
+                (filter?.turnItemTypes === undefined || filter.turnItemTypes.includes(item.type)),
+            ),
+          }) as never,
+        getRuntimeRecoveryProjection: () =>
+          Effect.succeed({
+            thread: scenario.thread ?? thread("auto-accept-edits", "/work/site"),
+            runs: [],
+            attempts: [],
+            nodes: [],
+            subagents: [],
+            providerSessions: [],
+            providerThreads: [],
+            providerTurns: [],
+            runtimeRequests: scenario.pendingRequests ?? [],
+            messages: [],
+            turnItems: items,
+          }),
+      }),
+      Layer.mock(GitVcsDriver.GitVcsDriver)({
+        statusDetailsLocal: () =>
+          scenario.git === "broken" || scenario.git === undefined
+            ? Effect.fail(gitFailure("statusDetailsLocal"))
+            : Effect.succeed({
+                isRepo: true,
+                hasOriginRemote: true,
+                isDefaultBranch: false,
+                branch: scenario.git.branch,
+                upstreamRef: null,
+                hasWorkingTreeChanges: false,
+                workingTree: { files: [], insertions: 0, deletions: 0 },
+                hasUpstream: false,
+                aheadCount: 0,
+                behindCount: 0,
+                aheadOfDefaultCount: 0,
+              }),
+        resolvePrimaryRemoteName: () =>
+          scenario.git === "broken" || scenario.git === undefined
+            ? Effect.fail(gitFailure("resolvePrimaryRemoteName"))
+            : Effect.succeed("origin"),
+        resolveDefaultBranchName: () =>
+          scenario.git === "broken" || scenario.git === undefined
+            ? Effect.fail(gitFailure("resolveDefaultBranchName"))
+            : Effect.succeed(scenario.git.defaultBranch),
       }),
       Layer.mock(ProjectStore.ProjectStoreV2)({
         get: () =>
@@ -340,6 +419,177 @@ describe("SkycotPolicyReactor", () => {
         requestEvent(request("user_input")),
       );
       assert.equal(question.outcome.type, "skipped");
+    }),
+  );
+
+  it.effect("holds every runner-wrapped deploy the same as the bare program", () =>
+    Effect.gen(function* () {
+      for (const command of [
+        "npx vercel --prod",
+        "pnpm dlx netlify deploy --prod",
+        "bunx wrangler deploy",
+        "sudo npm exec -- vercel deploy --prod",
+        "/bin/zsh -lc 'cd /work/site && npx -y vercel --prod'",
+      ]) {
+        const { outcome, dispatched } = yield* run(
+          { items: [approvalItem("command"), commandItem(command)] },
+          requestEvent(request("command")),
+        );
+        assert.equal(outcome.type, "held", command);
+        assert.deepEqual(dispatched, []);
+      }
+      const benign = yield* run(
+        { items: [approvalItem("command"), commandItem("npx prettier --write .")] },
+        requestEvent(request("command")),
+      );
+      assert.equal(benign.outcome.type, "approved");
+    }),
+  );
+
+  it.effect("judges a bare git push by the thread's branch and the repo's default branch", () =>
+    Effect.gen(function* () {
+      const items = [approvalItem("command"), commandItem("git push")];
+      const feature = yield* run(
+        {
+          thread: thread("auto-accept-edits", "/work/site", "skycot/opening-hours"),
+          git: { branch: "skycot/opening-hours", defaultBranch: "main" },
+          items,
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(feature.outcome.type, "approved");
+
+      // A plain folder has no thread branch: git answers, and it is on the live branch.
+      const plainFolder = yield* run(
+        {
+          thread: thread("auto-accept-edits", null),
+          git: { branch: "main", defaultBranch: "main" },
+          items,
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(plainFolder.outcome.type, "held");
+      if (plainFolder.outcome.type === "held") {
+        assert.equal(plainFolder.outcome.evaluation.risk, "high");
+      }
+
+      // An unusual default branch counts as live once git names it.
+      const unusual = yield* run(
+        {
+          thread: thread("auto-accept-edits", null),
+          git: { branch: "trunk-2026", defaultBranch: "trunk-2026" },
+          items,
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(unusual.outcome.type, "held");
+
+      // Git unavailable: hold, as medium, because nobody knows which branch goes up.
+      const unknown = yield* run(
+        { thread: thread("auto-accept-edits", null), git: "broken", items },
+        requestEvent(request("command")),
+      );
+      assert.equal(unknown.outcome.type, "held");
+      if (unknown.outcome.type === "held") {
+        assert.equal(unknown.outcome.evaluation.risk, "medium");
+        assert.equal(unknown.outcome.evaluation.matches[0]?.held, UNKNOWN_BRANCH_PUSH);
+      }
+
+      // No push, no git lookups: a broken git must not stop ordinary approvals.
+      const noPush = yield* run(
+        {
+          thread: thread("auto-accept-edits", null),
+          git: "broken",
+          items: [approvalItem("command"), commandItem("pnpm test")],
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(noPush.outcome.type, "approved");
+    }),
+  );
+
+  it.effect("answers the run's pending asks with cancel the moment Stop is requested", () =>
+    Effect.gen(function* () {
+      const runId = "run-1" as RunId;
+      const otherRequestId = RuntimeRequestId.make("req-other");
+      const pendingOfRun = request("command");
+      const pendingOfOtherRun: OrchestrationV2RuntimeRequest = {
+        ...request("command"),
+        id: otherRequestId,
+        nodeId: "node:other" as never,
+      };
+      const resolvedOfRun: OrchestrationV2RuntimeRequest = {
+        ...request("command", "resolved"),
+        id: RuntimeRequestId.make("req-done"),
+      };
+      const stopItem: OrchestrationV2TurnItem = {
+        ...base,
+        id: TurnItemId.make("turn-item:run-signal:interrupt-request"),
+        runId,
+        nativeItemRef: null,
+        ordinal: 5,
+        status: "completed",
+        type: "run_interrupt_request",
+        message: "Interrupt requested",
+      };
+      const { outcome, dispatched } = yield* run(
+        {
+          thread: thread("approval-required", "/work/site"),
+          items: [
+            { ...approvalItem("command"), runId },
+            {
+              ...approvalItem("command"),
+              id: TurnItemId.make("turn-item:runtime-request:req-other"),
+              requestId: otherRequestId,
+              runId: "run-0" as RunId,
+            } as OrchestrationV2TurnItem,
+            stopItem,
+          ],
+          pendingRequests: [pendingOfRun, pendingOfOtherRun, resolvedOfRun],
+        },
+        itemEvent(stopItem),
+      );
+      assert.equal(outcome.type, "cancelled");
+      if (outcome.type === "cancelled") assert.deepEqual(outcome.requestIds, [REQUEST_ID]);
+      assert.equal(dispatched.length, 1);
+      assert.equal(dispatched[0]!.decision, "cancel");
+      assert.equal(dispatched[0]!.requestId, REQUEST_ID);
+      assert.equal(dispatched[0]!.commandId, `server:skycot-stop:${THREAD_ID}:${REQUEST_ID}`);
+    }),
+  );
+
+  it.effect("never approves a request whose run was stopped or has ended", () =>
+    Effect.gen(function* () {
+      const runId = "run-1" as RunId;
+      const asked = { ...approvalItem("command"), runId };
+      const stopItem: OrchestrationV2TurnItem = {
+        ...base,
+        id: TurnItemId.make("turn-item:run-signal:interrupt-request"),
+        runId,
+        nativeItemRef: null,
+        ordinal: 5,
+        status: "completed",
+        type: "run_interrupt_request",
+        message: "Interrupt requested",
+      };
+      const stopping = yield* run(
+        { items: [asked, commandItem("pnpm test"), stopItem], runs: { [runId]: "running" } },
+        requestEvent(request("command")),
+      );
+      assert.deepEqual(stopping.outcome, { type: "skipped", reason: "run no longer active" });
+      assert.deepEqual(stopping.dispatched, []);
+
+      const ended = yield* run(
+        { items: [asked, commandItem("pnpm test")], runs: { [runId]: "interrupted" } },
+        requestEvent(request("command")),
+      );
+      assert.deepEqual(ended.outcome, { type: "skipped", reason: "run no longer active" });
+
+      const live = yield* run(
+        { items: [asked, commandItem("pnpm test")], runs: { [runId]: "running" } },
+        requestEvent(request("command")),
+      );
+      assert.equal(live.outcome.type, "approved");
     }),
   );
 

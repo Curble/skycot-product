@@ -1,14 +1,21 @@
 // Answers the provider's approval requests for threads the SKYCOT policy governs: approves
 // what no hard rule matches, leaves the rest pending for the person. See SkycotPolicy.ts for
 // the design and the flag that gates both halves.
+//
+// It also closes the door Stop leaves open: the engine only cancels a run's pending asks
+// once the provider has confirmed the interrupt, which can take a while, and until then a
+// late click on a card is still accepted. The moment the person asks to stop, every pending
+// ask of that run is answered `cancel` here, so nothing can be approved into a stopped run.
 
 import {
   CommandId,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2RuntimeRequest,
+  type OrchestrationV2RunStatus,
   type OrchestrationV2TurnItem,
   type ProjectId,
   type ProviderDriverKind,
+  type RunId,
   type RuntimeRequestId,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -21,18 +28,26 @@ import * as Stream from "effect/Stream";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { policyDecisionAnswers } from "@t3tools/skycot-rules/decision";
-import { evaluateRequest, type RuleEvaluation } from "@t3tools/skycot-rules/rules";
+import {
+  evaluateRequest,
+  type RuleContext,
+  type RuleEvaluation,
+  type RuleRequest,
+} from "@t3tools/skycot-rules/rules";
 
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { forkParked } from "../serverActivation.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import { appliesToRuntimeMode, requestFacts } from "./SkycotPolicy.ts";
 
 export type SkycotPolicyOutcome =
   | { readonly type: "skipped"; readonly reason: string }
   | { readonly type: "held"; readonly evaluation: RuleEvaluation }
-  | { readonly type: "approved"; readonly evaluation: RuleEvaluation };
+  | { readonly type: "approved"; readonly evaluation: RuleEvaluation }
+  /** Stop was pressed: these pending asks were answered `cancel` on the person's behalf. */
+  | { readonly type: "cancelled"; readonly requestIds: ReadonlyArray<RuntimeRequestId> };
 
 export class SkycotPolicyReactor extends Context.Service<
   SkycotPolicyReactor,
@@ -53,14 +68,62 @@ const AUTO_KINDS: ReadonlySet<OrchestrationV2RuntimeRequest["kind"]> = new Set([
   "mcp-elicitation",
 ]);
 
+const SETTLED_RUN_STATUSES: ReadonlySet<OrchestrationV2RunStatus> = new Set([
+  "completed",
+  "interrupted",
+  "failed",
+  "cancelled",
+  "rolled_back",
+]);
+
 export function policyCommandId(threadId: ThreadId, requestId: RuntimeRequestId): CommandId {
   return CommandId.make(`server:skycot-policy:${threadId}:${requestId}`);
+}
+
+export function stopCommandId(threadId: ThreadId, requestId: RuntimeRequestId): CommandId {
+  return CommandId.make(`server:skycot-stop:${threadId}:${requestId}`);
+}
+
+/** Only a push can be judged by branch, so only a push pays for the two git lookups. */
+export function needsBranchContext(facts: RuleRequest): boolean {
+  return (
+    facts.kind === "command" &&
+    facts.command !== undefined &&
+    /\bgit\b[\s\S]*\bpush\b/.test(facts.command)
+  );
 }
 
 const make = Effect.gen(function* () {
   const engine = yield* Orchestrator.OrchestratorV2;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const git = yield* GitVcsDriver.GitVcsDriver;
+
+  /**
+   * The branch the push would send and the branch everyone sees. A thread with a private
+   * copy knows its branch; a plain folder asks git. Anything that fails stays null, and the
+   * rules hold a bare push whose branch nobody knows.
+   */
+  const branchContextFor = Effect.fnUntraced(function* (
+    thread: { readonly branch: string | null },
+    projectRoot: string | null,
+  ): Generator<
+    Effect.Effect<unknown, never>,
+    Pick<RuleContext, "currentBranch" | "defaultBranch">
+  > {
+    if (projectRoot === null) return { currentBranch: thread.branch, defaultBranch: null };
+    const currentBranch =
+      thread.branch ??
+      (yield* git.statusDetailsLocal(projectRoot).pipe(
+        Effect.map((details) => details.branch),
+        Effect.orElseSucceed(() => null),
+      ));
+    const defaultBranch = yield* git.resolvePrimaryRemoteName(projectRoot).pipe(
+      Effect.flatMap((remote) => git.resolveDefaultBranchName(projectRoot, remote)),
+      Effect.orElseSucceed(() => null),
+    );
+    return { currentBranch, defaultBranch };
+  });
 
   const toolCallFor = Effect.fnUntraced(function* (
     threadId: ThreadId,
@@ -88,6 +151,18 @@ const make = Effect.gen(function* () {
     return Option.isSome(project) ? project.value.workspaceRoot : null;
   });
 
+  /** False once the person asked to stop the run, or the run has already settled. */
+  const runStillActive = Effect.fnUntraced(function* (threadId: ThreadId, runId: RunId) {
+    const records = yield* projections.getThreadRecords(threadId, ["runs", "turnItems"], {
+      runIds: [runId],
+      turnItemRunIds: [runId],
+      turnItemTypes: ["run_interrupt_request"],
+    });
+    if (records.turnItems.length > 0) return false;
+    const run = records.runs.find((candidate) => candidate.id === runId);
+    return run === undefined || !SETTLED_RUN_STATUSES.has(run.status);
+  });
+
   const decide = Effect.fn("SkycotPolicyReactor.decide")(function* (input: {
     readonly threadId: ThreadId;
     readonly requestId: RuntimeRequestId;
@@ -109,11 +184,16 @@ const make = Effect.gen(function* () {
       // The turn item lands in the same batch; its own event re-enters here.
       return skipped("approval item not stored yet");
     }
+    if (approval.runId !== null && !(yield* runStillActive(input.threadId, approval.runId))) {
+      // Stop was pressed (or the run ended): never approve into a run that is going away.
+      return skipped("run no longer active");
+    }
     const toolCall = yield* toolCallFor(input.threadId, approval, input.driver);
     const facts = requestFacts(approval, toolCall);
     if (facts === null) return skipped("request kind unknown");
     const projectRoot = yield* projectRootFor(thread);
-    const evaluation = evaluateRequest(facts, { projectRoot });
+    const branches = needsBranchContext(facts) ? yield* branchContextFor(thread, projectRoot) : {};
+    const evaluation = evaluateRequest(facts, { projectRoot, ...branches });
     if (evaluation.decision === "hold") {
       yield* Effect.logInfo("skycot-policy.held", {
         threadId: input.threadId,
@@ -138,11 +218,75 @@ const make = Effect.gen(function* () {
     return { type: "approved", evaluation } satisfies SkycotPolicyOutcome;
   });
 
+  // Stop pressed: answer every pending ask of that run with `cancel` now, before the
+  // provider has even acknowledged the interrupt.
+  const cancelPendingAsks = Effect.fn("SkycotPolicyReactor.cancelPendingAsks")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly runId: RunId;
+  }) {
+    const recovery = yield* projections.getRuntimeRecoveryProjection(input.threadId);
+    const askedByRun = new Set(
+      recovery.turnItems.flatMap((item) =>
+        item.runId === input.runId &&
+        (item.type === "approval_request" || item.type === "user_input_request")
+          ? [item.requestId]
+          : [],
+      ),
+    );
+    const nodesOfRun = new Set(
+      recovery.nodes.filter((node) => node.runId === input.runId).map((node) => node.id),
+    );
+    const pending = recovery.runtimeRequests.filter(
+      (request) =>
+        request.status === "pending" &&
+        request.responseCapability.type === "live" &&
+        (askedByRun.has(request.id) || nodesOfRun.has(request.nodeId)),
+    );
+    const cancelled: Array<RuntimeRequestId> = [];
+    for (const request of pending) {
+      const sent = yield* engine
+        .dispatch({
+          type: "runtime-request.respond",
+          commandId: stopCommandId(input.threadId, request.id),
+          threadId: input.threadId,
+          requestId: request.id,
+          decision: "cancel",
+        })
+        .pipe(
+          Effect.as(true),
+          // Already answered or already cancelled by the engine: nothing to do.
+          Effect.catchCause((cause) =>
+            Effect.logDebug("skycot-stop.respond-failed", {
+              threadId: input.threadId,
+              requestId: request.id,
+              cause,
+            }).pipe(Effect.as(false)),
+          ),
+        );
+      if (sent) cancelled.push(request.id);
+    }
+    if (cancelled.length > 0) {
+      yield* Effect.logInfo("skycot-stop.cancelled-pending-asks", {
+        threadId: input.threadId,
+        runId: input.runId,
+        requestIds: cancelled,
+      });
+    }
+    return { type: "cancelled", requestIds: cancelled } satisfies SkycotPolicyOutcome;
+  });
+
   // Runs for every domain event; most events return before any work is needed. Both the
   // request event and the approval item's event are handled because the adapters emit them
   // in the same batch and either may be stored first.
   const handle: SkycotPolicyReactor["Service"]["handle"] = Effect.fnUntraced(
     function* (event) {
+      if (
+        event.type === "turn-item.updated" &&
+        event.payload.type === "run_interrupt_request" &&
+        event.payload.runId !== null
+      ) {
+        return yield* cancelPendingAsks({ threadId: event.threadId, runId: event.payload.runId });
+      }
       if (event.type === "runtime-request.updated") {
         if (event.payload.status !== "pending") return skipped("not pending");
         return yield* decide({
@@ -203,7 +347,10 @@ export function layer(options: {
 }): Layer.Layer<
   SkycotPolicyReactor,
   never,
-  Orchestrator.OrchestratorV2 | ProjectionStore.ProjectionStoreV2 | ProjectStore.ProjectStoreV2
+  | Orchestrator.OrchestratorV2
+  | ProjectionStore.ProjectionStoreV2
+  | ProjectStore.ProjectStoreV2
+  | GitVcsDriver.GitVcsDriver
 > {
   return options.enabled ? Layer.effect(SkycotPolicyReactor, make) : layerDisabled;
 }
