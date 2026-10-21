@@ -1,21 +1,33 @@
 # nondev fork: nightly merge of upstream T3 Code (pingdotgg/t3code) into this repository.
 #
 # What it does (see nondev/README.md for the plain-English version):
-#   1. checks out `main` with full history, restores the git rerere cache (remembered conflict fixes)
-#   2. runs nondev/scripts/upstream-sync.ts, which creates sync/upstream-YYYY-MM-DD, merges
-#      upstream/main, resolves lockfile + declared-seam conflicts mechanically, typechecks and
-#      builds @t3tools/nondev, and writes nondev/sync-report.md on the branch
-#   3. pushes the branch and opens/updates the PR `sync: upstream YYYY-MM-DD` with the report as body
-#   4. optionally enables GitHub auto-merge (only when repo variable NONDEV_SYNC_AUTOMERGE=true and
-#      the sync was clean; branch protection must require the `nondev / check` status for this to wait
-#      for CI instead of merging immediately)
+#   job `merge`   — NO SECRETS. Checks out `main` with full history (credentials not persisted),
+#                   restores the git rerere cache (remembered conflict fixes), runs
+#                   nondev/scripts/upstream-sync.ts, which creates sync/upstream-YYYY-MM-DD, merges
+#                   upstream/main, resolves lockfile + declared-seam conflicts mechanically,
+#                   installs with lifecycle scripts disabled, typechecks and builds @t3tools/nondev,
+#                   and writes nondev/sync-report.md on the branch. The branch leaves the job only
+#                   as a git bundle artifact.
+#   job `publish` — the only job that holds a write token. Checks out `main` (git + gh only; it
+#                   never installs or runs anything from the merged tree), fetches the branch from
+#                   the bundle, pushes it, and opens/updates the PR `sync: upstream YYYY-MM-DD` with
+#                   the report as body. Auto-merge is enabled ONLY when the repo variable
+#                   NONDEV_SYNC_AUTOMERGE is `true` AND `main` is protected by a rule requiring
+#                   status checks. Free private repositories cannot protect `main`, so on such a
+#                   repo auto-merge stays off whatever the variable says. Humans review every sync.
+#
+# Why two jobs (security audit SEC-04): the merged tree is upstream's latest code plus whatever its
+# dependencies run at install time. Nothing in the job that executes it can reach a token able to
+# push to `main` or open PRs.
 #
 # Secrets / variables (Settings → Secrets and variables → Actions):
-#   NONDEV_SYNC_TOKEN      optional PAT (contents + pull-requests write). Without it the default
-#                          GITHUB_TOKEN is used: PRs it creates do NOT trigger nondev-ci.yml, so
-#                          auto-merge cannot go green. Also requires "Allow GitHub Actions to create
-#                          and approve pull requests" in Settings → Actions → General.
-#   NONDEV_SYNC_AUTOMERGE  repo variable; set to `true` to let clean syncs merge themselves.
+#   NONDEV_SYNC_TOKEN      optional fine-grained PAT, this repository only, Contents: write +
+#                          Pull requests: write, 90-day expiry. Without it the default GITHUB_TOKEN
+#                          is used: PRs it creates do NOT trigger nondev-ci.yml. Also requires
+#                          "Allow GitHub Actions to create and approve pull requests" in
+#                          Settings → Actions → General.
+#   NONDEV_SYNC_AUTOMERGE  repo variable; `true` lets a clean sync merge itself ONLY when branch
+#                          protection on `main` requires status checks (see above).
 name: nondev / upstream sync
 
 on:
@@ -34,30 +46,45 @@ on:
         default: false
         type: boolean
 
-permissions:
-  contents: write
-  pull-requests: write
+# Nothing at the workflow level; each job declares the least it needs.
+permissions: {}
 
 concurrency:
   group: nondev-upstream-sync
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Merge upstream
+  merge:
+    name: Merge and verify (no secrets)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
     env:
-      GH_TOKEN: ${{ secrets.NONDEV_SYNC_TOKEN || github.token }}
       UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
+      # Both installs in this job (pre-merge via setup-ci-deps, post-merge inside the sync script)
+      # skip dependency lifecycle scripts. pnpm reads npm_config_* from the environment; the second
+      # variable is the sync script's explicit flag. Trade-off: native addons (node-pty, sqlite…)
+      # are not built, which the typecheck and Vite build of @t3tools/nondev never needed. If a
+      # future upstream change makes typecheck depend on a postinstall step, the check fails and the
+      # sync is reported `needs-human` rather than silently running that script here.
+      npm_config_ignore_scripts: "true"
+      T3CODE_SYNC_INSTALL_FLAGS: "--ignore-scripts"
+    outputs:
+      status: ${{ steps.sync.outputs.status }}
+      branch: ${{ steps.sync.outputs.branch }}
+      date: ${{ steps.sync.outputs.date }}
+      reasons: ${{ steps.sync.outputs.reasons }}
+      commits: ${{ steps.sync.outputs.commits }}
     steps:
       # Full history: the script needs the merge-base with upstream, and rerere needs .git.
+      # persist-credentials: false keeps even the read-only GITHUB_TOKEN out of .git/config.
       - name: Checkout main
         uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.NONDEV_SYNC_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Restore remembered conflict resolutions (git rerere)
         uses: actions/cache/restore@v6
@@ -94,9 +121,16 @@ jobs:
         if: always() && hashFiles('nondev/sync-report.md') != ''
         uses: actions/upload-artifact@v7
         with:
-          name: sync-report-${{ steps.sync.outputs.date || github.run_id }}
+          name: sync-report
           path: nondev/sync-report.md
           retention-days: 30
+
+      - name: Save remembered conflict resolutions (git rerere)
+        if: always() && hashFiles('.git/rr-cache/**') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: .git/rr-cache
+          key: nondev-rerere-${{ github.run_id }}
 
       - name: Stop when there is nothing to merge or this was a dry run
         if: steps.sync.outputs.status == 'up-to-date' || inputs.dry_run == true
@@ -108,28 +142,82 @@ jobs:
           echo "::error::Upstream sync aborted: a conflict outside the declared seams needs a human. See the job summary."
           exit 1
 
-      - name: Push sync branch
+      # Only the commits the branch adds on top of origin/main go into the bundle; the publish job
+      # has origin/main, so the prerequisites resolve there.
+      - name: Bundle the sync branch
         if: steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human'
         run: |
           branch="${{ steps.sync.outputs.branch }}"
-          git fetch origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null || true
-          git push --force-with-lease origin "HEAD:refs/heads/$branch"
+          git bundle create "$RUNNER_TEMP/sync.bundle" "origin/main..refs/heads/$branch"
+          git bundle verify "$RUNNER_TEMP/sync.bundle"
+
+      - name: Upload sync branch bundle
+        if: steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human'
+        uses: actions/upload-artifact@v7
+        with:
+          name: sync-bundle
+          path: ${{ runner.temp }}/sync.bundle
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Push branch and open PR
+    needs: merge
+    if: >-
+      inputs.dry_run != true &&
+      (needs.merge.outputs.status == 'clean' || needs.merge.outputs.status == 'needs-human')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.NONDEV_SYNC_TOKEN || github.token }}
+      SYNC_BRANCH: ${{ needs.merge.outputs.branch }}
+      SYNC_DATE: ${{ needs.merge.outputs.date }}
+      SYNC_STATUS: ${{ needs.merge.outputs.status }}
+      SYNC_REASONS: ${{ needs.merge.outputs.reasons }}
+    steps:
+      # This job runs git and gh only: no install, no node, nothing from the merged tree executes.
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.NONDEV_SYNC_TOKEN || github.token }}
+
+      - name: Download sync branch bundle and report
+        uses: actions/download-artifact@v8
+        with:
+          pattern: sync-*
+          path: ${{ runner.temp }}/sync-artifacts
+
+      - name: Import the sync branch from the bundle
+        run: |
+          bundle="$RUNNER_TEMP/sync-artifacts/sync-bundle/sync.bundle"
+          git bundle verify "$bundle"
+          git fetch "$bundle" "+refs/heads/$SYNC_BRANCH:refs/heads/$SYNC_BRANCH"
+          git log --oneline -3 "refs/heads/$SYNC_BRANCH"
+
+      - name: Push sync branch
+        run: |
+          git fetch origin "+refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH" 2>/dev/null || true
+          git push --force-with-lease origin "refs/heads/$SYNC_BRANCH:refs/heads/$SYNC_BRANCH"
 
       - name: Open or update pull request
         id: pr
-        if: steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human'
         run: |
-          branch="${{ steps.sync.outputs.branch }}"
-          title="sync: upstream ${{ steps.sync.outputs.date }}"
+          report="$RUNNER_TEMP/sync-artifacts/sync-report/sync-report.md"
+          title="sync: upstream $SYNC_DATE"
           gh label create upstream-sync --color 0E8A16 --description "Nightly merge of pingdotgg/t3code" --force
           gh label create needs-human --color D93F0B --description "The sync could not finish on its own" --force
-          number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
+          number="$(gh pr list --head "$SYNC_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
           if [ -z "$number" ]; then
-            number="$(gh pr create --base main --head "$branch" --title "$title" --body-file nondev/sync-report.md --label upstream-sync | grep -oE '[0-9]+$')"
+            number="$(gh pr create --base main --head "$SYNC_BRANCH" --title "$title" --body-file "$report" --label upstream-sync | grep -oE '[0-9]+$')"
           else
-            gh pr edit "$number" --title "$title" --body-file nondev/sync-report.md --add-label upstream-sync
+            gh pr edit "$number" --title "$title" --body-file "$report" --add-label upstream-sync
           fi
-          if [ "${{ steps.sync.outputs.status }}" = "needs-human" ]; then
+          if [ "$SYNC_STATUS" = "needs-human" ]; then
             gh pr edit "$number" --add-label needs-human
           else
             gh pr edit "$number" --remove-label needs-human 2>/dev/null || true
@@ -137,22 +225,37 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "Pull request #$number: $(gh pr view "$number" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 
-      # Only when explicitly enabled. GitHub's auto-merge waits for the branch's required status
-      # checks; if `main` has no protection rule requiring `nondev / check`, this call errors out
-      # (and we surface that) rather than merging an unchecked branch.
-      - name: Enable auto-merge for a clean sync
-        if: steps.pr.outcome == 'success' && steps.sync.outputs.status == 'clean' && vars.NONDEV_SYNC_AUTOMERGE == 'true'
+      # Auto-merge is off unless BOTH hold: the repo variable opts in, and `main` is protected by a
+      # rule that requires status checks (classic protection or a ruleset). Without protection,
+      # GitHub's auto-merge merges immediately, before `nondev / check` has run. Free private
+      # repositories cannot protect branches at all (the API answers 403/404), so there auto-merge
+      # stays permanently off. A human merges every sync PR.
+      - name: Decide whether auto-merge is allowed
+        id: automerge
+        if: steps.pr.outcome == 'success' && env.SYNC_STATUS == 'clean'
+        env:
+          OPT_IN: ${{ vars.NONDEV_SYNC_AUTOMERGE }}
+        run: |
+          allowed=false
+          if [ "$OPT_IN" = "true" ]; then
+            classic="$(gh api "repos/$GITHUB_REPOSITORY/branches/main/protection" --jq '.required_status_checks.contexts // [] | length' 2>/dev/null || echo 0)"
+            rules="$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" --jq '[.[] | select(.type == "required_status_checks")] | length' 2>/dev/null || echo 0)"
+            if [ "${classic:-0}" -gt 0 ] || [ "${rules:-0}" -gt 0 ]; then
+              allowed=true
+            else
+              echo "::warning::NONDEV_SYNC_AUTOMERGE is true but main has no rule requiring status checks (free private repos cannot protect branches). Auto-merge stays off; merge the PR by hand."
+            fi
+          else
+            echo "Auto-merge not requested (NONDEV_SYNC_AUTOMERGE is not 'true'); a human merges this PR."
+          fi
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge for a clean, protected sync
+        if: steps.automerge.outputs.allowed == 'true'
         run: gh pr merge --auto --merge "${{ steps.pr.outputs.number }}"
 
-      - name: Save remembered conflict resolutions (git rerere)
-        if: always() && hashFiles('.git/rr-cache/**') != ''
-        uses: actions/cache/save@v6
-        with:
-          path: .git/rr-cache
-          key: nondev-rerere-${{ github.run_id }}
-
       - name: Report needs-human as a failed run so it is noticed
-        if: steps.sync.outputs.status == 'needs-human'
+        if: env.SYNC_STATUS == 'needs-human'
         run: |
-          echo "::warning::Sync PR opened but needs a human: ${{ steps.sync.outputs.reasons }}"
+          echo "::warning::Sync PR opened but needs a human: $SYNC_REASONS"
           exit 1

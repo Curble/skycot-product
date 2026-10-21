@@ -20,6 +20,8 @@
  * (seam re-apply, lockfile re-resolution failure, typecheck/build failure) · 2 aborted or refused.
  *
  * --dry-run fetches and reports only: no branch, no merge, no files written (report to stdout).
+ * T3CODE_SYNC_INSTALL_FLAGS (env) appends flags to the post-merge install, e.g. `--ignore-scripts`.
+ * Upstream changes to SENSITIVE_PATH_GLOBS (lib.ts) always yield `needs-human`.
  */
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -48,6 +50,7 @@ import {
   findSeamsForPath,
   formatOutputs,
   isOurPath,
+  isSensitivePath,
   parseConflictPaths,
   parseManifest,
   renderExportDiff,
@@ -228,6 +231,8 @@ function main(): void {
     (p) => findSeamsForPath(manifest.seams, p).length > 0,
   );
   const ourPathsTouched = upstreamChanged.filter((p) => isOurPath(p));
+  const sensitiveTouched = upstreamChanged.filter((p) => isSensitivePath(p));
+  outputs.sensitive_files = sensitiveTouched.length;
 
   report.push(
     `# Upstream sync ${date}${dryRun ? " (dry run)" : ""}`,
@@ -289,6 +294,30 @@ function main(): void {
       "> ⚠ Upstream created or changed files inside paths this fork owns:",
       ...ourPathsTouched.map((p) => `> - \`${p}\``),
     );
+  }
+  report.push("", "## Security-sensitive changes to read first", "");
+  if (sensitiveTouched.length === 0) {
+    report.push(
+      "None — no workflow, auth, CORS, Electron shell, permission contract, manifest, patch or build-script file changed upstream.",
+    );
+  } else {
+    report.push(
+      `Upstream touched **${sensitiveTouched.length}** file(s) that decide who may do what, what CI runs, or what gets installed. This sync is therefore \`needs-human\` even if every check is green.`,
+      "",
+    );
+    const sensitiveCommits = gitLines(root, [
+      "log",
+      "--format=- %h %s",
+      `${mergeBase}..${target}`,
+      "--",
+      ...sensitiveTouched,
+    ]);
+    report.push(...sensitiveCommits.slice(0, 40));
+    if (sensitiveCommits.length > 40) report.push(`- … ${sensitiveCommits.length - 40} more`);
+    report.push("", "<details><summary>Files</summary>", "");
+    report.push(...sensitiveTouched.slice(0, 80).map((p) => `- \`${p}\``));
+    if (sensitiveTouched.length > 80) report.push(`- … ${sensitiveTouched.length - 80} more`);
+    report.push("", "</details>");
   }
   const engineCommits = gitLines(root, [
     "log",
@@ -540,7 +569,17 @@ function main(): void {
   const steps: StepResult[] = [];
   if (verify) {
     const pm = packageManager(root);
-    const install = runTool(root, "install", pm, ["install", "--no-frozen-lockfile"]);
+    // The merged tree is untrusted until a human reads it; CI sets `--ignore-scripts` here so no
+    // freshly merged lifecycle script runs (audit SEC-04). Typecheck and the Vite build of our
+    // client need no native builds, so the checks still mean something without them.
+    const extraInstallFlags = (process.env.T3CODE_SYNC_INSTALL_FLAGS ?? "")
+      .split(/\s+/)
+      .filter(Boolean);
+    const install = runTool(root, "install", pm, [
+      "install",
+      "--no-frozen-lockfile",
+      ...extraInstallFlags,
+    ]);
     steps.push(install);
     if (gitLines(root, ["status", "--porcelain", "--", "pnpm-lock.yaml"]).length) {
       git(root, ["add", "--", "pnpm-lock.yaml"]);
@@ -590,9 +629,12 @@ function main(): void {
     seamsToReapply.length > 0 ||
     markerLost.length > 0 ||
     (lockfile !== null && !lockfile.ok) ||
-    conflicts.some((c) => c.kind === "ours");
+    conflicts.some((c) => c.kind === "ours") ||
+    sensitiveTouched.length > 0;
   const status: Status = needsHuman ? "needs-human" : "clean";
   const reasons: string[] = [];
+  if (sensitiveTouched.length)
+    reasons.push(`${sensitiveTouched.length} security-sensitive file(s) changed upstream`);
   if (seamsToReapply.length) reasons.push(`${seamsToReapply.length} seam(s) need re-applying`);
   if (markerLost.length) reasons.push(`${markerLost.length} seam marker(s) missing`);
   if (lockfile && !lockfile.ok) reasons.push("lockfile re-resolution failed");

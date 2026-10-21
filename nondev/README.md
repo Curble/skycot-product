@@ -32,13 +32,19 @@ Glossary used below:
 
 Our code lives **only** in paths upstream does not own. Anything there can never conflict.
 
-| Path                             | What goes there                                      |
-| -------------------------------- | ---------------------------------------------------- |
-| `apps/nondev/**`                 | our client (the workspace package `@t3tools/nondev`) |
-| `nondev/**`                      | this folder: tooling, scripts, docs, brand assets    |
-| `docs/nondev/**`                 | design docs for the fork                             |
-| `.github/workflows/nondev-*.yml` | our GitHub Actions                                   |
-| `SEAM-MANIFEST.md` (repo root)   | the list of upstream files we were forced to edit    |
+| Path                                                                     | What goes there                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `apps/nondev/**`                                                         | our client (the workspace package `@t3tools/nondev`), incl. `themes-community/` |
+| `apps/server/src/skycot/**`                                              | SKYCOT-only server modules (provider policy)                                    |
+| `packages/skycot-rules/**`                                               | SKYCOT-only shared rules package                                                |
+| `nondev/**`                                                              | this folder: tooling, scripts, docs, brand assets, `bin/skycot.cjs`             |
+| `docs/nondev/**`                                                         | design docs for the fork                                                        |
+| `docs/legal/**`, `docs/security/**`, `docs/qa/**`, `docs/skycot-site/**` | legal, security-audit, QA and website documents                                 |
+| `.github/workflows/nondev-*.yml`                                         | our GitHub Actions                                                              |
+| `SEAM-MANIFEST.md` (repo root)                                           | the list of upstream files we were forced to edit                               |
+| `NOTICE`, `CONTRIBUTING-THEMES.md` (repo root)                           | our attribution notice and theme-contribution guide                             |
+
+The authoritative list is `OUR_PATH_GLOBS` in `nondev/scripts/lib.ts`; this table mirrors it.
 
 Every edit to any **other** file is a seam and **must** have a row in `SEAM-MANIFEST.md` with a
 marker comment (`// nondev-seam: <id>`) in the file. `node nondev/scripts/check-seams.ts` enforces
@@ -60,14 +66,30 @@ Every night at **03:00 Melbourne** (02:00 outside daylight saving) the workflow
      re-apply"** with our diff in the report.
    - a path we own → keep ours, flag it.
    - **anything else** → abort. The branch is deleted, nothing changes, the run fails loudly.
-4. Installs, typechecks and builds `@t3tools/nondev`.
+4. Installs (with dependency lifecycle scripts disabled — see below), typechecks and builds
+   `@t3tools/nondev`.
 5. Writes `nondev/sync-report.md` (commits merged, version moved from→to, conflicts and how each
-   was resolved, seams to re-apply, check results, and a list of upstream **exports we import
-   that were removed or renamed**, so the fix location is known before reading the typecheck log).
-6. Pushes the branch and opens or updates the PR **`sync: upstream YYYY-MM-DD`**, label
+   was resolved, seams to re-apply, check results, **security-sensitive files upstream changed**
+   (workflows, auth, CORS, Electron shell, permission contracts, manifests, patches, build
+   scripts — any of these makes the sync `needs-human` even when every check is green), and a
+   list of upstream **exports we import that were removed or renamed**, so the fix location is
+   known before reading the typecheck log).
+6. Hands the branch to a **second job** as a git bundle. Only that job holds a GitHub token; it
+   pushes the branch and opens or updates the PR **`sync: upstream YYYY-MM-DD`**, label
    `upstream-sync`, with the report as the PR body. Red syncs also get `needs-human`.
-7. If the repository variable `NONDEV_SYNC_AUTOMERGE` is `true` **and** the sync was clean,
-   it enables GitHub auto-merge, which merges once CI (`nondev / check`) is green.
+7. **Auto-merge is off.** It is enabled only when the repository variable `NONDEV_SYNC_AUTOMERGE`
+   is `true` **and** `main` has a branch-protection rule (or ruleset) that requires status checks,
+   so GitHub waits for `nondev / check` instead of merging immediately. GitHub does not offer
+   branch protection on free private repositories, so there a human merges every sync PR whatever
+   the variable says.
+
+Why two jobs (security audit SEC-04): the merged tree is upstream's newest code plus whatever its
+dependencies would run at install time. The job that installs and builds it has **no secrets** and
+no write token in `.git/config` (`persist-credentials: false`), and it installs with
+`--ignore-scripts` so no freshly merged install script runs. Trade-off: native add-ons are not
+compiled in that job; the typecheck and the Vite build of our client never needed them, and if a
+future upstream change makes them necessary the check fails as `needs-human` rather than running
+the script. The publish job runs only `git` and `gh`.
 
 Run it yourself from a clean checkout (no uncommitted changes, otherwise it refuses):
 
@@ -138,24 +160,24 @@ Steps:
 0.1.2-nondev.1` correctly. Verify once with upstream's mock update server
    (`T3CODE_DESKTOP_MOCK_UPDATES`, `vp run start:mock-update-server`) before the first public build.
 
-## 6. Branding and isolation checklist (TODO — nothing here is done yet)
+## 6. Branding and isolation checklist (status 21 Oct 2026: code items done via `brand.json` + seams; icons/artwork still upstream's)
 
 These are the places where upstream's identity is baked in. Shipping without changing them would
 send our users' data to upstream's services or make our app fight an installed T3 Code. Each row
 is a future seam **or** an environment variable set in our build; prefer the variable.
 
-| Item                                                                                          | Where upstream sets it                                                                                                                            | What to do                                                                                        | Seam or env?                                  |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Telemetry (usage analytics via PostHog) key + host `https://ingest.t3.codes`                  | `apps/server/src/telemetry/AnalyticsService.ts` lines 75–81 (`T3CODE_POSTHOG_KEY`, `T3CODE_POSTHOG_HOST`, `T3CODE_TELEMETRY_ENABLED`)             | ship with `T3CODE_TELEMETRY_ENABLED=false`, or set our own PostHog key/host at build time         | env                                           |
-| Clerk (login provider) production key `pk_live_…`, OAuth client id, JWT template              | `.env.example` lines 9–22 (`T3CODE_CLERK_*`)                                                                                                      | never copy `.env.example` into our build; T3 Connect stays disabled until we own a Clerk instance | env                                           |
-| Relay `https://relay.t3.codes` and hosted app `https://app.t3.codes`                          | `.env.example` (`T3CODE_RELAY_URL`), `packages/shared/src/connectAuth.ts:10` (`DEFAULT_HOSTED_APP_URL`), `infra/relay/**`                         | leave unset (Connect off) or deploy our own relay per `docs/operations/connect-setup.md`          | env, later seam                               |
-| Home directory `~/.t3` shared with an installed T3 Code                                       | `T3CODE_HOME` default; `apps/server/src/os-jank.ts:122`, `packages/shared/src/devHome.ts`                                                         | launch our desktop/CLI with `T3CODE_HOME=~/.nondev` (or similar) so databases never collide       | env (desktop seam if we want a baked default) |
-| Deep-link scheme `t3code://` / `t3code-dev://`                                                | `apps/desktop/src/electron/ElectronProtocol.ts:16-17`                                                                                             | change to our own scheme or the OS will route our links to T3 Code                                | seam (2 lines)                                |
-| `DESKTOP_APP_ID = "com.t3tools.t3code"` (also drives single-instance lock and keychain group) | `scripts/build-desktop-artifact.ts:65`                                                                                                            | our own id, e.g. `com.<company>.nondev`                                                           | seam (1 line)                                 |
-| `productName: "T3 Code (Beta)"` and `APP_BASE_NAME = "T3 Code"`                               | `apps/desktop/package.json:45`, `apps/desktop/src/app/DesktopEnvironment.ts:88`                                                                   | our product name                                                                                  | seam (2 lines)                                |
-| Update feed (where the app looks for new versions)                                            | `T3CODE_DESKTOP_UPDATE_REPOSITORY`, read in `scripts/build-desktop-artifact.ts:2742`                                                              | set to `mark-hallam/t3code-nondev` in our release workflow; never let it fall back to upstream    | env                                           |
-| Install scripts download from `pingdotgg/t3code`                                              | `scripts/install.sh:20`, `scripts/install.ps1:19`, `scripts/npm-launcher/t3.mjs`, `packages/shared/src/cliRelease.ts` (`T3CODE_RELEASE_BASE_URL`) | do not ship the CLI installers, or set `T3CODE_RELEASE_BASE_URL` to our releases                  | env / do not ship                             |
-| Icons and installer artwork                                                                   | `assets/{prod,nightly,dev}/**`, `apps/desktop/resources/{dmg,installer.nsh,linux}`                                                                | replace with ours; declare as `(binary)` glob seams                                               | seam (binary)                                 |
+| Item                                                                                          | Where upstream sets it                                                                                                                            | What to do                                                                                                                                                                               | Seam or env?                                  |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Telemetry (usage analytics via PostHog) key + host `https://ingest.t3.codes`                  | `apps/server/src/telemetry/AnalyticsService.ts` lines 75–81 (`T3CODE_POSTHOG_KEY`, `T3CODE_POSTHOG_HOST`, `T3CODE_TELEMETRY_ENABLED`)             | **done**: `env.cjs` sets `false` + loopback sink, and seam `telemetry-default-off` makes the engine default off even without `env.cjs`                                                   | env + 1-line seam                             |
+| Clerk (login provider) production key `pk_live_…`, OAuth client id, JWT template              | `.env.example` lines 9–22 (`T3CODE_CLERK_*`)                                                                                                      | never copy `.env.example` into our build; T3 Connect stays disabled until we own a Clerk instance                                                                                        | env                                           |
+| Relay `https://relay.t3.codes` and hosted app `https://app.t3.codes`                          | `.env.example` (`T3CODE_RELAY_URL`), `packages/shared/src/connectAuth.ts:10` (`DEFAULT_HOSTED_APP_URL`), `infra/relay/**`                         | leave unset (Connect off) or deploy our own relay per `docs/operations/connect-setup.md`                                                                                                 | env, later seam                               |
+| Home directory `~/.t3` shared with an installed T3 Code                                       | `T3CODE_HOME` default; `apps/server/src/os-jank.ts:122`, `packages/shared/src/devHome.ts`                                                         | launch our desktop/CLI with `T3CODE_HOME=~/.nondev` (or similar) so databases never collide                                                                                              | env (desktop seam if we want a baked default) |
+| Deep-link scheme `t3code://` / `t3code-dev://`                                                | `apps/desktop/src/electron/ElectronProtocol.ts:16-17`                                                                                             | change to our own scheme or the OS will route our links to T3 Code                                                                                                                       | seam (2 lines)                                |
+| `DESKTOP_APP_ID = "com.t3tools.t3code"` (also drives single-instance lock and keychain group) | `scripts/build-desktop-artifact.ts:65`                                                                                                            | our own id, e.g. `com.<company>.nondev`                                                                                                                                                  | seam (1 line)                                 |
+| `productName: "T3 Code (Beta)"` and `APP_BASE_NAME = "T3 Code"`                               | `apps/desktop/package.json:45`, `apps/desktop/src/app/DesktopEnvironment.ts:88`                                                                   | our product name                                                                                                                                                                         | seam (2 lines)                                |
+| Update feed (where the app looks for new versions)                                            | `T3CODE_DESKTOP_UPDATE_REPOSITORY`, read in `scripts/build-desktop-artifact.ts:2742`                                                              | **done**: `brand.json updateRepository` = `mark-hallam/skycot-product` (= git origin; `apply-brand.ts` enforces) feeds desktop + CLI                                                     | env + seam `brand-cli-update-repo`            |
+| Install scripts download from `pingdotgg/t3code`                                              | `scripts/install.sh:20`, `scripts/install.ps1:19`, `scripts/npm-launcher/t3.mjs`, `packages/shared/src/cliRelease.ts` (`T3CODE_RELEASE_BASE_URL`) | **done** for the `update` command and download base (seam `brand-cli-update-repo`); `scripts/install.sh`, `install.ps1` and `npm-launcher/t3.mjs` still name upstream — do not ship them | seam / do not ship                            |
+| Icons and installer artwork                                                                   | `assets/{prod,nightly,dev}/**`, `apps/desktop/resources/{dmg,installer.nsh,linux}`                                                                | replace with ours; declare as `(binary)` glob seams                                                                                                                                      | seam (binary)                                 |
 
 Best long-term move (first principles): open an upstream PR making the four code items above
 (`DESKTOP_APP_ID`, `productName`, `APP_BASE_NAME`, the protocol scheme) configurable via
@@ -164,25 +186,37 @@ welcomes forks; if accepted, our code seams drop to zero and only icon files rem
 
 ## 7. GitHub settings the workflows need (one-time)
 
-- **Secret `NONDEV_SYNC_TOKEN`** (recommended): a fine-grained personal access token with
-  _Contents: write_ and _Pull requests: write_ on this repo. Without it, PRs created by the bot do
-  not trigger CI, so auto-merge can never go green. If you skip it, enable _Settings → Actions →
-  General → "Allow GitHub Actions to create and approve pull requests"_.
-- **Variable `NONDEV_SYNC_AUTOMERGE`** = `true` only once you trust the checks. Leave unset to
-  review every sync PR by hand.
-- **Settings → General → "Allow auto-merge"** must be on for the auto-merge step.
+- **Secret `NONDEV_SYNC_TOKEN`** (recommended): a **fine-grained** personal access token scoped
+  to **this repository only**, with _Contents: write_ and _Pull requests: write_, 90-day expiry
+  (set a calendar reminder to rotate it). It is used only by the `publish` job, which runs `git`
+  and `gh` and nothing from the merged code. Without it, PRs created by the bot do not trigger CI.
+  If you skip it, enable _Settings → Actions → General → "Allow GitHub Actions to create and
+  approve pull requests"_.
+- **Variable `NONDEV_SYNC_AUTOMERGE`**: leave unset. Sync PRs are reviewed by a human. Setting it
+  to `true` has no effect until `main` is protected (next bullet) — the workflow checks for the
+  rule and refuses to enable auto-merge without it.
 - **Branch protection on `main`** requiring the status check **`nondev / check`** (from
-  `nondev-ci.yml`). Without it, auto-merge would merge immediately instead of waiting for CI.
+  `nondev-ci.yml`). Not available on a free private repository (GitHub offers it for public repos
+  and paid plans); until then, auto-merge stays off by construction.
+- **Settings → General → "Allow auto-merge"** must be on only if auto-merge is ever used.
+- **Settings → Actions → General**: disable upstream's workflows we do not need (release, publish,
+  deploy, mobile, bots). `node nondev/scripts/check-workflows.ts` lists the ones that would run here
+  unguarded; CI prints the same list on every run.
 - Labels `upstream-sync` and `needs-human` are created automatically.
 
 ## 8. Files in this folder
 
-| File                        | Purpose                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------ |
-| `scripts/upstream-sync.ts`  | the nightly merge driver (also runnable locally)                               |
-| `scripts/check-seams.ts`    | CI gate: every changed upstream file is declared; markers present (`--strict`) |
-| `scripts/lib.ts`            | pure helpers: manifest parsing, glob matching, export/import diffing           |
-| `scripts/git.ts`            | thin git/shell wrappers                                                        |
-| `scripts/lib.test.ts`       | unit tests — `node --test nondev/scripts/*.test.ts`                            |
-| `SEAM-MANIFEST.template.md` | the manifest format and rules                                                  |
-| `sync-report.md`            | written by each sync on its branch (not present on a fresh `main`)             |
+| File                         | Purpose                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `scripts/upstream-sync.ts`   | the nightly merge driver (also runnable locally)                                        |
+| `scripts/check-seams.ts`     | CI gate: every changed upstream file is declared; markers present (`--strict`)          |
+| `scripts/check-workflows.ts` | lists inherited upstream workflows that run here without a repository guard             |
+| `scripts/apply-brand.ts`     | brand checker: seams intact, `brand.json` sane, update feed = git origin, analytics off |
+| `scripts/lib.ts`             | pure helpers: manifest parsing, glob matching, sensitive paths, export diffing          |
+| `scripts/git.ts`             | thin git/shell wrappers                                                                 |
+| `scripts/*.test.ts`          | unit tests — `node --test nondev/scripts/*.test.ts`                                     |
+| `bin/skycot.cjs`             | the only supported CLI entry: loads `brand/env.cjs`, then upstream's `bin.mjs`          |
+| `brand.json`, `brand/`       | the fork's identity and the bootstrap that turns it into `T3CODE_*` defaults            |
+| `legal/`                     | the licence-packaging seams (L-1…L-5) and why each exists                               |
+| `SEAM-MANIFEST.template.md`  | the manifest format and rules                                                           |
+| `sync-report.md`             | written by each sync on its branch (not present on a fresh `main`)                      |
