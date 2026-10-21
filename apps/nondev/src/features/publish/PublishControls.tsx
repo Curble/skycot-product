@@ -6,6 +6,7 @@ import type {
 } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@t3tools/contracts";
 import { Upload } from "lucide-react";
+import { useId } from "react";
 
 import { Button } from "../../ui/Button";
 import { Pill } from "../../ui/Pill";
@@ -55,10 +56,15 @@ export function usePublishOverview(input: {
       link: data.link,
       ...(data.detail ? { reviewers: data.detail.reviewers } : {}),
       hasSomethingToPublish: hasSomethingToPublish(data.vcs, data.link),
+      uploadedAt: data.uploadCurrent && data.lastUpload ? data.lastUpload.at : null,
     }),
   };
 }
 
+/**
+ * A blocked Publish stays focusable (aria-disabled, not disabled) so the
+ * reason reaches keyboard and screen-reader users, not only the mouse hover.
+ */
 export function PublishButton({
   readiness,
   onClick,
@@ -66,17 +72,26 @@ export function PublishButton({
   readonly readiness: PublishReadiness;
   readonly onClick: () => void;
 }) {
+  const reasonId = useId();
   return (
     <span className="fm-pub-tip" data-tip={readiness.enabled ? undefined : readiness.reason}>
       <Button
         variant="primary"
         size="sm"
         icon={Upload}
-        disabled={!readiness.enabled}
-        onClick={onClick}
+        aria-disabled={!readiness.enabled}
+        aria-describedby={readiness.enabled ? undefined : reasonId}
+        onClick={() => {
+          if (readiness.enabled) onClick();
+        }}
       >
         Publish…
       </Button>
+      {readiness.enabled ? null : (
+        <span id={reasonId} className="fm-sr-only">
+          {readiness.reason}
+        </span>
+      )}
     </span>
   );
 }

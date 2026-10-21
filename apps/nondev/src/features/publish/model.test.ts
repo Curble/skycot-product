@@ -9,14 +9,17 @@ import type {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  areaFileNoun,
   buildSafetyCheck,
   collectCheckRuns,
+  describeFailure,
   describePublishStatus,
   pickPullRequestLink,
   publishReadiness,
   resolveLiveChoice,
   resolveReviewChoice,
   latestTurnCount,
+  uploadStillCurrent,
 } from "./model";
 import { describeTurnDiff } from "../../plain/changes";
 
@@ -284,5 +287,90 @@ describe("latestTurnCount", () => {
     expect(
       latestTurnCount(checkpoints, [run("run-1", "rolled_back"), run("run-2", "rolled_back")]),
     ).toBeNull();
+  });
+});
+
+describe("describeFailure", () => {
+  const pushError = new Error(
+    "Git command failed in GitVcsDriver.pushCurrentBranch.pushWithUpstream (/tmp/wt): Git command exited with a non-zero status. (remote_unreachable)",
+  );
+  it("names the online copy, not GitHub, when the remote is a folder", () => {
+    const failure = describeFailure(pushError, { remote: "other" });
+    expect(failure.headline).toBe("The online copy didn't respond.");
+    expect(failure.hint).toMatch(/Nothing was lost/);
+    expect(failure.detail).toContain("remote_unreachable");
+  });
+  it("names GitHub when the remote is GitHub", () => {
+    expect(describeFailure(pushError, { remote: "github" }).headline).toBe(
+      "GitHub didn't respond.",
+    );
+  });
+  it("keeps permission problems and unknown failures plain", () => {
+    expect(describeFailure(new Error("missing scope: source-control:write")).headline).toMatch(
+      /isn't allowed/,
+    );
+    expect(describeFailure(new Error("boom")).headline).toBe("That didn't work.");
+  });
+});
+
+describe("areaFileNoun", () => {
+  it("says 'settings file' like the card does", () => {
+    expect(areaFileNoun("settings", 1)).toBe("settings file");
+    expect(areaFileNoun("pages", 4)).toBe("pages");
+    expect(areaFileNoun("behind the scenes", 2)).toBe("files behind the scenes");
+  });
+});
+
+describe("buildSafetyCheck reversal note", () => {
+  it("warns when the upload would carry the undoing of a kept version", () => {
+    const { lines } = buildSafetyCheck({
+      changes: {
+        conversation: describeTurnDiff(
+          "diff --git a/menu.html b/menu.html\n--- a/menu.html\n+++ b/menu.html\n@@ -1 +1 @@\n-a\n+b\n",
+        ),
+        outsideConversation: [],
+        pending: false,
+      },
+      checkRuns: [],
+      operationsKnown: true,
+      reversedKept: [{ subject: "Change the footer email", number: 3 }],
+    });
+    const note = lines.find((line) => /already kept/.test(line.text));
+    expect(note?.state).toBe("warn");
+    expect(note?.detail).toContain("Version 3: Change the footer email");
+  });
+});
+
+describe("uploadStillCurrent", () => {
+  it("is true only while nothing has changed since the upload", () => {
+    const upload = { at: "2026-10-21T10:00:00.000Z" };
+    expect(
+      uploadStillCurrent(vcs({ hasWorkingTreeChanges: false, aheadCount: 0 }), upload, null),
+    ).toBe(true);
+    expect(uploadStillCurrent(vcs({ hasWorkingTreeChanges: true }), upload, null)).toBe(false);
+    expect(
+      uploadStillCurrent(
+        vcs({ hasWorkingTreeChanges: false, aheadCount: 0 }),
+        upload,
+        "2026-10-21T10:05:00.000Z",
+      ),
+    ).toBe(false);
+    expect(uploadStillCurrent(vcs(), null, null)).toBe(false);
+  });
+});
+
+describe("describePublishStatus after an upload", () => {
+  it("says Uploaded with the time, with an Advanced-prefixed tooltip", () => {
+    const status = describePublishStatus({
+      link: null,
+      hasSomethingToPublish: true,
+      uploadedAt: "2026-10-21T10:00:00.000Z",
+      formatTime: () => "8:00 pm",
+    });
+    expect(status?.label).toBe("Uploaded · 8:00 pm");
+    expect(status?.advanced).toMatch(/^Advanced:/);
+    expect(describePublishStatus({ link: null, hasSomethingToPublish: true })?.advanced).toMatch(
+      /^Advanced:/,
+    );
   });
 });

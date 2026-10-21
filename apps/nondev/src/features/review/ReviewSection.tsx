@@ -17,7 +17,7 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useId, useState } from "react";
 
 import { randomUUID } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
@@ -32,6 +32,7 @@ import {
 } from "../../plain/changes";
 import { planGitIntent } from "../../plain/git";
 import { describeCheckpoint } from "../../plain/versions";
+import { copy } from "../../plain";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import { orchestrationEnvironment, vcsActionManager, vcsEnvironment } from "../../state/vcs";
@@ -44,6 +45,7 @@ import { Pill } from "../../ui/Pill";
 import { StepBadge } from "../../ui/StepBadge";
 import { RestoreSheet, plainRestoreProblem } from "../versions/RestoreSheet";
 import { formatVersionTime, useVersionsTimeline } from "../versions/timeline";
+import { useLastUpload } from "../publish/uploads";
 import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
 import { reviewTargetFor } from "./turnReview";
 
@@ -87,6 +89,7 @@ export function ReviewSection({
 
   const timeline = useVersionsTimeline(environmentId, threadId, shell);
   const kept = useKeptVersions(threadId);
+  const lastUpload = useLastUpload(threadId);
 
   const cwd = shell?.worktreePath ?? project?.workspaceRoot ?? null;
   const gitStatus = useEnvironmentQuery(
@@ -102,6 +105,7 @@ export function ReviewSection({
   const [problem, setProblem] = useState<string | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoRequested, setUndoRequested] = useState(false);
+  const undoNoteId = useId();
 
   // The turn's diff loads with the card: the engine's checkpoint summary calls
   // every file "modified", so only the diff can tell a new page from an edit.
@@ -123,10 +127,17 @@ export function ReviewSection({
   const versionNumber = timeline.numbers.get(checkpoint.id) ?? null;
   const when = formatVersionTime(DateTime.formatIso(checkpoint.capturedAt));
   const keptHere = kept.find((entry) => entry.checkpointId === checkpoint.id) ?? null;
-  const keptNumber = keptHere ? (timeline.numbers.get(keptHere.sha) ?? null) : null;
+  const uploadedHere =
+    keptHere !== null &&
+    lastUpload !== null &&
+    Date.parse(lastUpload.at) >= Date.parse(keptHere.at);
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
 
   if (run?.status === "rolled_back") {
+    // Files roll back; a kept commit never does. Say which happened.
+    const keptNote = keptHere
+      ? ` The files are back to how they were, but this version is still saved as Git commit ${keptHere.sha.slice(0, 7)}${uploadedHere ? " and on the online copy" : ""}. Publishing now would send the reversal.`
+      : " Everything is back to how it was before this change.";
     return (
       <div className="fm-review" data-checkpoint-id={checkpoint.id}>
         <Card label="What changed (undone)" tinted>
@@ -134,7 +145,7 @@ export function ReviewSection({
             icon={Undo2}
             tone="grey"
             title="Undone"
-            subtitle={`${what.summary} Everything is back to how it was before this change.`}
+            subtitle={`${what.summary}${keptNote}`}
           />
         </Card>
       </div>
@@ -164,10 +175,15 @@ export function ReviewSection({
     commitMessage,
     filePaths,
   });
+  const nothingToKeep = gitStatus.data !== null && gitStatus.data.hasWorkingTreeChanges === false;
   const keepBlocked = keptHere !== null || plan.kind !== "stacked" || cwd === null || !canOperate;
 
+  // The timeline's view of "before" carries the truthful blockers (undone,
+  // or a kept version in between); a hidden empty point falls back to the
+  // plain description.
   const beforeEntry = before
-    ? describeCheckpoint(before, { canRollbackFiles: timeline.canRollbackFiles }, false)
+    ? (timeline.byId.get(before.id) ??
+      describeCheckpoint(before, { canRollbackFiles: timeline.canRollbackFiles }, false))
     : null;
   const undoBlocker = !canOperate
     ? "This connection can read but not change things."
@@ -175,7 +191,9 @@ export function ReviewSection({
       ? "There's no restore point from before this change."
       : active
         ? "Wait for the current work to finish before undoing."
-        : (beforeEntry.restoreExplainer.blockedBecause ?? null);
+        : keptHere !== null
+          ? `This version was kept as a Git commit${uploadedHere ? " and uploaded" : ""}, so it can't be rolled back from here. Ask the Crew to undo it instead — that makes a new version reversing it.`
+          : (beforeEntry.restoreExplainer.blockedBecause ?? null);
   const canUndo = beforeEntry !== null && beforeEntry.canRestore && undoBlocker === null;
   const rollbackFailure = projection.thread.rollbackFailure ?? null;
 
@@ -193,7 +211,16 @@ export function ReviewSection({
     });
     setKeeping(false);
     if (outcome._tag === "Failure") {
-      setProblem(plainGitProblem(squashAtomCommandFailure(outcome)));
+      const cause = squashAtomCommandFailure(outcome);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      // Git's "nothing to commit" is not a failure; it means it was already saved.
+      if (
+        /nothing to commit|no changes|did not match any file|pathspec|nothing added/i.test(message)
+      ) {
+        setKeepNote("Nothing new to keep — this was already saved.");
+        return;
+      }
+      setProblem(plainGitProblem(cause));
       return;
     }
     const commit = outcome.value.commit;
@@ -218,11 +245,13 @@ export function ReviewSection({
   };
 
   const footerNote = keptHere
-    ? `Saved as Version ${keptNumber ?? "—"} · also a Git commit ${keptHere.sha.slice(0, 7)}`
+    ? `Kept${uploadedHere ? " and uploaded" : ""} · also a Git commit ${keptHere.sha.slice(0, 7)}`
     : (keepNote ??
-      (plan.kind === "blocked"
-        ? plan.reason
-        : "Keeping doesn't make it live — that's the next step."));
+      (nothingToKeep
+        ? copy.git.nothingToKeep
+        : plan.kind === "blocked"
+          ? plan.reason
+          : "Keeping doesn't make it live — that's the next step."));
 
   return (
     <div className="fm-review" data-checkpoint-id={checkpoint.id}>
@@ -234,7 +263,7 @@ export function ReviewSection({
           subtitle={[
             versionNumber ? `Version ${versionNumber}` : "Restore point",
             when,
-            "nothing is live yet",
+            keptHere ? (uploadedHere ? "kept and uploaded" : "kept") : "nothing is live yet",
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -290,8 +319,13 @@ export function ReviewSection({
             <p className="fm-disclosure__hint">
               Green lines were added, red lines removed. You don't need to read this — it's here for
               you or whoever reviews it.
-              {shell?.branch ? ` Advanced: on branch ${shell.branch}.` : ""}
             </p>
+            {shell?.branch ? (
+              <details className="fm-disclosure__advanced">
+                <summary>Advanced</summary>
+                On branch {shell.branch}.
+              </details>
+            ) : null}
             {showCode ? (
               diffInput === null ? (
                 <p className="fm-disclosure__hint">
@@ -313,7 +347,7 @@ export function ReviewSection({
               )
             ) : null}
           </details>
-          {problem ? (
+          {problem && !keepBlocked ? (
             <div className="fm-review__flag">
               <Banner tone="danger">{problem}</Banner>
             </div>
@@ -327,15 +361,21 @@ export function ReviewSection({
           ) : null}
         </CardBody>
         <CardFooter note={footerNote}>
-          <Button variant="primary" disabled={keepBlocked || keeping} onClick={() => void keep()}>
+          <Button
+            variant="primary"
+            disabled={keepBlocked || keeping || nothingToKeep}
+            onClick={() => void keep()}
+          >
             {keeping ? "Keeping…" : keptHere ? "Kept" : "Keep these changes"}
           </Button>
           <Button
             variant="destructive"
             icon={Undo2}
-            disabled={!canUndo}
-            title={undoBlocker ?? undefined}
-            onClick={() => setUndoOpen(true)}
+            aria-disabled={!canUndo}
+            aria-describedby={!canUndo && undoBlocker ? undoNoteId : undefined}
+            onClick={() => {
+              if (canUndo) setUndoOpen(true);
+            }}
           >
             Undo all of it
           </Button>
@@ -343,8 +383,10 @@ export function ReviewSection({
             Ask for a tweak
           </Button>
         </CardFooter>
-        {undoBlocker && beforeEntry !== null && !canUndo ? (
-          <p className="fm-review__footnote">{undoBlocker}</p>
+        {undoBlocker && !canUndo ? (
+          <p id={undoNoteId} className="fm-review__footnote">
+            {undoBlocker}
+          </p>
         ) : null}
       </Card>
       <RestoreSheet

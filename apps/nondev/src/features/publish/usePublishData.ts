@@ -18,7 +18,12 @@ import type {
 
 import { useEnvironmentQuery } from "~/state/query";
 
+import * as DateTime from "effect/DateTime";
+
 import type { WhatChanged } from "../../plain/changes";
+import { useKeptVersions } from "../review/keptVersions";
+import { rootCheckpoints } from "../review/turnReview";
+import { buildTimeline } from "../versions/timeline";
 import {
   changesFromDiff,
   changesFromWorkingTree,
@@ -27,9 +32,12 @@ import {
   githubConnection,
   latestTurnCount,
   pickPullRequestLink,
+  uploadStillCurrent,
   type CheckRun,
   type GitHubConnection,
+  type RemoteKind,
 } from "./model";
+import { useLastUpload, type UploadRecord } from "./uploads";
 import {
   canWriteSourceControlAtom,
   orchestrationEnvironment,
@@ -54,6 +62,18 @@ export interface PublishData {
   readonly outsideConversation: ReadonlyArray<string>;
   readonly checkRuns: ReadonlyArray<CheckRun>;
   readonly canWrite: boolean;
+  /** GitHub, some other online copy, or none: who to name when a push fails. */
+  readonly remoteKind: RemoteKind;
+  /** Kept versions this publish would reverse: kept, then undone in-app. */
+  readonly reversedKept: ReadonlyArray<{
+    readonly subject: string;
+    readonly number: number | null;
+  }>;
+  /** Turns that changed files and still stand; more than one means the sheet counts the lot. */
+  readonly turnsWithChanges: number;
+  readonly lastUpload: UploadRecord | null;
+  /** True while the last upload still covers everything. */
+  readonly uploadCurrent: boolean;
 }
 
 export function pullRequestRefFor(
@@ -120,6 +140,36 @@ export function usePublishData(input: {
 
   const canWrite = useAtomValue(canWriteSourceControlAtom(environmentId));
 
+  const kept = useKeptVersions(threadId);
+  const lastUpload = useLastUpload(threadId);
+  const rolledBackRuns = new Set(
+    (projection?.runs ?? []).filter((run) => run.status === "rolled_back").map((run) => run.id),
+  );
+  const numbers = projection ? buildTimeline(projection, shell, kept).numbers : new Map();
+  const reversedKept = kept.flatMap((record) => {
+    if (!record.checkpointId || !projection) return [];
+    const checkpoint = projection.checkpoints.find((c) => c.id === record.checkpointId);
+    if (!checkpoint) return [];
+    const undone =
+      checkpoint.status === "stale" ||
+      (checkpoint.runId !== null && rolledBackRuns.has(checkpoint.runId));
+    return undone
+      ? [{ subject: record.subject, number: numbers.get(record.checkpointId) ?? null }]
+      : [];
+  });
+  const standing = projection
+    ? rootCheckpoints(projection).filter(
+        (c) => c.files.length > 0 && (c.runId === null || !rolledBackRuns.has(c.runId)),
+      )
+    : [];
+  const latestChangeAt =
+    standing.length > 0 ? DateTime.formatIso(standing.at(-1)!.capturedAt) : null;
+  const remoteKind: RemoteKind = !vcs?.hasPrimaryRemote
+    ? "none"
+    : vcs.sourceControlProvider?.kind === "github"
+      ? "github"
+      : "other";
+
   return {
     cwd,
     vcs,
@@ -135,5 +185,10 @@ export function usePublishData(input: {
     outsideConversation: fromDiff === null ? [] : filesOutsideConversation(vcs, fromDiff),
     checkRuns: projection ? collectCheckRuns(projection.turnItems) : [],
     canWrite,
+    remoteKind,
+    reversedKept,
+    turnsWithChanges: standing.length,
+    lastUpload,
+    uploadCurrent: uploadStillCurrent(vcs, lastUpload, latestChangeAt),
   };
 }

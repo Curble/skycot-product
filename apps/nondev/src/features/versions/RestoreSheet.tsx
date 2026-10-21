@@ -5,12 +5,13 @@ import { useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
 
-import { restoreConfirmation, type VersionEntry } from "../../plain/versions";
+import type { VersionEntry } from "../../plain/versions";
 import { threadEnvironment } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
-import { formatVersionTime, honestRestoreExplainer } from "./timeline";
+import { formatVersionTime, honestRestoreExplainer, restoreSentence } from "./timeline";
+import { useEscapeToClose } from "./useEscapeToClose";
 
 export type RestoreIntent = "undo" | "restore";
 
@@ -42,6 +43,7 @@ export function RestoreSheet({
   const revert = useAtomCommand(threadEnvironment.revertCheckpoint, { reportFailure: false });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  useEscapeToClose(open && !busy && entry !== null, onClose);
 
   if (!entry) return null;
   const explainer = honestRestoreExplainer(entry.restoreExplainer.blockedBecause);
@@ -84,7 +86,9 @@ export function RestoreSheet({
       title={title}
       icon={RotateCcw}
       iconTone="red"
-      description={restoreConfirmation(entry, formatVersionTime)}
+      description={restoreSentence(intent, versionNumber, formatVersionTime(entry.timestamp))}
+      // A stray click outside must not cancel (or confirm) a destructive step.
+      dismissOnBackdrop={false}
       actions={
         <>
           <Button onClick={onClose} disabled={busy}>

@@ -435,3 +435,10 @@
 .fm-disclosure__advanced[open] > summary {
   margin-bottom: 2px;
 }
+
+/* Blocked footer buttons stay focusable (aria-disabled) so their reason is reachable. */
+.fm-card__footer .fm-btn[aria-disabled="true"],
+.fm-conv-header .fm-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}

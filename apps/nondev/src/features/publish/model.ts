@@ -15,6 +15,7 @@ import type {
 import {
   describeChanges,
   describeTurnDiff,
+  type ChangeArea,
   type FileChange,
   type WhatChanged,
 } from "../../plain/changes";
@@ -68,6 +69,8 @@ export function describePublishStatus(input: {
   readonly link: ThreadPullRequestLink | null;
   readonly reviewers?: ReadonlyArray<{ readonly login: string; readonly name: string | null }>;
   readonly hasSomethingToPublish: boolean;
+  /** ISO time of the last upload from this app, when nothing new has happened since. */
+  readonly uploadedAt?: string | null;
   readonly formatTime?: (iso: string) => string;
 }): PublishStatus | null {
   const snapshot = input.link?.snapshot ?? null;
@@ -99,10 +102,33 @@ export function describePublishStatus(input: {
     }
     return { label: state.label, tone: PR_TONE[state.tone], advanced: state.advanced };
   }
+  if (input.uploadedAt) {
+    return {
+      label: `Uploaded · ${(input.formatTime ?? defaultFormatTime)(input.uploadedAt)}`,
+      tone: "neutral",
+      advanced: "Advanced: the draft branch is on the remote; no pull request is linked yet.",
+    };
+  }
   if (input.hasSomethingToPublish) {
-    return { label: "Not live yet", tone: "neutral", advanced: "No pull request is linked yet." };
+    return {
+      label: "Not live yet",
+      tone: "neutral",
+      advanced: "Advanced: no pull request is linked yet.",
+    };
   }
   return null;
+}
+
+/** True when the last upload still covers everything: nothing new since, locally or in commits. */
+export function uploadStillCurrent(
+  vcs: VcsStatusResult | null,
+  upload: { readonly at: string } | null,
+  latestChangeAt: string | null,
+): boolean {
+  if (!vcs || upload === null) return false;
+  if (vcs.hasWorkingTreeChanges || vcs.aheadCount > 0) return false;
+  if (latestChangeAt !== null && Date.parse(latestChangeAt) > Date.parse(upload.at)) return false;
+  return true;
 }
 
 function defaultFormatTime(iso: string): string {
@@ -256,6 +282,22 @@ function pluralFiles(count: number): string {
   return `${count} ${count === 1 ? "file" : "files"}`;
 }
 
+/** "1 settings file", "2 pages": the same nouns the What-changed card uses. */
+export function areaFileNoun(area: ChangeArea, count: number): string {
+  switch (area) {
+    case "pages":
+      return count === 1 ? "page" : "pages";
+    case "styles":
+      return count === 1 ? "style file" : "style files";
+    case "content":
+      return count === 1 ? "content file" : "content files";
+    case "settings":
+      return count === 1 ? "settings file" : "settings files";
+    case "behind the scenes":
+      return count === 1 ? "file behind the scenes" : "files behind the scenes";
+  }
+}
+
 /**
  * Every line is backed by something the engine told us. Anything we could not
  * see is "Not checked", never a green tick.
@@ -264,6 +306,11 @@ export function buildSafetyCheck(input: {
   readonly changes: ChangeSource;
   readonly checkRuns: ReadonlyArray<CheckRun>;
   readonly operationsKnown: boolean;
+  /** Kept versions this publish would reverse (undone in-app after being kept). */
+  readonly reversedKept?: ReadonlyArray<{
+    readonly subject: string;
+    readonly number: number | null;
+  }>;
 }): { readonly lines: ReadonlyArray<SafetyLine>; readonly summary: string } {
   const lines: Array<SafetyLine> = [];
   const changes = input.changes.conversation;
@@ -273,7 +320,9 @@ export function buildSafetyCheck(input: {
   } else if (changes === null) {
     lines.push({ state: "unknown", text: "Not checked — couldn't read what changed." });
   } else {
-    const groups = changes.groups.map((g) => `${g.files.length} ${g.label.toLowerCase()}`);
+    const groups = changes.groups.map(
+      (g) => `${g.files.length} ${areaFileNoun(g.area, g.files.length)}`,
+    );
     lines.push({
       state: "ok",
       text: `${pluralFiles(changes.counts.files)} changed${groups.length > 0 ? `: ${joinList(groups)}` : ""}.`,
@@ -325,6 +374,20 @@ export function buildSafetyCheck(input: {
       state: "warn",
       text: `${pluralFiles(input.changes.outsideConversation.length)} changed outside this conversation will go along too.`,
       detail: input.changes.outsideConversation.join("\n"),
+    });
+  }
+
+  const reversed = input.reversedKept ?? [];
+  if (reversed.length > 0) {
+    lines.push({
+      state: "warn",
+      text: `This undoes ${reversed.length === 1 ? "a version that was already kept" : `${reversed.length} versions that were already kept`} — the upload carries the reversal.`,
+      detail: reversed
+        .map(
+          (kept) =>
+            `${kept.number === null ? "Kept version" : `Version ${kept.number}`}: ${kept.subject}`,
+        )
+        .join("\n"),
     });
   }
 
@@ -639,20 +702,44 @@ function isString(value: string | null): value is string {
   return value !== null;
 }
 
-/** "GitHub didn't respond." style sentence for a failure, with the raw detail kept aside. */
-export function describeFailure(error: unknown): {
+export type RemoteKind = "github" | "other" | "none";
+
+/**
+ * One plain sentence for a failure, naming whoever did not respond: GitHub
+ * when the remote is GitHub, otherwise "the online copy" (a folder, a
+ * self-hosted server). The raw developer text stays behind "Show details".
+ */
+export function describeFailure(
+  error: unknown,
+  context: { readonly remote?: RemoteKind } = {},
+): {
   readonly headline: string;
+  readonly hint: string | null;
   readonly detail: string;
 } {
   const detail = error instanceof Error ? error.message : String(error);
-  const github = /github|gh\b|pull request|remote|network|ECONN|timed? ?out|fetch/i.test(detail);
   const permission = /scope|permission|unauthori|forbidden|not allowed/i.test(detail);
-  return {
-    headline: permission
-      ? "This connection isn't allowed to publish."
-      : github
-        ? copy.errors.didNotRespond("GitHub")
-        : "That didn't work.",
-    detail,
-  };
+  if (permission) {
+    return { headline: "This connection isn't allowed to publish.", hint: null, detail };
+  }
+  const unreachable =
+    /remote_unreachable|could not read from remote|does not appear to be a git repository|repository .+ not found|network|ECONN|ENOTFOUND|timed? ?out|could not resolve host/i.test(
+      detail,
+    );
+  const mentionsGitHub = /github|gh\b|pull request/i.test(detail);
+  const github = context.remote === "github" || (context.remote === undefined && mentionsGitHub);
+  if (unreachable || mentionsGitHub || /\bpush\b|\bfetch\b|\bremote\b/i.test(detail)) {
+    return github
+      ? {
+          headline: copy.errors.didNotRespond("GitHub"),
+          hint: "Check you're online and signed in to GitHub, then try again.",
+          detail,
+        }
+      : {
+          headline: "The online copy didn't respond.",
+          hint: "Check the online copy still exists and your Mac can reach it, then try again. Nothing was lost.",
+          detail,
+        };
+  }
+  return { headline: "That didn't work.", hint: null, detail };
 }

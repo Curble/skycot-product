@@ -1,10 +1,9 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
-import { Check, X } from "lucide-react";
+import { Check, GitCommitHorizontal, X } from "lucide-react";
 import { useState } from "react";
 
-import { versions as copy } from "../../plain/copy";
 import { Button } from "../../ui/Button";
 import { Pill, type PillTone } from "../../ui/Pill";
 import { RestoreSheet } from "./RestoreSheet";
@@ -24,7 +23,9 @@ const KIND_TONE: Record<NumberedVersion["kind"], PillTone> = {
 /**
  * The Time Machine column: every point you can step back to, newest first,
  * with a Restore button per point and the fixed does / does-not explainer.
- * Shared by the right-hand rail and the narrow-screen sheet.
+ * Shared by the right-hand rail and the narrow-screen sheet. A blocked
+ * Restore stays tappable: the reason appears under the row, so it never
+ * lives only in a hover tooltip.
  */
 export function VersionsTimeline({
   environmentId,
@@ -39,6 +40,7 @@ export function VersionsTimeline({
 }) {
   const timeline = useVersionsTimeline(environmentId, threadId, shell);
   const [restoring, setRestoring] = useState<NumberedVersion | null>(null);
+  const [explained, setExplained] = useState<string | null>(null);
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const explainer = honestRestoreExplainer();
 
@@ -59,6 +61,7 @@ export function VersionsTimeline({
                   ? "This is where the project is right now."
                   : (entry.restoreExplainer.blockedBecause ?? null);
             const canRestore = entry.canRestore && blocker === null;
+            const whyId = `fm-tm-why-${entry.id}`;
             return (
               <li
                 key={entry.id}
@@ -74,24 +77,36 @@ export function VersionsTimeline({
                   <span className="fm-tm__meta">
                     {formatVersionTime(entry.timestamp)}
                     {entry.isCurrent ? " · now" : ""}
-                    {entry.restoreExplainer.blockedBecause === copy.cannotRestoreStale
-                      ? " · undone"
-                      : ""}
+                    {entry.undone ? " · undone" : ""}
                     <Pill tone={KIND_TONE[entry.kind]} size="sm" dot={false}>
                       {entry.kindLabel}
                     </Pill>
+                    {entry.kept ? (
+                      <span className="fm-tm__kept">
+                        <GitCommitHorizontal size={12} strokeWidth={2.2} aria-hidden />
+                        Kept · commit {entry.kept.sha.slice(0, 7)}
+                      </span>
+                    ) : null}
                   </span>
                 </div>
                 {entry.kind === "restore point" ? (
                   <Button
                     size="sm"
-                    disabled={!canRestore}
-                    title={blocker ?? undefined}
+                    aria-disabled={!canRestore}
+                    aria-describedby={!canRestore && explained === entry.id ? whyId : undefined}
                     aria-label={`Restore to ${entry.label}`}
-                    onClick={() => setRestoring(entry)}
+                    onClick={() => {
+                      if (canRestore) setRestoring(entry);
+                      else setExplained((current) => (current === entry.id ? null : entry.id));
+                    }}
                   >
                     Restore
                   </Button>
+                ) : null}
+                {!canRestore && blocker && explained === entry.id ? (
+                  <p id={whyId} className="fm-tm__why" role="status">
+                    {blocker}
+                  </p>
                 ) : null}
               </li>
             );
@@ -125,7 +140,8 @@ export function VersionsTimeline({
           ))}
         </ul>
         <p className="fm-tm__advanced">
-          Advanced: each restore point is a hidden Git ref; each kept version is a Git commit.
+          Advanced: each restore point is a hidden Git ref; a kept version is a Git commit on the
+          conversation's branch.
         </p>
       </div>
       <RestoreSheet

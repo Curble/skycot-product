@@ -17,7 +17,7 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { Check, Copy, ExternalLink, Globe, Send, Undo2, Upload, UserRound } from "lucide-react";
-import { useEffect, useEffectEvent, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { newMessageId, randomUUID } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
@@ -31,6 +31,7 @@ import { Button } from "../../ui/Button";
 import { Pill } from "../../ui/Pill";
 import { Sheet } from "../../ui/Sheet";
 import { StepBadge, type StepBadgeState } from "../../ui/StepBadge";
+import { useEscapeToClose } from "../versions/useEscapeToClose";
 import {
   HONESTY_NOTE,
   SETTINGS_HREF,
@@ -51,6 +52,7 @@ import {
   vcsActionManager,
   vcsEnvironment,
 } from "./state";
+import { rememberUpload } from "./uploads";
 import { usePublishData } from "./usePublishData";
 
 type Phase = "choose" | "confirm" | "done";
@@ -71,6 +73,7 @@ type Outcome =
 
 interface Failure {
   readonly headline: string;
+  readonly hint: string | null;
   readonly detail: string;
 }
 
@@ -137,6 +140,17 @@ function PublishSheetBody({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [reviewerName, setReviewerName] = useState<string | null>(null);
+  useEscapeToClose(!busy, onClose);
+
+  // The choice cards unmount when a step changes, which would drop focus to
+  // the page body (and Escape with it); focus follows to the current step's
+  // heading instead — a heading, so nothing is pre-selected.
+  const stepHeads = useRef<Array<HTMLElement | null>>([]);
+  useEffect(() => {
+    const step = phase === "choose" ? 1 : phase === "confirm" ? 2 : 3;
+    const head = stepHeads.current[step];
+    if (head && !head.contains(document.activeElement)) head.focus({ preventScroll: false });
+  }, [phase]);
 
   const scope = { environmentId, cwd: data.cwd };
   const runStacked = useAtomCommand(vcsActionManager.runStackedAction(scope), {
@@ -165,6 +179,7 @@ function PublishSheetBody({
     },
     checkRuns: data.checkRuns,
     operationsKnown: data.operationsKnown,
+    reversedKept: data.reversedKept,
   });
 
   const review: ReviewChoice = resolveReviewChoice({
@@ -188,11 +203,17 @@ function PublishSheetBody({
   };
 
   const fail = (error: unknown) => {
-    setFailure(describeFailure(error));
+    setFailure(describeFailure(error, { remote: data.remoteKind }));
   };
 
   const finishStacked = (result: GitRunStackedActionResult, opensReview: boolean) => {
     const sentence = describeStackedResult(result);
+    if (result.push.status === "pushed") {
+      rememberUpload(threadId, {
+        at: new Date().toISOString(),
+        branch: result.push.branch ?? result.branch.name ?? null,
+      });
+    }
     if (result.action === "commit") {
       setOutcome({ kind: "keep", sentence });
     } else {
@@ -250,6 +271,9 @@ function PublishSheetBody({
         return;
       }
       if (live.kind === "script" && shell) {
+        // Going live always asks: the turn runs in "Ask me first" whatever the
+        // conversation's mode, and the message names the script, not its
+        // command, so the assistant runs what Settings configured.
         const result = await startTurn({
           environmentId,
           input: {
@@ -257,11 +281,11 @@ function PublishSheetBody({
             message: {
               messageId: newMessageId(),
               role: "user",
-              text: `Put it live: run the project's “${live.script.name}” script (${live.script.command}) and tell me when the site is live.`,
+              text: `Put it live by running this project's “${live.script.name}” script exactly as it is set up in the project's scripts, and tell me when the site is live.`,
               attachments: [],
             },
             modelSelection: shell.modelSelection,
-            runtimeMode: shell.runtimeMode,
+            runtimeMode: "approval-required",
             interactionMode: shell.interactionMode,
           },
         });
@@ -340,6 +364,9 @@ function PublishSheetBody({
           badge={safetyBadge(safety.lines)}
           trailing={safety.summary}
           expanded={phase === "choose"}
+          headRef={(node) => {
+            stepHeads.current[0] = node;
+          }}
         >
           <ul className="fm-pub-rows" aria-label="Safety check results">
             {safety.lines.map((line) => (
@@ -362,6 +389,9 @@ function PublishSheetBody({
           }
           expanded={phase === "choose"}
           onChange={phase === "confirm" && !busy ? () => setPhase("choose") : undefined}
+          headRef={(node) => {
+            stepHeads.current[1] = node;
+          }}
         >
           <div className="fm-pub-choices" role="group" aria-label="Ways to publish">
             <ChoiceCard
@@ -374,6 +404,9 @@ function PublishSheetBody({
                 ) : (
                   <>
                     {review.explainer}
+                    {data.lastUpload && review.kind === "review"
+                      ? ` Last uploaded ${formatUploadTime(data.lastUpload.at)}${data.uploadCurrent ? " — nothing new since." : "."}`
+                      : ""}
                     {review.kind === "keep" ? (
                       <>
                         {" "}
@@ -431,6 +464,9 @@ function PublishSheetBody({
             ) : undefined
           }
           expanded={phase === "confirm"}
+          headRef={(node) => {
+            stepHeads.current[2] = node;
+          }}
         >
           <ConfirmBody choice={choice} review={review} live={live} data={data} />
           {busy ? (
@@ -464,6 +500,9 @@ function PublishSheetBody({
           state={phase === "done" ? "done" : "todo"}
           success={phase === "done"}
           expanded={phase === "done"}
+          headRef={(node) => {
+            stepHeads.current[3] = node;
+          }}
         >
           {outcome ? (
             <ResultBody
@@ -492,6 +531,15 @@ function safetyBadge(lines: ReadonlyArray<SafetyLine>): StepBadgeState {
   return lines.length > 0 && lines.every((line) => line.state === "ok") ? "done" : "number";
 }
 
+function formatUploadTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "earlier";
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return date.toDateString() === new Date().toDateString()
+    ? `at ${time}`
+    : `on ${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
+}
+
 function StepGroup({
   number,
   title,
@@ -502,6 +550,7 @@ function StepGroup({
   danger = false,
   success = false,
   onChange,
+  headRef,
   children,
 }: {
   readonly number: number;
@@ -514,6 +563,7 @@ function StepGroup({
   readonly danger?: boolean;
   readonly success?: boolean;
   readonly onChange?: (() => void) | undefined;
+  readonly headRef?: (node: HTMLElement | null) => void;
   readonly children?: ReactNode;
 }) {
   const classes = [
@@ -526,7 +576,7 @@ function StepGroup({
     .join(" ");
   return (
     <section className={classes} aria-label={`Step ${number}`}>
-      <header className="fm-pub-group__head">
+      <header className="fm-pub-group__head" tabIndex={-1} ref={headRef}>
         <StepBadge
           state={state === "done" && badge ? badge : state}
           label={state === "done" ? "Done" : state === "now" ? "Current step" : "Upcoming step"}
@@ -638,13 +688,31 @@ function ConfirmBody({
   if (choice === null) return null;
   // What goes out is the working tree, which may be less than the conversation
   // changed when part of it was kept earlier; say the smaller, truer number.
+  // Otherwise the sheet counts the whole conversation, and says so when that
+  // differs from the latest card's single turn.
   const pendingFiles = data.vcs?.workingTree.files.length ?? 0;
+  const wholeConversation = data.turnsWithChanges > 1 && data.operationsKnown;
   const changed =
     data.vcs?.hasWorkingTreeChanges && data.changes && pendingFiles < data.changes.counts.files
       ? `${pendingFiles} ${pendingFiles === 1 ? "file" : "files"} not yet kept (the rest of this conversation's changes were kept earlier).`
       : data.changes
-        ? data.changes.summary
+        ? `${data.changes.summary}${wholeConversation ? " That counts every change in this conversation, so the numbers can differ from the latest What-changed card, which shows one step." : ""}`
         : "The files from this conversation.";
+  const reversal =
+    data.reversedKept.length > 0 ? (
+      <p className="fm-pub-reversal">
+        This includes undoing{" "}
+        {data.reversedKept
+          .map((kept) =>
+            kept.number === null
+              ? `“${kept.subject}”`
+              : `Version ${kept.number} (“${kept.subject}”)`,
+          )
+          .join(" and ")}
+        , which {data.reversedKept.length === 1 ? "was" : "were"} already kept as a Git commit. The
+        online copy will receive the reversal, not a deletion of history.
+      </p>
+    ) : null;
   if (choice === "live") {
     if (live.kind === "blocked") return <p className="fm-pub-help">{live.reason}</p>;
     const rows: Array<[string, string]> =
@@ -668,7 +736,7 @@ function ConfirmBody({
         : [
             [
               "What will happen",
-              `${CREW_NAME} runs “${live.script.name}” (${live.script.command}) in this conversation and reports back.`,
+              `${CREW_NAME} runs your “${live.script.name}” script in this conversation, asking before each step, and reports back.`,
             ],
             [
               "What won't",
@@ -714,6 +782,7 @@ function ConfirmBody({
   return (
     <>
       <KeyValues rows={rows} />
+      {reversal}
       {review.kind === "review" && review.guard ? (
         <Banner tone="info">{review.guard}</Banner>
       ) : null}
@@ -761,6 +830,7 @@ function FailureNotice({
         }
       >
         <b>{failure.headline}</b>
+        {failure.hint ? ` ${failure.hint}` : ""}
       </Banner>
       {showDetails ? <pre className="fm-pub-failure__detail">{failure.detail}</pre> : null}
     </div>
