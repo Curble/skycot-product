@@ -78,14 +78,14 @@ const route = (
       const auth = yield* EnvironmentAuth.EnvironmentAuth;
       const family = yield* SkycotFamily.SkycotFamily;
       const settings = yield* ServerSettings.ServerSettingsService;
-      const pinSafeDefault = settings
-        .updateSettings({ defaultRuntimeMode: "approval-required" })
-        .pipe(
-          Effect.ignoreCause({
-            log: true,
-            message: "Could not pin the Family default runtime mode.",
-          }),
-        );
+      const pinSafeDefault = Effect.suspend(() =>
+        settings.updateSettings({ defaultRuntimeMode: "approval-required" }),
+      ).pipe(
+        Effect.ignoreCause({
+          log: true,
+          message: "Could not pin the Family default runtime mode.",
+        }),
+      );
       const session = yield* auth
         .authenticateHttpRequest(request)
         .pipe(Effect.orElseSucceed(() => null));
