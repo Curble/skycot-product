@@ -3,7 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { items, turnItem } from "./fixtures.test-helpers";
 import {
   classifyCommand,
+  commandInputsOf,
   describeTurnItem,
+  retriedFailures,
   narrationStatus,
   progressHint,
   summarizeRun,
@@ -499,5 +501,79 @@ describe("classifyCommand — check loops (QA-P2-2-13)", () => {
 
   it("drops echo next to real work", () => {
     expect(classifyCommand("pnpm test && echo done").past).toBe("Ran the project's checks");
+  });
+});
+
+describe("approvals are narrated from their command, not the provider's reason (N-1)", () => {
+  const PUSH = "/bin/zsh -lc 'git push --set-upstream origin skycot/upload-52d1'";
+  const ref = { driver: "codex", nativeId: "exec-1", strength: "strong" };
+  const policy = new Map([
+    [
+      "req-1",
+      {
+        decision: "accept" as const,
+        status: "resolved" as const,
+        answers: { skycot: { decidedBy: "policy", note: "allowed by SKYCOT rules" } },
+      },
+    ],
+  ]);
+  const escalation = items.approval(
+    "command",
+    { prompt: "Allow Git to push this branch to the local remote outside the workspace?" },
+    { nativeItemRef: ref, status: "completed" },
+  );
+
+  it("names what the command does, never the first word of the reason", () => {
+    const narration = describeTurnItem(escalation, {
+      runtimeRequests: policy,
+      commandInputs: commandInputsOf([items.command(PUSH, {}, { nativeItemRef: ref })]),
+    });
+    expect(narration.headline).toBe(
+      "SKYCOT rules allowed the assistant to upload the saved versions to the online copy outside its safe area",
+    );
+    expect(narration.headline).not.toContain('"Allow"');
+    expect(narration.technical).toContain(PUSH);
+  });
+
+  it("says it cannot name the step when the command is not known yet", () => {
+    const narration = describeTurnItem(escalation, { runtimeRequests: policy });
+    expect(narration.headline).toBe(
+      "SKYCOT rules allowed the assistant to run a step outside its safe area",
+    );
+  });
+
+  it("uses the command over Claude's human title too", () => {
+    const claude = { driver: "claudeAgent", nativeId: "toolu_1", strength: "strong" };
+    const narration = describeTurnItem(
+      items.approval("command", { prompt: "Run the checks" }, { nativeItemRef: claude }),
+      {
+        commandInputs: commandInputsOf([items.command("pnpm test", {}, { nativeItemRef: claude })]),
+      },
+    );
+    expect(narration.headline).toBe("The assistant wants to run the project's checks");
+  });
+});
+
+describe("retriedFailures — a failure redone successfully is not a failure (N-3)", () => {
+  it("marks a failed step that a later run of the same step fixed", () => {
+    const first = items.command(
+      "/bin/zsh -lc 'git push --set-upstream origin skycot/x'",
+      { exitCode: 128 },
+      { status: "failed" },
+    );
+    const retry = items.command("/bin/zsh -lc 'git push --set-upstream origin skycot/x'", {
+      exitCode: 0,
+    });
+    const other = items.command("npm test", { exitCode: 1 }, { status: "failed" });
+    expect([...retriedFailures([first, other, retry])]).toEqual([first.id]);
+  });
+
+  it("leaves a failure that was never redone, or was redone and failed again", () => {
+    const failed = items.command("npm test", { exitCode: 1 }, { status: "failed" });
+    const again = items.command("npm test", { exitCode: 1 }, { status: "failed" });
+    expect(retriedFailures([failed, again]).size).toBe(0);
+    // A success earlier than the failure does not cover it.
+    const ok = items.command("npm test", { exitCode: 0 });
+    expect(retriedFailures([ok, failed]).size).toBe(0);
   });
 });

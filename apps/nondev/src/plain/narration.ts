@@ -9,6 +9,7 @@ import type {
 
 import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 import { isOutsideProject } from "@t3tools/skycot-rules/files";
+import { readCommandAsk } from "@t3tools/skycot-rules/rules";
 import { programTokens, splitShellSegments, unwrapShellWrapper } from "@t3tools/skycot-rules/shell";
 
 import { describeFile, humanizeFileName } from "./changes";
@@ -66,6 +67,30 @@ export interface NarrationContext {
   readonly deletedPaths?: ReadonlySet<string>;
   /** The thread's own note of when the provider's allowance resets, if it has one. */
   readonly usageLimitResetAt?: string | null;
+  /**
+   * Each command's exact text by its native item (`commandInputKey`), so an ask is narrated
+   * from the command it is about, never from the provider's reason or title.
+   */
+  readonly commandInputs?: ReadonlyMap<string, string>;
+}
+
+type NativeItemRef = OrchestrationV2TurnItem["nativeItemRef"];
+
+function commandInputKey(ref: NativeItemRef): string | null {
+  return ref === null || ref.nativeId === null ? null : `${ref.driver}:${ref.nativeId}`;
+}
+
+/** The `commandInputs` map for a list of items. */
+export function commandInputsOf(
+  items: ReadonlyArray<OrchestrationV2TurnItem>,
+): ReadonlyMap<string, string> {
+  const inputs = new Map<string, string>();
+  for (const item of items) {
+    if (item.type !== "command_execution") continue;
+    const key = commandInputKey(item.nativeItemRef);
+    if (key !== null) inputs.set(key, item.input);
+  }
+  return inputs;
 }
 
 export interface CommandClassification {
@@ -1359,6 +1384,7 @@ export function classifyCommand(command: string): CommandClassification {
   const trimmed = unwrapped.replace(HEREDOC_PATTERN, "").trim();
   const whole = SQL_DESTRUCTIVE_PATTERN.test(trimmed) || PIPE_TO_SHELL_PATTERN.test(trimmed);
   const loop = describeReadOnlyLoop(trimmed);
+
   if (loop !== null && !whole) return loop;
   const all = splitShellSegments(trimmed)
     .map((segment) => classifySegment(withoutQuietRedirects(segment)))
@@ -1759,9 +1785,23 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
     case "approval_request": {
       const request = ctx.runtimeRequests?.get(item.requestId);
       const status = narrationStatus(item.status, { decision: request?.decision });
+      const key = commandInputKey(item.nativeItemRef);
+      const ask =
+        item.requestKind === "command"
+          ? readCommandAsk({
+              driver: item.nativeItemRef?.driver,
+              prompt: item.prompt,
+              toolCallInput: key === null ? undefined : ctx.commandInputs?.get(key),
+            })
+          : null;
+      const outsideSafeArea = ask?.leavesSandbox === true ? " outside its safe area" : "";
       const subject =
-        item.requestKind === "command" && item.prompt
-          ? classifyCommand(item.prompt).infinitive
+        ask !== null
+          ? ask.command
+            ? `${classifyCommand(ask.command).infinitive}${outsideSafeArea}`
+            : ask.leavesSandbox
+              ? "run a step outside its safe area"
+              : "run a command"
           : item.requestKind === "file-change"
             ? `change ${item.prompt ? describeFile(firstLine(item.prompt, 400)).noun : "a file"}`
             : item.requestKind === "file-read"
@@ -1778,8 +1818,7 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
           : status === "denied"
             ? `You said no to: ${subject}`
             : `The assistant wants to ${subject}`;
-      const classified =
-        item.requestKind === "command" && item.prompt ? classifyCommand(item.prompt) : undefined;
+      const classified = ask?.command ? classifyCommand(ask.command) : undefined;
       return {
         headline,
         detail: policy !== null && status === "done" ? policy.note : classified?.warning,
@@ -1792,7 +1831,10 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
                 ? "read"
                 : "other",
         status: status === "running" ? "pending" : status,
-        technical: item.prompt ?? item.requestKind,
+        technical:
+          ask?.sandboxReason !== undefined
+            ? `${ask.command ?? ""}\n(asked to run outside the safe area: ${ask.sandboxReason})`.trim()
+            : (ask?.command ?? item.prompt ?? item.requestKind),
         ...(classified ? { risk: classified.risk } : {}),
       };
     }
@@ -2136,6 +2178,43 @@ export interface RunSummary {
   readonly summary: string;
   readonly checklist: RunChecklist;
   readonly needsYou: boolean;
+}
+
+/** What makes two steps "the same step" for retry purposes: the same intent, the same file. */
+function retryKey(item: OrchestrationV2TurnItem): string | null {
+  switch (item.type) {
+    case "command_execution":
+      return `command:${classifyCommand(item.input).infinitive}`;
+    case "file_change":
+      return `file:${item.fileName}`;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Failed steps that a later step of the same run redid successfully (a sandboxed push that
+ * was retried outside it, a check run again after a fix). They "needed a second try"; the
+ * run did not end with them broken. Pass one run's items, in stream order.
+ */
+export function retriedFailures(
+  items: ReadonlyArray<OrchestrationV2TurnItem>,
+  ctx: NarrationContext = {},
+): ReadonlySet<string> {
+  const retried = new Set<string>();
+  const failedByKey = new Map<string, Array<string>>();
+  for (const item of items) {
+    const key = retryKey(item);
+    if (key === null) continue;
+    const status = describeTurnItem(item, ctx).status;
+    if (status === "failed") {
+      failedByKey.set(key, [...(failedByKey.get(key) ?? []), item.id]);
+    } else if (status === "done") {
+      for (const id of failedByKey.get(key) ?? []) retried.add(id);
+      failedByKey.delete(key);
+    }
+  }
+  return retried;
 }
 
 const TOOLISH: ReadonlySet<NarrationKind> = new Set([

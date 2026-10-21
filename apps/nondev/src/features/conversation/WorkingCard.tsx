@@ -19,8 +19,10 @@ import { describeDecision } from "../../plain/approvals";
 import { filesFromPrompt } from "../../plain/changes";
 import { progress } from "../../plain/copy";
 import {
+  commandInputsOf,
   describeTurnItem,
   progressHint,
+  retriedFailures,
   summarizeRun,
   type NarrationContext,
 } from "../../plain/narration";
@@ -121,6 +123,7 @@ export function WorkingCard({
     runtimeRequests: requests,
     ...(stopped ? { stopped: true } : {}),
     ...(deletedPaths.size > 0 ? { deletedPaths } : {}),
+    commandInputs: commandInputsOf(projection.turnItems),
   };
   // Approval cards are their own stream items, but the run's asks still count
   // for the clock and for "you said no" — the checklist and tool items come
@@ -173,7 +176,11 @@ export function WorkingCard({
       !(item.type === "command_execution" && /^preparing workspace$/i.test(item.input.trim())) &&
       narration.status !== "denied",
   ).length;
-  const failed = narrated.filter((n) => n.narration.status === "failed").length;
+  // A step that failed and was then redone successfully in this run is not a failure.
+  const retried = retriedFailures(toolItems, ctx);
+  const failed = narrated.filter(
+    (n) => n.narration.status === "failed" && !retried.has(n.item.id),
+  ).length;
   const deniedAsks = runAsks.filter((item) => {
     const request = requests.get(item.requestId);
     return request?.decision === "decline";
@@ -313,6 +320,10 @@ export function WorkingCard({
             <p className="fm-work__hint">
               {failed === 1 ? "One step didn't work" : `${failed} steps didn't work`} — the details
               below say which.
+            </p>
+          ) : run?.status === "completed" && retried.size > 0 ? (
+            <p className="fm-work__hint">
+              {retried.size === 1 ? "1 step" : `${retried.size} steps`} needed a second try.
             </p>
           ) : run?.status === "completed" && stepCount === 0 ? (
             <p className="fm-work__hint">{progress.allDone} Nothing in the project was changed.</p>
