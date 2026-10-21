@@ -68,9 +68,9 @@ export function VersionsTimeline({
               >
                 <div className="fm-tm__text">
                   <span className="fm-tm__title">
-                    {entry.number ? `Version ${entry.number} · ` : ""}
-                    {entry.label}
+                    {entry.number ? `Version ${entry.number}` : entry.label}
                   </span>
+                  {entry.number ? <span className="fm-tm__label">{entry.label}</span> : null}
                   <span className="fm-tm__meta">
                     {formatVersionTime(entry.timestamp)}
                     {entry.isCurrent ? " · now" : ""}

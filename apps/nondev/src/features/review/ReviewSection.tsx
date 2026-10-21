@@ -149,10 +149,9 @@ export function ReviewSection({
     ?.text.trim()
     .split(/\r?\n/)[0]
     ?.trim();
-  const commitSubject = (request && request.length > 0 ? request : what.summary)
-    .replace(/\.$/, "")
-    .slice(0, 72)
-    .trimEnd();
+  const subjectSource = (request && request.length > 0 ? request : what.summary).replace(/\.$/, "");
+  const commitSubject =
+    subjectSource.length > 72 ? `${subjectSource.slice(0, 71).trimEnd()}…` : subjectSource;
   const commitMessage = `${commitSubject}\n\n${what.summary}`;
   const plan = planGitIntent("keepThisVersion", {
     cwd: cwd ?? "",
@@ -291,7 +290,7 @@ export function ReviewSection({
             <p className="fm-disclosure__hint">
               Green lines were added, red lines removed. You don't need to read this — it's here for
               you or whoever reviews it.
-              {checkpoint.ref ? ` Advanced: ${checkpoint.ref}.` : ""}
+              {shell?.branch ? ` Advanced: on branch ${shell.branch}.` : ""}
             </p>
             {showCode ? (
               diffInput === null ? (

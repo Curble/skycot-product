@@ -595,6 +595,16 @@
   padding-left: 12px;
   padding-right: 12px;
 }
+/* The strip stays one line on a phone and swipes sideways instead of clipping. */
+.fm-shell[data-columns="1"] .fm-strip {
+  padding-left: 12px;
+  padding-right: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fm-shell[data-columns="1"] .fm-strip::-webkit-scrollbar {
+  display: none;
+}
 .fm-shell[data-columns="1"] .fm-msg {
   max-width: 86%;
 }

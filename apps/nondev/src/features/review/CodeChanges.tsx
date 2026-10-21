@@ -77,7 +77,14 @@ export default function CodeChanges({
   };
 
   return (
-    <div className="fm-code-changes" data-appearance={appearance} onClickCapture={onHeaderClick}>
+    <div
+      className="fm-code-changes"
+      data-appearance={appearance}
+      onClickCapture={onHeaderClick}
+      // The viewer virtualises rows, so it needs a real height; while every file
+      // is folded that height is just the list of names, not an empty box.
+      style={expanded.size === 0 ? { height: Math.min(440, files.length * 34 + 14) } : undefined}
+    >
       <StyledDiffCodeView
         items={items}
         renderHeaderPrefix={(item) => {
