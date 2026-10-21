@@ -6,6 +6,8 @@ import * as StorageCleanup from "./storageCleanup.ts";
 import * as PullRequestSyncReactor from "./orchestration-v2/PullRequestSyncReactor.ts";
 import * as PullRequestWatchReactor from "./orchestration-v2/PullRequestWatchReactor.ts";
 import * as DelegatedTaskQuestionReactor from "./orchestration-v2/DelegatedTaskQuestionReactor.ts";
+import * as SkycotPolicy from "./skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-reactor
+import * as SkycotPolicyReactor from "./skycot/SkycotPolicyReactor.ts"; // nondev-seam: skycot-policy-reactor
 // Effect wraps this raw Node HTTP server after its startup and write-error guards attach.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
@@ -598,6 +600,18 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       yield* service.start();
     }),
   ).pipe(Layer.provide(DelegatedTaskQuestionReactor.layer), Layer.provide(ProjectionStoreV2.layer)),
+  // nondev-seam: skycot-policy-reactor (no-op layer unless T3CODE_SKYCOT_POLICY=1)
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const service = yield* SkycotPolicyReactor.SkycotPolicyReactor;
+      yield* service.start();
+    }),
+  ).pipe(
+    Layer.provide(
+      SkycotPolicyReactor.layer({ enabled: SkycotPolicy.isSkycotPolicyEnabled(process.env) }),
+    ),
+    Layer.provide(ProjectionStoreV2.layer),
+  ),
   ProviderUsageLimitsIngestion.layer,
   layerProviderInstallationRefresh,
   ReplayMarkers.layer,

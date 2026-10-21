@@ -61,6 +61,11 @@ function resolveBrandEnv(b, host) {
     T3CODE_TELEMETRY_ENABLED: b.telemetryEnabledByDefault ? "true" : "false",
     T3CODE_POSTHOG_KEY: telemetryKey || "",
     T3CODE_POSTHOG_HOST: telemetryHost || LOCAL_SINK_HOST,
+    // Safety (SEC-03): the engine's own default runtime mode is full-access upstream; SKYCOT
+    // starts every thread that inherits the default in "Ask me first" (seam: skycot-default-runtime-mode).
+    T3CODE_DEFAULT_RUNTIME_MODE: "approval-required",
+    // Safety (SEC-01): server-side hard rules for "Just do it, carefully" (seams: skycot-policy-*).
+    T3CODE_SKYCOT_POLICY: "1",
   };
 }
 

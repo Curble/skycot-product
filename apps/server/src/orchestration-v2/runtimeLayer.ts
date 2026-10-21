@@ -46,6 +46,7 @@ import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
+import * as SkycotPolicy from "../skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-runtime
 import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadLaunchService from "./ThreadLaunchService.ts";
@@ -60,9 +61,10 @@ export const layerEventInfrastructure = Layer.mergeAll(
   OrchestrationCommandReceipts.layer,
 );
 
-const layerRuntimePolicyProvided = RuntimePolicy.layerFromProjectStore.pipe(
-  Layer.provide(ProjectStore.layer),
-);
+// nondev-seam: skycot-policy-runtime (wraps the engine policy; identity unless T3CODE_SKYCOT_POLICY=1)
+const layerRuntimePolicyProvided = SkycotPolicy.layerRuntimePolicy({
+  enabled: SkycotPolicy.isSkycotPolicyEnabled(process.env),
+}).pipe(Layer.provide(RuntimePolicy.layerFromProjectStore.pipe(Layer.provide(ProjectStore.layer))));
 
 const layerEventStoreProvided = EventStore.layerFromOrchestrationEventStore.pipe(
   Layer.provide(layerEventInfrastructure),

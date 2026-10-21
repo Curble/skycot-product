@@ -1,5 +1,6 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
+import * as SkycotPolicy from "./skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-config
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 
 import * as DateTime from "effect/DateTime";
@@ -1718,6 +1719,8 @@ export const layerWsRpc = (
           threadSnapshotPagination: true,
           threadFind: true,
           threadFindProgressive: true,
+          // nondev-seam: skycot-policy-config (tells SKYCOT clients whether the server policy is on)
+          skycotPolicy: SkycotPolicy.isSkycotPolicyEnabled(process.env),
           ...Option.match(scratchWorkspaceRoot, {
             onNone: () => ({}),
             onSome: (root) => ({ scratchWorkspaceRoot: root }),

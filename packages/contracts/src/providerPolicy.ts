@@ -29,7 +29,13 @@ export const RuntimeMode = Schema.Literals([
   "full-access",
 ]);
 export type RuntimeMode = typeof RuntimeMode.Type;
-export const DEFAULT_RUNTIME_MODE: RuntimeMode = "full-access";
+// nondev-seam: skycot-default-runtime-mode (env-driven on the server; browsers have no process and keep "full-access")
+const envDefaultRuntimeMode = (
+  globalThis as { process?: { env?: Record<string, string | undefined> } }
+).process?.env?.T3CODE_DEFAULT_RUNTIME_MODE;
+export const DEFAULT_RUNTIME_MODE: RuntimeMode = Schema.is(RuntimeMode)(envDefaultRuntimeMode)
+  ? envDefaultRuntimeMode
+  : "full-access";
 
 export const ProviderInteractionMode = Schema.Literals(["default", "plan"]);
 export type ProviderInteractionMode = typeof ProviderInteractionMode.Type;
