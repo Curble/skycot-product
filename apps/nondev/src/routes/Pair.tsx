@@ -1,19 +1,22 @@
-// The local pairing screen from apps/web/src/components/auth/PairingRouteSurface.tsx,
-// minus the hosted (app.t3.codes) variant, which needs the stock connection
-// runtime. On success the fragment is reset and the page reloads so the
-// WebSocket picks up the new session cookie, as the stock /pair route does.
+// The local pairing screen, restyled as a centered card. Same working flow as
+// before: a token in the URL fragment is submitted automatically; on success
+// the fragment is reset and the page reloads so the WebSocket picks up the new
+// session cookie, as the stock /pair route does.
 import type { AuthSessionState } from "@t3tools/contracts";
+import { Laptop } from "lucide-react";
 import React, { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { Alert, AlertDescription } from "~/components/ui/alert";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { StandalonePage, StandalonePageHeader } from "~/components/ui/standalone-page";
 import {
   peekPairingTokenFromUrl,
   stripPairingTokenFromUrl,
   submitServerAuthCredential,
 } from "~/environments/primary/auth";
+
+import { PRODUCT_NAME } from "../brand";
+import { Banner } from "../ui/Banner";
+import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
+import { TextField } from "../ui/TextField";
 
 export function PairRoute({
   auth,
@@ -24,26 +27,24 @@ export function PairRoute({
 }) {
   const [autoPairToken] = useState(peekPairingTokenFromUrl);
   const [credential, setCredential] = useState(autoPairToken ?? "");
-  const [errorMessage, setErrorMessage] = useState(initialErrorMessage ?? "");
+  const [problem, setProblem] = useState(
+    initialErrorMessage ? calmPairingError(initialErrorMessage) : "",
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const autoSubmitAttemptedRef = useRef(false);
 
   const submitCredential = async (nextCredential: string) => {
     setIsSubmitting(true);
-    setErrorMessage("");
-
+    setProblem("");
     const submitError = await submitServerAuthCredential(nextCredential).then(
       () => null,
-      (error: unknown) => errorMessageFromUnknown(error),
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
-
     setIsSubmitting(false);
-
-    if (submitError) {
-      setErrorMessage(submitError);
+    if (submitError !== null) {
+      setProblem(calmPairingError(submitError));
       return;
     }
-
     startTransition(() => {
       window.location.hash = "/";
       window.location.reload();
@@ -60,77 +61,77 @@ export function PairRoute({
   });
 
   useEffect(() => {
-    if (!autoPairToken || autoSubmitAttemptedRef.current) {
-      return;
-    }
+    if (!autoPairToken || autoSubmitAttemptedRef.current) return;
     autoSubmitAttemptedRef.current = true;
     stripPairingTokenFromUrl();
     autoSubmit(autoPairToken);
   }, [autoPairToken]);
 
+  const acceptsTokens = auth.bootstrapMethods.includes("one-time-token");
+
   return (
-    <StandalonePage tone="pairing">
-      <StandalonePageHeader
-        eyebrow="T3 Code Simple"
-        title="Pair with this environment"
-        description="Enter a pairing token to start a session with this environment."
-      />
-
-      <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="pairing-token">
-            Pairing token
-          </label>
-          <Input
-            id="pairing-token"
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect="off"
-            disabled={isSubmitting}
-            nativeInput
-            onChange={(event) => setCredential(event.currentTarget.value)}
-            placeholder="Paste a one-time token or pairing secret"
-            spellCheck={false}
-            value={credential}
-          />
-        </div>
-
-        {errorMessage ? (
-          <Alert variant="error">
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={isSubmitting} size="sm" type="submit">
-            {isSubmitting ? "Pairing..." : "Continue"}
-          </Button>
+    <StandalonePage>
+      <span className="fm-standalone__icon" aria-hidden>
+        <Laptop size={30} strokeWidth={1.6} />
+      </span>
+      <h1 className="fm-standalone__title">Connect to your Mac</h1>
+      <p className="fm-standalone__text">
+        {PRODUCT_NAME} talks to the engine running on your Mac. Paste the connection code it gave
+        you, or open the link it printed, and you're in.
+      </p>
+      <form className="fm-standalone__form" onSubmit={(event) => void handleSubmit(event)}>
+        <TextField
+          label="Connection code"
+          mono
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          disabled={isSubmitting}
+          placeholder="Paste the code here"
+          value={credential}
+          onChange={(event) => setCredential(event.currentTarget.value)}
+        />
+        {problem ? <Banner tone="warning">{problem}</Banner> : null}
+        <div className="fm-standalone__actions">
           <Button
-            disabled={isSubmitting}
-            onClick={() => window.location.reload()}
-            size="sm"
-            variant="outline"
+            variant="primary"
+            type="submit"
+            disabled={isSubmitting || credential.trim().length === 0}
           >
-            Reload app
+            {isSubmitting ? "Connecting…" : "Connect"}
+          </Button>
+          <Button disabled={isSubmitting} onClick={() => window.location.reload()}>
+            Try again
           </Button>
         </div>
       </form>
-
-      <div className="mt-6 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-        {auth.bootstrapMethods.includes("one-time-token")
-          ? "This environment accepts one-time pairing tokens. Mint one on the host with `t3 pair`, open the link it prints, or paste the token here."
-          : "This environment expects a trusted pairing credential before the app can connect."}
+      <div className="fm-standalone__foot">
+        {acceptsTokens
+          ? "On the Mac that runs the engine, type “t3 pair” in Terminal. It prints a link you can open on this device, or a code to paste above."
+          : "This Mac expects a trusted connection code before the app can connect. Ask whoever set it up."}
       </div>
     </StandalonePage>
   );
 }
 
-function errorMessageFromUnknown(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+function calmPairingError(message: string): string {
+  if (/expired|used|invalid|reject|unauthori|not found/i.test(message)) {
+    return "That code didn't work. Codes are single-use and expire quickly — ask for a fresh one.";
   }
-  if (typeof error === "string" && error.trim().length > 0) {
-    return error;
+  if (/network|fetch|unreachable|timeout/i.test(message)) {
+    return "Can't reach your Mac right now. Check it is awake, then try again.";
   }
-  return "Authentication failed.";
+  return "That didn't work. Ask for a fresh code and try again.";
+}
+
+/** Centered card for pairing, connecting and error screens. */
+export function StandalonePage({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div className="fm-standalone">
+      <Card label={PRODUCT_NAME}>
+        <div className="fm-standalone__card">{children}</div>
+      </Card>
+    </div>
+  );
 }
