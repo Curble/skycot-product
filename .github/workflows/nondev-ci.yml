@@ -33,13 +33,16 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          # The job installs and builds whatever the PR contains; keep the token out of .git/config.
-          persist-credentials: false
           sparse-checkout: |
             /*
             !/.repos/
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
+
+      # Drop the checkout token before anything installs or builds. Not persist-credentials: false:
+      # that walks submodules, and upstream's vendored .repos/ has gitlinks without .gitmodules.
+      - name: Drop the checkout token from .git/config
+        run: git config --local --unset-all 'http.https://github.com/.extraheader' || true
 
       - name: Fetch upstream main
         run: |

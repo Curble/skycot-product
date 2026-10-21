@@ -78,13 +78,17 @@ jobs:
       commits: ${{ steps.sync.outputs.commits }}
     steps:
       # Full history: the script needs the merge-base with upstream, and rerere needs .git.
-      # persist-credentials: false keeps even the read-only GITHUB_TOKEN out of .git/config.
+      # The step after checkout removes even the read-only GITHUB_TOKEN from .git/config.
       - name: Checkout main
         uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: false
+
+      # Drop the checkout token before anything installs or builds. Not persist-credentials: false:
+      # that walks submodules, and upstream's vendored .repos/ has gitlinks without .gitmodules.
+      - name: Drop the checkout token from .git/config
+        run: git config --local --unset-all 'http.https://github.com/.extraheader' || true
 
       - name: Restore remembered conflict resolutions (git rerere)
         uses: actions/cache/restore@v6
