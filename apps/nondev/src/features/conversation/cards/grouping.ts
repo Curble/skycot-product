@@ -43,10 +43,22 @@ interface MutableWorkGroup {
   index: number;
 }
 
+const OPEN_ASK_STATUSES: ReadonlySet<OrchestrationV2TurnItem["status"]> = new Set<
+  OrchestrationV2TurnItem["status"]
+>(["idle", "pending", "running", "waiting"]);
+
+function isSettledAsk(item: OrchestrationV2TurnItem): boolean {
+  return (
+    (item.type === "approval_request" || item.type === "user_input_request") &&
+    !OPEN_ASK_STATUSES.has(item.status)
+  );
+}
+
 /**
- * One card per run, placed where the run's newest tool item sits, so a
- * finished "Done" never reads above the approval cards that led to it. Items
- * without a run id (older servers) group by adjacency instead.
+ * One card per run, placed where the run's newest tool item or answered ask
+ * sits, so a finished "Done" or "Stopped" never reads above the approval cards
+ * that led to it. Items without a run id (older servers) group by adjacency
+ * instead.
  */
 export function groupTimelineItems(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
@@ -65,6 +77,13 @@ export function groupTimelineItems(
     if (!WORK_ITEM_TYPES.has(item.type) && !(options.absorb?.(item) ?? false)) {
       adjacent = null;
       entries.push({ kind: "item", item, index });
+      // An answered (or stopped) ask is part of the run's story: the run's card, which says
+      // how the run ended, reads below it. A pending ask stays last, where the person acts.
+      const group = item.runId === null ? undefined : byRun.get(item.runId);
+      if (group && isSettledAsk(item)) {
+        entries.splice(entries.indexOf(group), 1);
+        entries.push(group);
+      }
       return;
     }
     if (item.runId !== null) {

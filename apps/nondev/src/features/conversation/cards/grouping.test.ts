@@ -108,3 +108,34 @@ describe("groupTimelineItems", () => {
     ]);
   });
 });
+
+describe("groupTimelineItems — the run's card reads after its answered asks (N-6)", () => {
+  it("puts a stopped run's card below the ask that was pending when Stop was pressed", () => {
+    const list = [
+      items.user("List the files in the project"),
+      items.command("Preparing workspace"),
+      items.assistant("I'll list the project files."),
+      items.command("rg --files", {}, { status: "interrupted" }),
+      items.approval("command", { prompt: "rg --files" }, { status: "cancelled" }),
+    ];
+    const entries = groupTimelineItems(list);
+    expect(entries.map((e) => (e.kind === "work" ? "work" : e.item.type))).toEqual([
+      "user_message",
+      "assistant_message",
+      "approval_request",
+      "work",
+    ]);
+  });
+
+  it("keeps a pending ask last, below the live card", () => {
+    const list = [
+      items.command("rg --files"),
+      items.approval("command", { prompt: "npx vercel --prod" }),
+    ];
+    const entries = groupTimelineItems(list);
+    expect(entries.map((e) => (e.kind === "work" ? "work" : e.item.type))).toEqual([
+      "work",
+      "approval_request",
+    ]);
+  });
+});
