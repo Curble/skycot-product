@@ -374,6 +374,30 @@ describe("hard rules on cards (QA2-03)", () => {
     expect(decisions(read)).not.toContain("acceptAlways");
   });
 
+  it("offers only Don't allow / Allow once for a read outside the project (QA-P2-2-09)", () => {
+    const cat = describeRuntimeRequest(
+      items.approval("command", { prompt: "cat /Users/me/t3code-nondev/AGENTS.md" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(decisions(cat).toSorted()).toEqual(["accept", "decline"]);
+    expect(cat.scopeExplainer).toBe("Reads one file outside the project; changes nothing.");
+    expect(cat.scopeExplainer).not.toMatch(/can affect/i);
+    const read = describeRuntimeRequest(items.approval("file-read", { prompt: "/etc/hosts" }), {
+      projectRoot: "/Users/me/site",
+    });
+    expect(decisions(read).toSorted()).toEqual(["accept", "decline"]);
+    expect(read.scopeExplainer).toBe("Reads one file outside the project; changes nothing.");
+  });
+
+  it("says each warning once on a delete card (QA-P2-2-08)", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "rm book.html" }), {
+      projectRoot: "/Users/me/site",
+    });
+    expect(card.warning).toBeDefined();
+    expect(card.warning!.match(/can't be undone/g)?.length).toBe(1);
+    expect(card.warning).toContain("Check the exact command below");
+  });
+
   it("holds writes and runs outside the project as high", () => {
     const card = describeRuntimeRequest(
       items.approval("command", { prompt: "cp menu.html /Users/me/Desktop/menu.html" }),

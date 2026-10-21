@@ -229,6 +229,8 @@ function buildApprovalOptions(
   alwaysWhat: string,
   providerOptions: ReadonlyArray<ProviderApprovalOption> | undefined,
   allowAlways: boolean,
+  /** Only "Don't allow" / "Allow once": each ask is a fresh question (reads outside the project). */
+  onceOnly = false,
 ): Array<ApprovalOption> {
   const source: ReadonlyArray<ProviderApprovalOption> =
     providerOptions && providerOptions.length > 0
@@ -243,7 +245,12 @@ function buildApprovalOptions(
       (!allowAlways || risk === "high" || risk === "blocked")
     )
       continue;
-    if (option.decision === "acceptForSession" && (risk === "high" || risk === "blocked")) continue;
+    if (
+      option.decision === "acceptForSession" &&
+      (onceOnly || risk === "high" || risk === "blocked")
+    )
+      continue;
+    if (option.decision === "acceptAlways" && onceOnly) continue;
     if (risk === "blocked" && option.decision !== "decline" && option.decision !== "cancel")
       continue;
     seen.add(option.decision);
@@ -285,6 +292,15 @@ function firstLine(text: string | undefined, max = 400): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
+/** One sentence per idea: a lead that already says "can't be undone" only gets the check line. */
+function withUndoWarning(lead: string): string {
+  return /can't be undone/i.test(lead)
+    ? `${lead} ${copy.checkTheCommand}`
+    : `${lead} ${copy.destructiveWarning}`;
+}
+
+const READS_OUTSIDE_SCOPE = "Reads one file outside the project; changes nothing.";
+
 function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
   const command = item.prompt ?? "";
   const classified: CommandClassification = classifyCommand(command);
@@ -300,6 +316,15 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
   const destructive = irreversible;
   const risk: ApprovalRisk = maxRisk(classified.risk, rules.risk);
   const readsOutside = rules.matches.find((match) => match.rule.id === "reads-outside-project");
+  // Only reading outside (no write, delete or upload): it changes nothing, and one allow
+  // must not cover the next personal file, so the card offers "Allow once" only.
+  const readsOutsideOnly =
+    readsOutside !== undefined &&
+    !irreversible &&
+    !outsideOnly &&
+    rules.matches.every(
+      (match) => match.rule.id === "reads-outside-project" || match.rule.id === "secrets",
+    );
   const whatItWants = readsOutside
     ? `The assistant wants to read a file outside your project${readsOutside.detail ? ` (${readsOutside.detail})` : ""}.`
     : `The assistant wants to ${classified.infinitive}.`;
@@ -334,7 +359,9 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
         ? "Careful — this can't be undone"
         : outsideOnly
           ? "May I work outside the project?"
-          : "May I run this?",
+          : readsOutsideOnly
+            ? "May I read a file outside the project?"
+            : "May I run this?",
       whatItWants,
       whyItMatters: ruleLine ?? whyCommandMatters(classified),
       scope: readsOutside || outsideOnly ? "your computer" : classified.touches,
@@ -342,14 +369,24 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
       ifYouSayNo: copy.ifNoCommand,
       risk,
       warning: destructive
-        ? `${classified.warning ?? "This command deletes, overwrites or publishes something."} ${copy.destructiveWarning}`
+        ? withUndoWarning(
+            classified.warning ?? "This command deletes, overwrites or publishes something.",
+          )
         : outsideOnly
-          ? `This touches files outside the project folder. ${copy.destructiveWarning}`
+          ? withUndoWarning("This touches files outside the project folder.")
           : undefined,
-      options: buildApprovalOptions(item.requestId, risk, alwaysWhat, item.options, allowAlways),
+      options: buildApprovalOptions(
+        item.requestId,
+        risk,
+        alwaysWhat,
+        item.options,
+        allowAlways,
+        readsOutsideOnly,
+      ),
       technical: command,
     },
     ctx,
+    readsOutsideOnly ? READS_OUTSIDE_SCOPE : undefined,
   );
 }
 
@@ -455,9 +492,9 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
       ifYouSayNo: copy.ifNoFileChange,
       risk,
       warning: deletes
-        ? `${deleteNoun} will be deleted. ${copy.destructiveWarning}`
+        ? withUndoWarning(`${deleteNoun} will be deleted.`)
         : outside
-          ? `${outsideNoun} outside the project folder. ${copy.destructiveWarning}`
+          ? withUndoWarning(`${outsideNoun} outside the project folder.`)
           : undefined,
       options: buildApprovalOptions(
         item.requestId,
@@ -506,10 +543,16 @@ function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): App
         "reading files",
         item.options,
         !outside && !secret,
+        outside,
       ),
       technical: item.prompt ?? "file read",
     },
     ctx,
+    outside
+      ? files.length > 1
+        ? "Reads files outside the project; changes nothing."
+        : READS_OUTSIDE_SCOPE
+      : undefined,
   );
 }
 
@@ -744,6 +787,8 @@ function describeRawRequest(
 function finishCard(
   card: Omit<ApprovalCard, "nothingPreselected" | "scopeExplainer">,
   ctx: ApprovalContext,
+  /** Replaces the scope's generic sentence when the card knows better. */
+  scopeExplainer?: string,
 ): ApprovalCard {
   const gone = ctx.responseCapability === "not_resumable";
   const options: ReadonlyArray<ApprovalOption> = gone
@@ -765,7 +810,7 @@ function finishCard(
   return {
     ...card,
     whyItMatters,
-    scopeExplainer: scopes[card.scope],
+    scopeExplainer: scopeExplainer ?? scopes[card.scope],
     ...(warning ? { warning } : {}),
     options,
     nothingPreselected: true,
