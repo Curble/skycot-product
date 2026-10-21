@@ -9,6 +9,7 @@ import {
 import { Scale } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
 import { advancedModeUrl } from "../../../app/platform";
 import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { Button } from "../../../ui/Button";
@@ -186,31 +187,36 @@ export function OpenSourceLicensesSheet({
   readonly open: boolean;
   readonly onClose: () => void;
 }) {
+  // Every exit to the developer interface goes through the same confirm sheet
+  // (and the parent code, with the Family profile on).
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      icon={Scale}
-      iconTone="grey"
-      wide
-      title="Open-source licences"
-      description="The libraries, fonts and sounds this app is built from, each with the licence its authors chose. Open a row to read the full notice."
-      actions={
-        <>
-          <Button
-            onClick={() =>
-              window.location.assign(`${advancedModeUrl()}settings/open-source-licenses`)
-            }
-          >
-            Open in {ADVANCED_MODE_LABEL}
-          </Button>
-          <Button variant="primary" onClick={onClose}>
-            Done
-          </Button>
-        </>
-      }
-    >
-      {open ? <LicenseList /> : null}
-    </Sheet>
+    <>
+      <Sheet
+        open={open}
+        onClose={onClose}
+        icon={Scale}
+        iconTone="grey"
+        wide
+        title="Open-source licences"
+        description="The libraries, fonts and sounds this app is built from, each with the licence its authors chose. Open a row to read the full notice."
+        actions={
+          <>
+            <Button onClick={() => setAdvancedOpen(true)}>Open in {ADVANCED_MODE_LABEL}</Button>
+            <Button variant="primary" onClick={onClose}>
+              Done
+            </Button>
+          </>
+        }
+      >
+        {open ? <LicenseList /> : null}
+      </Sheet>
+      <AdvancedModeSheet
+        open={advancedOpen}
+        onClose={() => setAdvancedOpen(false)}
+        path="settings/open-source-licenses"
+        reason="The same licence list has its own page there."
+      />
+    </>
   );
 }

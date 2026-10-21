@@ -73,17 +73,26 @@ export function FamilySetupForm({
         </p>
         {showProblem ? <Banner tone="warning">{problem}</Banner> : null}
       </div>
-      <FamilyHonestyBox />
+      {/* The form always sits under a sheet's h2, so its sub-headings are h3. */}
+      <FamilyHonestyBox headingLevel={3} />
     </div>
   );
 }
 
 /** "What this does / does not do", word for word the same everywhere it appears. */
-export function FamilyHonestyBox({ compact = false }: { readonly compact?: boolean }) {
+export function FamilyHonestyBox({
+  compact = false,
+  headingLevel = 4,
+}: {
+  readonly compact?: boolean;
+  /** One below the heading the box sits under: 3 inside a sheet (h2), 4 under a Settings group (h3). */
+  readonly headingLevel?: 3 | 4;
+}) {
+  const Heading = headingLevel === 3 ? "h3" : "h4";
   return (
     <div className={`fm-family-honesty${compact ? " fm-family-honesty--compact" : ""}`}>
       <div className="fm-family-honesty__col">
-        <h4>What this does</h4>
+        <Heading>What this does</Heading>
         <ul>
           {familyCopy.does.map((line) => (
             <li key={line}>
@@ -94,7 +103,7 @@ export function FamilyHonestyBox({ compact = false }: { readonly compact?: boole
         </ul>
       </div>
       <div className="fm-family-honesty__col">
-        <h4>What it does not do</h4>
+        <Heading>What it does not do</Heading>
         <ul>
           {familyCopy.doesNot.map((line) => (
             <li key={line}>

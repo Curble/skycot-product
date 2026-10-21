@@ -66,7 +66,7 @@ export function AdvancedModeSheet({
         </>
       }
     >
-      {locked ? <ParentCodeEntry entry={entry} autoFocus /> : null}
+      {locked ? <ParentCodeEntry entry={entry} /> : null}
     </Sheet>
   );
 }

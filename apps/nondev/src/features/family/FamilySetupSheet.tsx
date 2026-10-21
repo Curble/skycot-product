@@ -49,8 +49,9 @@ function FamilySetupSheetBody({
       icon={Users}
       iconTone="orange"
       title={`Set up the ${familyCopy.title}`}
-      description="For a child you look after. The Workshop look comes on, the assistant always asks first, and a parent code guards publishing, automations and the developer tools."
+      description="For a child you look after. The Workshop look comes on unless you've already picked another, the assistant always asks first, and a parent code guards publishing, automations and the developer tools."
       wide
+      sober
       initialFocus="first"
       dismissOnBackdrop={false}
       actions={
@@ -68,7 +69,7 @@ function FamilySetupSheetBody({
         </>
       }
     >
-      <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus />
+      <FamilySetupForm draft={draft} onDraft={setDraft} />
     </Sheet>
   );
 }

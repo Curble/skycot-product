@@ -11,7 +11,7 @@ import {
   useWriteServerDefaultRuntimeMode,
 } from "../../../state/autonomy";
 import { settingsHref } from "../../../router";
-import { ListRow } from "../../../ui/ListRow";
+import { ListExtra, ListRow } from "../../../ui/ListRow";
 import { SegmentedControl } from "../../../ui/SegmentedControl";
 import { StepBadge } from "../../../ui/StepBadge";
 import {
@@ -74,40 +74,42 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
           )
         }
       >
-        <div className="fm-setting-block">
-          {family.enabled ? (
-            <FamilyAutonomyLock
-              note={`${familyCopy.title} · ${describeAutonomyLevel("askMeFirst", { policyEnforced })}`}
-            />
-          ) : (
-            <SegmentedControl
-              label="Default autonomy"
-              value={selected}
-              onChange={choose}
-              block
-              options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
-                value: option.value,
-                label: option.label,
-                ...(option.tag ? { tag: option.tag } : {}),
-              }))}
-            />
-          )}
-          {handsOffOnServer && !family.enabled ? (
-            <div className="fm-setting-warning" role="alert">
-              <p>
-                Your Mac is currently set to <b>{AUTONOMY_LEVELS.fullyHandsOff.label}</b> (chosen in{" "}
-                {ADVANCED_MODE_LABEL}). {AUTONOMY_LEVELS.fullyHandsOff.warning}
-              </p>
-              <button
-                type="button"
-                className="fm-btn fm-btn--primary fm-btn--sm"
-                onClick={() => choose("ask-first")}
-              >
-                Switch to {AUTONOMY_LEVELS.askMeFirst.label}
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <ListExtra>
+          <div className="fm-setting-block">
+            {family.enabled ? (
+              <FamilyAutonomyLock
+                note={`${familyCopy.title} · ${describeAutonomyLevel("askMeFirst", { policyEnforced })}`}
+              />
+            ) : (
+              <SegmentedControl
+                label="Default autonomy"
+                value={selected}
+                onChange={choose}
+                block
+                options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                  ...(option.tag ? { tag: option.tag } : {}),
+                }))}
+              />
+            )}
+            {handsOffOnServer && !family.enabled ? (
+              <div className="fm-setting-warning" role="alert">
+                <p>
+                  Your Mac is currently set to <b>{AUTONOMY_LEVELS.fullyHandsOff.label}</b> (chosen
+                  in {ADVANCED_MODE_LABEL}). {AUTONOMY_LEVELS.fullyHandsOff.warning}
+                </p>
+                <button
+                  type="button"
+                  className="fm-btn fm-btn--primary fm-btn--sm"
+                  onClick={() => choose("ask-first")}
+                >
+                  Switch to {AUTONOMY_LEVELS.askMeFirst.label}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </ListExtra>
       </SettingsGroup>
 
       <SettingsGroup

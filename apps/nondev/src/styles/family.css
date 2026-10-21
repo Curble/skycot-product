@@ -53,6 +53,7 @@
     grid-template-columns: 1fr;
   }
 }
+.fm-family-honesty h3,
 .fm-family-honesty h4 {
   margin: 0 0 6px;
   font-size: calc(12px * var(--fm-text-scale));

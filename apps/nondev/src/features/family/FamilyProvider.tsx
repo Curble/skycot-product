@@ -97,7 +97,7 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
         </>
       }
     >
-      <ParentCodeEntry entry={entry} autoFocus />
+      <ParentCodeEntry entry={entry} />
     </Sheet>
   );
 }

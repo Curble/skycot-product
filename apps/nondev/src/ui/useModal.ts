@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useInsertionEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -42,11 +42,19 @@ export function useModal(
     readonly initialFocus?: "body" | "first";
   },
 ) {
+  // Who to hand focus back to. Recorded before React commits the DOM, because a
+  // field that autofocuses inside the modal has already taken focus by the time
+  // a layout or passive effect runs and would be mistaken for the opener.
+  const openerRef = useRef<Element | null>(null);
+  useInsertionEffect(() => {
+    if (open) openerRef.current = document.activeElement;
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const element = ref.current;
     if (!element) return;
-    const opener = document.activeElement;
+    const opener = openerRef.current;
     stack.push(element);
     const root = appRoot();
     if (stack.length === 1 && root) root.inert = true;
