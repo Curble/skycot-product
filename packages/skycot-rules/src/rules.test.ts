@@ -648,3 +648,46 @@ describe("evaluateRequest — leaving the sandbox is a hard rule (N-2)", () => {
     expect(result.matches[0]!.rule.id).toBe("leaves-sandbox");
   });
 });
+
+describe("the assistant reading its own plugin and skill instructions (N-7)", () => {
+  const SKILL =
+    "/Users/me/.codex/plugins/cache/openai-curated-remote/vercel/0.54.1/skills/cli/SKILL.md";
+
+  it("allows look-only reads under the Codex and Claude plugin and skill folders", () => {
+    expect(ids(`/bin/zsh -lc 'cat ${SKILL} ~/.codex/skills/deploy/SKILL.md'`)).toEqual([]);
+    expect(ids("rg -n vercel /Users/me/.claude/plugins/cache/x/README.md")).toEqual([]);
+    expect(ids("head -n 40 ~/.claude/skills/pdf/SKILL.md 2>/dev/null")).toEqual([]);
+    expect(ids("find ~/.codex/skills -name SKILL.md")).toEqual([]);
+    expect(
+      evaluateFileRead([{ path: "/Users/me/.claude/skills/pdf/SKILL.md", operation: "change" }], {
+        projectRoot: ROOT,
+      }).decision,
+    ).toBe("allow");
+  });
+
+  it("keeps the assistants' sign-in, settings and secret files held as secrets", () => {
+    for (const path of [
+      "~/.codex/auth.json",
+      "/Users/me/.codex/config.toml",
+      "/Users/me/.claude/.credentials.json",
+      "~/.codex/plugins/cache/x/token.json",
+      "~/.claude/skills/x/.env",
+      "~/.claude/plugins/x/deploy-key.pem",
+      "~/.codex/plugins/x/github_access_token",
+    ]) {
+      expect(ids(`cat ${path}`)).toContain("secrets");
+      expect(
+        evaluateFileRead([{ path, operation: "change" }], { projectRoot: ROOT }).decision,
+      ).toBe("hold");
+    }
+  });
+
+  it("holds anything that writes there or climbs out of those folders", () => {
+    expect(ids("sed -i s/a/b/ ~/.codex/skills/x/SKILL.md")).toContain("reads-outside-project");
+    expect(ids("cat notes.md > ~/.claude/skills/x/SKILL.md")).not.toEqual([]);
+    expect(ids("cp SKILL.md ~/.codex/skills/x/SKILL.md")).toContain("outside-project");
+    expect(ids("find ~/.codex/skills -name '*.md' -exec cat {} +")).not.toEqual([]);
+    expect(ids("cat ~/.codex/skills/../sessions/today.jsonl")).toContain("reads-outside-project");
+    expect(ids("cat ~/.codex/history.jsonl")).toContain("reads-outside-project");
+  });
+});

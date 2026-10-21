@@ -7,7 +7,12 @@
 // be auto-approved. Rules err towards matching: a false hold costs one tap, a false allow
 // can delete work.
 
-import { isOutsideProject, isSecretPath, type PromptFile } from "./files.ts";
+import {
+  isOutsideProject,
+  isProviderInstructionPath,
+  isSecretPath,
+  type PromptFile,
+} from "./files.ts";
 import {
   commandSubstitutions,
   innerShellScript,
@@ -347,6 +352,46 @@ const SECRET_TOOL_PATTERN =
 const UPLOAD_FLAG_PATTERN =
   /(^|\s)(-T|--upload-file|--data-binary\s+@|--data\s+@|-d\s+@|--data-raw\s+@|-F\s+\S*@|--form\s+\S*@|--post-file|--post-data|--body-file)/;
 
+/** Programs that can only show a file, whatever their flags (unlike `sed -i` or `sort -o`). */
+const LOOK_ONLY_PROGRAMS = new Set([
+  "ls",
+  "cat",
+  "head",
+  "tail",
+  "less",
+  "more",
+  "wc",
+  "tree",
+  "stat",
+  "file",
+  "du",
+  "bat",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "ag",
+  "ack",
+  "fd",
+  "fdfind",
+  "diff",
+  "cmp",
+  "md5",
+  "shasum",
+  "sha256sum",
+  "strings",
+]);
+
+/** A step that reads and writes nothing back: no output redirect, no `find -exec`. */
+function looksWithoutWriting(base: string, args: ReadonlyArray<string>, segment: string): boolean {
+  const quiet = segment.replace(/\s+\d*>{1,2}\s*(?:\/dev\/null|&\d)(?=\s|$)/g, "");
+  if (/>/.test(quiet)) return false;
+  if (base === "find") {
+    return !args.some((arg) => /^-(exec|execdir|ok|okdir|delete|fprint\w*|fls)$/.test(arg));
+  }
+  return LOOK_ONLY_PROGRAMS.has(base);
+}
+
 function isPathLike(token: string): boolean {
   if (token.includes("://") || token.startsWith("-")) return false;
   return (
@@ -553,9 +598,13 @@ function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
     }
   }
 
-  // Outside the project.
+  // Outside the project. The assistant reading its own plugin and skill instructions is not
+  // the person's business, as long as the step only looks.
+  const onlyLooks = looksWithoutWriting(base, args, segment);
   const outside = [...(base === "cd" ? positional.slice(0, 1) : []), ...pathTokens(args)].filter(
-    (candidate) => isOutsideProject(candidate, ctx.projectRoot),
+    (candidate) =>
+      isOutsideProject(candidate, ctx.projectRoot) &&
+      !(onlyLooks && isProviderInstructionPath(candidate)),
   );
   if (outside.length > 0) {
     hit(READ_PROGRAMS.has(base) ? "reads-outside-project" : "outside-project", outside[0]!);
@@ -614,7 +663,7 @@ export function evaluateFileRead(
 ): RuleEvaluation {
   const matches: Array<RuleMatch> = [];
   for (const file of files) {
-    if (isOutsideProject(file.path, ctx.projectRoot)) {
+    if (isOutsideProject(file.path, ctx.projectRoot) && !isProviderInstructionPath(file.path)) {
       matches.push({ rule: hardRule("reads-outside-project"), detail: file.path });
     }
     if (isSecretPath(file.path)) matches.push({ rule: hardRule("secrets"), detail: file.path });

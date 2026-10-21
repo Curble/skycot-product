@@ -103,8 +103,48 @@ export function isOutsideProject(
 const SECRET_PATH_PATTERN =
   /(^|[\\/])(\.env(\.[\w.-]+)?|\.npmrc|\.pypirc|\.netrc|\.git-credentials|credentials(\.json)?|secrets?(\.[\w.-]+)?|id_rsa|id_ed25519|id_ecdsa|known_hosts|authorized_keys|\.ssh|\.aws|\.gnupg|\.docker\/config\.json|keychain)$|\.(pem|key|p12|pfx|jks|keystore)$/i;
 
+/**
+ * The assistants' own sign-in and settings files: `~/.codex/auth.json`, `~/.codex/config.toml`,
+ * `~/.claude/.credentials.json`, and anything token-named under either folder.
+ */
+const PROVIDER_SECRET_PATTERN =
+  /(^|[\\/])\.(codex|claude)[\\/](.*[\\/])?(auth\.json|config\.toml|\.credentials[^\\/]*|[^\\/]*token[^\\/]*)$/i;
+
 /** A path whose contents are usually keys, passwords or tokens. `.env.example` is not. */
 export function isSecretPath(path: string): boolean {
   if (/\.env\.(example|sample|template|dist)$/i.test(path)) return false;
-  return SECRET_PATH_PATTERN.test(path);
+  return SECRET_PATH_PATTERN.test(path) || PROVIDER_SECRET_PATTERN.test(path);
+}
+
+/** `a/b/../c` → `a/c`; null when the path climbs above where it started. */
+function collapseDots(path: string): string | null {
+  const parts: Array<string> = [];
+  for (const part of path.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (parts.length === 0) return null;
+      parts.pop();
+      continue;
+    }
+    parts.push(part);
+  }
+  return parts.join("/");
+}
+
+/** The home folder however a command spells it: `~`, `$HOME`, `/Users/me`, `/home/me`. */
+const HOME_PREFIX = /^(~|\$HOME|\$\{HOME\}|\/Users\/[^/]+|\/home\/[^/]+|\/root|\/var\/root)\//;
+const INSTRUCTION_FOLDER = /^\.(codex|claude)\/(plugins|skills)(\/|$)/;
+
+/**
+ * True for the assistants' own plugin and skill instructions (`~/.codex/plugins/…/SKILL.md`,
+ * `~/.claude/skills/…`): reading them is the assistant reading its own manual, not the
+ * person's files. Never true for a secret-looking file, even inside those folders, or for a
+ * path that climbs out of them with `..`.
+ */
+export function isProviderInstructionPath(path: string): boolean {
+  const home = HOME_PREFIX.exec(path);
+  if (home === null) return false;
+  const rest = collapseDots(path.slice(home[0].length));
+  if (rest === null || !INSTRUCTION_FOLDER.test(rest)) return false;
+  return !isSecretPath(rest) && !/(^|\/)\.env[^/]*$|\.pem$/i.test(rest);
 }

@@ -712,4 +712,34 @@ describe("SkycotPolicyReactor", () => {
       }
     }),
   );
+
+  it.effect("lets Codex read its own skill instructions but never its sign-in file", () =>
+    Effect.gen(function* () {
+      const skill = yield* run(
+        {
+          items: [
+            approvalItem("command"),
+            commandItem(
+              "/bin/zsh -lc 'cat /Users/me/.codex/plugins/cache/openai-curated-remote/vercel/0.54.1/skills/vercel-cli/SKILL.md'",
+            ),
+          ],
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(skill.outcome.type, "approved");
+      const auth = yield* run(
+        {
+          items: [
+            approvalItem("command"),
+            commandItem("/bin/zsh -lc 'cat /Users/me/.codex/auth.json'"),
+          ],
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(auth.outcome.type, "held");
+      if (auth.outcome.type === "held") {
+        assert.ok(auth.outcome.evaluation.matches.some((match) => match.rule.id === "secrets"));
+      }
+    }),
+  );
 });
