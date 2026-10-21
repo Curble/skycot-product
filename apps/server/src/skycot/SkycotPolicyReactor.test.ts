@@ -22,7 +22,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as CodexSchema from "effect-codex-app-server/schema";
 
 import { SKYCOT_POLICY_NOTE } from "@t3tools/skycot-rules/decision";
 import { UNKNOWN_BRANCH_PUSH } from "@t3tools/skycot-rules/rules";
@@ -287,7 +289,7 @@ describe("SkycotPolicyReactor", () => {
   it.effect("approves a routine in-project command and signs the decision", () =>
     Effect.gen(function* () {
       const { outcome, dispatched } = yield* run(
-        { items: [approvalItem("command", "Run the checks"), commandItem("pnpm test")] },
+        { items: [approvalItem("command", "pnpm test"), commandItem("pnpm test")] },
         requestEvent(request("command")),
       );
       assert.equal(outcome.type, "approved");
@@ -302,10 +304,10 @@ describe("SkycotPolicyReactor", () => {
     }),
   );
 
-  it.effect("holds a delete even when the provider's title hides it", () =>
+  it.effect("holds a delete the approval's own prompt does not show", () =>
     Effect.gen(function* () {
       const { outcome, dispatched } = yield* run(
-        { items: [approvalItem("command", "Tidy up the old page"), commandItem("rm book.html")] },
+        { items: [approvalItem("command"), commandItem("rm book.html")] },
         requestEvent(request("command")),
       );
       assert.equal(outcome.type, "held");
@@ -605,6 +607,109 @@ describe("SkycotPolicyReactor", () => {
       const later = yield* run({ items: [item, commandItem("pnpm test")] }, itemEvent(item));
       assert.equal(later.outcome.type, "approved");
       assert.equal(later.dispatched.length, 1);
+    }),
+  );
+  // The shape Codex sent in the live re-check (2b): the model asked to run the push outside
+  // its sandbox, so `reason` carries its justification and the adapter shows that as the
+  // prompt (`reason ?? command`). Decoded through the app-server schema so a drifted field
+  // name fails here.
+  const decodeCodexApproval = Schema.decodeUnknownSync(
+    CodexSchema.CommandExecutionRequestApprovalParams,
+  );
+  const ESCALATION = decodeCodexApproval({
+    kind: "command",
+    threadId: "01a15f5e-83fb-7043-8e36-58b5b2fe728e",
+    turnId: "01a15f5f-4649-7553-8ebf-3176388c1d9e",
+    itemId: "item-1",
+    approvalId: "d76063e4-e0a2-4c41-a701-56bfdd56c216",
+    startedAtMs: 1792601453371,
+    environmentId: "local",
+    reason:
+      "Allow Git to push this branch to the local remote outside the workspace and set its upstream?",
+    command:
+      "/bin/zsh -lc 'git push --set-upstream origin skycot/upload-this-branch-plain-git-52d1'",
+    cwd: "/work/site",
+    commandActions: [
+      {
+        type: "unknown",
+        command: "git push --set-upstream origin skycot/upload-this-branch-plain-git-52d1",
+      },
+    ],
+    proposedExecpolicyAmendment: [
+      "git",
+      "push",
+      "--set-upstream",
+      "origin",
+      "skycot/upload-this-branch-plain-git-52d1",
+    ],
+  });
+
+  /** What CodexAdapterV2 stores for an approval: the prompt is `reason ?? command`. */
+  const codexAsk = (params: typeof ESCALATION) => [
+    approvalItem("command", params.reason ?? params.command ?? undefined),
+    commandItem(params.command ?? ""),
+  ];
+
+  it.effect("holds a Codex request to leave its sandbox even when the command is harmless", () =>
+    Effect.gen(function* () {
+      const { outcome, dispatched } = yield* run(
+        {
+          thread: thread(
+            "auto-accept-edits",
+            "/work/site",
+            "skycot/upload-this-branch-plain-git-52d1",
+          ),
+          git: { branch: "skycot/upload-this-branch-plain-git-52d1", defaultBranch: "main" },
+          items: codexAsk(ESCALATION),
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(outcome.type, "held");
+      assert.deepEqual(dispatched, []);
+      if (outcome.type === "held") {
+        assert.deepEqual(
+          outcome.evaluation.matches.map((match) => match.rule.id),
+          ["leaves-sandbox"],
+        );
+        assert.equal(outcome.evaluation.risk, "medium");
+        assert.equal(outcome.evaluation.matches[0]!.detail, ESCALATION.reason);
+      }
+      // The same push asked for inside the sandbox (no reason) is still approved.
+      const inside = yield* run(
+        {
+          thread: thread(
+            "auto-accept-edits",
+            "/work/site",
+            "skycot/upload-this-branch-plain-git-52d1",
+          ),
+          git: { branch: "skycot/upload-this-branch-plain-git-52d1", defaultBranch: "main" },
+          items: codexAsk(decodeCodexApproval({ ...ESCALATION, reason: null })),
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(inside.outcome.type, "approved");
+    }),
+  );
+
+  it.effect("holds an escalation that also matches another rule as high", () =>
+    Effect.gen(function* () {
+      const { outcome, dispatched } = yield* run(
+        {
+          items: codexAsk(
+            decodeCodexApproval({ ...ESCALATION, command: "/bin/zsh -lc 'npx vercel --prod'" }),
+          ),
+        },
+        requestEvent(request("command")),
+      );
+      assert.equal(outcome.type, "held");
+      assert.deepEqual(dispatched, []);
+      if (outcome.type === "held") {
+        assert.equal(outcome.evaluation.risk, "high");
+        assert.deepEqual(
+          outcome.evaluation.matches.map((match) => match.rule.id),
+          ["leaves-sandbox", "publishes-or-deploys"],
+        );
+      }
     }),
   );
 });

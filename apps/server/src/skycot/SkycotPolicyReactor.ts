@@ -189,7 +189,7 @@ const make = Effect.gen(function* () {
       return skipped("run no longer active");
     }
     const toolCall = yield* toolCallFor(input.threadId, approval, input.driver);
-    const facts = requestFacts(approval, toolCall);
+    const facts = requestFacts(approval, toolCall, input.driver);
     if (facts === null) return skipped("request kind unknown");
     const projectRoot = yield* projectRootFor(thread);
     const branches = needsBranchContext(facts) ? yield* branchContextFor(thread, projectRoot) : {};

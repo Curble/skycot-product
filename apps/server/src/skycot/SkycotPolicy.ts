@@ -22,7 +22,7 @@ import * as Layer from "effect/Layer";
 
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { filesFromPrompt, type PromptFile } from "@t3tools/skycot-rules/files";
-import type { RuleRequest } from "@t3tools/skycot-rules/rules";
+import { readCommandAsk, type RuleRequest } from "@t3tools/skycot-rules/rules";
 
 import * as RuntimePolicy from "../orchestration-v2/RuntimePolicy.ts";
 
@@ -85,20 +85,33 @@ type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" 
  * The facts the rules need, read from the projection. The approval item's `prompt` is what
  * the provider chose to show (Claude prefers a human title, Codex a reason), so the tool
  * call's own turn item is preferred where it exists: `command_execution.input` is the exact
- * command, `file_change.fileName` the exact path. Anything unreadable stays undefined and
- * the rules hold it.
+ * command, `file_change.fileName` the exact path. A Codex prompt that is not the command is
+ * the reason it gave for leaving its sandbox, which is a hard rule of its own. Anything
+ * unreadable stays undefined and the rules hold it.
  */
 export function requestFacts(
   approval: ApprovalItem,
   toolCall: OrchestrationV2TurnItem | null | undefined,
+  /** The provider that raised the ask, when the approval item does not name it. */
+  driver?: string,
 ): RuleRequest | null {
   switch (approval.requestKind) {
     case "command": {
-      const command =
-        toolCall?.type === "command_execution" && toolCall.input.trim().length > 0
-          ? toolCall.input
-          : approval.prompt;
-      return { kind: "command", command };
+      const ask = readCommandAsk({
+        driver: approval.nativeItemRef?.driver ?? driver,
+        prompt: approval.prompt,
+        toolCallInput: toolCall?.type === "command_execution" ? toolCall.input : undefined,
+      });
+      return {
+        kind: "command",
+        command: ask.command,
+        ...(ask.leavesSandbox
+          ? {
+              leavesSandbox: true,
+              ...(ask.sandboxReason === undefined ? {} : { sandboxReason: ask.sandboxReason }),
+            }
+          : {}),
+      };
     }
     case "file-change":
     case "file-read": {

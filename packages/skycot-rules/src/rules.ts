@@ -23,6 +23,7 @@ export type HardRuleId =
   | "destructive-git"
   | "pushes-to-live"
   | "outside-project"
+  | "leaves-sandbox"
   | "reads-outside-project"
   | "pipes-to-shell"
   | "sends-data-out"
@@ -80,6 +81,12 @@ export const HARD_RULES: ReadonlyArray<HardRule> = [
     title: "Changing or running anything outside this project's folder",
     held: "works outside your project folder",
     risk: "high",
+  },
+  {
+    id: "leaves-sandbox",
+    title: "Stepping outside the assistant's safe area",
+    held: "needs to reach outside the assistant's safe area",
+    risk: "medium",
   },
   {
     id: "sends-data-out",
@@ -628,6 +635,89 @@ export interface RuleRequest {
   readonly command?: string | undefined;
   /** The files for `file-change` / `file-read` requests. */
   readonly files?: ReadonlyArray<RuleFile> | undefined;
+  /** The provider asked to run this command outside its sandbox (see `readCommandAsk`). */
+  readonly leavesSandbox?: boolean | undefined;
+  /** The provider's own words for why, when it gave any. */
+  readonly sandboxReason?: string | undefined;
+}
+
+/** The card's one-line explanation of the sandbox, in words a non-developer can follow. */
+export const SANDBOX_EXPLAINER =
+  "The assistant normally works inside a walled-off area of your Mac. This step needs to reach outside it.";
+
+/**
+ * Adds the "leaves the sandbox" hold to whatever else the command matched. On its own it is a
+ * question (medium); on top of another rule the step is already risky and now unconfined (high).
+ */
+export function withLeavesSandbox(base: RuleEvaluation, detail?: string): RuleEvaluation {
+  return evaluation([
+    {
+      rule: hardRule("leaves-sandbox"),
+      ...(detail === undefined ? {} : { detail }),
+      risk: base.matches.length > 0 ? "high" : "medium",
+    },
+    ...base.matches,
+  ]);
+}
+
+export interface CommandAsk {
+  /** The provider that asked (`codex`, `claudeAgent`, …), from the approval's native item. */
+  readonly driver?: string | null | undefined;
+  /** The approval item's prompt. */
+  readonly prompt?: string | undefined;
+  /** The tool call's own command text, when its item is stored. */
+  readonly toolCallInput?: string | undefined;
+}
+
+export interface CommandAskFacts {
+  /** The command that would run; undefined when nobody can tell. */
+  readonly command: string | undefined;
+  readonly leavesSandbox: boolean;
+  readonly sandboxReason?: string;
+}
+
+function nonEmpty(text: string | undefined): string | undefined {
+  const trimmed = text?.trim();
+  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
+}
+
+/** "Allow Git to push this branch …?": a sentence for a person, not a command line. */
+function looksLikeReason(text: string): boolean {
+  return /\?$/.test(text) || /^[A-Z][a-z]+(\s+[\w'’,.-]+){3,}[.!]?$/.test(text);
+}
+
+/**
+ * Whether a Codex prompt is (part of) the command itself. Codex shows `reason ?? command`, and
+ * a subcommand ask (zsh exec bridge) shows one piece of the script, so any piece of the
+ * command counts as the command. Erring towards "a reason" only costs a question.
+ */
+function promptIsCommand(prompt: string, command: string): boolean {
+  if (command.includes(prompt)) return true;
+  const flat = (text: string) =>
+    normalizeForMatching(unwrapShellWrapper(text)).replace(/\s+/g, " ");
+  return flat(command).includes(flat(prompt));
+}
+
+/**
+ * Reads a command ask the way its provider phrases it. Codex puts the reason in the prompt
+ * only when the command must leave the sandbox (the model's escalation justification, or
+ * "retry without sandbox?" after a sandbox denial); an ordinary ask shows the command itself.
+ * Claude's prompt is a human title and SKYCOT does not run Claude inside its sandbox, so
+ * nothing Claude asks is an escalation.
+ */
+export function readCommandAsk(ask: CommandAsk): CommandAskFacts {
+  const input = nonEmpty(ask.toolCallInput);
+  const prompt = nonEmpty(ask.prompt);
+  if (ask.driver !== "codex") return { command: input ?? prompt, leavesSandbox: false };
+  if (input === undefined) {
+    return prompt !== undefined && looksLikeReason(prompt)
+      ? { command: undefined, leavesSandbox: true, sandboxReason: prompt }
+      : { command: prompt, leavesSandbox: false };
+  }
+  if (prompt === undefined || promptIsCommand(prompt, input)) {
+    return { command: input, leavesSandbox: false };
+  }
+  return { command: input, leavesSandbox: true, sandboxReason: prompt };
 }
 
 /**
@@ -636,12 +726,17 @@ export interface RuleRequest {
  */
 export function evaluateRequest(request: RuleRequest, ctx: RuleContext = {}): RuleEvaluation {
   switch (request.kind) {
-    case "command":
-      return request.command === undefined || request.command.trim().length === 0
-        ? evaluation([
-            { rule: hardRule("destructive-command"), detail: "command text unavailable" },
-          ])
-        : evaluateCommand(request.command, ctx);
+    case "command": {
+      const base =
+        request.command === undefined || request.command.trim().length === 0
+          ? evaluation([
+              { rule: hardRule("destructive-command"), detail: "command text unavailable" },
+            ])
+          : evaluateCommand(request.command, ctx);
+      return request.leavesSandbox === true
+        ? withLeavesSandbox(base, request.sandboxReason ?? request.command)
+        : base;
+    }
     case "file-change":
       return request.files === undefined || request.files.length === 0
         ? evaluation([{ rule: hardRule("outside-project"), detail: "file list unavailable" }])

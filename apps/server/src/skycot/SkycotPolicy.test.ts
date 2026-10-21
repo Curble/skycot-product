@@ -21,6 +21,7 @@ import * as RuntimePolicy from "../orchestration-v2/RuntimePolicy.ts";
 import * as SkycotPolicy from "./SkycotPolicy.ts";
 
 const CODEX = ProviderDriverKind.make("codex");
+const CLAUDE = ProviderDriverKind.make("claudeAgent");
 const projectId = ProjectId.make("project:skycot");
 const modelSelection = {
   instanceId: ProviderInstanceId.make("codex"),
@@ -113,6 +114,7 @@ const now = DateTime.makeUnsafe("2026-10-21T09:00:00.000Z");
 function approval(
   requestKind: "command" | "file-change" | "file-read" | "permission",
   prompt: string | undefined,
+  driver: ProviderDriverKind = CODEX,
 ): Extract<OrchestrationV2TurnItem, { type: "approval_request" }> {
   return {
     id: TurnItemId.make("turn-item:approval"),
@@ -121,7 +123,7 @@ function approval(
     nodeId: "node:approval" as never,
     providerThreadId: null,
     providerTurnId: null,
-    nativeItemRef: { driver: CODEX, nativeId: "item-1", strength: "strong" },
+    nativeItemRef: { driver, nativeId: "item-1", strength: "strong" },
     parentItemId: null,
     ordinal: 1,
     status: "waiting",
@@ -165,9 +167,13 @@ describe("SkycotPolicy.requestFacts", () => {
   it("prefers the exact command over the provider's title", () => {
     assert.deepEqual(
       SkycotPolicy.requestFacts(
-        approval("command", "Remove the old page"),
+        approval("command", "Remove the old page", CLAUDE),
         commandItem("rm book.html"),
       ),
+      { kind: "command", command: "rm book.html" },
+    );
+    assert.deepEqual(
+      SkycotPolicy.requestFacts(approval("command", "rm book.html"), commandItem("rm book.html")),
       { kind: "command", command: "rm book.html" },
     );
     assert.deepEqual(SkycotPolicy.requestFacts(approval("command", "rm book.html"), null), {
@@ -178,6 +184,21 @@ describe("SkycotPolicy.requestFacts", () => {
       kind: "command",
       command: undefined,
     });
+  });
+
+  it("reads a Codex reason in place of the command as a request to leave the sandbox", () => {
+    assert.deepEqual(
+      SkycotPolicy.requestFacts(
+        approval("command", "Allow Git to push this branch outside the workspace?"),
+        commandItem("/bin/zsh -lc 'git push'"),
+      ),
+      {
+        kind: "command",
+        command: "/bin/zsh -lc 'git push'",
+        leavesSandbox: true,
+        sandboxReason: "Allow Git to push this branch outside the workspace?",
+      },
+    );
   });
 
   it("joins the files the prompt names with the tool call's path", () => {

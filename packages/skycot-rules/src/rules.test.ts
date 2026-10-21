@@ -8,6 +8,7 @@ import {
   evaluateFileRead,
   evaluateRequest,
   isDestructiveCommand,
+  readCommandAsk,
   RENAMES_AWAY,
   UNKNOWN_BRANCH_PUSH,
 } from "./rules.ts";
@@ -541,5 +542,109 @@ describe("evaluateCommand — renaming a page away (QA-P2-2-03)", () => {
     "git mv a.css styles/a.css",
   ])("still allows %s", (command) => {
     expect(evaluateCommand(command, { projectRoot: ROOT }).decision).toBe("allow");
+  });
+});
+
+describe("readCommandAsk — a Codex ask to leave the sandbox (N-2)", () => {
+  const PUSH = "/bin/zsh -lc 'git push --set-upstream origin skycot/upload-52d1'";
+  const REASON =
+    "Allow Git to push this branch to the local remote outside the workspace and set its upstream?";
+
+  it("reads an ordinary Codex ask (the prompt is the command) as staying inside", () => {
+    expect(readCommandAsk({ driver: "codex", prompt: PUSH, toolCallInput: PUSH })).toEqual({
+      command: PUSH,
+      leavesSandbox: false,
+    });
+    // A zsh-bridge subcommand ask shows one piece of the script.
+    expect(
+      readCommandAsk({
+        driver: "codex",
+        prompt: "git push",
+        toolCallInput: "/bin/zsh -lc 'cd site && git push'",
+      }).leavesSandbox,
+    ).toBe(false);
+    expect(readCommandAsk({ driver: "codex", toolCallInput: PUSH }).leavesSandbox).toBe(false);
+  });
+
+  it("reads a Codex prompt that is a reason as an escalation and keeps the real command", () => {
+    expect(readCommandAsk({ driver: "codex", prompt: REASON, toolCallInput: PUSH })).toEqual({
+      command: PUSH,
+      leavesSandbox: true,
+      sandboxReason: REASON,
+    });
+    expect(
+      readCommandAsk({
+        driver: "codex",
+        prompt: "command failed; retry without sandbox?",
+        toolCallInput: "/bin/zsh -lc 'npm install'",
+      }).leavesSandbox,
+    ).toBe(true);
+  });
+
+  it("holds a reason whose command is not stored yet, and never guesses the command from it", () => {
+    expect(readCommandAsk({ driver: "codex", prompt: REASON })).toEqual({
+      command: undefined,
+      leavesSandbox: true,
+      sandboxReason: REASON,
+    });
+    expect(readCommandAsk({ driver: "codex", prompt: "git status" })).toEqual({
+      command: "git status",
+      leavesSandbox: false,
+    });
+  });
+
+  it("never treats Claude's human title as an escalation", () => {
+    expect(
+      readCommandAsk({
+        driver: "claudeAgent",
+        prompt: "Run the checks",
+        toolCallInput: "pnpm test",
+      }),
+    ).toEqual({ command: "pnpm test", leavesSandbox: false });
+  });
+});
+
+describe("evaluateRequest — leaving the sandbox is a hard rule (N-2)", () => {
+  it("is listed with the other hard rules", () => {
+    expect(HARD_RULES.find((rule) => rule.id === "leaves-sandbox")?.title).toBe(
+      "Stepping outside the assistant's safe area",
+    );
+  });
+
+  it("holds an otherwise harmless command as medium, never allows it", () => {
+    const result = evaluateRequest(
+      {
+        kind: "command",
+        command: "git push --set-upstream origin skycot/x",
+        leavesSandbox: true,
+        sandboxReason: "Allow Git to push?",
+      },
+      { projectRoot: ROOT, currentBranch: "skycot/x", defaultBranch: "main" },
+    );
+    expect(result.decision).toBe("hold");
+    expect(result.risk).toBe("medium");
+    expect(result.matches.map((m) => m.rule.id)).toEqual(["leaves-sandbox"]);
+    expect(result.matches[0]!.detail).toBe("Allow Git to push?");
+  });
+
+  it("is high when the command also matches another rule", () => {
+    const result = evaluateRequest(
+      { kind: "command", command: "cat ~/Documents/notes.txt", leavesSandbox: true },
+      { projectRoot: ROOT },
+    );
+    expect(result.risk).toBe("high");
+    expect(result.matches.map((m) => m.rule.id)).toEqual([
+      "leaves-sandbox",
+      "reads-outside-project",
+    ]);
+    expect(describeMatches(result.matches)).toBe(
+      "needs to reach outside the assistant's safe area and reads a file outside your project",
+    );
+  });
+
+  it("holds an escalation whose command nobody can read", () => {
+    const result = evaluateRequest({ kind: "command", leavesSandbox: true, sandboxReason: "Why?" });
+    expect(result.decision).toBe("hold");
+    expect(result.matches[0]!.rule.id).toBe("leaves-sandbox");
   });
 });
