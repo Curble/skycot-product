@@ -1,0 +1,470 @@
+// The Apple-Pay-sheet style "May I…?" card for approval_request,
+// user_input_request and secret_request. Everything it says comes from
+// plain/approvals `describeRuntimeRequest`; this file only lays it out, builds
+// the question form, and sends the chosen option's real payload. Nothing is
+// pre-selected: every button is the same weight and none has focus.
+import { useAtomValue } from "@effect/atom-react";
+import type { OrchestrationV2RuntimeRequest, OrchestrationV2TurnItem } from "@t3tools/contracts";
+import {
+  CircleHelp,
+  KeyRound,
+  type LucideIcon,
+  ShieldAlert,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
+import { useId, useState } from "react";
+
+import {
+  type ApprovalCard,
+  type ApprovalOption,
+  type ApprovalRisk,
+  describeRuntimeRequest,
+} from "../../../plain/approvals";
+import { projectAtomOrEmpty } from "../../../state/projects";
+import { Banner } from "../../../ui/Banner";
+import { Bubble } from "../../../ui/Bubble";
+import { Button } from "../../../ui/Button";
+import { Card, CardBody, CardFooter, CardHeader, type CardIconTone } from "../../../ui/Card";
+import { Disclosure } from "./Disclosure";
+import { type DispatchDecision, useDecisionDispatcher } from "./dispatch";
+import { InlineReply } from "./InlineReply";
+import type { TimelineRenderContext } from "./registry";
+import { shortTime } from "./time";
+
+type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
+type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
+type SecretItem = Extract<OrchestrationV2TurnItem, { type: "secret_request" }>;
+export type RequestItem = ApprovalItem | QuestionItem | SecretItem;
+
+const PENDING_ITEM_STATUS = new Set<OrchestrationV2TurnItem["status"]>([
+  "idle",
+  "pending",
+  "running",
+  "waiting",
+]);
+
+function riskTone(risk: ApprovalRisk): CardIconTone {
+  switch (risk) {
+    case "low":
+      return "blue";
+    case "medium":
+      return "orange";
+    case "high":
+    case "blocked":
+      return "red";
+  }
+}
+
+function iconFor(item: RequestItem, risk: ApprovalRisk): LucideIcon {
+  if (item.type === "user_input_request") return CircleHelp;
+  if (item.type === "secret_request") return KeyRound;
+  return risk === "low" ? ShieldCheck : risk === "medium" ? ShieldAlert : TriangleAlert;
+}
+
+function capitalize(text: string): string {
+  return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
+}
+
+/** "You allowed this once · 8:42" once the request is settled; null while it waits. */
+function decidedLine(
+  item: RequestItem,
+  request: OrchestrationV2RuntimeRequest | undefined,
+): string | null {
+  const when = shortTime(request?.resolvedAt ?? item.completedAt ?? null);
+  const stamp = when ? ` · ${when}` : "";
+  if (item.type === "secret_request") {
+    switch (item.secretStatus) {
+      case "saved":
+        return `Saved securely${stamp}`;
+      case "declined":
+        return `You chose not to share it${stamp}`;
+      case "cancelled":
+        return `No longer needed${stamp}`;
+      default:
+        return null;
+    }
+  }
+  const pending = request ? request.status === "pending" : PENDING_ITEM_STATUS.has(item.status);
+  if (pending) return null;
+  if (item.type === "approval_request") {
+    switch (request?.decision) {
+      case "accept":
+        return `You allowed this once${stamp}`;
+      case "acceptForSession":
+        return `You allowed this for the rest of the conversation${stamp}`;
+      case "acceptAlways":
+        return `You allowed this for the whole project${stamp}`;
+      case "decline":
+        return `You said no${stamp}`;
+      case "cancel":
+        return `You stopped the assistant${stamp}`;
+      default:
+        return `No longer needed${stamp}`;
+    }
+  }
+  if (request?.answers !== undefined) return `You answered${stamp}`;
+  if (request?.status === "resolved" || item.status === "completed")
+    return `You skipped this${stamp}`;
+  return `No longer needed${stamp}`;
+}
+
+/** Apple order: the refusal sits left, the allows follow; a hard stop goes last. */
+const BUTTON_ORDER: Record<string, number> = {
+  decline: 0,
+  skip: 0,
+  accept: 1,
+  answer: 1,
+  save: 1,
+  message: 1,
+  acceptForSession: 2,
+  acceptAlways: 3,
+  cancel: 4,
+  interrupt: 4,
+};
+
+function orderOptions(options: ReadonlyArray<ApprovalOption>): Array<ApprovalOption> {
+  return [...options].sort((a, b) => (BUTTON_ORDER[a.id] ?? 9) - (BUTTON_ORDER[b.id] ?? 9));
+}
+
+export function RequestCard({
+  item,
+  context,
+}: {
+  readonly item: RequestItem;
+  readonly context: TimelineRenderContext;
+}) {
+  const { projection, environmentId, threadId, shell, projectName } = context;
+  const project = useAtomValue(
+    projectAtomOrEmpty({ environmentId, projectId: shell?.projectId ?? null }),
+  );
+  const request =
+    item.type === "secret_request"
+      ? undefined
+      : projection.runtimeRequests.find((r) => r.id === item.requestId);
+  const card = describeRuntimeRequest(item, {
+    ...(projectName === null ? {} : { projectName }),
+    ...(project ? { projectRoot: project.workspaceRoot } : {}),
+    ...(request ? { responseCapability: request.responseCapability.type } : {}),
+    ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
+  });
+  const decided = decidedLine(item, request);
+  const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const choose = async (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => {
+    setBusyId(option.id);
+    setProblem(null);
+    const result = await dispatch(option.decision, extras);
+    setBusyId(null);
+    if (result !== null) setProblem(result);
+  };
+
+  const tone = riskTone(card.risk);
+  const Icon = iconFor(item, card.risk);
+  const classes = [
+    "fm-approval",
+    `fm-approval--${card.risk}`,
+    decided ? "fm-approval--decided" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <Bubble
+      author="crew"
+      full
+      meta={decided ? undefined : shortTime(item.startedAt ?? item.updatedAt)}
+    >
+      <div className={classes}>
+        <Card label={card.title}>
+          <CardHeader
+            icon={Icon}
+            tone={decided ? "grey" : tone}
+            title={card.title}
+            subtitle={decided ?? "Waiting for you · nothing is pre-selected"}
+          />
+          <CardBody>
+            <p className="fm-approval__what">{card.whatItWants}</p>
+            {decided ? null : (
+              <dl className="fm-kv">
+                <dt>Why it matters</dt>
+                <dd>{card.whyItMatters}</dd>
+                <dt>Where it reaches</dt>
+                <dd>
+                  <b>{capitalize(card.scope)}.</b> {card.scopeExplainer}
+                </dd>
+                {card.sizeOrCost ? (
+                  <>
+                    <dt>Size or cost</dt>
+                    <dd>{card.sizeOrCost}</dd>
+                  </>
+                ) : null}
+                <dt>If you say no</dt>
+                <dd>{card.ifYouSayNo}</dd>
+              </dl>
+            )}
+            {card.warning && !decided ? (
+              <p className="fm-approval__warning" role="alert">
+                <TriangleAlert size={14} strokeWidth={2} aria-hidden />
+                <span>{card.warning}</span>
+              </p>
+            ) : null}
+            {decided ? null : item.type === "user_input_request" ? (
+              <QuestionForm item={item} card={card} busy={busyId !== null} onChoose={choose} />
+            ) : item.type === "secret_request" ? (
+              <SecretForm item={item} card={card} busyId={busyId} onChoose={choose} />
+            ) : null}
+            {problem ? (
+              <div className="fm-card__problem">
+                <Banner tone="warning">{problem}</Banner>
+              </div>
+            ) : null}
+            <Disclosure>
+              <pre className="fm-details__pre">
+                <code>{card.technical}</code>
+              </pre>
+            </Disclosure>
+          </CardBody>
+          {decided || item.type !== "approval_request" ? null : (
+            <CardFooter>
+              <div className="fm-approval__actions">
+                {orderOptions(card.options).map((option) => (
+                  <Button
+                    key={option.id}
+                    size="md"
+                    variant={option.tone === "danger" ? "destructive" : "secondary"}
+                    disabled={busyId !== null}
+                    title={option.warning}
+                    onClick={() => void choose(option)}
+                  >
+                    {busyId === option.id ? "Sending…" : option.label}
+                  </Button>
+                ))}
+              </div>
+            </CardFooter>
+          )}
+        </Card>
+      </div>
+    </Bubble>
+  );
+}
+
+interface DraftAnswer {
+  readonly selected: ReadonlyArray<string>;
+  readonly custom: string;
+}
+
+function QuestionForm({
+  item,
+  card,
+  busy,
+  onChoose,
+}: {
+  readonly item: QuestionItem;
+  readonly card: ApprovalCard;
+  readonly busy: boolean;
+  readonly onChoose: (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => void;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, DraftAnswer>>({});
+  const answerOption = card.options.find((o) => o.id === "answer");
+  const skipOption = card.options.find((o) => o.id === "skip");
+  const messageOption = card.options.find((o) => o.id === "message");
+
+  if (card.answerByMessage && messageOption) {
+    return (
+      <div className="fm-question">
+        {item.questions.map((question) => (
+          <div key={question.id} className="fm-question__block">
+            <span className="fm-question__header">{question.header}</span>
+            <p className="fm-question__text">{question.question}</p>
+          </div>
+        ))}
+        <InlineReply
+          label="Your answer"
+          placeholder="Type your answer…"
+          sendLabel={messageOption.label}
+          busy={busy}
+          autoFocus={false}
+          onSend={(text) => onChoose(messageOption, { text })}
+        />
+      </div>
+    );
+  }
+
+  const draftFor = (id: string): DraftAnswer => drafts[id] ?? { selected: [], custom: "" };
+  const valueFor = (
+    question: QuestionItem["questions"][number],
+  ): string | ReadonlyArray<string> | null => {
+    const draft = draftFor(question.id);
+    const custom = question.allowCustomAnswer === false ? "" : draft.custom.trim();
+    if (custom.length > 0) return custom;
+    if (draft.selected.length === 0) return null;
+    return question.multiSelect ? draft.selected : draft.selected[0]!;
+  };
+  const complete = item.questions.every(
+    (question) => question.required === false || valueFor(question) !== null,
+  );
+  const answers = Object.fromEntries(
+    item.questions
+      .map((question) => [question.id, valueFor(question)] as const)
+      .filter(
+        (entry): entry is readonly [string, string | ReadonlyArray<string>] => entry[1] !== null,
+      ),
+  );
+
+  return (
+    <div className="fm-question">
+      {item.questions.map((question) => {
+        const draft = draftFor(question.id);
+        const chosen = question.options.filter((o) => draft.selected.includes(o.value ?? o.label));
+        return (
+          <fieldset key={question.id} className="fm-question__block">
+            <legend className="fm-question__header">{question.header}</legend>
+            <p className="fm-question__text">{question.question}</p>
+            {question.options.length > 0 ? (
+              <div className="fm-chips" role="group" aria-label={question.header}>
+                {question.options.map((option) => {
+                  const value = option.value ?? option.label;
+                  const on = draft.selected.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`fm-chip${on ? " fm-chip--on" : ""}`}
+                      aria-pressed={on}
+                      disabled={busy}
+                      onClick={() =>
+                        setDrafts((prev) => ({
+                          ...prev,
+                          [question.id]: {
+                            ...draftFor(question.id),
+                            selected: question.multiSelect
+                              ? on
+                                ? draft.selected.filter((v) => v !== value)
+                                : [...draft.selected, value]
+                              : on
+                                ? []
+                                : [value],
+                          },
+                        }))
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            {chosen.length > 0 ? (
+              <p className="fm-question__description">
+                {chosen.map((o) => o.description).join(" · ")}
+              </p>
+            ) : null}
+            {question.allowCustomAnswer === false ? null : (
+              <textarea
+                className="fm-question__custom"
+                rows={2}
+                placeholder={
+                  question.options.length > 0 ? "Or type your own answer…" : "Type your answer…"
+                }
+                value={draft.custom}
+                disabled={busy}
+                aria-label={`Your own answer to: ${question.header}`}
+                onChange={(event) =>
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [question.id]: { ...draftFor(question.id), custom: event.currentTarget.value },
+                  }))
+                }
+              />
+            )}
+          </fieldset>
+        );
+      })}
+      <div className="fm-approval__actions">
+        {skipOption ? (
+          <Button disabled={busy} onClick={() => onChoose(skipOption)}>
+            {skipOption.label}
+          </Button>
+        ) : null}
+        {answerOption ? (
+          <Button
+            variant={complete ? "primary" : "secondary"}
+            disabled={busy || !complete}
+            onClick={() => onChoose(answerOption, { answers })}
+          >
+            {busy ? "Sending…" : answerOption.label}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SecretForm({
+  item,
+  card,
+  busyId,
+  onChoose,
+}: {
+  readonly item: SecretItem;
+  readonly card: ApprovalCard;
+  readonly busyId: string | null;
+  readonly onChoose: (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => void;
+}) {
+  const id = useId();
+  const [secret, setSecret] = useState("");
+  const save = card.options.find((o) => o.id === "save");
+  const decline = card.options.find((o) => o.id === "decline");
+  const canSave = secret.trim().length > 0 && busyId === null;
+  const submit = () => {
+    if (!save || !canSave) return;
+    // The value goes straight to the secrets RPC; the plain layer never sees it.
+    onChoose(save, { secret });
+    setSecret("");
+  };
+  return (
+    <form
+      className="fm-secret"
+      autoComplete="off"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <label htmlFor={id} className="fm-field-label">
+        {item.label}
+      </label>
+      <input
+        id={id}
+        className="fm-field fm-field--mono"
+        type="password"
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder={item.placeholder ?? "Paste the key here"}
+        value={secret}
+        disabled={busyId !== null}
+        onChange={(event) => setSecret(event.currentTarget.value)}
+      />
+      <p className="fm-secret__note">
+        Stored only on this Mac and handed to the assistant once. It never appears in the chat.
+      </p>
+      <div className="fm-approval__actions">
+        {decline ? (
+          <Button type="button" disabled={busyId !== null} onClick={() => onChoose(decline)}>
+            {busyId === "decline" ? "Sending…" : decline.label}
+          </Button>
+        ) : null}
+        {save ? (
+          <Button type="submit" variant={canSave ? "primary" : "secondary"} disabled={!canSave}>
+            {busyId === "save" ? "Saving…" : save.label}
+          </Button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
