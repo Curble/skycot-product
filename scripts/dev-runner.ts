@@ -71,6 +71,7 @@ const MODE_ARGS = {
     "run",
     "--filter=@t3tools/contracts",
     "--filter=@t3tools/web",
+    "--filter=@t3tools/nondev",
     "--filter=t3",
     "--parallel",
     "dev",

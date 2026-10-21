@@ -95,6 +95,15 @@ const buildCmd = Command.make(
       } else {
         yield* Effect.logWarning("[cli] Web dist not found — skipping client bundle.");
       }
+
+      // Fork seam (SEAM-MANIFEST.md): the non-developer client ships beside the
+      // stock UI and is served at /simple/ by the static handler's subdirectory
+      // index resolution.
+      const nondevDist = path.join(repoRoot, "apps/nondev/dist");
+      if (yield* fs.exists(nondevDist)) {
+        yield* fs.copy(nondevDist, path.join(clientTarget, "simple"));
+        yield* Effect.log("[cli] Bundled nondev app into dist/client/simple");
+      }
     }),
 ).pipe(Command.withDescription("Build the server package (tsdown + bundle web client)."));
 
