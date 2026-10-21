@@ -1,0 +1,34 @@
+# Illustrative diff for seams L-1 and L-3 (see README.md in this folder).
+# NOT applied. Line numbers follow upstream 3e250a8387 and will drift; apply by hand
+# and keep the `// nondev-seam:` markers so `nondev/scripts/check-seams.ts` can track them.
+# Also add the three new rows to SEAM-MANIFEST.md when applying.
+
+--- a/scripts/build-desktop-artifact.ts
++++ b/scripts/build-desktop-artifact.ts
+@@ export const DESKTOP_EXTRA_RESOURCES = [
+   {
+     from: "apps/desktop/prod-resources/resource-monitor",
+     to: "resource-monitor",
+   },
++  // nondev-seam: L-1 — the MIT notice must travel with every copy of the app.
++  { from: "LICENSE", to: "LICENSE" },
++  { from: "NOTICE", to: "NOTICE" },
+ ] as const;
+
+@@ if (Object.keys(stagePatchedDependencies).length > 0) {
+     yield* fs.copy(path.join(repoRoot, "patches"), path.join(stageAppDir, "patches"));
+   }
++  // nondev-seam: L-1 — staged into the project dir so the extraResources entries above resolve.
++  for (const noticeFile of ["LICENSE", "NOTICE"]) {
++    yield* fs.copy(path.join(repoRoot, noticeFile), path.join(stageAppDir, noticeFile));
++  }
+
+--- a/apps/web/vite.config.ts
++++ b/apps/web/vite.config.ts
+@@ thirdPartyLicensesPlugin({
+         packageManifests: [
+           { bundle: "web", path: new URL("./package.json", import.meta.url) },
++          { bundle: "web", path: new URL("../nondev/package.json", import.meta.url) }, // nondev-seam: L-3
+           { bundle: "server", path: new URL("../server/package.json", import.meta.url) },
+           { bundle: "desktop", path: new URL("../desktop/package.json", import.meta.url) },
+         ],

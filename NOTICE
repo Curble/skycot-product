@@ -1,0 +1,25 @@
+SKYCOT
+Copyright (c) 2026 SKYCOT (Mark Hallam), Melbourne, Australia
+https://www.skycot.com
+
+SKYCOT is based on T3 Code.
+
+    T3 Code
+    Copyright (c) 2026 T3 Tools Inc.
+    Licensed under the MIT License.
+    Source: https://github.com/pingdotgg/t3code
+
+The full MIT License text, which applies to the T3 Code portions of this
+software and must accompany every copy or substantial portion of it, is in
+the file LICENSE next to this one. In the application it is reproduced under
+Settings > About > "Based on T3 Code".
+
+SKYCOT is an independent product. It is not affiliated with, endorsed by or
+sponsored by T3 Tools Inc. "T3", "T3 Code", "T3 Tools" and "t3.codes" are
+names and marks of T3 Tools Inc. and are used here only to identify the
+software this product is based on.
+
+Third-party open-source components are listed, with their licence texts, in
+the application under Settings > About > "Open-source licences" (the
+third-party-licenses.json manifest generated at build time from
+third-party-licenses.config.json).
