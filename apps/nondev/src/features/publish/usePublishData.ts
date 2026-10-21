@@ -32,6 +32,8 @@ import {
   githubConnection,
   latestTurnCount,
   pickPullRequestLink,
+  uploadedTurnCount,
+  uploadReversesOnline,
   uploadStillCurrent,
   type CheckRun,
   type GitHubConnection,
@@ -56,6 +58,13 @@ export interface PublishData {
   readonly linkRef: PullRequestRef | null;
   readonly detail: PullRequestDetail | null;
   readonly changes: WhatChanged | null;
+  /**
+   * What the next upload carries relative to the online copy, when this
+   * conversation was uploaded before and has moved on since. Null otherwise.
+   */
+  readonly sinceUpload: WhatChanged | null;
+  /** The next upload puts something back to how it was before the conversation. */
+  readonly reversesOnline: boolean;
   /** False when `changes` came from the working tree, which cannot tell added from deleted. */
   readonly operationsKnown: boolean;
   readonly changesPending: boolean;
@@ -142,6 +151,20 @@ export function usePublishData(input: {
 
   const kept = useKeptVersions(threadId);
   const lastUpload = useLastUpload(threadId);
+  // After an upload, the online copy is the baseline: the conversation's net
+  // diff can be empty while the upload reverses what is online (QA-P2-3-05).
+  const uploadedTurn = projection
+    ? uploadedTurnCount(projection.checkpoints, projection.runs, lastUpload?.at ?? null)
+    : null;
+  const sinceUploadQuery = useEnvironmentQuery(
+    input.wantChanges && uploadedTurn !== null && turnCount !== null && uploadedTurn < turnCount
+      ? orchestrationEnvironment.turnDiff({
+          environmentId,
+          input: { threadId, fromTurnCount: uploadedTurn, toTurnCount: turnCount },
+        })
+      : null,
+  );
+  const sinceUpload = changesFromDiff(sinceUploadQuery.data?.diff ?? null);
   const rolledBackRuns = new Set(
     (projection?.runs ?? []).filter((run) => run.status === "rolled_back").map((run) => run.id),
   );
@@ -180,6 +203,8 @@ export function usePublishData(input: {
     linkRef,
     detail: detailQuery.data ?? null,
     changes,
+    sinceUpload,
+    reversesOnline: uploadReversesOnline(sinceUpload, fromDiff),
     operationsKnown: fromDiff !== null,
     changesPending: diffQuery.isPending && changes === null,
     outsideConversation: fromDiff === null ? [] : filesOutsideConversation(vcs, fromDiff),

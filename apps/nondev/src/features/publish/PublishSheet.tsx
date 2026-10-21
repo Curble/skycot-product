@@ -197,7 +197,8 @@ function PublishSheetBody({
 
   const safety = buildSafetyCheck({
     changes: {
-      conversation: data.changes,
+      // After an upload, count what this upload changes on the online copy.
+      conversation: data.sinceUpload ?? data.changes,
       outsideConversation: data.outsideConversation,
       pending: data.changesPending,
     },
@@ -410,7 +411,8 @@ function PublishSheetBody({
       description="Nothing leaves your Mac until you press a button below. Each step is one plain question."
       initialFocus="body"
       dismissOnBackdrop={!busy}
-      sober={confirmingLive || phase === "code"}
+      // Every confirm is a plain, sober surface: what goes online is never a sketch.
+      sober={phase === "confirm" || phase === "code"}
       actions={actions}
       note={phase === "confirm" && choice === "live" ? copy.git.neverPushLive : undefined}
     >
@@ -532,8 +534,14 @@ function PublishSheetBody({
             }}
           >
             <p className="fm-pub-help">
-              {choice === "live" ? "Putting it live" : "Sending for review"} needs a parent&apos;s
-              OK while the {familyCopy.title} is on.
+              {choice === "live"
+                ? "Putting it live"
+                : review.kind === "keep"
+                  ? "Keeping a version"
+                  : review.kind === "review" && review.opensReview
+                    ? "Sending for review"
+                    : "Uploading a draft line"}{" "}
+              needs a parent&apos;s OK while the {familyCopy.title} is on.
             </p>
             <ParentCodeEntry entry={codeEntry} autoFocus />
           </StepGroup>
@@ -824,11 +832,13 @@ function ConfirmBody({
   const pendingFiles = data.vcs?.workingTree.files.length ?? 0;
   const wholeConversation = data.turnsWithChanges > 1 && data.operationsKnown;
   const changed =
-    data.vcs?.hasWorkingTreeChanges && data.changes && pendingFiles < data.changes.counts.files
-      ? `${pendingFiles} ${pendingFiles === 1 ? "file" : "files"} not yet kept (the rest of this conversation's changes were kept earlier).`
-      : data.changes
-        ? `${data.changes.summary}${wholeConversation ? " That counts every change in this conversation, so the numbers can differ from the latest What-changed card, which shows one step." : ""}`
-        : "The files from this conversation.";
+    choice === "review" && data.sinceUpload !== null
+      ? `${data.sinceUpload.summary.replace(/\.$/, "")} since the last upload${data.reversesOnline ? " — this reverses what's online" : ""}.`
+      : data.vcs?.hasWorkingTreeChanges && data.changes && pendingFiles < data.changes.counts.files
+        ? `${pendingFiles} ${pendingFiles === 1 ? "file" : "files"} not yet kept (the rest of this conversation's changes were kept earlier).`
+        : data.changes
+          ? `${data.changes.summary}${wholeConversation ? " That counts every change in this conversation, so the numbers can differ from the latest What-changed card, which shows one step." : ""}`
+          : "The files from this conversation.";
   const reversal =
     data.reversedKept.length > 0 ? (
       <p className="fm-pub-reversal">

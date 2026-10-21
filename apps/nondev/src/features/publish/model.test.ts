@@ -19,8 +19,11 @@ import {
   resolveLiveChoice,
   resolveReviewChoice,
   latestTurnCount,
+  uploadedTurnCount,
+  uploadReversesOnline,
   uploadStillCurrent,
 } from "./model";
+import { checkpoint as checkpointFixture } from "../../plain/fixtures.test-helpers";
 import { describeTurnDiff } from "../../plain/changes";
 
 function vcs(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
@@ -381,5 +384,40 @@ describe("describePublishStatus after an upload", () => {
     expect(describePublishStatus({ link: null, hasSomethingToPublish: true })?.advanced).toMatch(
       /^Advanced:/,
     );
+  });
+});
+
+describe("measuring an upload against the online copy (QA-P2-3-05)", () => {
+  const edit = (path: string) =>
+    describeTurnDiff(
+      `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-a\n+b\n`,
+    );
+
+  it("finds the turn the last upload carried", () => {
+    const checkpoints = [
+      checkpointFixture({
+        id: "c1",
+        runId: "run-1",
+        appRunOrdinal: 1,
+        capturedAt: "2026-10-21T09:00:00.000Z",
+      }),
+      checkpointFixture({
+        id: "c2",
+        runId: "run-2",
+        appRunOrdinal: 2,
+        capturedAt: "2026-10-21T09:10:00.000Z",
+      }),
+    ];
+    expect(uploadedTurnCount(checkpoints, [], "2026-10-21T09:05:00.000Z")).toBe(1);
+    expect(uploadedTurnCount(checkpoints, [], "2026-10-21T09:20:00.000Z")).toBe(2);
+    expect(uploadedTurnCount(checkpoints, [], null)).toBeNull();
+    expect(uploadedTurnCount(checkpoints, [], "2026-10-21T08:00:00.000Z")).toBeNull();
+  });
+
+  it("says the upload reverses what's online when the conversation nets to nothing", () => {
+    const sinceUpload = edit("index.html");
+    expect(uploadReversesOnline(sinceUpload, describeTurnDiff(""))).toBe(true);
+    expect(uploadReversesOnline(sinceUpload, edit("index.html"))).toBe(false);
+    expect(uploadReversesOnline(null, describeTurnDiff(""))).toBe(false);
   });
 });

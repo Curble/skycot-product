@@ -11,6 +11,7 @@ import type {
   ThreadPullRequestLink,
   VcsStatusResult,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 
 import {
   describeChanges,
@@ -250,6 +251,48 @@ export function latestTurnCount(
     if (max === null || checkpoint.appRunOrdinal > max) max = checkpoint.appRunOrdinal;
   }
   return max;
+}
+
+/**
+ * The turn the last upload carried: the newest standing checkpoint captured
+ * before it. Null without an upload, or when the upload predates every turn.
+ */
+export function uploadedTurnCount(
+  checkpoints: ReadonlyArray<OrchestrationV2Checkpoint>,
+  runs: ReadonlyArray<Pick<OrchestrationV2Run, "id" | "status">>,
+  uploadAt: string | null,
+): number | null {
+  if (uploadAt === null) return null;
+  const at = Date.parse(uploadAt);
+  if (Number.isNaN(at)) return null;
+  const rolledBack = new Set(
+    runs.filter((run) => run.status === "rolled_back").map((run) => run.id),
+  );
+  let max: number | null = null;
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.appRunOrdinal === null) continue;
+    if (checkpoint.runId !== null && rolledBack.has(checkpoint.runId)) continue;
+    if (DateTime.toEpochMillis(checkpoint.capturedAt) > at) continue;
+    if (max === null || checkpoint.appRunOrdinal > max) max = checkpoint.appRunOrdinal;
+  }
+  return max;
+}
+
+/**
+ * True when the upload puts a file back to how it was before the conversation:
+ * the online copy has the change, the conversation as a whole no longer does.
+ */
+export function uploadReversesOnline(
+  sinceUpload: WhatChanged | null,
+  conversation: WhatChanged | null,
+): boolean {
+  if (sinceUpload === null || conversation === null) return false;
+  const stillChanged = new Set(
+    conversation.groups.flatMap((group) => group.files.map((file) => file.path)),
+  );
+  return sinceUpload.groups.some((group) =>
+    group.files.some((file) => !stillChanged.has(file.path)),
+  );
 }
 
 export function changesFromDiff(diff: string | null): WhatChanged | null {
