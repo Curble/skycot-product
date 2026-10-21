@@ -19,6 +19,10 @@
     "./decision": {
       "types": "./src/decision.ts",
       "import": "./src/decision.ts"
+    },
+    "./family": {
+      "types": "./src/family.ts",
+      "import": "./src/family.ts"
     }
   },
   "scripts": {
