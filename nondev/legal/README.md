@@ -1,11 +1,18 @@
-# nondev/legal — compliance seams the fork still needs
+# nondev/legal — compliance seams the fork needs
 
 The analysis, attribution text, privacy notes and go-live checklist are in `docs/legal/`. This
-folder records the **engineering changes to upstream files** that the licensing work needs but
-could not make itself (upstream files are owned by the seam process in `SEAM-MANIFEST.md`). Each
-one is a small appended change in the style of the existing `// nondev-seam:` markers.
+folder records the **engineering changes to upstream files** that the licensing work needs. Each
+one is a small appended change in the style of the existing `// nondev-seam:` markers and has a
+row in `SEAM-MANIFEST.md` ("Legal and security seams").
+
+**Status, 21 October 2026:** L-1, L-2 and L-5 are applied (see each section). L-3 is the only
+one still open — it lives in `apps/nondev/` and `apps/web/vite.config.ts`, which this pass did not
+own. L-4 is closed by a stronger measure than the one proposed here: the engine's own default is
+now off (`telemetry-default-off`), and `nondev/bin/skycot.cjs` is the supported CLI entry.
 
 ## Seam L-1: ship `LICENSE` and `NOTICE` inside the desktop bundle
+
+**Applied** (seam `L-1`, both spots, `scripts/build-desktop-artifact.ts`). The `.deb` copyright path (item 3) is left as upstream has it.
 
 **Why.** MIT requires the notice "in all copies or substantial portions of the Software". The
 desktop build stages a fresh directory (`stageAppDir`) with a synthesized `package.json`
@@ -46,12 +53,16 @@ numbers drift with upstream, apply by hand).
 
 ## Seam L-2: `LICENSE` and `NOTICE` in the CLI archive and npm launcher
 
+**Applied** (seams `L-2a` in `scripts/build-cli-archive.ts`, `L-2b` in `scripts/build-npm-launcher.ts`; the npm `files` list names both files, and a scratch build of the launcher showed them in the tarball).
+
 `scripts/build-cli-archive.ts` and `scripts/build-npm-launcher.ts` package the server binary and
 launcher without a licence file (`build-npm-launcher.ts` only copies the `license` field). Add the
 two files to each archive the same way. Until then, the npm package metadata says MIT but ships no
 notice text.
 
 ## Seam L-3: make the licence pipeline aware of `apps/nondev`
+
+**Open — needs the conductor** (`apps/web/vite.config.ts` and `apps/nondev/package.json` are outside this pass's ownership). One line; see below.
 
 `apps/web/vite.config.ts` lists the root manifests the third-party-notice generator walks (`web`,
 `server`, `desktop`). Add:
@@ -66,6 +77,8 @@ strict build on a missing notice, which is the behaviour we want.
 
 ## Seam L-4: analytics can never fall back to upstream's PostHog
 
+**Closed by a stronger measure**: seam `telemetry-default-off` in `AnalyticsService.ts` makes the engine default to off even when `env.cjs` is not loaded (env override still works; pinned by `telemetry-default-off-test`), and `nondev/bin/skycot.cjs` is the supported CLI entry point. The release smoke test below still applies.
+
 `apps/server/src/telemetry/AnalyticsService.ts` defaults to enabled with T3's key and
 `https://ingest.t3.codes`. `nondev/brand/env.cjs` turns it off, but only when loaded. Every SKYCOT
 entry point must load it: the desktop does (`boot.ts`); the CLI archive and npm launcher must spawn
@@ -74,6 +87,8 @@ variables at build time). Release smoke test: run the packaged CLI on a clean ma
 network capture and confirm no request to `ingest.t3.codes`.
 
 ## Seam L-5: CLI self-update feed
+
+**Applied** as seam `brand-cli-update-repo`, reading `T3CODE_CLI_UPDATE_REPOSITORY` (set by `env.cjs` to `brand.updateRepository`, which `apply-brand.ts` requires to equal the git origin, `mark-hallam/skycot-product`). It covers both the `update` command's release index and the default download base URL.
 
 `packages/shared/src/cliRelease.ts` hard-codes `pingdotgg/t3code` as the release repository for
 the `update` command. A SKYCOT CLI would update itself into T3's binary. Read the repository from

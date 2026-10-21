@@ -483,6 +483,10 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
 
   yield* Effect.log(`[cli-archive] Staging ${stem}...`);
   yield* fs.copyFile(builtExecutable, path.join(contentDir, executableName));
+  // nondev-seam: L-2 — the MIT notice must travel with every copy of the CLI.
+  for (const noticeFile of ["LICENSE", "NOTICE"]) {
+    yield* fs.copyFile(path.join(repoRoot, noticeFile), path.join(contentDir, noticeFile));
+  }
   yield* stageWebClient(webClient, path.join(contentDir, "client"));
   yield* fs.copy(resourceMonitorDir, path.join(contentDir, "resource-monitor"));
   yield* stageRuntimeExternals({

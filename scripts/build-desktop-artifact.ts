@@ -1116,6 +1116,9 @@ export const DESKTOP_EXTRA_RESOURCES = [
     from: "apps/desktop/prod-resources/resource-monitor",
     to: "resource-monitor",
   },
+  // nondev-seam: L-1 — the MIT notice must travel with every copy of the app (staged below).
+  { from: "LICENSE", to: "LICENSE" },
+  { from: "NOTICE", to: "NOTICE" },
 ] as const;
 export const LINUX_CAPTURE_EXTRA_RESOURCES = [
   {
@@ -3961,6 +3964,10 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
 
   if (Object.keys(stagePatchedDependencies).length > 0) {
     yield* fs.copy(path.join(repoRoot, "patches"), path.join(stageAppDir, "patches"));
+  }
+  // nondev-seam: L-1 — staged into the project dir so the LICENSE/NOTICE extraResources resolve.
+  for (const noticeFile of ["LICENSE", "NOTICE"]) {
+    yield* fs.copy(path.join(repoRoot, noticeFile), path.join(stageAppDir, noticeFile));
   }
 
   yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");

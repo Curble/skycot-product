@@ -51,7 +51,8 @@ export function npmLauncherPackageManifest(version: string) {
     license: serverPackageJson.license,
     repository: serverPackageJson.repository,
     bin: { t3: "./bin/t3.mjs" },
-    files: ["bin", "dist"],
+    // nondev-seam: L-2 — npm includes LICENSE on its own; NOTICE must be listed.
+    files: ["bin", "dist", "LICENSE", "NOTICE"],
     engines: { node: ">=20.11" },
   };
 }
@@ -83,6 +84,11 @@ export const buildNpmLauncher = Effect.fn("buildNpmLauncher")(function* (input: 
   const readme = yield* path.fromFileUrl(new URL("../apps/server/README.md", import.meta.url));
   if (yield* fs.exists(readme)) {
     yield* fs.copyFile(readme, path.join(stageDir, "README.md"));
+  }
+  // nondev-seam: L-2 — the MIT notice must travel with every copy of the launcher.
+  for (const noticeFile of ["LICENSE", "NOTICE"]) {
+    const source = yield* path.fromFileUrl(new URL(`../${noticeFile}`, import.meta.url));
+    yield* fs.copyFile(source, path.join(stageDir, noticeFile));
   }
 
   const packageDir = path.join(input.outputDir, NPM_LAUNCHER_PACKAGE_NAME);
