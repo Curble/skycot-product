@@ -35,6 +35,7 @@ import {
   visibleEntries,
 } from "./folders";
 import { useConnected } from "./useConnection";
+import { useFamily } from "../features/family/FamilyProvider";
 
 const LAST_BROWSE_KEY = "skycot:last-folder-browse";
 
@@ -108,6 +109,7 @@ function OpenFolderSheetBody({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
+  const family = useFamily();
   const listRef = useRef<HTMLDivElement>(null);
 
   const browse = useAtomValue(
@@ -138,6 +140,8 @@ function OpenFolderSheetBody({
       onClose();
       return;
     }
+    // With the Family profile on, the engine only adds a folder a grown-up chose.
+    if (!(await family.requireParentCode("openFolder"))) return;
     setBusy(true);
     setProblem(null);
     const trimmed = title.trim();

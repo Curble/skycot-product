@@ -67,7 +67,7 @@ import {
   vcsEnvironment,
 } from "./state";
 import { familyCopy } from "../family/copy";
-import { useFamily } from "../family/FamilyProvider";
+import { attemptFor, useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { rememberKeptVersion } from "../review/keptVersions";
 import { latestReviewable } from "../review/turnReview";
@@ -158,7 +158,7 @@ function PublishSheetBody({
   const needsCode = family.isLocked("publish");
 
   const [phase, setPhase] = useState<Phase>("choose");
-  const codeEntry = useParentCodeEntry(() => setPhase("confirm"));
+  const codeEntry = useParentCodeEntry(attemptFor("publish", {}), () => setPhase("confirm"));
   const [choice, setChoice] = useState<Choice | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);

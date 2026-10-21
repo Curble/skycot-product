@@ -16,6 +16,7 @@ import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import type { ApprovalDecisionPayload } from "../../../plain/approvals";
+import { isFamilyRefusal } from "../../family/cards";
 import { serverEnvironment } from "../../../state/server";
 import { threadEnvironment } from "../../../state/threads";
 
@@ -39,6 +40,8 @@ export type DispatchDecision = (
 
 export function calmFailure(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
+  // The engine's Family-profile refusal is already one calm sentence; the card acts on it.
+  if (isFamilyRefusal(message)) return message;
   if (/scope|permission|unauthori/i.test(message))
     return "This connection isn't allowed to answer for you.";
   if (/already|resolved|not found|no longer/i.test(message))

@@ -130,6 +130,7 @@ export function OnboardingSheet({
   const [draft, setDraft] = useState<FamilySetupDraft>(EMPTY_SETUP_DRAFT);
   const [step, setStep] = useState<Step>("who");
   const [finishing, setFinishing] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const enableFamily = useEnableFamilyWithDefaults(environmentId);
   const steps = onboardingSteps(audience, family.enabled);
   const index = Math.max(0, steps.indexOf(step));
@@ -148,8 +149,15 @@ export function OnboardingSheet({
     if (finishing) return;
     if (childPath && !family.enabled && setupReady(draft)) {
       setFinishing(true);
-      await enableFamily({ childName: draft.childName, code: draft.code });
+      setProblem(null);
+      const failure = await enableFamily({ childName: draft.childName, code: draft.code });
       setFinishing(false);
+      // The engine keeps the profile; if it could not, say so and stay here rather than
+      // finish with a child path that protects nothing.
+      if (failure !== null) {
+        setProblem(failure);
+        return;
+      }
     }
     finish("done");
   };
@@ -215,6 +223,7 @@ export function OnboardingSheet({
         )
       ) : null}
       {step === "look" ? <LookStep preselectWorkshop={childPath} /> : null}
+      {step === "done" && problem ? <Banner tone="warning">{problem}</Banner> : null}
       {step === "done" ? (
         <DoneStep
           environmentId={environmentId}
@@ -250,14 +259,14 @@ function WhoStep({
         <WhoCard
           icon={Users}
           title="A child I look after"
-          text={`${familyCopy.title}: the Workshop look (unless you've picked another), the assistant always asks first, the riskier modes and developer tools hidden, and a parent code for publishing and automations.`}
+          text={`${familyCopy.title}: SKYCOT's engine keeps the assistant asking first and child-friendly, and a parent code guards the internet, installs, publishing, automations and the developer tools. The Workshop look, unless you've picked another.`}
           checked={audience === "child"}
           onClick={() => onAudience("child")}
         />
       </div>
       {familyEnabled ? (
         <Banner tone="info">
-          The {familyCopy.title} is on {audience === "child" ? "for this browser" : ""}. To set{" "}
+          The {familyCopy.title} is on {audience === "child" ? "on this Mac" : ""}. To set{" "}
           {PRODUCT_NAME} up for yourself, turn it off first in Settings → Family (parent code).
         </Banner>
       ) : (

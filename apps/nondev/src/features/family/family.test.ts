@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   EMPTY_PROFILE,
   EMPTY_SETUP_DRAFT,
+  EMPTY_VIEW,
   LOCKOUT_MS,
   MAX_ATTEMPTS,
   attemptsLeft,
@@ -13,7 +14,14 @@ import {
   isFamilyLocked,
   isValidCode,
   lockoutSentence,
+  parseCachedView,
   parseProfile,
+  parseServerStatus,
+  purposeFor,
+  readFamilyAnswer,
+  serializeCachedView,
+  viewFromStatus,
+  viewLockRemainingMs,
   serializeProfile,
   setupProblem,
   setupReady,
@@ -163,9 +171,9 @@ describe("verifyCode", () => {
 });
 
 describe("isFamilyLocked", () => {
-  it("locks every action except picking a look, and only while the profile is on", async () => {
-    const on = await createProfile({ childName: null, code: "2580", now: T0 });
-    const off = { ...on, enabled: false };
+  it("locks every action except picking a look, while the engine says on or a browser profile waits to move", () => {
+    const on = { ...EMPTY_VIEW, enabled: true };
+    const waiting = { ...EMPTY_VIEW, legacy: true };
     for (const action of [
       "publish",
       "advancedMode",
@@ -174,12 +182,108 @@ describe("isFamilyLocked", () => {
       "createAutomation",
       "changeAutonomy",
       "rerunOnboarding",
+      "openFolder",
+      "approve",
+      "aiSettings",
     ] as const) {
       expect(isFamilyLocked(on, action)).toBe(true);
-      expect(isFamilyLocked(off, action)).toBe(false);
-      expect(isFamilyLocked(EMPTY_PROFILE, action)).toBe(false);
+      expect(isFamilyLocked(waiting, action)).toBe(true);
+      expect(isFamilyLocked(EMPTY_VIEW, action)).toBe(false);
     }
     expect(isFamilyLocked(on, "changeTheme")).toBe(false);
+  });
+
+  it("names the engine grant each action asks for", () => {
+    expect(purposeFor("publish")).toBe("publish");
+    expect(purposeFor("createAutomation")).toBe("automation");
+    expect(purposeFor("advancedMode")).toBe("advanced");
+    expect(purposeFor("openFolder")).toBe("openFolder");
+    expect(purposeFor("approve")).toBe("approve");
+    expect(purposeFor("aiSettings")).toBe("settings");
+    // The code goes with the request itself for these.
+    expect(purposeFor("disableFamily")).toBeNull();
+    expect(purposeFor("changeCode")).toBeNull();
+  });
+});
+
+describe("the engine's answers", () => {
+  it("reads the status and never invents an on", () => {
+    expect(parseServerStatus(null)).toBeNull();
+    expect(parseServerStatus({ childName: "Ava" })).toBeNull();
+    expect(
+      parseServerStatus({
+        enabled: true,
+        childName: "Ava",
+        createdAt: "2026-10-22T09:00:00.000Z",
+        attemptsLeft: 3,
+        lockedForMs: 0,
+      }),
+    ).toEqual({
+      enabled: true,
+      childName: "Ava",
+      createdAt: "2026-10-22T09:00:00.000Z",
+      attemptsLeft: 3,
+      lockedForMs: 0,
+    });
+  });
+
+  it("turns a lock into a local deadline and retires a moved browser profile", () => {
+    const view = viewFromStatus(
+      { enabled: true, childName: null, createdAt: null, attemptsLeft: 0, lockedForMs: 60_000 },
+      T0,
+      true,
+    );
+    expect(view.lockedUntil).toBe(T0 + 60_000);
+    expect(view.legacy).toBe(false);
+    expect(view.source).toBe("engine");
+    expect(viewLockRemainingMs(view, T0 + 59_000)).toBe(1_000);
+    const off = viewFromStatus(
+      { enabled: false, childName: null, createdAt: null, attemptsLeft: 5, lockedForMs: 0 },
+      T0,
+      true,
+    );
+    expect(off.legacy).toBe(true);
+  });
+
+  it("caches only what first paint needs", () => {
+    const view = { ...EMPTY_VIEW, enabled: true, childName: "Ava", attemptsLeft: 2 };
+    const raw = serializeCachedView(view);
+    expect(raw).not.toContain("attemptsLeft");
+    const cached = parseCachedView(raw, false);
+    expect(cached.enabled).toBe(true);
+    expect(cached.childName).toBe("Ava");
+    expect(cached.source).toBe("cache");
+    expect(parseCachedView("{oops", false)).toEqual(EMPTY_VIEW);
+  });
+
+  it("passes the engine's own sentence through, and the counters with it", () => {
+    expect(readFamilyAnswer(200, { enabled: false }, parseServerStatus)).toMatchObject({
+      ok: true,
+    });
+    expect(
+      readFamilyAnswer(
+        403,
+        {
+          error: "wrong-code",
+          message: "That's not the parent code. 2 tries left.",
+          attemptsLeft: 2,
+        },
+        parseServerStatus,
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "wrong-code",
+      message: "That's not the parent code. 2 tries left.",
+      attemptsLeft: 2,
+    });
+    expect(
+      readFamilyAnswer(429, { error: "locked", remainingMs: 1_000 }, parseServerStatus),
+    ).toMatchObject({
+      ok: false,
+      reason: "locked",
+      remainingMs: 1_000,
+    });
+    expect(readFamilyAnswer(200, "nonsense", parseServerStatus)).toMatchObject({ ok: false });
   });
 });
 

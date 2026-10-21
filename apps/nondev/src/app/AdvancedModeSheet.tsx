@@ -2,7 +2,7 @@ import { Wrench } from "lucide-react";
 
 import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../brand";
 import { familyCopy } from "../features/family/copy";
-import { useFamily } from "../features/family/FamilyProvider";
+import { attemptFor, useFamily } from "../features/family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../features/family/ParentCodeEntry";
 import { Button } from "../ui/Button";
 import { Sheet } from "../ui/Sheet";
@@ -28,7 +28,9 @@ export function AdvancedModeSheet({
 }) {
   const family = useFamily();
   const locked = family.isLocked("advancedMode");
-  const entry = useParentCodeEntry(() => openAdvancedMode(path));
+  // The engine checks the code, records the grant and sets the short-lived cookie the
+  // developer interface's page needs; only then does the browser go there.
+  const entry = useParentCodeEntry(attemptFor("advancedMode", {}), () => openAdvancedMode(path));
   return (
     <Sheet
       open={open}
@@ -42,7 +44,13 @@ export function AdvancedModeSheet({
           {ADVANCED_MODE_LABEL} is the full developer interface: every file, command and setting, in
           developer language. Your conversations and projects are the same in both. To come back,
           use <b>Back to {PRODUCT_NAME}</b> at the bottom of its sidebar.
-          {locked ? <> With the {familyCopy.title} on, a parent enters the code first.</> : null}
+          {locked ? (
+            <>
+              {" "}
+              With the {familyCopy.title} on, a parent enters the code first; it opens{" "}
+              {ADVANCED_MODE_LABEL} on this device for 15 minutes.
+            </>
+          ) : null}
         </>
       }
       sober={locked}

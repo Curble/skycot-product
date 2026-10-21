@@ -4,6 +4,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { Users } from "lucide-react";
 import { useState } from "react";
 
+import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { useEnableFamilyWithDefaults } from "./applyDefaults";
@@ -34,12 +35,18 @@ function FamilySetupSheetBody({
 }) {
   const [draft, setDraft] = useState<FamilySetupDraft>(EMPTY_SETUP_DRAFT);
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const enable = useEnableFamilyWithDefaults(environmentId);
   const finish = async () => {
     if (!setupReady(draft) || busy) return;
     setBusy(true);
-    await enable({ childName: draft.childName, code: draft.code });
+    setProblem(null);
+    const failure = await enable({ childName: draft.childName, code: draft.code });
     setBusy(false);
+    if (failure !== null) {
+      setProblem(failure);
+      return;
+    }
     onClose();
   };
   return (
@@ -49,7 +56,7 @@ function FamilySetupSheetBody({
       icon={Users}
       iconTone="orange"
       title={`Set up the ${familyCopy.title}`}
-      description="For a child you look after. The Workshop look comes on unless you've already picked another, the assistant always asks first, and a parent code guards publishing, automations and the developer tools."
+      description="For a child you look after. SKYCOT's engine keeps the assistant on “Ask me first”, and a parent code guards the internet, installs, publishing, automations, other folders and the developer tools. The Workshop look comes on unless you've already picked another."
       wide
       sober
       initialFocus="first"
@@ -70,6 +77,7 @@ function FamilySetupSheetBody({
       }
     >
       <FamilySetupForm draft={draft} onDraft={setDraft} />
+      {problem ? <Banner tone="warning">{problem}</Banner> : null}
     </Sheet>
   );
 }

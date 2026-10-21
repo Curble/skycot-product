@@ -16,6 +16,7 @@ import {
   CODE_MAX,
   codeStrength,
   digitsOnly,
+  isValidCode,
   setupProblem,
   strengthHint,
   type FamilySetupDraft,
@@ -24,7 +25,12 @@ import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
 import { useFamily } from "../../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../../family/ParentCodeEntry";
-import { changeParentCode, disableFamily, renameChild } from "../../family/store";
+import {
+  changeParentCode,
+  lockFamilyGrants,
+  moveLegacyProfile,
+  renameChild,
+} from "../../family/store";
 import { SettingsGroup } from "../SettingsGroup";
 
 /**
@@ -36,6 +42,8 @@ import { SettingsGroup } from "../SettingsGroup";
 export function FamilyPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const family = useFamily();
   const [setupOpen, setSetupOpen] = useState(false);
+
+  if (family.profile.legacy && !family.profile.enabled) return <MoveLegacyPane />;
 
   if (!family.enabled) {
     return (
@@ -83,9 +91,10 @@ function FamilyOnPane() {
   const [confirmOff, setConfirmOff] = useState(false);
   const since = profile.createdAt ? formatSince(profile.createdAt) : null;
 
+  // Confirm first; the code sheet then turns it off on the engine in the same step.
   const turnOff = async () => {
-    const ok = await requireParentCode("disableFamily");
-    if (ok) setConfirmOff(true);
+    setConfirmOff(false);
+    await requireParentCode("disableFamily");
   };
 
   return (
@@ -113,7 +122,7 @@ function FamilyOnPane() {
         <ListRow
           leading={<StepBadge state="ok" />}
           title="Always asks first"
-          subtitle="Autonomy is fixed at “Ask me first” while the profile is on. The riskier modes are hidden."
+          subtitle="SKYCOT's engine runs every conversation in “Ask me first” while the profile is on, whatever a setting or an older conversation says."
         />
       </SettingsGroup>
 
@@ -150,15 +159,25 @@ function FamilyOnPane() {
 
       <SettingsGroup
         title="Developer tools"
-        footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on. A parent can still open it from here.`}
+        footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on, and the engine sends its address back here unless a parent has entered the code. A parent can still open it from here.`}
       >
         <ListRow
           leading={<StepBadge state="todo" icon={Wrench} />}
           title={`Open ${ADVANCED_MODE_LABEL} (parent code)`}
-          subtitle="The full developer interface, with no guardrails."
+          subtitle="The full developer interface. The code opens it on this device for 15 minutes; publishing and approvals there are allowed for that time too."
           trailing={
             <Button size="sm" onClick={() => setAdvancedOpen(true)}>
               Open…
+            </Button>
+          }
+        />
+        <ListRow
+          leading={<StepBadge state="todo" icon={KeyRound} />}
+          title="Lock again now"
+          subtitle="Ends every “yes” the parent code gave on this device (Advanced mode, publishing, automations) before it runs out."
+          trailing={
+            <Button size="sm" onClick={() => void lockFamilyGrants()}>
+              Lock
             </Button>
           }
         />
@@ -168,9 +187,9 @@ function FamilyOnPane() {
         <ListRow
           leading={<StepBadge state="warn" icon={Power} />}
           title={`Turn off the ${familyCopy.title}`}
-          subtitle="Asks for the parent code, then confirms. The look and text size stay as they are; autonomy, Advanced mode and publishing open up again."
+          subtitle="Confirms, then asks for the parent code. The look and text size stay as they are; autonomy, Advanced mode and publishing open up again."
           trailing={
-            <Button size="sm" variant="destructive" onClick={() => void turnOff()}>
+            <Button size="sm" variant="destructive" onClick={() => setConfirmOff(true)}>
               Turn off…
             </Button>
           }
@@ -192,21 +211,14 @@ function FamilyOnPane() {
         icon={Power}
         iconTone="red"
         title={`Turn off the ${familyCopy.title}?`}
-        description="Every guardrail it added goes: the assistant can be set to do more on its own, Advanced mode comes back, and publishing no longer asks for a code. The child's name and the code are forgotten."
+        description="Every guardrail it added goes: the assistant can be set to do more on its own, Advanced mode comes back, and publishing, the internet and installs no longer ask for a code. The child's name and the code are forgotten."
         sober
         dismissOnBackdrop={false}
         actions={
           <>
             <Button onClick={() => setConfirmOff(false)}>Keep it on</Button>
-            <Button
-              variant="destructive"
-              filled
-              onClick={() => {
-                disableFamily();
-                setConfirmOff(false);
-              }}
-            >
-              Turn off
+            <Button variant="destructive" filled onClick={() => void turnOff()}>
+              Enter parent code…
             </Button>
           </>
         }
@@ -216,10 +228,14 @@ function FamilyOnPane() {
 }
 
 function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
-  const [verified, setVerified] = useState(false);
-  const entry = useParentCodeEntry(() => setVerified(true));
+  // The engine checks the current code and sets the new one in one request, so the current
+  // code is only held here between the two steps.
+  const [current, setCurrent] = useState<string | null>(null);
+  const [currentDraft, setCurrentDraft] = useState("");
   const [draft, setDraft] = useState<FamilySetupDraft>({ childName: "", code: "", confirm: "" });
+  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const problem = setupProblem(draft);
   const strength = codeStrength(draft.code);
 
@@ -236,10 +252,20 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
     );
   }
 
-  if (!verified) {
+  if (current === null) {
     return (
-      <div className="fm-family-inline">
-        <ParentCodeEntry entry={entry} label="Current parent code" autoFocus />
+      <div className="fm-family-inline" data-sober="">
+        <TextField
+          label="Current parent code"
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={CODE_MAX}
+          autoFocus
+          value={currentDraft}
+          onChange={(event) => setCurrentDraft(digitsOnly(event.currentTarget.value))}
+        />
+        {failure ? <Banner tone="warning">{failure}</Banner> : null}
         <div className="fm-family-inline__actions">
           <Button size="sm" onClick={onDone}>
             Cancel
@@ -247,15 +273,34 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
           <Button
             size="sm"
             variant="primary"
-            disabled={!entry.canSubmit}
-            onClick={() => void entry.submit()}
+            disabled={!isValidCode(currentDraft)}
+            onClick={() => {
+              setFailure(null);
+              setCurrent(currentDraft);
+            }}
           >
-            {entry.busy ? "Checking…" : "Next"}
+            Next
           </Button>
         </div>
       </div>
     );
   }
+
+  const save = async () => {
+    setBusy(true);
+    const result = await changeParentCode(current, draft.code);
+    setBusy(false);
+    if (result.ok) {
+      setSaved(true);
+      return;
+    }
+    // A wrong current code goes back to that step with the engine's sentence.
+    setFailure(result.message);
+    if (result.reason === "wrong-code" || result.reason === "locked") {
+      setCurrent(null);
+      setCurrentDraft("");
+    }
+  };
 
   return (
     <div className="fm-family-inline" data-sober="">
@@ -288,22 +333,63 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
       {problem !== null && draft.confirm.length > 0 ? (
         <Banner tone="warning">{problem}</Banner>
       ) : null}
+      {failure ? <Banner tone="warning">{failure}</Banner> : null}
       <div className="fm-family-inline__actions">
-        <Button size="sm" onClick={onDone}>
+        <Button size="sm" onClick={onDone} disabled={busy}>
           Cancel
         </Button>
         <Button
           size="sm"
           variant="primary"
-          disabled={problem !== null}
-          onClick={() => {
-            void changeParentCode(draft.code).then(() => setSaved(true));
-          }}
+          disabled={problem !== null || busy}
+          onClick={() => void save()}
         >
-          Save new code
+          {busy ? "Saving…" : "Save new code"}
         </Button>
       </div>
     </div>
+  );
+}
+
+/** A profile from before the engine kept it: one code entry carries it over. */
+function MoveLegacyPane() {
+  const entry = useParentCodeEntry(
+    async (code) => {
+      const problem = await moveLegacyProfile(code);
+      return problem === null
+        ? { ok: true, value: null }
+        : { ok: false, reason: "wrong-code", message: problem };
+    },
+    () => undefined,
+  );
+  return (
+    <>
+      <SettingsGroup title={familyCopy.legacyTitle} footer={familyCopy.honesty}>
+        <ListExtra>
+          <div className="fm-family-inline" data-sober="">
+            <Banner tone="warning">{familyCopy.legacyBody}</Banner>
+            <ParentCodeEntry entry={entry} autoFocus />
+            <div className="fm-family-inline__actions">
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={!entry.canSubmit}
+                onClick={() => void entry.submit()}
+              >
+                {entry.busy ? "Moving…" : "Move to the engine"}
+              </Button>
+            </div>
+          </div>
+        </ListExtra>
+      </SettingsGroup>
+      <SettingsGroup title="What it does and does not do">
+        <ListExtra>
+          <div className="fm-sheet-inset">
+            <FamilyHonestyBox />
+          </div>
+        </ListExtra>
+      </SettingsGroup>
+    </>
   );
 }
 
@@ -315,6 +401,15 @@ function RenameForm({
   readonly onDone: () => void;
 }) {
   const [name, setName] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    const result = await renameChild(name);
+    setBusy(false);
+    if (result.ok) onDone();
+    else setFailure(result.message);
+  };
   return (
     <div className="fm-family-inline">
       <TextField
@@ -325,26 +420,17 @@ function RenameForm({
         value={name}
         onChange={(event) => setName(event.currentTarget.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            renameChild(name);
-            onDone();
-          }
+          if (event.key === "Enter") void save();
         }}
       />
       <p className="fm-help">Leave it empty for a greeting without a name.</p>
+      {failure ? <Banner tone="warning">{failure}</Banner> : null}
       <div className="fm-family-inline__actions">
         <Button size="sm" onClick={onDone}>
           Cancel
         </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => {
-            renameChild(name);
-            onDone();
-          }}
-        >
-          Save
+        <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()}>
+          {busy ? "Saving…" : "Save"}
         </Button>
       </div>
     </div>

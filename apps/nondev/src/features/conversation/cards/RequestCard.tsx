@@ -45,6 +45,15 @@ import { type DispatchDecision, useDecisionDispatcher } from "./dispatch";
 import { InlineReply } from "./InlineReply";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
+import {
+  approves,
+  familyCard,
+  familyHoldFor,
+  isFamilyRefusal,
+  toolItemTypeFor,
+} from "../../family/cards";
+import { familyCopy } from "../../family/copy";
+import { useFamily } from "../../family/FamilyProvider";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
@@ -204,6 +213,18 @@ export function RequestCard({
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
     ...(toolCallInput === undefined ? {} : { toolCallInput }),
   });
+  // Family profile: the same rules the engine enforces say which cards need a grown-up.
+  const family = useFamily();
+  const familyApplies = family.enabled && item.type === "approval_request";
+  const grownUp =
+    familyApplies && item.type === "approval_request"
+      ? familyHoldFor(item, {
+          projectRoot,
+          toolCallInput,
+          toolItemType: toolItemTypeFor(item, projection.turnItems),
+        })
+      : null;
+  const shown = familyApplies ? familyCard(card, grownUp) : card;
   const runEnded = askRunEnded(item, projection, shell);
   const decided = decidedLine(item, request, runEnded);
   const decision = request ? describeDecision(request) : null;
@@ -232,9 +253,25 @@ export function RequestCard({
   const choose = async (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => {
     // Never answer into a stopped run, even from a click that raced the Stop.
     if (askRunEnded(item, projection, shell)) return;
+    const askParent = () =>
+      item.type === "approval_request"
+        ? family.requireParentCode("approve", { requestId: item.requestId })
+        : Promise.resolve(false);
+    const needsParent = familyApplies && approves(option);
+    if (needsParent && grownUp !== null && !(await askParent())) return;
     setBusyId(option.id);
     setProblem(null);
-    const result = await dispatch(option.decision, extras);
+    let result = await dispatch(option.decision, extras);
+    // The engine had the final say and wanted a grown-up after all: ask, then try once more.
+    if (result !== null && needsParent && grownUp === null && isFamilyRefusal(result)) {
+      setBusyId(null);
+      if (!(await askParent())) {
+        setProblem(result);
+        return;
+      }
+      setBusyId(option.id);
+      result = await dispatch(option.decision, extras);
+    }
     setBusyId(null);
     if (result !== null) setProblem(result);
   };
@@ -273,9 +310,11 @@ export function RequestCard({
             title={card.title}
             subtitle={
               decided ??
-              (card.ruleTitle
-                ? `${card.ruleTitle} · waiting for you`
-                : "Waiting for you · nothing is pre-selected")
+              (grownUp !== null
+                ? `${familyCopy.needsGrownUp} · waiting for a parent`
+                : card.ruleTitle
+                  ? `${card.ruleTitle} · waiting for you`
+                  : "Waiting for you · nothing is pre-selected")
             }
           />
           <CardBody>
@@ -309,6 +348,9 @@ export function RequestCard({
             ) : item.type === "secret_request" ? (
               <SecretForm item={item} card={card} busyId={busyId} onChoose={choose} />
             ) : null}
+            {grownUp !== null && !decided ? (
+              <Banner tone="info">{grownUp} A grown-up enters the parent code to allow it.</Banner>
+            ) : null}
             {problem ? (
               <div className="fm-card__problem">
                 <Banner tone="warning">{problem}</Banner>
@@ -326,7 +368,7 @@ export function RequestCard({
           {decided || item.type !== "approval_request" ? null : (
             <CardFooter>
               <div className="fm-approval__actions">
-                {orderOptions(card.options).map((option) => (
+                {orderOptions(shown.options).map((option) => (
                   <Button
                     key={option.id}
                     size="md"

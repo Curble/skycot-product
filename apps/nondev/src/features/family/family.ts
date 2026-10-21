@@ -1,11 +1,10 @@
-// The Family profile, pure part: the stored record, the parent code (hashed,
-// never kept in the clear), the five-tries-then-wait rule, and which actions
-// the profile locks. Nothing here touches the DOM or storage; store.ts does
-// the reading and writing so this file is testable in Node.
-//
-// Honesty: this is a guardrail for a kid who is not trying to break it. The
-// hash and lockout live in this browser's localStorage, so a determined
-// teenager with the developer tools can clear it. The copy says so.
+// The Family profile, pure part. The engine keeps the profile (the hashed parent code, the
+// wrong-try counter, the "a grown-up said yes" grants) and enforces it; this client shows its
+// state and asks for the code. What is here: the status the engine reports, the view the UI
+// renders (with a small localStorage cache for first paint only), which actions a code
+// guards, and the code-format helpers. The older browser-only record (`FamilyProfile`,
+// `skycot:family`) stays readable so a profile set up before the move can be carried over.
+// Nothing here touches the DOM or the network; store.ts and api.ts do.
 
 export type FamilyAction =
   | "publish"
@@ -15,7 +14,17 @@ export type FamilyAction =
   | "createAutomation"
   | "changeAutonomy"
   | "changeTheme"
-  | "rerunOnboarding";
+  | "rerunOnboarding"
+  | "openFolder"
+  | "approve"
+  | "aiSettings";
+
+/** The browser-only record from before the engine kept the profile. */
+export const FAMILY_KEY = "skycot:family";
+export const MAX_ATTEMPTS = 5;
+export const LOCKOUT_MS = 5 * 60_000;
+export const CODE_MIN = 4;
+export const CODE_MAX = 6;
 
 /** Picking a look stays open: kids may choose themes. Everything else waits for the code. */
 export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
@@ -26,7 +35,221 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "createAutomation",
   "changeAutonomy",
   "rerunOnboarding",
+  "openFolder",
+  "approve",
+  "aiSettings",
 ]);
+
+/** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
+export type FamilyPurpose =
+  | "approve"
+  | "publish"
+  | "automation"
+  | "openFolder"
+  | "settings"
+  | "advanced";
+
+/**
+ * The engine grant an action asks for. Turning the profile off and changing the code are not
+ * grants: the code goes with that one request.
+ */
+export function purposeFor(action: FamilyAction): FamilyPurpose | null {
+  switch (action) {
+    case "publish":
+      return "publish";
+    case "createAutomation":
+      return "automation";
+    case "advancedMode":
+      return "advanced";
+    case "openFolder":
+      return "openFolder";
+    case "approve":
+      return "approve";
+    case "aiSettings":
+    case "rerunOnboarding":
+    case "changeAutonomy":
+      return "settings";
+    case "disableFamily":
+    case "changeCode":
+    case "changeTheme":
+      return null;
+  }
+}
+
+/** `GET /api/skycot/family`, as the engine sends it. Never the hash. */
+export interface ServerFamilyStatus {
+  readonly enabled: boolean;
+  readonly childName: string | null;
+  readonly createdAt: string | null;
+  readonly attemptsLeft: number;
+  readonly lockedForMs: number;
+}
+
+export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
+  if (typeof body !== "object" || body === null) return null;
+  const record = body as Record<string, unknown>;
+  if (typeof record["enabled"] !== "boolean") return null;
+  const text = (key: string) => (typeof record[key] === "string" ? (record[key] as string) : null);
+  const number = (key: string, fallback: number) =>
+    typeof record[key] === "number" && Number.isFinite(record[key])
+      ? (record[key] as number)
+      : fallback;
+  return {
+    enabled: record["enabled"],
+    childName: text("childName"),
+    createdAt: text("createdAt"),
+    attemptsLeft: Math.max(0, Math.floor(number("attemptsLeft", MAX_ATTEMPTS))),
+    lockedForMs: Math.max(0, number("lockedForMs", 0)),
+  };
+}
+
+export type FamilyFailure =
+  | "not-enabled"
+  | "already-enabled"
+  | "invalid-code"
+  | "wrong-code"
+  | "locked"
+  | "invalid-request"
+  | "storage"
+  | "unauthenticated"
+  | "forbidden"
+  | "unreachable";
+
+export type FamilyResult<A> =
+  | { readonly ok: true; readonly value: A }
+  | {
+      readonly ok: false;
+      readonly reason: FamilyFailure;
+      readonly message: string;
+      readonly attemptsLeft?: number;
+      readonly remainingMs?: number;
+    };
+
+export const ENGINE_UNREACHABLE =
+  "SKYCOT's engine isn't answering, so the Family profile can't be checked. Check the Mac is awake and try again.";
+
+/** Reads one answer: a value on 2xx, the engine's own sentence otherwise. */
+export function readFamilyAnswer<A>(
+  status: number,
+  body: unknown,
+  decode: (body: unknown) => A | null,
+): FamilyResult<A> {
+  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  if (status >= 200 && status < 300) {
+    const value = decode(body);
+    return value === null
+      ? {
+          ok: false,
+          reason: "invalid-request",
+          message: "The engine sent an answer this app doesn't understand.",
+        }
+      : { ok: true, value };
+  }
+  const reason = (
+    typeof record["error"] === "string" ? record["error"] : "storage"
+  ) as FamilyFailure;
+  const message =
+    typeof record["message"] === "string" && record["message"].length > 0
+      ? record["message"]
+      : ENGINE_UNREACHABLE;
+  return {
+    ok: false,
+    reason,
+    message,
+    ...(typeof record["attemptsLeft"] === "number" ? { attemptsLeft: record["attemptsLeft"] } : {}),
+    ...(typeof record["remainingMs"] === "number" ? { remainingMs: record["remainingMs"] } : {}),
+  };
+}
+
+/** What the UI renders. */
+export interface FamilyView {
+  readonly enabled: boolean;
+  readonly childName: string | null;
+  readonly createdAt: string | null;
+  readonly attemptsLeft: number;
+  /** Epoch ms (this browser's clock) until code prompts open again; null when not locked. */
+  readonly lockedUntil: number | null;
+  /** "engine" once the engine has answered; "cache" while only the first-paint cache is known. */
+  readonly source: "engine" | "cache";
+  /** A profile set up before the engine kept it, still only in this browser. */
+  readonly legacy: boolean;
+}
+
+export const EMPTY_VIEW: FamilyView = {
+  enabled: false,
+  childName: null,
+  createdAt: null,
+  attemptsLeft: MAX_ATTEMPTS,
+  lockedUntil: null,
+  source: "cache",
+  legacy: false,
+};
+
+export function viewFromStatus(
+  status: ServerFamilyStatus,
+  now: number,
+  legacy: boolean,
+): FamilyView {
+  return {
+    enabled: status.enabled,
+    childName: status.childName,
+    createdAt: status.createdAt,
+    attemptsLeft: status.attemptsLeft,
+    lockedUntil: status.lockedForMs > 0 ? now + status.lockedForMs : null,
+    source: "engine",
+    // Once the engine has a profile, the browser copy is history.
+    legacy: legacy && !status.enabled,
+  };
+}
+
+export const FAMILY_CACHE_KEY = "skycot:family-cache";
+
+/** First paint only: the engine's last answer, without counters. Never trusted for a decision. */
+export function parseCachedView(raw: string | null, legacy: boolean): FamilyView {
+  const base = { ...EMPTY_VIEW, legacy };
+  if (raw === null) return base;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return base;
+    const record = parsed as Record<string, unknown>;
+    return {
+      ...base,
+      enabled: record["enabled"] === true,
+      childName: typeof record["childName"] === "string" ? record["childName"] : null,
+      createdAt: typeof record["createdAt"] === "string" ? record["createdAt"] : null,
+    };
+  } catch {
+    return base;
+  }
+}
+
+export function serializeCachedView(view: FamilyView): string {
+  return JSON.stringify({
+    enabled: view.enabled,
+    childName: view.childName,
+    createdAt: view.createdAt,
+  });
+}
+
+/**
+ * On for the UI: the engine says so, or a browser-only profile from before the move is still
+ * waiting to be carried over (its locks stay in place until it is; the first code prompt
+ * moves it).
+ */
+export function familyOn(view: Pick<FamilyView, "enabled" | "legacy">): boolean {
+  return view.enabled || view.legacy;
+}
+
+export function isFamilyLocked(
+  view: Pick<FamilyView, "enabled" | "legacy">,
+  action: FamilyAction,
+): boolean {
+  return familyOn(view) && LOCKED_ACTIONS.has(action);
+}
+
+export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: number): number {
+  return view.lockedUntil === null ? 0 : Math.max(0, view.lockedUntil - now);
+}
 
 export interface FamilyProfile {
   readonly enabled: boolean;
@@ -40,12 +263,6 @@ export interface FamilyProfile {
   readonly lockedUntil: number | null;
 }
 
-export const FAMILY_KEY = "skycot:family";
-export const MAX_ATTEMPTS = 5;
-export const LOCKOUT_MS = 5 * 60_000;
-export const CODE_MIN = 4;
-export const CODE_MAX = 6;
-
 export const EMPTY_PROFILE: FamilyProfile = {
   enabled: false,
   childName: null,
@@ -55,10 +272,6 @@ export const EMPTY_PROFILE: FamilyProfile = {
   failedAttempts: 0,
   lockedUntil: null,
 };
-
-export function isFamilyLocked(profile: FamilyProfile, action: FamilyAction): boolean {
-  return profile.enabled && profile.codeHash !== null && LOCKED_ACTIONS.has(action);
-}
 
 export function isValidCode(code: string): boolean {
   return new RegExp(`^\\d{${CODE_MIN},${CODE_MAX}}$`).test(code);

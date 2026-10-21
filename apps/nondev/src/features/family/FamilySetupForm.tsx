@@ -1,4 +1,4 @@
-// The Family set-up: child's first name (optional, this browser only), the
+// The Family set-up: child's first name (optional, kept by the engine on this Mac), the
 // parent code typed twice with a strength nudge, and the honesty box. Used as
 // an onboarding step and inside Settings › Family's "Set up" sheet; the host
 // owns the Continue button and reads `setupReady(draft)`.
@@ -39,7 +39,7 @@ export function FamilySetupForm({
         value={draft.childName}
         onChange={(event) => onDraft({ ...draft, childName: event.currentTarget.value })}
       />
-      <p className="fm-help">Only used for the greeting. It stays in this browser.</p>
+      <p className="fm-help">Only used for the greeting. It stays on this Mac.</p>
       <div className="fm-family-setup__codes" data-sober="">
         <div className="fm-family-setup__row">
           <TextField

@@ -1,96 +1,167 @@
-// Where the Family profile lives: this browser's localStorage under
-// `skycot:family`, guarded like every other preference (storage can be
-// blocked). Only the salted hash of the parent code is ever written.
+// A thin view over the engine's Family profile. The engine decides; this module remembers its
+// last answer (and caches it in localStorage for first paint only), refreshes after every
+// change, and carries a profile set up before the move over to the engine.
 import { useSyncExternalStore } from "react";
 
+import { familyApi, type FamilyResult, type UnlockToken } from "./api";
 import {
-  EMPTY_PROFILE,
+  EMPTY_VIEW,
+  FAMILY_CACHE_KEY,
   FAMILY_KEY,
-  createProfile,
+  parseCachedView,
   parseProfile,
-  serializeProfile,
+  serializeCachedView,
   verifyCode,
-  withChildName,
-  withNewCode,
-  type FamilyProfile,
-  type VerifyOutcome,
+  viewFromStatus,
+  type FamilyPurpose,
+  type FamilyView,
+  type ServerFamilyStatus,
 } from "./family";
 
 const listeners = new Set<() => void>();
-function notify() {
-  for (const listener of listeners) listener();
-}
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
 
-function read(): string | null {
+function readStorage(key: string): string | null {
   try {
-    return window.localStorage.getItem(FAMILY_KEY);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-// useSyncExternalStore wants a referentially stable snapshot; cache by raw text.
-let cachedRaw: string | null | undefined;
-let cached: FamilyProfile = EMPTY_PROFILE;
-
-export function readFamilyProfile(): FamilyProfile {
-  const raw = read();
-  if (raw !== cachedRaw) {
-    cachedRaw = raw;
-    cached = parseProfile(raw);
-  }
-  return cached;
-}
-
-export function writeFamilyProfile(profile: FamilyProfile): void {
+function writeStorage(key: string, value: string | null): void {
   try {
-    if (!profile.enabled && profile.codeHash === null) window.localStorage.removeItem(FAMILY_KEY);
-    else window.localStorage.setItem(FAMILY_KEY, serializeProfile(profile));
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
   } catch {
-    // Storage blocked: the profile lasts for this page only.
-    cachedRaw = serializeProfile(profile);
-    cached = profile;
+    // Storage blocked: the cache lasts for this page only, which is all it is for.
   }
-  notify();
 }
 
-export function useFamilyProfile(): FamilyProfile {
-  return useSyncExternalStore(subscribe, readFamilyProfile, () => EMPTY_PROFILE);
+function legacyPresent(): boolean {
+  return parseProfile(readStorage(FAMILY_KEY)).enabled;
 }
 
-export async function enableFamily(input: {
+let view: FamilyView =
+  typeof window === "undefined"
+    ? EMPTY_VIEW
+    : parseCachedView(readStorage(FAMILY_CACHE_KEY), legacyPresent());
+
+function setView(next: FamilyView): void {
+  view = next;
+  writeStorage(FAMILY_CACHE_KEY, next.enabled ? serializeCachedView(next) : null);
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function readFamilyView(): FamilyView {
+  return view;
+}
+
+export function useFamilyView(): FamilyView {
+  return useSyncExternalStore(subscribe, readFamilyView, () => EMPTY_VIEW);
+}
+
+function applyStatus(status: ServerFamilyStatus): void {
+  setView(viewFromStatus(status, Date.now(), legacyPresent()));
+}
+
+/** A failed code try tells us the counter: keep the prompt's sentence and lock in step. */
+function applyFailure(result: Extract<FamilyResult<unknown>, { ok: false }>): void {
+  if (result.reason === "locked") {
+    setView({
+      ...view,
+      attemptsLeft: 0,
+      lockedUntil: Date.now() + (result.remainingMs ?? 5 * 60_000),
+    });
+  } else if (result.reason === "wrong-code" && result.attemptsLeft !== undefined) {
+    setView({ ...view, attemptsLeft: result.attemptsLeft });
+  } else if (result.reason === "not-enabled") {
+    void refreshFamily();
+  }
+}
+
+async function settle<A>(
+  promise: Promise<FamilyResult<A>>,
+  onValue?: (value: A) => void,
+): Promise<FamilyResult<A>> {
+  const result = await promise;
+  if (result.ok) onValue?.(result.value);
+  else applyFailure(result);
+  return result;
+}
+
+export function refreshFamily(): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.status(), applyStatus);
+}
+
+export function enableFamily(input: {
   readonly childName: string | null;
   readonly code: string;
-}): Promise<FamilyProfile> {
-  const profile = await createProfile({ ...input, now: Date.now() });
-  writeFamilyProfile(profile);
-  return profile;
+}): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.enable(input), (status) => {
+    // The engine has it now; the browser-only copy would only confuse the next visit.
+    writeStorage(FAMILY_KEY, null);
+    applyStatus(status);
+  });
 }
 
-/** Turning off forgets everything, the child's name included: nothing lingers for the next person. */
-export function disableFamily(): void {
-  writeFamilyProfile(EMPTY_PROFILE);
+/** Turning off forgets everything on the engine, the child's name included. */
+export function disableFamily(code: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.disable({ code }), (status) => {
+    writeStorage(FAMILY_KEY, null);
+    applyStatus(status);
+  });
 }
 
-export async function changeParentCode(code: string): Promise<void> {
-  writeFamilyProfile(await withNewCode(readFamilyProfile(), code));
+export function changeParentCode(
+  oldCode: string,
+  newCode: string,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.changeCode({ oldCode, newCode }), applyStatus);
 }
 
-export function renameChild(childName: string | null): void {
-  writeFamilyProfile(withChildName(readFamilyProfile(), childName));
+export function renameChild(childName: string | null): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.rename({ childName }), applyStatus);
 }
 
-/** One attempt: compares, records the outcome (counter or lockout) and reports it. */
-export async function tryParentCode(code: string): Promise<VerifyOutcome> {
-  const outcome = await verifyCode(readFamilyProfile(), code, Date.now());
-  writeFamilyProfile(outcome.profile);
-  return outcome;
+/** One code try for a grown-up's "yes"; the engine records the grant for this device. */
+export function tryParentCode(
+  code: string,
+  purpose: FamilyPurpose,
+  requestId?: string,
+): Promise<FamilyResult<UnlockToken>> {
+  return settle(
+    familyApi.verify({ code, purpose, ...(requestId === undefined ? {} : { requestId }) }),
+    () => setView({ ...view, attemptsLeft: 5, lockedUntil: null }),
+  );
+}
+
+/** Ends this device's grants (a parent leaving Advanced mode). */
+export function lockFamilyGrants(): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.lock(), applyStatus);
+}
+
+/**
+ * Carries a profile set up before the engine kept it: the code is checked against the old
+ * browser copy (with its own wrong-try counter), then the same name and code move to the
+ * engine. Resolves with a sentence to show, or null when it moved.
+ */
+export async function moveLegacyProfile(code: string): Promise<string | null> {
+  const legacy = parseProfile(readStorage(FAMILY_KEY));
+  if (!legacy.enabled) return null;
+  const outcome = await verifyCode(legacy, code, Date.now());
+  writeStorage(FAMILY_KEY, JSON.stringify(outcome.profile));
+  if (!outcome.ok) {
+    return outcome.kind === "locked"
+      ? "Too many tries. Try again in a few minutes."
+      : "That's not the parent code this browser remembers.";
+  }
+  const moved = await enableFamily({ childName: legacy.childName, code });
+  return moved.ok ? null : moved.message;
 }

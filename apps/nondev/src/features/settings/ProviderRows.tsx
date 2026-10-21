@@ -26,6 +26,7 @@ import {
   readiness,
   statusSentence,
 } from "./providerCatalog";
+import { useFamily } from "../family/FamilyProvider";
 import { useProviderConnect } from "./useProviderConnect";
 
 type PlatformOs = ExecutionEnvironmentPlatformOs;
@@ -58,6 +59,12 @@ export function ProviderRow({
 }) {
   const entry = catalogEntryFor(driver);
   const connect = useProviderConnect(environmentId, driver, provider);
+  // The assistants run on a parent's accounts and settings; the engine refuses changes to
+  // them without the parent code while the Family profile is on.
+  const family = useFamily();
+  const asParent = (action: () => Promise<unknown>) => async () => {
+    if (await family.requireParentCode("aiSettings")) await action();
+  };
   const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const ready = isProviderReady(provider);
@@ -104,7 +111,7 @@ export function ProviderRow({
       <Pill tone="neutral" size="sm">
         Off
       </Pill>
-      <Button size="sm" onClick={() => void connect.enable()} disabled={connect.busy}>
+      <Button size="sm" onClick={() => void asParent(connect.enable)()} disabled={connect.busy}>
         Turn on
       </Button>
     </>
@@ -125,7 +132,7 @@ export function ProviderRow({
     <Button
       size="sm"
       variant="primary"
-      onClick={() => void connect.connect()}
+      onClick={() => void asParent(connect.connect)()}
       disabled={connect.busy}
     >
       {state === "install" || (driver === "codex" && !provider?.installed)
@@ -177,7 +184,7 @@ export function ProviderRow({
               variant="destructive"
               filled
               onClick={() => {
-                void connect.signOut().then(() => setSignOutOpen(false));
+                void asParent(connect.signOut)().then(() => setSignOutOpen(false));
               }}
             >
               Sign out

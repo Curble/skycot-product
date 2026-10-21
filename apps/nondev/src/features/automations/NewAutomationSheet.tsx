@@ -21,7 +21,7 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Switch } from "../../ui/Switch";
 import { TextField } from "../../ui/TextField";
 import { actionReason } from "../family/copy";
-import { useFamily } from "../family/FamilyProvider";
+import { attemptFor, useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import {
   DAY_SHORT,
@@ -122,7 +122,7 @@ export function NewAutomationSheet({
     }
     onClose();
   };
-  const codeEntry = useParentCodeEntry(() => void create());
+  const codeEntry = useParentCodeEntry(attemptFor("createAutomation", {}), () => void create());
 
   if (phase === "code") {
     return (
