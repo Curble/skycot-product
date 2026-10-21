@@ -162,8 +162,22 @@ export function decorateTimeline(
   };
   const finished = numbered.map(blockPastKept);
 
+  // Hidden empty points hold the same files as the nearest visible version
+  // before them, so an Undo that lands on one is named after that version.
   const byId = new Map<string, NumberedVersion>();
-  for (const entry of decorated) byId.set(entry.id, blockPastKept(entry));
+  for (const entry of decorated) {
+    const twin = finished.findLast(
+      (candidate) =>
+        candidate.kind === "restore point" &&
+        candidate.number !== null &&
+        Date.parse(candidate.timestamp) <= Date.parse(entry.timestamp),
+    );
+    const aliased =
+      entry.kind === "restore point" && entry.fileCount === 0 && twin
+        ? { ...entry, number: twin.number, label: twin.label }
+        : entry;
+    byId.set(entry.id, blockPastKept(aliased));
+  }
   for (const entry of finished) byId.set(entry.id, entry);
   // Newest first for the rail.
   return {

@@ -44,7 +44,7 @@ import { List, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { StepBadge } from "../../ui/StepBadge";
 import { RestoreSheet, plainRestoreProblem } from "../versions/RestoreSheet";
-import { formatVersionTime, useVersionsTimeline } from "../versions/timeline";
+import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "../versions/timeline";
 import { useLastUpload } from "../publish/uploads";
 import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
 import { reviewTargetFor } from "./turnReview";
@@ -190,9 +190,13 @@ export function ReviewSection({
   // The timeline's view of "before" carries the truthful blockers (undone,
   // or a kept version in between); a hidden empty point falls back to the
   // plain description.
-  const beforeEntry = before
-    ? (timeline.byId.get(before.id) ??
-      describeCheckpoint(before, { canRollbackFiles: timeline.canRollbackFiles }, false))
+  const beforeEntry: NumberedVersion | null = before
+    ? (timeline.byId.get(before.id) ?? {
+        ...describeCheckpoint(before, { canRollbackFiles: timeline.canRollbackFiles }, false),
+        number: null,
+        kept: null,
+        undone: false,
+      })
     : null;
   const undoBlocker = !canOperate
     ? "This connection can read but not change things."
@@ -405,7 +409,7 @@ export function ReviewSection({
         intent="undo"
         environmentId={environmentId}
         threadId={threadId}
-        versionNumber={before ? (timeline.numbers.get(before.id) ?? null) : null}
+        versionNumber={beforeEntry?.number ?? null}
         onRequested={() => setUndoRequested(true)}
       />
     </div>
