@@ -308,9 +308,14 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
     projectRoot: ctx.projectRoot,
     defaultBranch: ctx.defaultBranch,
   });
+  // A match the rules weighed down (a rename, a push to an unknown branch) is a
+  // question, not a "can't be undone" warning.
   const irreversible =
-    rules.matches.some((match) => IRREVERSIBLE_RULES.has(match.rule.id)) ||
-    classified.risk === "high";
+    rules.matches.some(
+      (match) =>
+        IRREVERSIBLE_RULES.has(match.rule.id) &&
+        (match.risk === undefined || match.risk === "high"),
+    ) || classified.risk === "high";
   const outsideOnly =
     !irreversible && rules.matches.some((match) => match.rule.id === "outside-project");
   const destructive = irreversible;

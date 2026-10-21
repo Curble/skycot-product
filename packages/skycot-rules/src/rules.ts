@@ -309,6 +309,8 @@ const DEPLOY_PROGRAMS = new Set([
 ]);
 /** The same programs when a package manager runs them from `node_modules/.bin`. */
 const RUNNABLE_BINS: ReadonlySet<string> = new Set([...DEPLOY_PROGRAMS, "stripe", "twine", "gh"]);
+/** `mv page.html page.html.bak`: the page disappears from the site. */
+export const RENAMES_AWAY = "renames a file out of the way, so it disappears from the site";
 /** The bare `git push` whose checked-out branch nobody could name. */
 export const UNKNOWN_BRANCH_PUSH =
   "sends your work online — SKYCOT can't tell which branch this uploads to";
@@ -400,6 +402,24 @@ function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
     if (args.some((arg) => arg === "-delete") || /-exec\s+rm\b/.test(segment)) hit("deletes-files");
   }
   if (base === "git" && (sub === "rm" || sub === "clean")) hit("deletes-files");
+  // `mv book.html book.html.bak`: the page leaves the site just as if it were deleted.
+  const moved =
+    base === "mv" ? positional : base === "git" && sub === "mv" ? positional.slice(1) : [];
+  if (moved.length >= 2) {
+    const target = programBaseName(moved.at(-1)!);
+    const sources = moved.slice(0, -1);
+    if (
+      /\.(bak|old|orig|backup|tmp|disabled)$|~$|^\./i.test(target) &&
+      sources.some((source) => !/\.(bak|old|orig|backup|tmp|disabled)$|~$/i.test(source))
+    ) {
+      matches.push({
+        rule: hardRule("deletes-files"),
+        detail: segment,
+        risk: "medium",
+        held: RENAMES_AWAY,
+      });
+    }
+  }
 
   // History.
   if (base === "git") {

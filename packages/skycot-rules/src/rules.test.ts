@@ -8,6 +8,7 @@ import {
   evaluateFileRead,
   evaluateRequest,
   isDestructiveCommand,
+  RENAMES_AWAY,
   UNKNOWN_BRANCH_PUSH,
 } from "./rules.ts";
 
@@ -520,5 +521,25 @@ describe("evaluateCommand — a bare git push is judged by the checked-out branc
     expect(evaluateCommand("git push --all", on("skycot/x")).decision).toBe("hold");
     expect(evaluateCommand("git push --mirror origin", on("skycot/x")).decision).toBe("hold");
     expect(evaluateCommand("git push origin HEAD:main", on("skycot/x")).risk).toBe("high");
+  });
+});
+
+describe("evaluateCommand — renaming a page away (QA-P2-2-03)", () => {
+  it.each(["mv book.html book.html.bak", "git mv book.html .book.html", "mv menu.html menu.html~"])(
+    "holds %s as medium",
+    (command) => {
+      const result = evaluateCommand(command, { projectRoot: ROOT });
+      expect(result.decision).toBe("hold");
+      expect(result.risk).toBe("medium");
+      expect(describeMatches(result.matches)).toBe(RENAMES_AWAY);
+    },
+  );
+
+  it.each([
+    "mv draft.html christmas.html",
+    "mv book.html.bak book.html",
+    "git mv a.css styles/a.css",
+  ])("still allows %s", (command) => {
+    expect(evaluateCommand(command, { projectRoot: ROOT }).decision).toBe("allow");
   });
 });

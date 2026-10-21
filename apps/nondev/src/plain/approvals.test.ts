@@ -389,6 +389,16 @@ describe("hard rules on cards (QA2-03)", () => {
     expect(read.scopeExplainer).toBe("Reads one file outside the project; changes nothing.");
   });
 
+  it("asks about renaming a page away without calling it irreversible (QA-P2-2-03)", () => {
+    const card = describeRuntimeRequest(
+      items.approval("command", { prompt: "mv book.html book.html.bak" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(card.risk).toBe("medium");
+    expect(card.title).not.toMatch(/can't be undone/);
+    expect(card.whyItMatters).toContain("disappears from the site");
+  });
+
   it("says each warning once on a delete card (QA-P2-2-08)", () => {
     const card = describeRuntimeRequest(items.approval("command", { prompt: "rm book.html" }), {
       projectRoot: "/Users/me/site",
