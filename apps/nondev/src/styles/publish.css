@@ -1,0 +1,358 @@
+/* Publish sheet: stepped Settings-style groups inside the macOS sheet.
+   Tokens come from styles/apple.css; nothing here defines a colour of its own. */
+
+.fm-pub {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---- One step ---------------------------------------------------------- */
+.fm-pub-group {
+  background: var(--fm-bg-fill);
+  border-radius: var(--fm-radius-lg);
+  overflow: hidden;
+}
+.fm-pub-group--todo {
+  opacity: 0.55;
+}
+.fm-pub-group--danger {
+  box-shadow: 0 0 0 1.5px var(--fm-red);
+}
+.fm-pub-group--success {
+  background: linear-gradient(180deg, var(--fm-green-soft), transparent 70%), var(--fm-bg-fill);
+}
+.fm-pub-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px 8px 12px;
+}
+.fm-pub-group__title {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.fm-pub-group--success .fm-pub-group__title {
+  font-size: 16px;
+}
+.fm-pub-group__trailing {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--fm-label-2);
+  text-align: right;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fm-pub-group__body {
+  padding: 2px 12px 12px;
+  border-top: 1px solid var(--fm-sep-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.fm-pub-group__body > * + * {
+  margin-top: 10px;
+}
+.fm-pub-danger-text {
+  color: var(--fm-red);
+  font-weight: 500;
+}
+
+/* ---- Safety rows -------------------------------------------------------- */
+.fm-pub-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fm-pub-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+.fm-pub-row + .fm-pub-row {
+  border-top: 1px solid var(--fm-sep-2);
+}
+.fm-pub-row .fm-step {
+  margin-top: -1px;
+}
+.fm-pub-row__text {
+  flex: 1;
+  min-width: 0;
+}
+.fm-pub-row--unknown .fm-pub-row__text {
+  color: var(--fm-label-2);
+}
+.fm-pub-row--fail .fm-pub-row__text {
+  color: var(--fm-red-ink);
+  font-weight: 500;
+}
+.fm-pub-details {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-pub-details summary {
+  cursor: pointer;
+  color: var(--fm-accent);
+  list-style: none;
+}
+.fm-pub-details summary::-webkit-details-marker {
+  display: none;
+}
+.fm-pub-details pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--fm-radius);
+  background: var(--fm-bg-card);
+  font: 11px/1.5 var(--fm-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+.fm-pub-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-pub-link {
+  color: var(--fm-accent);
+  text-decoration: none;
+}
+.fm-pub-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- Choice cards ------------------------------------------------------- */
+.fm-pub-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fm-pub-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-card);
+  color: var(--fm-label);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fm-pub-choice:not(:disabled):hover {
+  box-shadow:
+    0 0 0 1.5px var(--fm-accent),
+    var(--fm-shadow-card);
+}
+.fm-pub-choice:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--fm-accent),
+    var(--fm-shadow-card);
+}
+.fm-pub-choice:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.fm-pub-choice__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--fm-accent-soft);
+  color: var(--fm-accent);
+  flex: none;
+}
+.fm-pub-choice__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fm-pub-choice__title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.fm-pub-choice__text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-pub-guard {
+  display: block;
+  margin-top: 4px;
+  color: var(--fm-orange-ink);
+}
+.fm-pub-choice__advanced,
+.fm-pub-advanced {
+  font-size: 11px;
+  color: var(--fm-label-3);
+}
+.fm-pub-advanced {
+  margin: 0;
+}
+.fm-pub-choice__radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fm-label-3);
+  flex: none;
+  margin-top: 6px;
+}
+.fm-pub-tag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--fm-green-soft);
+  color: var(--fm-green-ink);
+}
+
+/* ---- Confirm ------------------------------------------------------------- */
+.fm-pub-kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fm-pub-kv__row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+}
+.fm-pub-kv__row + .fm-pub-kv__row {
+  border-top: 1px solid var(--fm-sep-2);
+}
+.fm-pub-kv dt {
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-pub-kv dd {
+  margin: 0;
+  min-width: 0;
+}
+.fm-pub-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-pub-failure__actions {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+.fm-pub-failure__detail {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--fm-radius);
+  background: var(--fm-bg-card);
+  font: 11px/1.5 var(--fm-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+
+/* ---- Result -------------------------------------------------------------- */
+.fm-pub-result__sentence {
+  margin: 0;
+  font-size: 13px;
+}
+.fm-pub-linkrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-card);
+}
+.fm-pub-linkrow__url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fm-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.fm-pub-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fm-pub-reviewers__label {
+  display: block;
+  font-size: 12px;
+  color: var(--fm-label-2);
+  margin-bottom: 6px;
+}
+.fm-pub-reviewers__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- Phone width --------------------------------------------------------- */
+@media (max-width: 599px) {
+  .fm-pub-kv__row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .fm-pub-group__head {
+    flex-wrap: wrap;
+  }
+  .fm-pub-group__trailing {
+    flex-basis: 100%;
+    text-align: left;
+    padding-left: 34px;
+    margin-left: 0;
+  }
+  .fm-pub-result__actions .fm-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Hover hint for the header button and strip pill ---------------------- */
+.fm-pub-tip {
+  position: relative;
+  display: inline-flex;
+}
+.fm-pub-tip[data-tip]:hover::after,
+.fm-pub-tip[data-tip]:focus-within::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  max-width: 260px;
+  padding: 6px 9px;
+  border-radius: var(--fm-radius);
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-popover);
+  color: var(--fm-label);
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: normal;
+  width: max-content;
+  pointer-events: none;
+}
