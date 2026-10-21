@@ -1,7 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { ThreadId } from "@t3tools/contracts";
+import type { ServerConfig, ThreadId } from "@t3tools/contracts";
+import { Atom } from "effect/reactivity";
 import { AlertCircle, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -10,18 +11,14 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CREW_NAME } from "../../brand";
 import { navigate, threadHref } from "../../router";
-import { environmentProjects } from "../../state/projects";
+import { environmentProjects, projectEnvironment } from "../../state/projects";
 import {
   readAutonomy,
   useLastProject,
   writeAutonomy,
   writeLastProject,
 } from "../../state/preferences";
-import {
-  providerDisplayName,
-  providerForSelection,
-  resolveDefaultModelSelection,
-} from "../../state/providers";
+import { providerForSelection, resolveDefaultModelSelection } from "../../state/providers";
 import { serverEnvironment } from "../../state/server";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import { threadEnvironment } from "../../state/threads";
@@ -32,10 +29,16 @@ import { Kbd } from "../../ui/Kbd";
 import { MenuItem, Popover } from "../../ui/Popover";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
+import { useColumns } from "../../app/useColumns";
+import { useConnected } from "../../app/useConnection";
+import { catalogEntryFor } from "../settings/providerCatalog";
+import { enabledEnvironmentIdsAtom } from "../../state/catalog";
+import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
-  ALWAYS_ASKS,
-  AUTONOMY_EXPLAINER,
-  AUTONOMY_OPTIONS,
+  autonomyLabel,
+  autonomyLevelOf,
+  PLAIN_AUTONOMY_OPTIONS,
+  plainAutonomyOrDefault,
   runtimeModeFor,
   type Autonomy,
 } from "./autonomy";
@@ -45,8 +48,10 @@ import {
   folderReadiness,
   plainPrivateCopyProblem,
   PRIVATE_COPY_COPY,
+  STARTER_GITIGNORE,
 } from "./privateCopy";
 import { rememberStartNote } from "./startNotes";
+import { TrackingSheet, type TrackingChoice } from "./TrackingSheet";
 
 /**
  * The Home compose box: project chip, autonomy choice, message. Sending creates
@@ -62,13 +67,28 @@ export function NewConversationComposer({
 }) {
   const projects = useAtomValue(environmentProjects.projectsAtom);
   const lastProject = useLastProject();
+  const columns = useColumns();
+  const connected = useConnected();
+  const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
+  const config = useAtomValue(
+    environmentIds[0] === undefined
+      ? EMPTY_CONFIG_ATOM
+      : serverEnvironment.configValueAtom(environmentIds[0]),
+  );
+  // Only the server can say whether the hard rules are enforced; the copy
+  // never claims more than it reports.
+  const policyEnforced = config?.skycotPolicy === true;
   const [chosenKey, setChosenKey] = useState<string | null>(null);
-  const [autonomy, setAutonomy] = useState<Autonomy>(readAutonomy);
+  // Plain surfaces offer only the levels that keep a safety promise; a stored
+  // "hands-off" (from Advanced mode) shows as asking first.
+  const [autonomy, setAutonomy] = useState<Autonomy>(() => plainAutonomyOrDefault(readAutonomy()));
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   const keyOf = (project: EnvironmentProject) => `${project.environmentId}:${project.id}`;
+  // Nothing chosen, nothing remembered and several projects: ask, rather than
+  // aim the first message at whichever project happens to be listed first.
   const project =
     projects.find((candidate) => keyOf(candidate) === (chosenKey ?? preferredProjectKey)) ??
     projects.find(
@@ -77,8 +97,8 @@ export function NewConversationComposer({
         candidate.environmentId === lastProject.environmentId &&
         candidate.id === lastProject.projectId,
     ) ??
-    projects[0] ??
-    null;
+    (projects.length === 1 ? projects[0]! : null);
+  const phone = columns === 1;
 
   return (
     <div className="fm-composer">
@@ -89,7 +109,13 @@ export function NewConversationComposer({
             trigger={
               <Button size="sm" disabled={projects.length === 0}>
                 {project ? <ProjectAvatar project={project} size="sm" /> : null}
-                {project ? project.title : "No project yet"}
+                {project
+                  ? project.title
+                  : projects.length === 0
+                    ? connected
+                      ? "No project yet"
+                      : "Waiting for your Mac…"
+                    : "Choose a project"}
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
               </Button>
             }
@@ -101,6 +127,11 @@ export function NewConversationComposer({
                   checked={project !== null && keyOf(candidate) === keyOf(project)}
                   onSelect={() => {
                     setChosenKey(keyOf(candidate));
+                    // Remembered at once, so a detour through Settings does not reset it.
+                    writeLastProject({
+                      environmentId: candidate.environmentId,
+                      projectId: candidate.id,
+                    });
                     close();
                   }}
                 >
@@ -113,29 +144,33 @@ export function NewConversationComposer({
           <SegmentedControl
             label="Autonomy"
             size="sm"
+            wrap={phone}
+            block={phone}
             value={autonomy}
             onChange={(next) => {
               setAutonomy(next);
               writeAutonomy(next);
             }}
-            options={AUTONOMY_OPTIONS.map((option) => ({
+            options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
               value: option.value,
               label: option.label,
               ...(option.tag ? { tag: option.tag } : {}),
             }))}
           />
         </div>
+        {/* One sentence for the chosen level, not a paragraph about every level. */}
         <p className="fm-help" style={{ marginBottom: 6 }}>
-          {AUTONOMY_EXPLAINER}
+          <b>{autonomyLabel(autonomy)}.</b>{" "}
+          {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
         </p>
-        <p className="fm-rule" style={{ marginBottom: 10 }}>
-          <span className="fm-rule__icon">
-            <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
-          </span>
-          <span>
-            <b>Always asks, in every mode:</b> {ALWAYS_ASKS}
-          </span>
-        </p>
+        {!phone ? (
+          <p className="fm-rule" style={{ marginBottom: 10 }}>
+            <span className="fm-rule__icon">
+              <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
+            </span>
+            <span>{hardRulesStatement(policyEnforced)}</span>
+          </p>
+        ) : null}
         {problem ? (
           <div style={{ marginBottom: 10 }}>
             <Banner tone="warning">{problem}</Banner>
@@ -148,13 +183,15 @@ export function NewConversationComposer({
             text={text}
             onText={setText}
             sending={sending}
+            connected={connected}
+            phone={phone}
             onSend={async (send) => {
               setSending(true);
               setProblem(null);
               const outcome = await send();
               setSending(false);
-              if (outcome !== null) setProblem(outcome);
-              else setText("");
+              if (outcome.kind === "failed") setProblem(outcome.message);
+              else if (outcome.kind === "started") setText("");
             }}
           />
         ) : (
@@ -164,8 +201,13 @@ export function NewConversationComposer({
             onSend={() => {}}
             canSend={false}
             disabled
-            attach
-            placeholder="Open a folder in the sidebar first, then say what you'd like done"
+            placeholder={
+              projects.length === 0
+                ? connected
+                  ? "Open a folder in the sidebar first, then say what you'd like done"
+                  : "Waiting for your Mac…"
+                : "Choose a project above, then say what you'd like done"
+            }
           />
         )}
       </div>
@@ -173,12 +215,23 @@ export function NewConversationComposer({
   );
 }
 
+const EMPTY_CONFIG_ATOM = Atom.make<ServerConfig | null>(null).pipe(
+  Atom.withLabel("nondev-composer-config:empty"),
+);
+
+type SendOutcome =
+  | { readonly kind: "started" }
+  | { readonly kind: "cancelled" }
+  | { readonly kind: "failed"; readonly message: string };
+
 function ComposerField({
   project,
   autonomy,
   text,
   onText,
   sending,
+  connected,
+  phone,
   onSend,
 }: {
   readonly project: EnvironmentProject;
@@ -186,7 +239,9 @@ function ComposerField({
   readonly text: string;
   readonly onText: (value: string) => void;
   readonly sending: boolean;
-  readonly onSend: (send: () => Promise<string | null>) => Promise<void>;
+  readonly connected: boolean;
+  readonly phone: boolean;
+  readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
   const environmentId = project.environmentId;
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -198,21 +253,38 @@ function ComposerField({
   const cwd = project.workspaceRoot;
   const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, { reportFailure: false });
   const initRepository = useAtomCommand(vcsEnvironment.init, { reportFailure: false });
+  const writeFile = useAtomCommand(projectEnvironment.writeFile, { reportFailure: false });
   const commitAll = useAtomCommand(vcsActionManager.runStackedAction({ environmentId, cwd }), {
     reportFailure: false,
   });
   const [phase, setPhase] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<{
+    readonly resolve: (choice: TrackingChoice) => void;
+  } | null>(null);
 
-  const ready = canOperate && modelSelection !== null;
+  // Send is only live when the Mac can actually take the message.
+  const ready = canOperate && modelSelection !== null && connected;
   const trimmed = text.trim();
+
+  const askTracking = () =>
+    new Promise<TrackingChoice>((resolve) => {
+      setTracking({
+        resolve: (choice) => {
+          setTracking(null);
+          resolve(choice);
+        },
+      });
+    });
 
   /**
    * The branch the private copy starts from, or the plain reason there can't
    * be one. A folder with no history gets `git init` and a first saved version
-   * so there is something to copy.
+   * so there is something to copy, but only after the person has agreed to it:
+   * writing a `.git` folder and a version of every file into someone's folder
+   * is not something to do silently.
    */
   const prepareFolder = async (): Promise<
-    { readonly baseBranch: string } | { readonly reason: string }
+    { readonly baseBranch: string } | { readonly reason: string } | { readonly cancelled: true }
   > => {
     const first = await refreshStatus({ environmentId, input: { cwd } });
     if (first._tag === "Failure") {
@@ -221,7 +293,19 @@ function ComposerField({
     }
     let readiness = folderReadiness(first.value);
     if (readiness.kind === "needs-init") {
+      const choice = await askTracking();
+      if (!choice.confirmed) return { cancelled: true };
       setPhase(PRIVATE_COPY_COPY.settingUp);
+      if (choice.starterIgnore) {
+        const written = await writeFile({
+          environmentId,
+          input: { cwd, relativePath: ".gitignore", contents: STARTER_GITIGNORE },
+        });
+        // Not fatal: the folder is still tracked, just without the safety list.
+        if (written._tag === "Failure") {
+          console.warn("[skycot] starter .gitignore failed:", squashAtomCommandFailure(written));
+        }
+      }
       const inited = await initRepository({ environmentId, input: { cwd } });
       if (inited._tag === "Failure") {
         console.warn("[skycot] git init failed:", squashAtomCommandFailure(inited));
@@ -247,8 +331,8 @@ function ComposerField({
     return { baseBranch: readiness.baseBranch };
   };
 
-  const send = async (): Promise<string | null> => {
-    if (!ready || trimmed.length === 0 || modelSelection === null) return null;
+  const send = async (): Promise<SendOutcome> => {
+    if (!ready || trimmed.length === 0 || modelSelection === null) return { kind: "cancelled" };
     const runtimeMode = runtimeModeFor(autonomy, provider);
     const createdAt = new Date().toISOString();
     const message = {
@@ -258,6 +342,10 @@ function ComposerField({
       attachments: [],
     } as const;
     const folder = await prepareFolder();
+    if ("cancelled" in folder) {
+      setPhase(null);
+      return { kind: "cancelled" };
+    }
     const privateCopy =
       "baseBranch" in folder
         ? { baseBranch: folder.baseBranch, branch: branchNameFor(trimmed, randomUUID()) }
@@ -318,44 +406,50 @@ function ComposerField({
     }
     if (started._tag === "Failure") {
       await deleteThread({ environmentId, input: { threadId } });
-      return calm(squashAtomCommandFailure(started));
+      return { kind: "failed", message: calm(squashAtomCommandFailure(started)) };
     }
     if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
     writeLastProject({ environmentId, projectId: project.id });
     navigate(threadHref(environmentId, threadId));
-    return null;
+    return { kind: "started" };
   };
 
-  const placeholder = !canOperate
-    ? "This connection can read conversations but not start them"
-    : modelSelection === null
-      ? "No assistant is set up yet — open Advanced mode to sign in to one"
-      : `Say what you'd like done in ${project.title}…`;
+  const placeholder = !connected
+    ? "Waiting for your Mac to reconnect…"
+    : !canOperate
+      ? "This connection can read conversations but not start them"
+      : modelSelection === null
+        ? "No assistant is set up yet — connect one in Settings → AI assistants"
+        : `Say what you'd like done in ${project.title}…`;
 
   return (
-    <MessageField
-      value={text}
-      onChange={onText}
-      onSend={() => void onSend(send)}
-      canSend={ready && trimmed.length > 0 && !sending}
-      disabled={!ready || sending}
-      attach
-      placeholder={placeholder}
-      label="New conversation"
-      foot={{
-        left: (
-          <>
-            Starts a new conversation in {project.title} · <Kbd>⇧</Kbd>
-            <Kbd>Return</Kbd> for a new line
-          </>
-        ),
-        right: sending
-          ? (phase ?? "Starting…")
-          : provider
-            ? `Using ${providerDisplayName(provider)}`
-            : "",
-      }}
-    />
+    <>
+      <MessageField
+        value={text}
+        onChange={onText}
+        onSend={() => void onSend(send)}
+        canSend={ready && trimmed.length > 0 && !sending}
+        disabled={!ready || sending}
+        placeholder={placeholder}
+        label="New conversation"
+        foot={{
+          left: phone ? (
+            <>Starts a new conversation in {project.title}</>
+          ) : (
+            <>
+              Starts a new conversation in {project.title} · <Kbd>⇧</Kbd>
+              <Kbd>Return</Kbd> for a new line
+            </>
+          ),
+          right: sending
+            ? (phase ?? "Starting…")
+            : provider
+              ? `Using ${catalogEntryFor(String(provider.driver)).brand}`
+              : "",
+        }}
+      />
+      {tracking ? <TrackingSheet projectTitle={project.title} onChoose={tracking.resolve} /> : null}
+    </>
   );
 }
 

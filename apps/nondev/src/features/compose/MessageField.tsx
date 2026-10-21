@@ -24,6 +24,7 @@ export function MessageField({
   readonly placeholder: string;
   readonly disabled?: boolean;
   readonly canSend: boolean;
+  /** Room for an attach button; it only renders once `onAttach` does something. */
   readonly attach?: boolean;
   readonly onAttach?: () => void;
   readonly autoFocus?: boolean;
@@ -41,12 +42,12 @@ export function MessageField({
   return (
     <div>
       <div className="fm-composer__field">
-        {attach ? (
+        {attach && onAttach ? (
           <button
             type="button"
             className="fm-composer__attach"
-            aria-label={onAttach ? "Attach a picture" : "Attaching pictures is coming soon"}
-            disabled={disabled || onAttach === undefined}
+            aria-label="Attach a picture"
+            disabled={disabled}
             onClick={onAttach}
           >
             <Plus size={16} strokeWidth={1.8} aria-hidden />
