@@ -50,6 +50,10 @@
             side && /^[#a-zA-Z0-9(),.% ]{3,64}$/.test(String(side.window)) ? side.window : fallback;
           document.documentElement.style.backgroundColor = colour;
           document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+          // Larger text (Settings → Appearance), applied before first paint too.
+          if (window.localStorage.getItem("skycot:text") === "large") {
+            document.documentElement.setAttribute("data-text", "large");
+          }
         } catch {
           // Storage can be blocked; the stylesheet's defaults take over.
         }

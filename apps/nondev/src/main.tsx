@@ -8,6 +8,7 @@ import { AppAtomRegistryProvider } from "~/rpc/atomRegistry";
 import { App } from "./App";
 import { applyPlatformClasses, writeUiMode } from "./app/platform";
 import { startThemeSync } from "./app/theme";
+import { applyTextSize, readTextSize } from "./features/settings/localPrefs";
 import { FAVICON_DATA_URI, PRODUCT_NAME } from "./brand";
 
 function applyBranding() {
@@ -26,6 +27,7 @@ export const startup = Promise.resolve().then(() => {
   applyBranding();
   applyPlatformClasses();
   startThemeSync();
+  applyTextSize(readTextSize());
   // Being here is choosing the simple interface; the stock UI reads this to
   // offer the way back.
   writeUiMode("simple");
