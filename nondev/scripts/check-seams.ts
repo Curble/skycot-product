@@ -8,8 +8,10 @@
  *
  * What it compares: `git diff --name-only <merge-base(upstream/main, HEAD)>..HEAD`, i.e. every
  * file that differs between us and the point where we last matched upstream. Paths the fork owns
- * outright (apps/nondev/**, nondev/**, docs/nondev/**, .github/workflows/nondev-*.yml,
- * SEAM-MANIFEST.md) are subtracted. Whatever is left must be declared.
+ * outright (`OUR_PATH_GLOBS` in lib.ts: apps/nondev/**, nondev/**, docs/{nondev,legal,security,
+ * qa,skycot-site}/**, packages/skycot-rules/**, apps/server/src/skycot/**, NOTICE,
+ * .github/workflows/nondev-*.yml, SEAM-MANIFEST.md, …) are subtracted. Whatever is left must be
+ * declared.
  *
  * Exit codes
  *   0  every changed upstream file is declared (markers may be missing unless --strict)

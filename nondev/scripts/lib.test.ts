@@ -11,6 +11,7 @@ import {
   globToRegExp,
   idFromPath,
   isOurPath,
+  isSensitivePath,
   joinPkgPath,
   matchesGlob,
   parseConflictPaths,
@@ -43,8 +44,33 @@ NodeTest.describe("glob matching", () => {
     NodeAssert.ok(isOurPath("nondev/scripts/lib.ts"));
     NodeAssert.ok(isOurPath("SEAM-MANIFEST.md"));
     NodeAssert.ok(isOurPath("docs/nondev/guide.md"));
+    NodeAssert.ok(isOurPath("docs/legal/ATTRIBUTION.md"));
+    NodeAssert.ok(isOurPath("docs/security/x.md"));
+    NodeAssert.ok(isOurPath("docs/qa/plan.md"));
+    NodeAssert.ok(isOurPath("docs/skycot-site/index.html"));
+    NodeAssert.ok(isOurPath("NOTICE"));
+    NodeAssert.ok(isOurPath("CONTRIBUTING-THEMES.md"));
+    NodeAssert.ok(isOurPath("packages/skycot-rules/src/index.ts"));
+    NodeAssert.ok(isOurPath("apps/server/src/skycot/providerPolicy.ts"));
+    NodeAssert.ok(isOurPath("apps/nondev/themes-community/ocean.json"));
     NodeAssert.ok(!isOurPath("apps/server/scripts/cli.ts"));
+    NodeAssert.ok(!isOurPath("apps/server/src/skycotx/other.ts"));
+    NodeAssert.ok(!isOurPath("LICENSE"));
     NodeAssert.ok(!isOurPath("pnpm-lock.yaml"));
+  });
+
+  NodeTest.it("flags security-sensitive upstream paths", () => {
+    NodeAssert.ok(isSensitivePath(".github/workflows/ci.yml"));
+    NodeAssert.ok(isSensitivePath("apps/server/src/auth/EnvironmentAuth.ts"));
+    NodeAssert.ok(isSensitivePath("apps/server/src/httpCors.ts"));
+    NodeAssert.ok(isSensitivePath("apps/desktop/src/electron/ElectronProtocol.ts"));
+    NodeAssert.ok(isSensitivePath("package.json"));
+    NodeAssert.ok(isSensitivePath("apps/web/package.json"));
+    NodeAssert.ok(isSensitivePath("patches/foo.patch"));
+    NodeAssert.ok(isSensitivePath("scripts/build-desktop-artifact.ts"));
+    NodeAssert.ok(!isSensitivePath("apps/web/src/App.tsx"));
+    NodeAssert.ok(!isSensitivePath("apps/server/src/orchestration-v2/Orchestrator.ts"));
+    NodeAssert.ok(!isSensitivePath("apps/server/scripts/cli.ts"));
   });
 });
 

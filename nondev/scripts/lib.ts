@@ -9,13 +9,45 @@
 // Keep in sync with nondev/README.md ("Folder rules") and SEAM-MANIFEST.template.md.
 export const OUR_PATH_GLOBS = [
   "apps/nondev/**",
+  "apps/nondev/themes-community/**",
+  "apps/server/src/skycot/**",
+  "packages/skycot-rules/**",
   "nondev/**",
   "docs/nondev/**",
+  "docs/legal/**",
+  "docs/security/**",
+  "docs/qa/**",
+  "docs/skycot-site/**",
   ".github/workflows/nondev-*.yml",
   "SEAM-MANIFEST.md",
+  "NOTICE",
+  "CONTRIBUTING-THEMES.md",
 ] as const;
 
 export const MANIFEST_PATH = "SEAM-MANIFEST.md";
+
+/**
+ * Upstream paths where a change can alter who may do what, what runs in CI, or what gets
+ * installed. A nightly merge that touches any of them is never "clean": the sync marks it
+ * `needs-human` and lists the commits so the reviewer reads those first (audit SEC-10).
+ */
+export const SENSITIVE_PATH_GLOBS = [
+  ".github/**",
+  "apps/server/src/auth/**",
+  "apps/server/src/http.ts",
+  "apps/server/src/httpCors.ts",
+  "apps/desktop/src/electron/**",
+  "packages/contracts/src/auth.ts",
+  "packages/contracts/src/clientRpcPermissions.ts",
+  "**/package.json",
+  "pnpm-workspace.yaml",
+  "patches/**",
+  "scripts/**",
+] as const;
+
+export function isSensitivePath(path: string): boolean {
+  return SENSITIVE_PATH_GLOBS.some((g) => matchesGlob(g, path));
+}
 
 /**
  * Generated files that legitimately differ from upstream without being seams: the lockfile
