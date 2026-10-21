@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  approvalNeedsBranch,
   describeDecision,
   describeRuntimeRequest,
   isDestructiveCommand,
@@ -524,5 +525,65 @@ describe("leaving the sandbox (N-2) and naming the rule (N-5)", () => {
     const other = items.command("ls", {}, { nativeItemRef: { ...codexRef, nativeId: "exec-2" } });
     expect(toolCallInputFor(ask(REASON), [other, command])).toBe(PUSH);
     expect(toolCallInputFor(items.approval("command"), [command])).toBeUndefined();
+  });
+});
+
+describe("a push is judged with the branch the server judged it with (S-1)", () => {
+  // Check A, 2026-10-22: the escalated retry of a sandboxed push from a private copy.
+  const PUSH = "/bin/zsh -lc 'git push --set-upstream origin HEAD'";
+  const REASON = "May I push this branch to the local origin repository outside the workspace?";
+  const ROOT = "/Users/me/.t3/worktrees/foreman-demo-cafe/skycot-upload-this-branch-git-push-4849";
+  const codexRef = { driver: "codex", nativeId: "call_push", strength: "strong" };
+  const escalation = () =>
+    items.approval("command", { prompt: REASON }, { nativeItemRef: codexRef });
+
+  it("a skycot/* push that leaves the sandbox is orange with only the sandbox reason", () => {
+    const card = describeRuntimeRequest(escalation(), {
+      projectRoot: ROOT,
+      toolCallInput: PUSH,
+      currentBranch: "skycot/upload-this-branch-git-push-4849",
+      defaultBranch: "main",
+    });
+    expect(card.title).toBe("May I step outside the safe area?");
+    expect(card.risk).toBe("medium");
+    expect(card.ruleTitle).toBe("Stepping outside the assistant's safe area");
+    expect(card.whyItMatters).not.toMatch(/live version|can't tell which branch/);
+    expect(card.warning).toBeUndefined();
+    expect(decisions(card)).toEqual(["accept", "decline"]);
+  });
+
+  it("the same push from main is red and names the live version", () => {
+    const card = describeRuntimeRequest(escalation(), {
+      projectRoot: ROOT,
+      toolCallInput: PUSH,
+      currentBranch: "main",
+      defaultBranch: "main",
+    });
+    expect(card.risk).toBe("high");
+    expect(card.ruleTitle).toBe(
+      "Stepping outside the assistant's safe area · Uploading straight to the live version",
+    );
+    expect(card.whyItMatters).toContain("uploads to the live version");
+  });
+
+  it("a bare push whose branch nobody knows is a medium question that says so", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "git push" }), {
+      projectRoot: ROOT,
+      currentBranch: null,
+    });
+    expect(card.risk).toBe("medium");
+    expect(card.whyItMatters).toContain("SKYCOT can't tell which branch this uploads to");
+    expect(card.warning).toBeUndefined();
+  });
+
+  it("only a push ask looks the branch up", () => {
+    expect(approvalNeedsBranch(escalation(), PUSH)).toBe(true);
+    expect(approvalNeedsBranch(items.approval("command", { prompt: "git push" }), undefined)).toBe(
+      true,
+    );
+    expect(approvalNeedsBranch(escalation(), "/bin/zsh -lc 'npm test'")).toBe(false);
+    expect(
+      approvalNeedsBranch(items.approval("file-change", { prompt: "git push" }), undefined),
+    ).toBe(false);
   });
 });

@@ -21,7 +21,10 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useEnvironmentQuery } from "~/state/query";
+
 import {
+  approvalNeedsBranch,
   type ApprovalCard,
   type ApprovalOption,
   type ApprovalRisk,
@@ -30,6 +33,7 @@ import {
   toolCallInputFor,
 } from "../../../plain/approvals";
 import { projectAtomOrEmpty } from "../../../state/projects";
+import { vcsEnvironment } from "../../../state/vcs";
 import { CrewAvatar } from "../../../themes/CrewAvatar";
 import { useCrew } from "../../../themes/useCrew";
 import { Banner } from "../../../ui/Banner";
@@ -175,15 +179,27 @@ export function RequestCard({
       : projection.runtimeRequests.find((r) => r.id === item.requestId);
   const toolCallInput =
     item.type === "approval_request" ? toolCallInputFor(item, projection.turnItems) : undefined;
+  // Files live in the thread's private copy when it has one; the project
+  // folder is only "outside" when neither matches.
+  const projectRoot = shell?.worktreePath ?? project?.workspaceRoot ?? null;
+  // A push is judged by branch, as the server's policy judged it: the thread's
+  // own branch first, else the folder's; the live branch from the folder. Only
+  // a push ask pays for the status lookup.
+  const needsBranch = projectRoot !== null && approvalNeedsBranch(item, toolCallInput);
+  const vcsStatus = useEnvironmentQuery(
+    needsBranch ? vcsEnvironment.status({ environmentId, input: { cwd: projectRoot } }) : null,
+  ).data;
   const card = describeRuntimeRequest(item, {
     ...(projectName === null ? {} : { projectName }),
-    // Files live in the thread's private copy when it has one; the project
-    // folder is only "outside" when neither matches.
-    ...(shell?.worktreePath
-      ? { projectRoot: shell.worktreePath }
-      : project
-        ? { projectRoot: project.workspaceRoot }
-        : {}),
+    ...(projectRoot === null ? {} : { projectRoot }),
+    ...(needsBranch
+      ? {
+          currentBranch: shell?.branch ?? vcsStatus?.refName ?? null,
+          defaultBranch:
+            vcsStatus?.branchChanges?.baseRef ??
+            (vcsStatus?.isDefaultRef ? vcsStatus.refName : null),
+        }
+      : {}),
     ...(request ? { responseCapability: request.responseCapability.type } : {}),
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
     ...(toolCallInput === undefined ? {} : { toolCallInput }),

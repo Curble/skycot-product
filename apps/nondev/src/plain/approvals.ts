@@ -120,6 +120,12 @@ export interface ApprovalContext {
   /** The branch everyone sees, when known, so "push to live" can name it. */
   readonly defaultBranch?: string | null;
   /**
+   * The branch checked out where the step runs: the thread's own branch (its `skycot/*`
+   * private copy) or the folder's. The server judges a bare `git push` with it, so the card
+   * must too; null or absent means nobody knows, and the push is a question.
+   */
+  readonly currentBranch?: string | null;
+  /**
    * The command the ask is about, from its own `command_execution` item. Codex shows a reason
    * in the prompt when the step must leave its sandbox, so the prompt alone is not the command.
    */
@@ -345,6 +351,18 @@ export function ruleTitleFor(matches: ReadonlyArray<RuleMatch>): string | undefi
 
 const SANDBOX_RULE = hardRule("leaves-sandbox");
 
+/**
+ * Only a push is judged by branch, so only a push ask needs the folder's branch looked up.
+ * Mirrors the server's `needsBranchContext`.
+ */
+export function approvalNeedsBranch(
+  item: OrchestrationV2TurnItem,
+  toolCallInput: string | undefined,
+): boolean {
+  if (item.type !== "approval_request" || item.requestKind !== "command") return false;
+  return /\bgit\b[\s\S]*\bpush\b/.test(toolCallInput ?? item.prompt ?? "");
+}
+
 function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
   const ask = readCommandAsk({
     driver: item.nativeItemRef?.driver,
@@ -353,9 +371,12 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
   });
   const command = ask.command ?? (ask.leavesSandbox ? "" : (item.prompt ?? ""));
   const classified: CommandClassification = classifyCommand(command);
+  // The same context the server's policy judged with (SkycotPolicyReactor), so the card
+  // never paints a hold the engine did not make.
   const inside: RuleEvaluation = evaluateCommand(command, {
     projectRoot: ctx.projectRoot,
     defaultBranch: ctx.defaultBranch,
+    currentBranch: ctx.currentBranch,
   });
   const rules = ask.leavesSandbox ? withLeavesSandbox(inside, ask.sandboxReason) : inside;
   const leavesSandbox = ask.leavesSandbox;
