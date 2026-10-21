@@ -15,6 +15,7 @@
  *
  * Exit codes: 0 ok, 1 validation failed (details on stderr).
  */
+import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";
 import * as NodeOS from "node:os";
@@ -55,7 +56,7 @@ interface Seam {
   readonly upstreamDefault: string;
   /** Effective value for this brand (derived from the env record). */
   readonly effective: (env: Record<string, string>) => string;
-  readonly mechanism: "env seam" | "upstream env (no edit)" | "hard edit (JSON)";
+  readonly mechanism: "env seam" | "upstream env (no edit)" | "hard edit (JSON)" | "hard edit (TS)";
 }
 
 const UPSTREAM_PRODUCT_NAME = "T3 Code (Beta)";
@@ -254,7 +255,79 @@ function seams(): Seam[] {
       effective: (e) => e.T3CODE_DESKTOP_ARTIFACT_NAME!,
       mechanism: "env seam",
     },
+    {
+      id: "brand-cli-update-repo",
+      file: "packages/shared/src/cliRelease.ts",
+      constant: "CLI_RELEASE_REPOSITORY (`update` command feed + release download base)",
+      envName: "T3CODE_CLI_UPDATE_REPOSITORY",
+      upstreamDefault: '"pingdotgg/t3code"',
+      effective: (e) => e.T3CODE_CLI_UPDATE_REPOSITORY!,
+      mechanism: "env seam",
+    },
+    {
+      id: "telemetry-default-off",
+      file: "apps/server/src/telemetry/AnalyticsService.ts",
+      constant: "telemetry enabled when T3CODE_TELEMETRY_ENABLED is unset",
+      envName: "T3CODE_TELEMETRY_ENABLED",
+      // Recorded in the marker comment: the line itself now says withDefault(false).
+      upstreamDefault: "upstream: withDefault(true)",
+      effective: () => "false (env override still honoured)",
+      mechanism: "hard edit (TS)",
+    },
   ];
+}
+
+/** `owner/repo` of the git `origin` remote, or undefined when there is none (fresh export, CI mirror). */
+function originRepository(): string | undefined {
+  try {
+    const url = NodeChildProcess.execFileSync("git", ["remote", "get-url", "origin"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const m = url.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/u);
+    return m ? `${m[1]}/${m[2]}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Checks that only make sense against the resolved environment (not brand.json alone). */
+function checkEnv(brand: Brand, env: Record<string, string>): string[] {
+  const errors: string[] = [];
+  for (const name of ["T3CODE_DESKTOP_UPDATE_REPOSITORY", "T3CODE_CLI_UPDATE_REPOSITORY"]) {
+    if (env[name] !== brand.updateRepository)
+      errors.push(
+        `env.cjs: ${name} must follow brand.json updateRepository (${brand.updateRepository})`,
+      );
+    if ((env[name] ?? "").toLowerCase().startsWith("pingdotgg/"))
+      errors.push(
+        `env.cjs: ${name} points at upstream (${env[name]}); users would update onto T3 Code`,
+      );
+  }
+  // Releases are published by the repository the code lives in; a feed naming any other repo
+  // either 404s forever or, worse, serves someone else's binaries.
+  const origin = originRepository();
+  if (origin && origin.toLowerCase() !== brand.updateRepository.toLowerCase())
+    errors.push(
+      `brand.json: updateRepository "${brand.updateRepository}" differs from the git origin "${origin}"; the update feed must be the repository that publishes releases`,
+    );
+  if (!brand.telemetryEnabledByDefault && env.T3CODE_TELEMETRY_ENABLED !== "false")
+    errors.push(
+      'env.cjs: T3CODE_TELEMETRY_ENABLED must be "false" while telemetryEnabledByDefault is false',
+    );
+  if (
+    !brand.telemetry?.posthogKey &&
+    !/^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/u.test(env.T3CODE_POSTHOG_HOST ?? "")
+  )
+    errors.push(
+      `env.cjs: with no PostHog key of our own, T3CODE_POSTHOG_HOST must be the loopback sink, not "${env.T3CODE_POSTHOG_HOST}"`,
+    );
+  for (const file of ["LICENSE", "NOTICE", "nondev/bin/skycot.cjs"]) {
+    if (read(file) === undefined)
+      errors.push(`${file}: missing (shipped in every bundle / the only supported CLI entry)`);
+  }
+  return errors;
 }
 
 /** Values upstream already reads from the environment: no file edit, only env.cjs. */
@@ -280,12 +353,6 @@ function upstreamEnvKnobs(
         "scripts/build-desktop-artifact.ts resolveGitHubPublishConfig (T3CODE_DESKTOP_UPDATE_REPOSITORY, else GITHUB_REPOSITORY, else no feed)",
       upstreamDefault: "pingdotgg/t3code via GITHUB_REPOSITORY in upstream CI",
       effective: env.T3CODE_DESKTOP_UPDATE_REPOSITORY!,
-    },
-    {
-      constant: "telemetry enabled",
-      where: "apps/server/src/telemetry/AnalyticsService.ts (T3CODE_TELEMETRY_ENABLED)",
-      upstreamDefault: "true",
-      effective: env.T3CODE_TELEMETRY_ENABLED!,
     },
     {
       constant: "telemetry PostHog key / host",
@@ -395,7 +462,7 @@ function main(): number {
     return 0;
   }
 
-  const errors = [...validateBrand(brand), ...checkSeams(brand)];
+  const errors = [...validateBrand(brand), ...checkSeams(brand), ...checkEnv(brand, env)];
 
   if (!quiet) {
     const out: string[] = [];
@@ -436,7 +503,10 @@ function main(): number {
       "How to use: desktop builds load env.cjs from boot.ts automatically. For the build script and the CLI:",
     );
     out.push("  node --import ./nondev/brand/env.cjs scripts/build-desktop-artifact.ts <args>");
-    out.push("  node --import ./nondev/brand/env.cjs apps/server/dist/bin.mjs");
+    out.push("  node nondev/bin/skycot.cjs serve        # the CLI wrapper; loads env.cjs itself");
+    out.push(
+      `  analytics: ${env.T3CODE_TELEMETRY_ENABLED === "false" ? "off" : "ON"}, sink ${env.T3CODE_POSTHOG_HOST} (AnalyticsService default is off even without env.cjs)`,
+    );
     out.push(
       "  eval \"$(node nondev/scripts/apply-brand.ts --env | sed 's/^/export /')\"   # or --github-env in Actions",
     );

@@ -53,6 +53,8 @@ function resolveBrandEnv(b, host) {
     T3CODE_CLIENT_ENTRY: clientEntryPath,
     // electron-updater feed; never upstream's binaries (already env-driven upstream).
     T3CODE_DESKTOP_UPDATE_REPOSITORY: b.updateRepository,
+    // `skycot update` release feed (seam: brand-cli-update-repo); same repository as the desktop feed.
+    T3CODE_CLI_UPDATE_REPOSITORY: b.updateRepository,
     // electron-builder artifact file name (seam: brand-artifact-name). `${...}` are electron-builder macros.
     T3CODE_DESKTOP_ARTIFACT_NAME: `${b.artifactPrefix}-\${version}-\${arch}.\${ext}`,
     // Analytics: off by default, and never upstream's PostHog project (already env-driven upstream).
