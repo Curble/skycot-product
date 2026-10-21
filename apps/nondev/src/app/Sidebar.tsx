@@ -33,6 +33,7 @@ import { AdvancedModeSheet } from "./AdvancedModeSheet";
 import { OpenFolderSheet } from "./OpenFolderSheet";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
+import { useFamily } from "../features/family/FamilyProvider";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -51,6 +52,7 @@ export function AppSidebar({
   const [folderSheetOpen, setFolderSheetOpen] = useState(false);
   const [advancedSheetOpen, setAdvancedSheetOpen] = useState(false);
   const crew = useCrew();
+  const family = useFamily();
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
@@ -186,18 +188,21 @@ export function AppSidebar({
             onClick={() => select(() => navigate(SETTINGS_HREF))}
           />
         </div>
-        <div className="fm-sidebar__footer-row">
-          {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
-          <Button
-            size="sm"
-            variant="quiet"
-            icon={Wrench}
-            block
-            onClick={() => setAdvancedSheetOpen(true)}
-          >
-            Open {ADVANCED_MODE_LABEL}…
-          </Button>
-        </div>
+        {/* The Family profile keeps the developer tools out of reach; Settings › Family has the parent's way in. */}
+        {family.enabled ? null : (
+          <div className="fm-sidebar__footer-row">
+            {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
+            <Button
+              size="sm"
+              variant="quiet"
+              icon={Wrench}
+              block
+              onClick={() => setAdvancedSheetOpen(true)}
+            >
+              Open {ADVANCED_MODE_LABEL}…
+            </Button>
+          </div>
+        )}
       </footer>
 
       {primaryEnvironmentId ? (

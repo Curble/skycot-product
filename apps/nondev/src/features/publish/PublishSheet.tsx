@@ -1,6 +1,7 @@
 // The Publish ceremony as one macOS sheet with stepped groups:
 //   1 Quick safety check → 2 How would you like to publish? → 3 Confirm → 4 Result
-// Nothing is pre-selected, nothing leaves the Mac before step 3's button, and
+// With the Family profile on, a "Parent code" step sits before Confirm.
+// Nothing is pre-selected, nothing leaves the Mac before the Confirm button, and
 // the default branch is never pushed from here (plain/git.ts guarantees it).
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -17,7 +18,17 @@ import type {
   PullRequestReviewerCandidate,
   ThreadId,
 } from "@t3tools/contracts";
-import { Check, Copy, ExternalLink, Globe, Send, Undo2, Upload, UserRound } from "lucide-react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Globe,
+  KeyRound,
+  Send,
+  Undo2,
+  Upload,
+  UserRound,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { newMessageId, randomUUID } from "~/lib/utils";
@@ -55,12 +66,15 @@ import {
   vcsActionManager,
   vcsEnvironment,
 } from "./state";
+import { familyCopy } from "../family/copy";
+import { useFamily } from "../family/FamilyProvider";
+import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { rememberKeptVersion } from "../review/keptVersions";
 import { latestReviewable } from "../review/turnReview";
 import { rememberUpload } from "./uploads";
 import { usePublishData } from "./usePublishData";
 
-type Phase = "choose" | "confirm" | "done";
+type Phase = "choose" | "code" | "confirm" | "done";
 type Choice = "review" | "live";
 
 type Outcome =
@@ -139,8 +153,12 @@ function PublishSheetBody({
   });
   const projectName = project?.title ?? null;
   const crew = useCrew();
+  const family = useFamily();
+  // Both ways out (review and live) wait for the code while the Family profile is on.
+  const needsCode = family.isLocked("publish");
 
   const [phase, setPhase] = useState<Phase>("choose");
+  const codeEntry = useParentCodeEntry(() => setPhase("confirm"));
   const [choice, setChoice] = useState<Choice | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -150,10 +168,11 @@ function PublishSheetBody({
   // The choice cards unmount when a step changes, which would drop focus to
   // the page body (and Escape with it); focus follows to the current step's
   // heading instead — a heading, so nothing is pre-selected.
-  const stepHeads = useRef<Array<HTMLElement | null>>([]);
+  const stepHeads = useRef<Partial<Record<Phase | "check", HTMLElement | null>>>({});
   useEffect(() => {
-    const step = phase === "choose" ? 1 : phase === "confirm" ? 2 : 3;
-    const head = stepHeads.current[step];
+    // The code step focuses its field instead (autoFocus): a heading would hide the keyboard on a phone.
+    if (phase === "code") return;
+    const head = stepHeads.current[phase];
     if (head && !head.contains(document.activeElement)) head.focus({ preventScroll: false });
   }, [phase]);
 
@@ -204,7 +223,7 @@ function PublishSheetBody({
   const choose = (next: Choice) => {
     setChoice(next);
     setFailure(null);
-    setPhase("confirm");
+    setPhase(needsCode ? "code" : "confirm");
   };
 
   const fail = (error: unknown) => {
@@ -250,7 +269,7 @@ function PublishSheetBody({
   };
 
   const confirm = async () => {
-    if (busy || choice === null || !data.canWrite) return;
+    if (busy || choice === null || !data.canWrite || phase !== "confirm") return;
     setBusy(true);
     setFailure(null);
     try {
@@ -330,10 +349,24 @@ function PublishSheetBody({
 
   const confirmingLive = phase === "confirm" && choice === "live";
   const title = projectName ? `Publish · ${projectName}` : "Publish";
+  const confirmNumber = needsCode ? 4 : 3;
 
   const actions =
     phase === "choose" ? (
       <Button onClick={onClose}>Not now</Button>
+    ) : phase === "code" ? (
+      <>
+        <Button onClick={() => setPhase("choose")} disabled={codeEntry.busy}>
+          Not yet
+        </Button>
+        <Button
+          variant="primary"
+          disabled={!codeEntry.canSubmit}
+          onClick={() => void codeEntry.submit()}
+        >
+          {codeEntry.busy ? "Checking…" : "Continue"}
+        </Button>
+      </>
     ) : phase === "confirm" ? (
       <>
         <Button onClick={() => setPhase("choose")} disabled={busy}>
@@ -371,13 +404,13 @@ function PublishSheetBody({
       open
       onClose={busy ? () => {} : onClose}
       wide
-      icon={confirmingLive ? Globe : Upload}
-      iconTone={confirmingLive ? "red" : "blue"}
+      icon={confirmingLive ? Globe : phase === "code" ? KeyRound : Upload}
+      iconTone={confirmingLive ? "red" : phase === "code" ? "grey" : "blue"}
       title={title}
       description="Nothing leaves your Mac until you press a button below. Each step is one plain question."
       initialFocus="body"
       dismissOnBackdrop={!busy}
-      sober={confirmingLive}
+      sober={confirmingLive || phase === "code"}
       actions={actions}
       note={phase === "confirm" && choice === "live" ? copy.git.neverPushLive : undefined}
     >
@@ -399,7 +432,7 @@ function PublishSheetBody({
           trailing={safety.summary}
           expanded={phase === "choose"}
           headRef={(node) => {
-            stepHeads.current[0] = node;
+            stepHeads.current.check = node;
           }}
         >
           <ul className="fm-pub-rows" aria-label="Safety check results">
@@ -426,9 +459,13 @@ function PublishSheetBody({
                 : review.label
           }
           expanded={phase === "choose"}
-          onChange={phase === "confirm" && !busy ? () => setPhase("choose") : undefined}
+          onChange={
+            (phase === "confirm" || phase === "code") && !busy
+              ? () => setPhase("choose")
+              : undefined
+          }
           headRef={(node) => {
-            stepHeads.current[1] = node;
+            stepHeads.current.choose = node;
           }}
         >
           <div className="fm-pub-choices" role="group" aria-label="Ways to publish">
@@ -477,10 +514,35 @@ function PublishSheetBody({
           ) : null}
         </StepGroup>
 
+        {needsCode ? (
+          <StepGroup
+            number={3}
+            title="Parent code"
+            state={phase === "choose" ? "todo" : phase === "code" ? "now" : "done"}
+            trailing={
+              phase === "code"
+                ? familyCopy.title
+                : phase === "choose"
+                  ? undefined
+                  : "Confirmed by a parent"
+            }
+            expanded={phase === "code"}
+            headRef={(node) => {
+              stepHeads.current.code = node;
+            }}
+          >
+            <p className="fm-pub-help">
+              {choice === "live" ? "Putting it live" : "Sending for review"} needs a parent&apos;s
+              OK while the {familyCopy.title} is on.
+            </p>
+            <ParentCodeEntry entry={codeEntry} autoFocus />
+          </StepGroup>
+        ) : null}
+
         <StepGroup
-          number={3}
+          number={confirmNumber}
           title={
-            phase === "choose"
+            phase === "choose" || phase === "code"
               ? "Confirm"
               : choice === "live"
                 ? live.kind === "script"
@@ -492,8 +554,10 @@ function PublishSheetBody({
                     ? "Upload a draft line?"
                     : "Send for review?"
           }
-          state={phase === "choose" ? "todo" : phase === "confirm" ? "now" : "done"}
-          danger={choice === "live" && phase !== "choose"}
+          state={
+            phase === "choose" || phase === "code" ? "todo" : phase === "confirm" ? "now" : "done"
+          }
+          danger={choice === "live" && (phase === "confirm" || phase === "done")}
           trailing={
             phase === "confirm" && choice === "live" ? (
               <span className="fm-pub-danger-text">Leaves your Mac · asks every time</span>
@@ -503,7 +567,7 @@ function PublishSheetBody({
           }
           expanded={phase === "confirm"}
           headRef={(node) => {
-            stepHeads.current[2] = node;
+            stepHeads.current.confirm = node;
           }}
         >
           <ConfirmBody choice={choice} review={review} live={live} data={data} />
@@ -519,7 +583,7 @@ function PublishSheetBody({
         </StepGroup>
 
         <StepGroup
-          number={4}
+          number={confirmNumber + 1}
           title={
             outcome === null ? (
               "Result"
@@ -543,7 +607,7 @@ function PublishSheetBody({
           success={phase === "done"}
           expanded={phase === "done"}
           headRef={(node) => {
-            stepHeads.current[3] = node;
+            stepHeads.current.done = node;
           }}
         >
           {outcome?.kind === "live" ? <ConfettiBurst /> : null}

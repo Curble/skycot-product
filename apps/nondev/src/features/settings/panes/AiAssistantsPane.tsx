@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ADVANCED_MODE_LABEL } from "../../../brand";
-import { WELCOME_HREF } from "../../../router";
+import { WELCOME_HREF, navigate } from "../../../router";
+import { useFamily } from "../../family/FamilyProvider";
 import { providerForSelection, resolveDefaultModelSelection } from "../../../state/providers";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
@@ -24,6 +25,7 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
   const [moreOpen, setMoreOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const os = config?.environment.platform.os ?? "darwin";
+  const family = useFamily();
 
   // Status can be stale while a sign-in happened in Terminal; probe on arrival.
   useEffect(() => {
@@ -129,8 +131,12 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
         />
         <ListRow
           title="Run the welcome steps again"
-          subtitle="The short first-run guide: assistant, folder, autonomy, look."
-          href={WELCOME_HREF}
+          subtitle={`The short first-run guide: who it's for, assistant, folder, autonomy, look.${family.enabled ? " Asks for the parent code." : ""}`}
+          onClick={() => {
+            void family.requireParentCode("rerunOnboarding").then((ok) => {
+              if (ok) navigate(WELCOME_HREF);
+            });
+          }}
           chevron
         />
       </SettingsGroup>

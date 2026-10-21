@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
-import { Bell, ChevronDown, ChevronUp, ShieldCheck } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, KeyRound, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -20,6 +20,9 @@ import { Sheet } from "../../ui/Sheet";
 import { StepBadge } from "../../ui/StepBadge";
 import { Switch } from "../../ui/Switch";
 import { TextField } from "../../ui/TextField";
+import { actionReason } from "../family/copy";
+import { useFamily } from "../family/FamilyProvider";
+import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import {
   DAY_SHORT,
   DEFAULT_SCHEDULE_DRAFT,
@@ -64,6 +67,10 @@ export function NewAutomationSheet({
   const [webhook, setWebhook] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // With the Family profile on, the form gives way to the code prompt before saving.
+  const family = useFamily();
+  const needsCode = family.isLocked("createAutomation");
+  const [phase, setPhase] = useState<"form" | "code">("form");
 
   const project = projects.find((entry) => entry.id === projectId) ?? null;
   const modelSelection = resolveDefaultModelSelection(providers, project);
@@ -83,6 +90,7 @@ export function NewAutomationSheet({
 
   const create = async () => {
     if (!ready || project === null || modelSelection === null || schedule === null) return;
+    setPhase("form");
     setBusy(true);
     setProblem(null);
     const outcome = await upsert({
@@ -114,6 +122,38 @@ export function NewAutomationSheet({
     }
     onClose();
   };
+  const codeEntry = useParentCodeEntry(() => void create());
+
+  if (phase === "code") {
+    return (
+      <Sheet
+        open
+        onClose={() => setPhase("form")}
+        icon={KeyRound}
+        iconTone="grey"
+        title="Parent code"
+        description={actionReason("createAutomation")}
+        sober
+        initialFocus="first"
+        actions={
+          <>
+            <Button onClick={() => setPhase("form")} disabled={codeEntry.busy}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!codeEntry.canSubmit}
+              onClick={() => void codeEntry.submit()}
+            >
+              {codeEntry.busy ? "Checking…" : "Create automation"}
+            </Button>
+          </>
+        }
+      >
+        <ParentCodeEntry entry={codeEntry} autoFocus />
+      </Sheet>
+    );
+  }
 
   const presetOptions: ReadonlyArray<{ value: SchedulePreset; label: string }> = [
     { value: "daily", label: "Daily" },
@@ -137,8 +177,12 @@ export function NewAutomationSheet({
           <Button onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void create()} disabled={!ready || busy}>
-            {busy ? "Saving…" : "Create automation"}
+          <Button
+            variant="primary"
+            onClick={() => (needsCode ? setPhase("code") : void create())}
+            disabled={!ready || busy}
+          >
+            {busy ? "Saving…" : needsCode ? "Continue" : "Create automation"}
           </Button>
         </>
       }

@@ -10,6 +10,7 @@ import {
   useSkycotPolicyEnabled,
   useWriteServerDefaultRuntimeMode,
 } from "../../../state/autonomy";
+import { settingsHref } from "../../../router";
 import { ListRow } from "../../../ui/ListRow";
 import { SegmentedControl } from "../../../ui/SegmentedControl";
 import { StepBadge } from "../../../ui/StepBadge";
@@ -22,6 +23,9 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "../../compose/autonomy";
+import { familyCopy } from "../../family/copy";
+import { FamilyAutonomyLock } from "../../family/FamilyLock";
+import { useFamily } from "../../family/FamilyProvider";
 import { SettingsGroup } from "../SettingsGroup";
 
 /**
@@ -36,14 +40,18 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
   const serverMode: RuntimeMode | null = useServerDefaultRuntimeMode(environmentId);
   const writeServerMode = useWriteServerDefaultRuntimeMode(environmentId);
   const policyEnforced = useSkycotPolicyEnabled(environmentId);
+  const family = useFamily();
 
   const serverAutonomy: Autonomy | null =
     serverMode === null ? null : autonomyForRuntimeMode(serverMode);
   const handsOffOnServer = serverMode === "full-access";
   // The control can only show the plain levels; a hands-off server default is shown as a
   // warning row with a one-tap way back instead of a selected segment.
-  const selected: Autonomy =
-    serverAutonomy === null || serverAutonomy === "hands-off" ? "ask-first" : serverAutonomy;
+  const selected: Autonomy = family.enabled
+    ? "ask-first"
+    : serverAutonomy === null || serverAutonomy === "hands-off"
+      ? "ask-first"
+      : serverAutonomy;
   const info = AUTONOMY_LEVELS[autonomyLevelOf(selected)];
 
   const choose = (next: Autonomy) => {
@@ -55,21 +63,36 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
     <>
       <SettingsGroup
         title="How much should the AI do on its own?"
-        footer={`${describeAutonomyLevel(autonomyLevelOf(selected), { policyEnforced })} ${info.hint}`}
+        footer={
+          family.enabled ? (
+            <>
+              {familyCopy.managedElsewhere.replace("Settings › Family.", "")}
+              <a href={settingsHref("family")}>Settings › Family</a>.
+            </>
+          ) : (
+            `${describeAutonomyLevel(autonomyLevelOf(selected), { policyEnforced })} ${info.hint}`
+          )
+        }
       >
         <div className="fm-setting-block">
-          <SegmentedControl
-            label="Default autonomy"
-            value={selected}
-            onChange={choose}
-            block
-            options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-              ...(option.tag ? { tag: option.tag } : {}),
-            }))}
-          />
-          {handsOffOnServer ? (
+          {family.enabled ? (
+            <FamilyAutonomyLock
+              note={`${familyCopy.title} · ${describeAutonomyLevel("askMeFirst", { policyEnforced })}`}
+            />
+          ) : (
+            <SegmentedControl
+              label="Default autonomy"
+              value={selected}
+              onChange={choose}
+              block
+              options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+                ...(option.tag ? { tag: option.tag } : {}),
+              }))}
+            />
+          )}
+          {handsOffOnServer && !family.enabled ? (
             <div className="fm-setting-warning" role="alert">
               <p>
                 Your Mac is currently set to <b>{AUTONOMY_LEVELS.fullyHandsOff.label}</b> (chosen in{" "}

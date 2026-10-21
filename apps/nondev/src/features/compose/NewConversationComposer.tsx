@@ -33,6 +33,8 @@ import { useColumns } from "../../app/useColumns";
 import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
+import { FamilyAutonomyLock } from "../family/FamilyLock";
+import { useFamily } from "../family/FamilyProvider";
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
   autonomyLabel,
@@ -79,9 +81,14 @@ export function NewConversationComposer({
   // never claims more than it reports.
   const policyEnforced = config?.skycotPolicy === true;
   const [chosenKey, setChosenKey] = useState<string | null>(null);
+  const family = useFamily();
   // Plain surfaces offer only the levels that keep a safety promise; a stored
-  // "hands-off" (from Advanced mode) shows as asking first.
-  const [autonomy, setAutonomy] = useState<Autonomy>(() => plainAutonomyOrDefault(readAutonomy()));
+  // "hands-off" (from Advanced mode) shows as asking first. The Family profile
+  // pins it to asking first.
+  const [chosenAutonomy, setAutonomy] = useState<Autonomy>(() =>
+    plainAutonomyOrDefault(readAutonomy()),
+  );
+  const autonomy: Autonomy = family.enabled ? "ask-first" : chosenAutonomy;
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -140,25 +147,31 @@ export function NewConversationComposer({
               ))
             }
           </Popover>
-          <span className="fm-composer__label">
-            How much should <CrewName /> do on its own?
-          </span>
-          <SegmentedControl
-            label="Autonomy"
-            size="sm"
-            wrap={phone}
-            block={phone}
-            value={autonomy}
-            onChange={(next) => {
-              setAutonomy(next);
-              writeAutonomy(next);
-            }}
-            options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-              ...(option.tag ? { tag: option.tag } : {}),
-            }))}
-          />
+          {family.enabled ? (
+            <FamilyAutonomyLock />
+          ) : (
+            <>
+              <span className="fm-composer__label">
+                How much should <CrewName /> do on its own?
+              </span>
+              <SegmentedControl
+                label="Autonomy"
+                size="sm"
+                wrap={phone}
+                block={phone}
+                value={autonomy}
+                onChange={(next) => {
+                  setAutonomy(next);
+                  writeAutonomy(next);
+                }}
+                options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                  ...(option.tag ? { tag: option.tag } : {}),
+                }))}
+              />
+            </>
+          )}
         </div>
         {/* One sentence for the chosen level, not a paragraph about every level. */}
         <p className="fm-help" style={{ marginBottom: 6 }}>
