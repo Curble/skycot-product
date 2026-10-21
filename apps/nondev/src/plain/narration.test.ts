@@ -595,11 +595,27 @@ describe("narration nits (N-4)", () => {
     expect(classifyCommand("pwd").past).toBe("Looked around the project files");
     expect(classifyCommand('rg --files; exit "$failed"').past).toBe("Listed the project's files");
     expect(classifyCommand("ls -la; ls -la src").past).toBe("Looked around the project files");
+    expect(
+      classifyCommand("cat ~/.codex/skills/a/SKILL.md ~/.codex/skills/b/SKILL.md").past,
+    ).not.toMatch(/(the skill text).*\1/);
   });
 
   it("reads the live check loop, score-keeping and all, as one check", () => {
     const loop =
       '/bin/zsh -lc \'failed=0\nfor file in *.html; do\n  if curl --fail --silent --show-error "file://$PWD/$file" | cmp -s "$file" -; then\n    printf \'"\'PASS %s\\\\n\' \\""\'$file"\n  else\n    printf \'"\'FAIL %s\\\\n\' \\""\'$file"\n    failed=1\n  fi\ndone\nexit "$failed"\'';
     expect(classifyCommand(loop).past).toBe("Checked that every page opens");
+  });
+});
+
+describe("a failed step is never told as if it happened (N-4)", () => {
+  it("says it tried and it didn't work", () => {
+    const blocked = items.command(
+      "/bin/zsh -lc 'python3 -m http.server 8765 --bind 127.0.0.1'",
+      { exitCode: 1 },
+      { status: "failed" },
+    );
+    expect(describeTurnItem(blocked).headline).toBe(
+      "Tried to start a local preview of the site — it didn't work",
+    );
   });
 });

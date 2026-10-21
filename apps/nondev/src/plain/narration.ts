@@ -391,7 +391,8 @@ function lookAt(targets: ReadonlyArray<string>): Verb {
   const what =
     targets.length === 1
       ? describeFile(targets[0]!).noun
-      : `${pluralize(targets.length, "file")}: ${joinList(targets.map((t) => describeFile(t).noun))}`;
+      : // Two SKILL.md files are "2 files: the skill text", not "the skill text and the skill text".
+        `${pluralize(targets.length, "file")}: ${joinList([...new Set(targets.map((t) => describeFile(t).noun))])}`;
   return verb(`look at ${what}`, `looked at ${what}`, `looking at ${what}`);
 }
 
@@ -1769,7 +1770,10 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
           ? withOutcome(bare, status, item)
           : status === "done" && (item.exitCode ?? 0) !== 0
             ? `${bare} (didn't go to plan)`
-            : bare;
+            : status === "failed"
+              ? // "Started a local preview" must not be said of a server the sandbox blocked.
+                `Tried to ${classified.infinitive} — it didn't work`
+              : bare;
       return {
         headline,
         detail: classified.warning,
