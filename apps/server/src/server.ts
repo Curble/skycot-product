@@ -8,6 +8,9 @@ import * as PullRequestWatchReactor from "./orchestration-v2/PullRequestWatchRea
 import * as DelegatedTaskQuestionReactor from "./orchestration-v2/DelegatedTaskQuestionReactor.ts";
 import * as SkycotPolicy from "./skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-reactor
 import * as SkycotPolicyReactor from "./skycot/SkycotPolicyReactor.ts"; // nondev-seam: skycot-policy-reactor
+import * as SkycotFamily from "./skycot/SkycotFamily.ts"; // nondev-seam: skycot-family
+import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts"; // nondev-seam: skycot-family
+import * as SkycotFamilyHttp from "./skycot/SkycotFamilyHttp.ts"; // nondev-seam: skycot-family
 // Effect wraps this raw Node HTTP server after its startup and write-error guards attach.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
@@ -722,6 +725,7 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerBrowserStream.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
+    SkycotFamilyHttp.layer, // nondev-seam: skycot-family
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
@@ -739,6 +743,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
   Layer.provide(layerCommandReadiness),
+  Layer.provide(SkycotFamilyGate.layer.pipe(Layer.provide(ProjectionStoreV2.layer))), // nondev-seam: skycot-family
   Layer.provide(ServerHttp.layerBrowserApiCors),
   Layer.provide(ServerHttp.layerHttpCompression),
 );
@@ -1076,6 +1081,8 @@ const layerMakeServer = Layer.unwrap(
       Layer.provideMerge(FetchHttpClient.layer),
       Layer.provide(VcsProcess.layer),
       Layer.provideMerge(AgentScopeLive.layer),
+      // nondev-seam: skycot-family (one instance under everything; inert until a parent turns it on)
+      Layer.provideMerge(SkycotFamily.layer),
       Layer.provideMerge(layerPlatformServices),
     );
   }),

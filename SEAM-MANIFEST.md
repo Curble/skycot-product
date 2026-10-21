@@ -73,6 +73,22 @@ environment: `T3CODE_HOME` (state dir, default `~/.t3`), `T3CODE_DESKTOP_APP_USE
 `T3CODE_DESKTOP_UPDATE_REPOSITORY`, `T3CODE_TELEMETRY_ENABLED` / `T3CODE_POSTHOG_*`, and the Clerk /
 relay values (absent `.env` ⇒ T3 Connect disabled).
 
+## Family profile seams (22 October 2026)
+
+The Family profile is enforced by the engine (`docs/nondev/FAMILY.md`): its state lives in
+`<T3 home>/userdata/skycot-family.json`, managed by `apps/server/src/skycot/SkycotFamily.ts`
+(fork-owned, under the `skycot-policy-files` glob). Every seam below is inert while no profile
+file exists, so upstream behaviour is unchanged; the optional ones read the service with
+`Effect.serviceOption` so upstream layer types and tests are untouched.
+
+| id                         | file                                                         | lines                                         | change                                                                                                                       | reason                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| skycot-family              | `apps/server/src/server.ts`                                  | 11-13, 728, 746, 1084-1085 (6 lines appended) | imports; `SkycotFamilyHttp.layer` route; `SkycotFamilyGate.layer` provided to the routes; `SkycotFamily.layer` provided once | one profile instance under everything; `/api/skycot/family/*` (status, enable, verify, disable, change-code, rename, lock)                     |
+| skycot-family-rpc          | `apps/server/src/ws.ts`                                      | 4, 3143, 3188-3189, 3203 (3 appended, 2 mod)  | the scope middleware is wrapped by `SkycotFamilyGate.wrapRpcAuthorization(…, gate, sessionId)`                               | publish, automation, folder, settings, terminal/install RPCs and "Allow" on a held card need the parent's grant; a raw RPC meets the same rule |
+| skycot-family-page         | `apps/server/src/http.ts`                                    | 51, 572-575 (4 lines appended)                | the static handler first asks `SkycotFamilyHttp.developerPageRedirect`                                                       | while the profile is on, every page outside `/simple/` redirects there unless the parent's Advanced-mode cookie is live (served mode only)     |
+| skycot-family-instructions | `apps/server/src/orchestration-v2/RunExecutionService.ts`    | 54-55, 616, 1546 (3 appended, 1 modified)     | the provider turn's `message` goes through `SkycotFamilyInstructions.withFamilyRules`                                        | child-appropriate rules on every turn of every provider, without writing into the child's project                                              |
+| skycot-family-mcp          | `apps/server/src/orchestration-v2/ProviderSessionManager.ts` | 55, 319, 461-462, 485-486 (4 appended, 1 mod) | Family threads' MCP credential keeps only `preview`; the reuse check compares the trimmed set                                | agents must not schedule tasks, open pull requests or launch threads through T3's own MCP tools while a child is driving                       |
+
 ## Legal and security seams (21 October 2026)
 
 Why each exists is in `nondev/legal/README.md` (L-1, L-2, L-3, L-5) and `docs/security/FIX-PLAN.md`
@@ -100,8 +116,7 @@ T3's analytics project even when the brand bootstrap is not loaded. Churn as abo
   in the second table (every one a `process.env.X ?? upstreamDefault` line).
   Reuse happens through a Vite/TypeScript alias (`~` → `apps/web/src`, with
   `~/lib/utils` shimmed locally) and `@t3tools/client-runtime` subpath imports.
-- `apps/server/src/**`: only the three brand seams below (CORS scheme list, pairing-URL
-  path). Routing under `/simple/` is hash-based so
+- `apps/server/src/**`: only the brand, safety and Family seams listed above. Routing under `/simple/` is hash-based so
   the SPA fallback (which serves the stock `index.html`) never fires for us.
 - Root `vite.config.ts` lint overrides: our path gets none of the web lint
   rules yet (report item C-3); revisit once the client stabilises.

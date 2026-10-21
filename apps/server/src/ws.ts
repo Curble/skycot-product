@@ -1,6 +1,7 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as SkycotPolicy from "./skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-config
+import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts"; // nondev-seam: skycot-family-rpc
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 
 import * as DateTime from "effect/DateTime";
@@ -3139,6 +3140,7 @@ export const layer = Layer.unwrap(
     const previewAutomationBroker = yield* PreviewAutomationBroker.PreviewAutomationBroker;
     const serverBrowser = yield* ServerBrowser.ServerBrowser;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
+    const skycotFamilyGate = yield* SkycotFamilyGate.SkycotFamilyGate; // nondev-seam: skycot-family-rpc
     const pullRequests = yield* PullRequestService.PullRequestService;
     const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
     const sql = yield* SqlClient.SqlClient;
@@ -3181,6 +3183,10 @@ export const layer = Layer.unwrap(
           const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket;
           yield* RpcServer.make(ServerWsRpcGroup, WS_RPC_SERVER_OPTIONS).pipe(
             Effect.provideService(RpcServer.Protocol, withTerminalOutputWindow(protocol)),
+            // nondev-seam: skycot-family-rpc (Family-profile check in front of the scope check below)
+            Effect.provide(
+              SkycotFamilyGate.layerRpcAuthorization(skycotFamilyGate, session.sessionId),
+            ),
             Effect.provide(
               Layer.merge(
                 RpcAuthorization.layer(session.scopes, (method, payload) => {

@@ -40,6 +40,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as SkycotFamily from "./SkycotFamily.ts";
 import { appliesToRuntimeMode, requestFacts } from "./SkycotPolicy.ts";
 
 export type SkycotPolicyOutcome =
@@ -98,6 +99,9 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
   const git = yield* GitVcsDriver.GitVcsDriver;
+  // Optional so the layer's type is unchanged; server.ts provides it at the top.
+  const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
+  const familyOn = Option.isNone(family) ? Effect.succeed(false) : family.value.isEnabled;
 
   /**
    * The branch the push would send and the branch everyone sees. A thread with a private
@@ -168,6 +172,8 @@ const make = Effect.gen(function* () {
     readonly requestId: RuntimeRequestId;
     readonly driver: ProviderDriverKind | undefined;
   }) {
+    // A child's assistant asks for everything; nothing is approved on their behalf.
+    if (yield* familyOn) return skipped("family profile is on");
     const thread = yield* projections.getThread(input.threadId);
     if (!appliesToRuntimeMode(thread.runtimeMode)) return skipped("runtime mode not governed");
     if (thread.archivedAt !== null || thread.deletedAt !== null) return skipped("thread closed");

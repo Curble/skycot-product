@@ -52,6 +52,7 @@ import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import * as SkycotFamily from "../skycot/SkycotFamily.ts"; // nondev-seam: skycot-family-mcp
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_MAX_IDLE_PIN_MS = 4 * 60 * 60 * 1000;
@@ -315,6 +316,7 @@ export const layerWithOptions = (
       const fileSystem = yield* FileSystem.FileSystem;
       const mcpSessionRegistry = yield* McpSessionRegistry.McpSessionRegistry;
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+      const skycotFamily = yield* Effect.serviceOption(SkycotFamily.SkycotFamily); // nondev-seam: skycot-family-mcp
       /**
        * When present, an unreadable settings file withholds browser access
        * rather than granting it — an explicit "off" silently becoming "on"
@@ -456,6 +458,9 @@ export const layerWithOptions = (
                 >(["orchestration", "worktree", "pull-requests"]);
                 if (browserToolsAvailable) capabilities.add("preview");
                 if (deviceToolsAvailable) capabilities.add("device");
+                // nondev-seam: skycot-family-mcp (Family profile on: previews only, no thread control, scheduling or PRs)
+                if (Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled))
+                  SkycotFamily.keepFamilyMcpCapabilities(capabilities);
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before the async resolve so a release cannot
@@ -478,7 +483,9 @@ export const layerWithOptions = (
                     resolved.thread.threadId === threadId &&
                     resolved.thread.providerInstanceId === providerInstanceId &&
                     resolved.capabilities.has("preview") === browserToolsAvailable &&
-                    resolved.capabilities.has("device") === deviceToolsAvailable
+                    resolved.capabilities.has("device") === capabilities.has("device") &&
+                    resolved.capabilities.has("orchestration") ===
+                      capabilities.has("orchestration") // nondev-seam: skycot-family-mcp
                   ) {
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
                   }

@@ -48,6 +48,7 @@ import {
   failEnvironmentInternal,
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
+import * as SkycotFamilyHttp from "./skycot/SkycotFamilyHttp.ts"; // nondev-seam: skycot-family-page
 import { WEBHOOK_ROUTE_PREFIX } from "./scheduledTasks/ScheduledTaskService.ts";
 import {
   browserApiCorsAllowedHeaders,
@@ -567,6 +568,10 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     if (Option.isNone(url)) {
       return HttpServerResponse.text("Bad Request", { status: 400 });
     }
+
+    // nondev-seam: skycot-family-page (Family profile on: the developer interface needs the parent code)
+    const familyRedirect = yield* SkycotFamilyHttp.developerPageRedirect(request, url.value);
+    if (familyRedirect !== null) return familyRedirect;
 
     const config = yield* ServerConfig.ServerConfig;
     if (config.devUrl && isDevProxiedPath(url.value.pathname)) {

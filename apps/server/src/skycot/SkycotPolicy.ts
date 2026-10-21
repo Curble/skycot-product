@@ -19,12 +19,14 @@
 import type { OrchestrationV2TurnItem, RuntimeMode } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { filesFromPrompt, type PromptFile } from "@t3tools/skycot-rules/files";
 import { readCommandAsk, type RuleRequest } from "@t3tools/skycot-rules/rules";
 
 import * as RuntimePolicy from "../orchestration-v2/RuntimePolicy.ts";
+import * as SkycotFamily from "./SkycotFamily.ts";
 
 export const SKYCOT_POLICY_ENV = "T3CODE_SKYCOT_POLICY";
 
@@ -49,9 +51,35 @@ export function appliesToRuntimeMode(runtimeMode: RuntimeMode): boolean {
   return runtimeMode === SKYCOT_POLICY_RUNTIME_MODE;
 }
 
+/** The one mode a Family-profile thread may run in, whatever the thread or the default says. */
+export const FAMILY_RUNTIME_MODE: RuntimeMode = "approval-required";
+
 /**
- * Wraps the engine's RuntimePolicyV2: resolves as before, then applies the override only
- * for threads whose *resolved* mode is `auto-accept-edits`. Disabled, it is the identity.
+ * A thread while the Family profile is on: "Ask me first", with the provider told to ask
+ * before every command and edit (Codex: "untrusted" in a workspace-write sandbox, which also
+ * keeps the network off; Claude: the "default" permission mode). `full-access` and
+ * `auto-accept-edits` threads are downgraded here, at the point the provider is configured, so
+ * no setting, old thread, MCP launch or raw RPC can start a hands-off turn.
+ */
+export function familyRuntimePolicy(
+  policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy,
+): ProviderAdapter.ProviderAdapterV2RuntimePolicy {
+  return ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+    ...policy,
+    runtimeMode: FAMILY_RUNTIME_MODE,
+    approvalPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.approvalPolicy,
+    sandboxPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.sandboxPolicy,
+  });
+}
+
+/**
+ * Wraps the engine's RuntimePolicyV2: resolves as before, then
+ *   - while the Family profile is on, downgrades every thread to `familyRuntimePolicy`
+ *     (whatever the policy flag says: the profile's promise does not depend on it);
+ *   - otherwise, with the policy flag on, applies the override only for threads whose
+ *     *resolved* mode is `auto-accept-edits`.
+ * The Family service is read optionally so this layer's type stays what upstream expects;
+ * the server provides it once at the top of its layer graph (server.ts).
  */
 export function layerRuntimePolicy(options: {
   readonly enabled: boolean;
@@ -60,18 +88,26 @@ export function layerRuntimePolicy(options: {
     RuntimePolicy.RuntimePolicyV2,
     Effect.gen(function* () {
       const base = yield* RuntimePolicy.RuntimePolicyV2;
-      if (!options.enabled) return base;
+      const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
+      if (!options.enabled && Option.isNone(family)) return base;
+      const familyOn = Option.isNone(family) ? Effect.succeed(false) : family.value.isEnabled;
       return RuntimePolicy.RuntimePolicyV2.of({
         resolve: (input) =>
           base.resolve(input).pipe(
-            Effect.map((policy) =>
-              appliesToRuntimeMode(policy.runtimeMode)
-                ? ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-                    ...policy,
-                    approvalPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.approvalPolicy,
-                    sandboxPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.sandboxPolicy,
-                  })
-                : policy,
+            Effect.flatMap((policy) =>
+              familyOn.pipe(
+                Effect.map((inFamily) =>
+                  inFamily
+                    ? familyRuntimePolicy(policy)
+                    : options.enabled && appliesToRuntimeMode(policy.runtimeMode)
+                      ? ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+                          ...policy,
+                          approvalPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.approvalPolicy,
+                          sandboxPolicy: SKYCOT_RUNTIME_POLICY_OVERRIDE.sandboxPolicy,
+                        })
+                      : policy,
+                ),
+              ),
             ),
           ),
       });

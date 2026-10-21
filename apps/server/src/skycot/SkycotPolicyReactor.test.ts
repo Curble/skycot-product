@@ -34,6 +34,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { GitCommandError } from "@t3tools/contracts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotPolicyReactor from "./SkycotPolicyReactor.ts";
 
 const CODEX = ProviderDriverKind.make("codex");
@@ -167,6 +168,8 @@ interface Scenario {
   readonly pendingRequests?: ReadonlyArray<OrchestrationV2RuntimeRequest>;
   /** Run statuses by id, for the "run no longer active" guard. */
   readonly runs?: Readonly<Record<string, OrchestrationV2Run["status"]>>;
+  /** The Family profile is on: nothing is approved on the child's behalf. */
+  readonly family?: boolean;
 }
 
 const gitFailure = (operation: string) =>
@@ -262,6 +265,9 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
             }),
           ),
       }),
+      scenario.family === true
+        ? Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) })
+        : Layer.empty,
       Layer.mock(Orchestrator.OrchestratorV2)({
         dispatch: (command) =>
           command.type === "runtime-request.respond"
@@ -286,6 +292,20 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
   });
 
 describe("SkycotPolicyReactor", () => {
+  it.effect("approves nothing while the Family profile is on", () =>
+    Effect.gen(function* () {
+      const { outcome, dispatched } = yield* run(
+        {
+          family: true,
+          items: [approvalItem("command", "pnpm test"), commandItem("pnpm test")],
+        },
+        requestEvent(request("command")),
+      );
+      assert.deepEqual(outcome, { type: "skipped", reason: "family profile is on" });
+      assert.equal(dispatched.length, 0);
+    }),
+  );
+
   it.effect("approves a routine in-project command and signs the decision", () =>
     Effect.gen(function* () {
       const { outcome, dispatched } = yield* run(
