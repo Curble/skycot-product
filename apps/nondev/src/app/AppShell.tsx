@@ -9,6 +9,14 @@ import { Atom } from "effect/reactivity";
 import { useEffect, type ReactNode } from "react";
 
 import { documentTitle } from "../brand";
+// Side effect: registers the "What changed" card for checkpoint turn items.
+import "../features/review";
+import {
+  useRoomForRail,
+  useVersionsRailOpen,
+  VersionsRailSlot,
+  versionsRailMode,
+} from "../features/versions";
 import { HOME_HREF, NEW_HREF, navigate, type Route } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { projectAtomOrEmpty } from "../state/projects";
@@ -71,8 +79,18 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
 
   const compose = () => navigate(columns === 1 ? NEW_HREF : HOME_HREF);
 
+  // The Versions rail sits to the right of an open conversation: a full column
+  // when there is room and it is open, otherwise a thin strip (or a floating
+  // button on a phone) that brings the same timeline up as a sheet.
+  const railOpen = useVersionsRailOpen();
+  const roomForRail = useRoomForRail();
+  const railMode =
+    route.name === "thread" && showContent
+      ? versionsRailMode(columns, railOpen, roomForRail)
+      : "hidden";
+
   return (
-    <div className="fm-shell" data-columns={columns}>
+    <div className="fm-shell" data-columns={columns} data-inspector={railMode}>
       <TitleBar columns={columns} detail={detail} trailing={<ProviderPill />} />
       <ConnectionBanner />
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
@@ -85,6 +103,14 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
           />
         ) : null}
         {showContent ? <main className="fm-content">{children}</main> : null}
+        {route.name === "thread" && showContent ? (
+          <VersionsRailSlot
+            environmentId={route.environmentId}
+            threadId={route.threadId}
+            mode={railMode}
+            expandable={columns === 3 && roomForRail}
+          />
+        ) : null}
       </div>
       {columns < 3 && shell.drawerOpen ? (
         <SidebarDrawer route={route} onClose={() => shell.setDrawerOpen(false)} />

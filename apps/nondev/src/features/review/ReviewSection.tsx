@@ -1,0 +1,437 @@
+import { useAtomValue } from "@effect/atom-react";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
+import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
+import * as Option from "effect/Option";
+import { AsyncResult } from "effect/reactivity";
+import {
+  Cog,
+  FileText,
+  Image,
+  MessageSquarePlus,
+  Palette,
+  Receipt,
+  Settings2,
+  ShieldCheck,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+
+import { randomUUID } from "~/lib/utils";
+import { useEnvironmentQuery } from "~/state/query";
+import { useAtomCommand } from "~/state/use-atom-command";
+
+import {
+  describeChanges,
+  describeTurnDiff,
+  fromCheckpointFiles,
+  type ChangeArea,
+  type WhatChanged,
+} from "../../plain/changes";
+import { planGitIntent } from "../../plain/git";
+import { describeCheckpoint } from "../../plain/versions";
+import { projectAtomOrEmpty } from "../../state/projects";
+import { canOperateEnvironmentAtom } from "../../state/session";
+import { environmentThreads, environmentThreadShells } from "../../state/threads";
+import { Banner } from "../../ui/Banner";
+import { Button } from "../../ui/Button";
+import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
+import { List, ListRow } from "../../ui/ListRow";
+import { Pill } from "../../ui/Pill";
+import { StepBadge } from "../../ui/StepBadge";
+import { RestoreSheet, plainRestoreProblem } from "../versions/RestoreSheet";
+import { formatVersionTime, useVersionsTimeline } from "../versions/timeline";
+import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
+import { pinReview, useHasPinnedReview } from "./pinnedReviews";
+import { reviewOrchestration, reviewVcs, reviewVcsActions } from "./state";
+import { latestReviewable, reviewTargetFor } from "./turnReview";
+
+const CodeChanges = lazy(() => import("./CodeChanges"));
+
+const AREA_ICON: Record<ChangeArea, LucideIcon> = {
+  pages: FileText,
+  styles: Palette,
+  content: Image,
+  settings: Settings2,
+  "behind the scenes": Cog,
+};
+
+/**
+ * The "What changed" card at the end of a completed turn: plain summary,
+ * per-area lines, calm flags, the real diff behind a disclosure, and the three
+ * decisions — Keep (git commit), Undo (checkpoint rollback), Ask for a tweak.
+ *
+ * Standalone: it subscribes to the thread itself, so the publish agent can mount
+ * it anywhere with just `{ environmentId, threadId }`; without `checkpointId` it
+ * reviews the newest turn that changed files. Before/after pictures appear only
+ * when the engine supplies them, which it does not yet — so nothing is shown in
+ * their place.
+ */
+export function ReviewSection({
+  environmentId,
+  threadId,
+  checkpointId,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly checkpointId?: string;
+}) {
+  const result = useAtomValue(environmentThreads.stateAtom(environmentId, threadId));
+  const shell = useAtomValue(environmentThreadShells.threadShellAtom({ environmentId, threadId }));
+  const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
+  const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
+  const state = Option.getOrNull(AsyncResult.value(result));
+  const projection = state ? Option.getOrNull(state.data) : null;
+  const target = projection ? reviewTargetFor(projection, threadId, checkpointId) : null;
+  const latestId = projection ? (latestReviewable(projection)?.id ?? null) : null;
+  const isLatest = target !== null && target.checkpoint.id === latestId;
+
+  // A card mounted without a checkpointId is the pinned "latest" review; the
+  // stream's copy of that same turn hides itself while one is mounted.
+  const pinnedHere = checkpointId === undefined;
+  useEffect(() => (pinnedHere ? pinReview(threadId) : undefined), [pinnedHere, threadId]);
+  const hasPinned = useHasPinnedReview(threadId);
+
+  const timeline = useVersionsTimeline(environmentId, threadId, shell);
+  const kept = useKeptVersions(threadId);
+
+  const cwd = shell?.worktreePath ?? project?.workspaceRoot ?? null;
+  const gitStatus = useEnvironmentQuery(
+    cwd === null ? null : reviewVcs.status({ environmentId, input: { cwd } }),
+  );
+  const runKeep = useAtomCommand(reviewVcsActions.runStackedAction({ environmentId, cwd }), {
+    reportFailure: false,
+  });
+
+  const [showCode, setShowCode] = useState(false);
+  const [keeping, setKeeping] = useState(false);
+  const [keepNote, setKeepNote] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
+  const [undoRequested, setUndoRequested] = useState(false);
+
+  // The newest turn's diff loads at once (it tells new files from edited ones,
+  // which the checkpoint summary does not); older cards wait for the disclosure.
+  const diffInput = target?.diffInput ?? null;
+  const diff = useEnvironmentQuery(
+    (showCode || isLatest) && diffInput !== null
+      ? reviewOrchestration.turnDiff({ environmentId, input: diffInput })
+      : null,
+  );
+
+  if (!projection || !target || target.checkpoint.files.length === 0) return null;
+  if (!pinnedHere && hasPinned && isLatest) return null;
+  const { checkpoint, run, before } = target;
+
+  const fromDiff = diff.data ? describeTurnDiff(diff.data.diff) : null;
+  const what: WhatChanged =
+    fromDiff && fromDiff.counts.files > 0
+      ? fromDiff
+      : describeChanges(fromCheckpointFiles(checkpoint.files));
+  const versionNumber = timeline.numbers.get(checkpoint.id) ?? null;
+  const when = formatVersionTime(DateTime.formatIso(checkpoint.capturedAt));
+  const keptHere = kept.find((entry) => entry.checkpointId === checkpoint.id) ?? null;
+  const keptNumber = keptHere ? (timeline.numbers.get(keptHere.sha) ?? null) : null;
+  const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
+
+  if (run?.status === "rolled_back") {
+    return (
+      <Card label="What changed (undone)" tinted>
+        <CardHeader
+          icon={Undo2}
+          tone="grey"
+          title="Undone"
+          subtitle={`${what.summary} Everything is back to how it was before this change.`}
+        />
+      </Card>
+    );
+  }
+
+  const filePaths = what.groups.flatMap((group) => group.files.map((file) => file.path));
+  // The commit reads like the request that caused it ("Make the button bigger…"),
+  // with the plain summary underneath; git shows the first line in every log.
+  const request = projection.messages
+    .find((message) => message.role === "user" && message.runId === checkpoint.runId)
+    ?.text.trim()
+    .split(/\r?\n/)[0]
+    ?.trim();
+  const commitSubject = (request && request.length > 0 ? request : what.summary)
+    .replace(/\.$/, "")
+    .slice(0, 72)
+    .trimEnd();
+  const commitMessage = `${commitSubject}\n\n${what.summary}`;
+  const plan = planGitIntent("keepThisVersion", {
+    cwd: cwd ?? "",
+    currentBranch: gitStatus.data?.refName ?? shell?.branch ?? null,
+    defaultBranch: null,
+    hasRemote: gitStatus.data?.hasPrimaryRemote ?? false,
+    // Until the folder's status arrives, assume there is something to keep: the engine
+    // answers "nothing new" itself if not.
+    hasUncommittedChanges: gitStatus.data?.hasWorkingTreeChanges ?? true,
+    commitMessage,
+    filePaths,
+  });
+  const keepBlocked = keptHere !== null || plan.kind !== "stacked" || cwd === null || !canOperate;
+
+  const beforeEntry = before
+    ? describeCheckpoint(before, { canRollbackFiles: timeline.canRollbackFiles }, false)
+    : null;
+  const undoBlocker = !canOperate
+    ? "This connection can read but not change things."
+    : beforeEntry === null
+      ? "There's no restore point from before this change."
+      : active
+        ? "Wait for the current work to finish before undoing."
+        : (beforeEntry.restoreExplainer.blockedBecause ?? null);
+  const canUndo = beforeEntry !== null && beforeEntry.canRestore && undoBlocker === null;
+  const rollbackFailure = projection.thread.rollbackFailure ?? null;
+
+  const keep = async () => {
+    if (keepBlocked || plan.kind !== "stacked") return;
+    setKeeping(true);
+    setProblem(null);
+    setKeepNote(null);
+    const outcome = await runKeep({
+      actionId: randomUUID(),
+      action: "commit",
+      commitMessage,
+      ...(filePaths.length > 0 ? { filePaths } : {}),
+      threadId,
+    });
+    setKeeping(false);
+    if (outcome._tag === "Failure") {
+      setProblem(plainGitProblem(squashAtomCommandFailure(outcome)));
+      return;
+    }
+    const commit = outcome.value.commit;
+    if (commit.status === "created" && commit.commitSha) {
+      rememberKeptVersion(threadId, {
+        sha: commit.commitSha,
+        subject: (commit.subject ?? commitSubject).replace(/\.$/, ""),
+        at: new Date().toISOString(),
+        fileCount: what.counts.files,
+        checkpointId: checkpoint.id,
+      });
+    } else {
+      setKeepNote("Nothing new to keep — this was already saved.");
+    }
+  };
+
+  const askForTweak = () => {
+    const field = document.querySelector<HTMLTextAreaElement>(".fm-composer__textarea");
+    if (!field) return;
+    field.focus();
+    field.scrollIntoView({ block: "nearest" });
+  };
+
+  const footerNote = keptHere
+    ? `Saved as Version ${keptNumber ?? "—"} · also a Git commit ${keptHere.sha.slice(0, 7)}`
+    : (keepNote ??
+      (plan.kind === "blocked"
+        ? plan.reason
+        : "Keeping doesn't make it live — that's the next step."));
+
+  return (
+    <>
+      <Card label="What changed">
+        <CardHeader
+          icon={Receipt}
+          tone="green"
+          title="What changed"
+          subtitle={[
+            versionNumber ? `Version ${versionNumber}` : "Restore point",
+            when,
+            "nothing is live yet",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          trailing={
+            <Pill tone="ok" size="sm" dot={false}>
+              {what.counts.files} {what.counts.files === 1 ? "file" : "files"}
+            </Pill>
+          }
+        />
+        <CardBody>
+          <p>{what.summary}</p>
+          {what.groups.map((group) => (
+            <section key={group.area} className="fm-review__area" aria-label={group.label}>
+              <h4 className="fm-review__area-title">
+                {group.label}
+                <OperationTags files={group.files} />
+              </h4>
+              <List plain label={`${group.label} changes`}>
+                {group.files.map((file) => (
+                  <ListRow
+                    key={file.path}
+                    leading={<StepBadge state="number" icon={AREA_ICON[group.area]} />}
+                    title={fileTitle(file.line)}
+                    subtitle={fileDetail(file)}
+                    trailing={<OperationTag operation={file.operation} />}
+                  />
+                ))}
+              </List>
+            </section>
+          ))}
+          <List plain label="Not touched">
+            <ListRow
+              leading={<StepBadge state="ok" icon={ShieldCheck} />}
+              title="Not touched"
+              subtitle={what.untouched}
+            />
+          </List>
+          {what.warnings.map((warning) => (
+            <div key={warning} className="fm-review__flag">
+              <Banner tone="warning">{warning}</Banner>
+            </div>
+          ))}
+          <details
+            className="fm-disclosure"
+            open={showCode}
+            onToggle={(event) => setShowCode(event.currentTarget.open)}
+          >
+            <summary>
+              Show the code changes — {what.counts.files}{" "}
+              {what.counts.files === 1 ? "file" : "files"}, +{what.counts.additions} −
+              {what.counts.deletions} lines
+            </summary>
+            <p className="fm-disclosure__hint">
+              Green lines were added, red lines removed. You don't need to read this — it's here for
+              you or whoever reviews it.
+              {checkpoint.ref ? ` Advanced: ${checkpoint.ref}.` : ""}
+            </p>
+            {showCode ? (
+              diffInput === null ? (
+                <p className="fm-disclosure__hint">
+                  The engine didn't record which turn this was, so the line-by-line view isn't
+                  available. The list above is still exact.
+                </p>
+              ) : diff.error ? (
+                <Banner tone="warning">
+                  Couldn't load the code changes just now. The list above is still exact.
+                </Banner>
+              ) : diff.data === null ? (
+                <p className="fm-disclosure__hint">Loading the code changes…</p>
+              ) : (
+                <Suspense
+                  fallback={<p className="fm-disclosure__hint">Preparing the code view…</p>}
+                >
+                  <CodeChanges diff={diff.data.diff} scope={`review:${checkpoint.id}`} />
+                </Suspense>
+              )
+            ) : null}
+          </details>
+          {problem ? (
+            <div className="fm-review__flag">
+              <Banner tone="danger">{problem}</Banner>
+            </div>
+          ) : null}
+          {undoRequested && rollbackFailure ? (
+            <div className="fm-review__flag">
+              <Banner tone="danger">
+                {plainRestoreProblem(new Error(rollbackFailure.message))}
+              </Banner>
+            </div>
+          ) : null}
+        </CardBody>
+        <CardFooter note={footerNote}>
+          <Button variant="primary" disabled={keepBlocked || keeping} onClick={() => void keep()}>
+            {keeping ? "Keeping…" : keptHere ? "Kept" : "Keep these changes"}
+          </Button>
+          <Button
+            variant="destructive"
+            icon={Undo2}
+            disabled={!canUndo}
+            title={undoBlocker ?? undefined}
+            onClick={() => setUndoOpen(true)}
+          >
+            Undo all of it
+          </Button>
+          <Button icon={MessageSquarePlus} onClick={askForTweak}>
+            Ask for a tweak
+          </Button>
+        </CardFooter>
+        {undoBlocker && beforeEntry !== null && !canUndo ? (
+          <p className="fm-review__footnote">{undoBlocker}</p>
+        ) : null}
+      </Card>
+      <RestoreSheet
+        open={undoOpen}
+        onClose={() => setUndoOpen(false)}
+        entry={beforeEntry}
+        intent="undo"
+        environmentId={environmentId}
+        threadId={threadId}
+        versionNumber={before ? (timeline.numbers.get(before.id) ?? null) : null}
+        onRequested={() => setUndoRequested(true)}
+      />
+    </>
+  );
+}
+
+function OperationTags({ files }: { readonly files: WhatChanged["groups"][number]["files"] }) {
+  const counts = { added: 0, edited: 0, deleted: 0, renamed: 0 };
+  for (const file of files) counts[file.operation] += 1;
+  const tags: Array<{ readonly label: string; readonly tone: "new" | "changed" | "removed" }> = [];
+  if (counts.added > 0) tags.push({ label: tagLabel("New", counts.added), tone: "new" });
+  if (counts.edited + counts.renamed > 0)
+    tags.push({ label: tagLabel("Changed", counts.edited + counts.renamed), tone: "changed" });
+  if (counts.deleted > 0)
+    tags.push({ label: tagLabel("Removed", counts.deleted), tone: "removed" });
+  return (
+    <span className="fm-tags">
+      {tags.map((tag) => (
+        <span key={tag.tone} className={`fm-tag fm-tag--${tag.tone}`}>
+          {tag.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function tagLabel(label: string, count: number): string {
+  return count > 1 ? `${label} ×${count}` : label;
+}
+
+const OPERATION_TAG: Record<
+  WhatChanged["groups"][number]["files"][number]["operation"],
+  { readonly label: string; readonly tone: "new" | "changed" | "removed" }
+> = {
+  added: { label: "New", tone: "new" },
+  edited: { label: "Changed", tone: "changed" },
+  renamed: { label: "Moved", tone: "changed" },
+  deleted: { label: "Removed", tone: "removed" },
+};
+
+function OperationTag({ operation }: { readonly operation: keyof typeof OPERATION_TAG }) {
+  const tag = OPERATION_TAG[operation];
+  return <span className={`fm-tag fm-tag--${tag.tone}`}>{tag.label}</span>;
+}
+
+/** "Edited the book page (+1 / −1 lines)" → "The book page". */
+function fileTitle(line: string): string {
+  const noun = line
+    .replace(/\s*\(.*\)\s*$/, "")
+    .replace(/^(added|edited|deleted|removed|renamed|moved|changed)\s+/i, "")
+    .trim();
+  return noun.length === 0 ? line : noun[0]!.toUpperCase() + noun.slice(1);
+}
+
+function fileDetail(file: WhatChanged["groups"][number]["files"][number]): string {
+  const counts =
+    file.additions + file.deletions === 0 ? "" : `+${file.additions} / −${file.deletions} lines · `;
+  return `${counts}${file.path}`;
+}
+
+/** Git's reasons in household English. Never a raw error string. */
+function plainGitProblem(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (/not_a_repository|not a git repository/i.test(message))
+    return "This folder isn't set up to keep versions yet.";
+  if (/scope|permission|unauthori/i.test(message))
+    return "This connection isn't allowed to keep versions.";
+  if (/unavailable|not connected/i.test(message))
+    return "Can't reach your Mac right now. Nothing was lost — try again in a moment.";
+  return "That didn't save. Nothing was lost — try again in a moment.";
+}
