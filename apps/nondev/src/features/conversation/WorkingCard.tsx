@@ -1,17 +1,18 @@
 // The "Working on it" card: one per run, fed by every tool-ish item the run
-// produced. Live it shows step N of M, the done/now/next checklist and a Stop
-// button; finished it collapses to "Done · N steps" with the developer
-// disclosure. Cost is never shown because the engine does not report dollars.
+// produced. Live it shows step N of M and the done/now/next checklist (the
+// Stop control lives in the header, so there is one on screen); finished it
+// collapses to "Done · N steps" with the developer disclosure. Cost is never
+// shown because the engine does not report dollars.
 import type {
   EnvironmentId,
   OrchestrationV2Run,
+  OrchestrationV2RuntimeRequest,
   OrchestrationV2ThreadProjection,
+  OrchestrationV2TurnItem,
   ThreadId,
 } from "@t3tools/contracts";
-import { CircleAlert, Hammer, Square } from "lucide-react";
-import { useState } from "react";
-
-import { useAtomCommand } from "~/state/use-atom-command";
+import * as DateTime from "effect/DateTime";
+import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
 import { useElapsedLabel } from "../../app/useElapsed";
 import { progress } from "../../plain/copy";
@@ -21,9 +22,7 @@ import {
   summarizeRun,
   type NarrationContext,
 } from "../../plain/narration";
-import { threadEnvironment } from "../../state/threads";
 import { Bubble } from "../../ui/Bubble";
-import { Button } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { ProgressBar } from "../../ui/ProgressBar";
 import { StepBadge } from "../../ui/StepBadge";
@@ -39,7 +38,7 @@ const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "waiting",
 ]);
 
-function finishedTitle(status: OrchestrationV2Run["status"] | undefined): string {
+function finishedTitle(status: OrchestrationV2Run["status"] | undefined, refused: boolean): string {
   switch (status) {
     case "failed":
       return "Stopped — something went wrong";
@@ -49,8 +48,46 @@ function finishedTitle(status: OrchestrationV2Run["status"] | undefined): string
     case "rolled_back":
       return "Restored to an earlier version";
     default:
-      return "Done";
+      return refused ? "Stopped — you said no to a step" : "Done";
   }
+}
+
+/**
+ * Time the run spent waiting on a person is not work. Settled requests shift
+ * the clock's start forward by how long each waited; a still-pending request
+ * keeps ticking (the strip shows the same figure), which is honest enough for
+ * a Polish item without a second timer.
+ */
+type AskItem = Extract<
+  OrchestrationV2TurnItem,
+  { type: "approval_request" } | { type: "user_input_request" }
+>;
+
+export function waitedMillis(
+  items: ReadonlyArray<AskItem>,
+  requests: ReadonlyMap<string, OrchestrationV2RuntimeRequest>,
+): number {
+  let total = 0;
+  for (const item of items) {
+    const request = requests.get(item.requestId);
+    if (!request || request.resolvedAt === null) continue;
+    total += Math.max(
+      0,
+      DateTime.toEpochMillis(request.resolvedAt) - DateTime.toEpochMillis(request.createdAt),
+    );
+  }
+  return total;
+}
+
+/**
+ * Requests the engine answered on the person's behalf carry a note once
+ * approval rules land server-side. Read defensively: the field is optional
+ * today and absent on older servers.
+ */
+export function decisionNoteOf(request: unknown): string | null {
+  if (typeof request !== "object" || request === null) return null;
+  const note = (request as { readonly decisionNote?: unknown }).decisionNote;
+  return typeof note === "string" && note.trim().length > 0 ? note.trim() : null;
 }
 
 export function WorkingCard({
@@ -66,11 +103,27 @@ export function WorkingCard({
   readonly threadId: ThreadId;
   readonly projectName: string | null;
 }) {
+  // environmentId / threadId stay in the signature for the stream's call site;
+  // the card itself no longer dispatches anything (Stop moved to the header).
+  void environmentId;
+  void threadId;
   const run = group.runId === null ? undefined : projection.runs.find((r) => r.id === group.runId);
+  const requests = new Map(projection.runtimeRequests.map((r) => [r.id, r]));
   const ctx: NarrationContext = {
     ...(projectName === null ? {} : { projectName }),
-    runtimeRequests: new Map(projection.runtimeRequests.map((r) => [r.id, r])),
+    runtimeRequests: requests,
   };
+  // Approval cards are their own stream items, but the run's asks still count
+  // for the clock and for "you said no" — the checklist and tool items come
+  // from this run's items only.
+  const runAsks =
+    group.runId === null
+      ? []
+      : projection.turnItems.filter(
+          (item): item is AskItem =>
+            item.runId === group.runId &&
+            (item.type === "approval_request" || item.type === "user_input_request"),
+        );
   const narrated = group.items.map((item) => ({ item, narration: describeTurnItem(item, ctx) }));
   const active = run
     ? ACTIVE_RUN.has(run.status)
@@ -84,18 +137,29 @@ export function WorkingCard({
     total,
     Math.max(1, checklist.done.length + (checklist.now.length > 0 ? 1 : 0)),
   );
-  // Thinking and the to-do list are bookkeeping, not steps the user would count.
-  const stepCount = group.items.filter(
-    (item) => item.type !== "reasoning" && item.type !== "todo_list",
+  // Thinking and the to-do list are bookkeeping, not steps the user would
+  // count; a step the person refused never happened.
+  const stepCount = narrated.filter(
+    ({ item, narration }) =>
+      item.type !== "reasoning" && item.type !== "todo_list" && narration.status !== "denied",
   ).length;
   const failed = narrated.filter((n) => n.narration.status === "failed").length;
+  const deniedAsks = runAsks.filter((item) => {
+    const request = requests.get(item.requestId);
+    return request?.decision === "decline";
+  }).length;
+  const refused = run?.status === "completed" && deniedAsks > 0 && stepCount === 0;
 
+  const startMillis = toIso(run?.workStartedAt ?? run?.startedAt ?? run?.requestedAt ?? null);
+  const waited = waitedMillis(runAsks, requests);
   const elapsed = useElapsedLabel(
-    toIso(run?.workStartedAt ?? run?.startedAt ?? run?.requestedAt ?? null),
+    startMillis === null ? null : new Date(Date.parse(startMillis) + waited).toISOString(),
     toIso(run?.completedAt ?? null),
     active,
   );
   const hint = progressHint(group.items, run?.status ?? "running", ctx);
+  // "Working on it" is already the title; saying it three times tells nothing.
+  const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
   const doneSoFar = checklist.done.length;
   const subtitleParts = active
@@ -104,27 +168,36 @@ export function WorkingCard({
           ? `Step ${stepNow} of ${total}`
           : doneSoFar > 0
             ? `${doneSoFar} ${doneSoFar === 1 ? "step" : "steps"} done so far`
-            : hint.replace(/[.…]+$/, ""),
+            : genericHint
+              ? "Just started"
+              : hint.replace(/[.…]+$/, ""),
         elapsed,
       ]
     : [
-        stepCount === 0 ? "No files touched" : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
+        refused
+          ? "Nothing was changed"
+          : stepCount === 0
+            ? "No files touched"
+            : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
         elapsed,
       ];
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
-  const detailLines = narrated.map(({ item, narration }) => ({
-    key: item.id,
-    time: shortTime(item.startedAt ?? item.updatedAt),
-    label: narration.headline,
-    text: narration.technical,
-    tone:
-      narration.status === "failed"
-        ? ("failed" as const)
-        : narration.status === "denied"
-          ? ("denied" as const)
-          : undefined,
-  }));
+  const detailLines = narrated.map(({ item, narration }) => {
+    const note = "requestId" in item ? decisionNoteOf(requests.get(item.requestId)) : null;
+    return {
+      key: item.id,
+      time: shortTime(item.startedAt ?? item.updatedAt),
+      label: note ? `${narration.headline} · ${note}` : narration.headline,
+      text: narration.technical,
+      tone:
+        narration.status === "failed"
+          ? ("failed" as const)
+          : narration.status === "denied"
+            ? ("denied" as const)
+            : undefined,
+    };
+  });
 
   // Checklist lines are plain strings and can repeat ("Ran a check" twice).
   const seen = new Map<string, number>();
@@ -138,24 +211,16 @@ export function WorkingCard({
     ? "blue"
     : run?.status === "failed"
       ? "red"
-      : failed > 0
+      : failed > 0 || refused
         ? "orange"
         : "green";
+  const title = active ? "Working on it" : finishedTitle(run?.status, refused);
+  const icon = run?.status === "failed" && !active ? CircleAlert : refused ? HandMetal : Hammer;
 
   return (
     <Bubble author="crew" full meta={active ? undefined : shortTime(run?.completedAt ?? null)}>
-      <Card label={active ? "Working on it" : finishedTitle(run?.status)}>
-        <CardHeader
-          icon={active || run?.status !== "failed" ? Hammer : CircleAlert}
-          tone={headerTone}
-          title={active ? "Working on it" : finishedTitle(run?.status)}
-          subtitle={subtitle}
-          trailing={
-            active ? (
-              <StopButton environmentId={environmentId} threadId={threadId} run={run} />
-            ) : null
-          }
-        />
+      <Card label={title}>
+        <CardHeader icon={icon} tone={headerTone} title={title} subtitle={subtitle} />
         <CardBody>
           {active ? (
             <>
@@ -197,9 +262,16 @@ export function WorkingCard({
                   ))}
                 </ol>
               ) : (
-                <p className="fm-work__hint">{hint}</p>
+                <p className="fm-work__hint">
+                  {genericHint ? "The first steps will appear here." : hint}
+                </p>
               )}
             </>
+          ) : refused ? (
+            <p className="fm-work__hint">
+              You said no to {deniedAsks === 1 ? "a step" : `${deniedAsks} steps`}, so nothing in
+              the project was changed. Reply below to say what you'd like instead.
+            </p>
           ) : failed > 0 ? (
             <p className="fm-work__hint">
               {failed === 1 ? "One step didn't work" : `${failed} steps didn't work`} — the details
@@ -214,33 +286,5 @@ export function WorkingCard({
         </CardBody>
       </Card>
     </Bubble>
-  );
-}
-
-function StopButton({
-  environmentId,
-  threadId,
-  run,
-}: {
-  readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
-  readonly run: OrchestrationV2Run | undefined;
-}) {
-  const interrupt = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
-  const [busy, setBusy] = useState(false);
-  return (
-    <Button
-      variant="destructive"
-      size="sm"
-      icon={Square}
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        await interrupt({ environmentId, input: { threadId, ...(run ? { runId: run.id } : {}) } });
-        setBusy(false);
-      }}
-    >
-      {busy ? "Stopping…" : "Stop"}
-    </Button>
   );
 }

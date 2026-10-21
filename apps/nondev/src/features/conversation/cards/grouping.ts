@@ -23,7 +23,7 @@ export interface WorkGroup {
   readonly key: string;
   readonly runId: RunId | null;
   readonly items: ReadonlyArray<OrchestrationV2TurnItem>;
-  /** Position of the first grouped item in the full list. */
+  /** Position of the newest grouped item in the full list: the card sits after the asks it made. */
   readonly index: number;
 }
 
@@ -44,8 +44,9 @@ interface MutableWorkGroup {
 }
 
 /**
- * One card per run, placed where the run's first tool item sits. Items without
- * a run id (older servers) group by adjacency instead.
+ * One card per run, placed where the run's newest tool item sits, so a
+ * finished "Done" never reads above the approval cards that led to it. Items
+ * without a run id (older servers) group by adjacency instead.
  */
 export function groupTimelineItems(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
@@ -64,6 +65,12 @@ export function groupTimelineItems(
       const existing = byRun.get(item.runId);
       if (existing) {
         existing.items.push(item);
+        existing.index = index;
+        const at = entries.indexOf(existing);
+        if (at !== -1 && at !== entries.length - 1) {
+          entries.splice(at, 1);
+          entries.push(existing);
+        }
         return;
       }
       const group: MutableWorkGroup = {

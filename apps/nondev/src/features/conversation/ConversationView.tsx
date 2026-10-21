@@ -5,10 +5,22 @@ import {
   threadRuntimeIsActive,
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationV2ThreadProjection,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { ChevronLeft, Clock, MessageSquareDashed, Receipt, Square } from "lucide-react";
+import {
+  ChevronLeft,
+  Clock,
+  MessageSquareDashed,
+  Receipt,
+  ShieldAlert,
+  Square,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { newMessageId } from "~/lib/utils";
@@ -37,7 +49,7 @@ import { MessageField } from "../compose/MessageField";
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
-import { describeThreadStatus } from "./status";
+import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
@@ -46,6 +58,45 @@ function scrollToCheckpoint(checkpointId: string) {
     .querySelector(`[data-checkpoint-id="${CSS.escape(checkpointId)}"]`)
     ?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
+
+/** True while the reader is at (or within a screenful of) the end of the stream. */
+function readerIsNearBottom(): boolean {
+  const scroller = document.querySelector<HTMLElement>(".fm-stream");
+  if (!scroller) return true;
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
+}
+
+/**
+ * A run that ended because the person said no to a step, and changed nothing,
+ * is a stop, not a success. The shell cannot see decisions, so this reads the
+ * full projection; the list row still relies on the Crew's closing message.
+ */
+export function endedOnRefusal(
+  projection: OrchestrationV2ThreadProjection,
+  latestRunId: string | null,
+): boolean {
+  if (latestRunId === null) return false;
+  const run = projection.runs.find((candidate) => candidate.id === latestRunId);
+  if (!run || run.status !== "completed") return false;
+  const declined = projection.turnItems.some(
+    (item) =>
+      item.type === "approval_request" &&
+      item.runId === run.id &&
+      projection.runtimeRequests.find((request) => request.id === item.requestId)?.decision ===
+        "decline",
+  );
+  if (!declined) return false;
+  return !projection.checkpoints.some(
+    (checkpoint) => checkpoint.runId === run.id && checkpoint.files.length > 0,
+  );
+}
+
+const REFUSED_STATUS: Pick<ConversationStatus, "kind" | "headline" | "presence" | "tone"> = {
+  kind: "stopped",
+  headline: "Stopped — you said no to a step",
+  presence: "Stopped · you said no · ready when you are",
+  tone: "neutral",
+};
 
 /**
  * One conversation: contact header, status strip, the stream, and the reply
@@ -65,8 +116,20 @@ export function ConversationView({
   const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
-  const status = shell ? describeThreadStatus(shell) : null;
+  const shellStatus = shell ? describeThreadStatus(shell) : null;
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
+  const refused =
+    projection !== null && shell !== null && !active
+      ? endedOnRefusal(projection, shell.latestRun?.runId ?? null)
+      : false;
+  const status =
+    shellStatus && refused && (shellStatus.kind === "done" || shellStatus.kind === "ready")
+      ? { ...shellStatus, ...REFUSED_STATUS }
+      : shellStatus;
+  // Nothing is "working" while the Crew waits on an answer; the dots would lie.
+  const waitingOnYou =
+    shell !== null &&
+    (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
 
   const visit = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -91,15 +154,17 @@ export function ConversationView({
   const projectName = project?.title ?? null;
 
   // When a run finishes with file changes, its What-changed card is the thing
-  // to read next: bring it into view once, and keep a pill in the strip that
-  // jumps back to it.
+  // to read next: bring it into view once (on open, or when the reader is
+  // already following the end of the stream), and keep a pill in the strip
+  // that jumps back to it. Someone re-reading an earlier message is not moved.
   const latest = projection ? (latestReviewable(projection) ?? null) : null;
   const latestId = latest?.id ?? null;
   const seenLatest = useRef<string | null>(null);
   useEffect(() => {
     if (latestId === null || latestId === seenLatest.current) return;
+    const firstSighting = seenLatest.current === null;
     seenLatest.current = latestId;
-    scrollToCheckpoint(latestId);
+    if (firstSighting || readerIsNearBottom()) scrollToCheckpoint(latestId);
   }, [latestId, seenLatest]);
   const startNote = useStartNote(threadId);
 
@@ -141,14 +206,20 @@ export function ConversationView({
           </span>
         </div>
         <div className="fm-conv-header__tools">
-          {active ? <StopButton environmentId={environmentId} threadId={threadId} /> : null}
+          {active ? (
+            <StopButton
+              environmentId={environmentId}
+              threadId={threadId}
+              runId={shell?.runtime?.activeRunId ?? null}
+            />
+          ) : null}
           <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           {project ? <ProjectAvatar project={project} size="md" /> : null}
         </div>
       </header>
 
       {shell && status ? (
-        <div className="fm-strip">
+        <div className="fm-strip fm-strip--wrap">
           <Pill tone={status.tone} size="sm">
             {latestId !== null && status.kind === "ready" ? "Done" : status.headline}
           </Pill>
@@ -169,11 +240,11 @@ export function ConversationView({
               {elapsed}
             </span>
           ) : null}
-          <span>·</span>
+          <span className="fm-strip__dot">·</span>
           <span>{autonomyLabel(autonomyForRuntimeMode(shell.runtimeMode))}</span>
           {publish.status ? (
             <>
-              <span>·</span>
+              <span className="fm-strip__dot">·</span>
               <PublishStatusPill status={publish.status} />
             </>
           ) : null}
@@ -183,6 +254,10 @@ export function ConversationView({
             </span>
           ) : null}
         </div>
+      ) : null}
+
+      {shell?.runtimeMode === "full-access" ? (
+        <HandsOffStrip environmentId={environmentId} threadId={threadId} canOperate={canOperate} />
       ) : null}
 
       {state && Option.isSome(state.error) ? (
@@ -214,6 +289,7 @@ export function ConversationView({
           projectName={projectName}
           trailing={
             active &&
+            !waitingOnYou &&
             !projection.turnItems.some(
               (item) => item.type === "assistant_message" && item.streaming,
             ) ? (
@@ -243,12 +319,15 @@ export function ConversationView({
   );
 }
 
+/** The one Stop control: in the header, always on screen while a run is live. */
 function StopButton({
   environmentId,
   threadId,
+  runId,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly runId: RunId | null;
 }) {
   const interrupt = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const [busy, setBusy] = useState(false);
@@ -260,12 +339,58 @@ function StopButton({
       disabled={busy}
       onClick={async () => {
         setBusy(true);
-        await interrupt({ environmentId, input: { threadId } });
+        await interrupt({ environmentId, input: { threadId, ...(runId ? { runId } : {}) } });
         setBusy(false);
       }}
     >
       {busy ? "Stopping…" : "Stop"}
     </Button>
+  );
+}
+
+/**
+ * Fully hands-off means no question is ever asked. The warning stays on screen
+ * for the whole conversation, with the one-tap way back to "Ask me first".
+ * The engine applies the new mode to the next thing the Crew asks about.
+ */
+function HandsOffStrip({
+  environmentId,
+  threadId,
+  canOperate,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly canOperate: boolean;
+}) {
+  const setRuntimeMode = useAtomCommand(threadEnvironment.setRuntimeMode, {
+    reportFailure: false,
+  });
+  const [state, setState] = useState<"idle" | "busy" | "failed">("idle");
+  return (
+    <div className="fm-handsoff" role="alert">
+      <ShieldAlert size={15} strokeWidth={2} aria-hidden />
+      <span className="fm-handsoff__text">
+        <b>Hands-off: nothing is being checked.</b> {CREW_NAME} can delete files, publish or spend
+        without asking you first.
+        {state === "failed" ? " The switch didn't go through — try again." : ""}
+      </span>
+      {canOperate ? (
+        <Button
+          size="sm"
+          disabled={state === "busy"}
+          onClick={async () => {
+            setState("busy");
+            const outcome = await setRuntimeMode({
+              environmentId,
+              input: { threadId, runtimeMode: "approval-required" },
+            });
+            setState(outcome._tag === "Failure" ? "failed" : "idle");
+          }}
+        >
+          {state === "busy" ? "Switching…" : "Switch to Ask me first"}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -285,11 +410,29 @@ function ReplyComposer({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // A note typed "while it works" is a steer, not a new paid request. If the
+  // run ends before Return, the first Return asks instead of sending.
+  const [typedWhileActive, setTypedWhileActive] = useState(false);
+  const [confirmNewTurn, setConfirmNewTurn] = useState(false);
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
 
-  const send = async () => {
+  const onChange = (value: string) => {
+    setText(value);
+    if (value.trim().length === 0) {
+      setTypedWhileActive(false);
+      setConfirmNewTurn(false);
+    } else if (active) {
+      setTypedWhileActive(true);
+    }
+  };
+
+  const send = async (asNewRequest = false) => {
     if (!ready || trimmed.length === 0 || shell === null) return;
+    if (!active && typedWhileActive && !asNewRequest) {
+      setConfirmNewTurn(true);
+      return;
+    }
     setSending(true);
     setProblem(null);
     const outcome = await startTurn({
@@ -313,7 +456,11 @@ function ReplyComposer({
       return;
     }
     setText("");
+    setTypedWhileActive(false);
+    setConfirmNewTurn(false);
   };
+
+  const noteOutlivedRun = !active && typedWhileActive && trimmed.length > 0;
 
   return (
     <div className="fm-composer">
@@ -323,9 +470,40 @@ function ReplyComposer({
             <Banner tone="warning">{problem}</Banner>
           </div>
         ) : null}
+        {confirmNewTurn && noteOutlivedRun ? (
+          <div className="fm-composer__confirm">
+            <Banner
+              tone="info"
+              action={
+                <span className="fm-composer__confirm-actions">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={sending}
+                    onClick={() => void send(true)}
+                  >
+                    Send as a new request
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setConfirmNewTurn(false);
+                      setTypedWhileActive(false);
+                    }}
+                  >
+                    Keep editing
+                  </Button>
+                </span>
+              }
+            >
+              <b>{CREW_NAME} finished while you were typing.</b> This note would start a new
+              request.
+            </Banner>
+          </div>
+        ) : null}
         <MessageField
           value={text}
-          onChange={setText}
+          onChange={onChange}
           onSend={() => void send()}
           canSend={ready && trimmed.length > 0 && !sending}
           disabled={!ready || sending}
@@ -341,7 +519,9 @@ function ReplyComposer({
           foot={{
             left: active
               ? `Replies while ${CREW_NAME} is working get picked up at the next step.`
-              : "Return to send · Shift-Return for a new line",
+              : noteOutlivedRun
+                ? `${CREW_NAME} has finished — Return now starts a new request.`
+                : "Return to send · Shift-Return for a new line",
             right: sending ? "Sending…" : "",
           }}
         />

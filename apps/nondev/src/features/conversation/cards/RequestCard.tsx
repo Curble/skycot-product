@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   type ApprovalCard,
@@ -26,6 +26,7 @@ import { Banner } from "../../../ui/Banner";
 import { Bubble } from "../../../ui/Bubble";
 import { Button } from "../../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader, type CardIconTone } from "../../../ui/Card";
+import { decisionNoteOf } from "../WorkingCard";
 import { Disclosure } from "./Disclosure";
 import { type DispatchDecision, useDecisionDispatcher } from "./dispatch";
 import { InlineReply } from "./InlineReply";
@@ -88,6 +89,10 @@ function decidedLine(
   const pending = request ? request.status === "pending" : PENDING_ITEM_STATUS.has(item.status);
   if (pending) return null;
   if (item.type === "approval_request") {
+    // Answered by the server's approval rules, not by a person: say so calmly.
+    if (decisionNoteOf(request) !== null && request?.decision !== "decline") {
+      return `Allowed by SKYCOT rules${stamp}`;
+    }
     switch (request?.decision) {
       case "accept":
         return `You allowed this once${stamp}`;
@@ -155,9 +160,27 @@ export function RequestCard({
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
   });
   const decided = decidedLine(item, request);
+  const decisionNote = decisionNoteOf(request);
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+
+  // A new ask lands keyboard focus on the card itself (not a button, so
+  // nothing is pre-selected) unless the person is typing somewhere; from the
+  // card, one Tab reaches "Don't allow". Sighted mouse users notice nothing.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pendingOnMount = decided === null;
+  useEffect(() => {
+    if (!pendingOnMount) return;
+    const activeElement = document.activeElement;
+    const typing =
+      activeElement instanceof HTMLElement &&
+      (activeElement.tagName === "TEXTAREA" ||
+        activeElement.tagName === "INPUT" ||
+        activeElement.isContentEditable);
+    if (typing) return;
+    cardRef.current?.focus({ preventScroll: true });
+  }, [pendingOnMount]);
 
   const choose = async (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => {
     setBusyId(option.id);
@@ -183,7 +206,7 @@ export function RequestCard({
       full
       meta={decided ? undefined : shortTime(item.startedAt ?? item.updatedAt)}
     >
-      <div className={classes}>
+      <div className={classes} ref={cardRef} tabIndex={decided ? undefined : -1}>
         <Card label={card.title}>
           <CardHeader
             icon={Icon}
@@ -228,6 +251,7 @@ export function RequestCard({
               </div>
             ) : null}
             <Disclosure>
+              {decisionNote ? <p className="fm-details__empty">Decision: {decisionNote}</p> : null}
               <pre className="fm-details__pre">
                 <code>{card.technical}</code>
               </pre>

@@ -22,10 +22,28 @@
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+/* Tailwind's preflight resets list-style to none; the Crew's lists keep their markers. */
 .fm-md ul,
 .fm-md ol {
   margin: 0;
   padding-left: 22px;
+}
+.fm-md ul {
+  list-style: disc;
+}
+.fm-md ol {
+  list-style: decimal;
+}
+.fm-md ul ul {
+  list-style: circle;
+}
+.fm-md a[title] {
+  text-decoration-style: dotted;
+}
+.fm-md__host {
+  margin-left: 3px;
+  font-size: 0.85em;
+  color: var(--fm-label-3);
 }
 .fm-md li + li {
   margin-top: 4px;
@@ -483,6 +501,9 @@ html.dark .fm-md code {
   .fm-approval__actions {
     flex-direction: column;
   }
+  .fm-approval__actions .fm-btn {
+    min-height: 44px;
+  }
   .fm-kv {
     grid-template-columns: 1fr;
     gap: 2px 0;
@@ -490,12 +511,75 @@ html.dark .fm-md code {
   .fm-kv dd {
     margin-bottom: 6px;
   }
+  /* The heading keeps a real width beside a pill or a Stop button; a wider
+     trailing control wraps under it instead of squeezing the title to one
+     word per line. */
   .fm-card__header {
     flex-wrap: wrap;
   }
-  .fm-card__trailing {
-    margin-left: 44px;
-    flex-basis: 100%;
-    text-align: left;
+  .fm-card__heading {
+    flex: 1 1 170px;
   }
+  .fm-card__trailing {
+    margin-left: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Conversation status strip
+   --------------------------------------------------------------------------- */
+/* Pills wrap onto a second line rather than being clipped at three columns or
+   swiped sideways on a phone. Specificity beats the shell's phone rule. */
+.fm-shell .fm-strip.fm-strip--wrap,
+.fm-shell[data-columns="1"] .fm-strip.fm-strip--wrap {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  white-space: normal;
+  overflow: visible;
+}
+.fm-strip__dot {
+  color: var(--fm-label-3);
+}
+.fm-strip__btn {
+  flex: none;
+}
+
+/* Hands-off: nothing is checked, so the warning stays until the mode changes. */
+.fm-handsoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 18px;
+  background: var(--fm-red-soft);
+  color: var(--fm-red-ink);
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--fm-sep-2);
+}
+.fm-handsoff b {
+  font-weight: 600;
+}
+.fm-handsoff__text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* Reply field: the run ended while a "note while it works" was being typed. */
+.fm-composer__confirm {
+  margin-bottom: 10px;
+}
+.fm-composer__confirm-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* A pending approval card can receive focus so keyboard users land on it
+   without tabbing through the whole app; nothing inside is pre-selected. */
+.fm-approval[tabindex="-1"] {
+  outline: none;
+  border-radius: var(--fm-radius-xl);
+}
+.fm-approval[tabindex="-1"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--fm-accent);
 }

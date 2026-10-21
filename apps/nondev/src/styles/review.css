@@ -332,6 +332,10 @@
 @media (max-width: 699px) {
   .fm-card__footer .fm-btn {
     flex: 1 1 auto;
+    min-height: 44px;
+  }
+  .fm-tm__v .fm-btn {
+    min-height: 36px;
   }
   .fm-card__footer-note {
     flex-basis: 100%;
@@ -385,7 +389,49 @@
 .fm-tm__explainer ul {
   list-style: disc;
 }
-/* The card header keeps its file-count pill beside the title on a phone. */
-.fm-card[aria-label="What changed"] .fm-card__header {
-  flex-wrap: nowrap;
+/* On a phone the floating Versions button sits over the stream's end; keep the
+   last bubble readable above it. */
+.fm-shell[data-columns="1"]:has(.fm-versions-fab) .fm-stream__inner {
+  padding-bottom: 64px;
+}
+
+/* A disabled Restore stays focusable and tappable: the reason shows under the
+   row instead of living only in a hover tooltip. */
+.fm-tm__why {
+  grid-column: 1 / -1;
+  margin: -4px 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--fm-orange-ink);
+}
+.fm-tm__v .fm-btn[aria-disabled="true"] {
+  opacity: 0.55;
+}
+.fm-tm__kept {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fm-green-ink);
+  font-weight: 500;
+}
+.fm-tm__kept svg {
+  flex: none;
+}
+
+/* The branch name is developer detail: folded away under the hint. */
+.fm-disclosure__advanced {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--fm-label-3);
+}
+.fm-disclosure__advanced > summary {
+  cursor: default;
+  list-style: none;
+  user-select: none;
+}
+.fm-disclosure__advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.fm-disclosure__advanced[open] > summary {
+  margin-bottom: 2px;
 }

@@ -312,6 +312,39 @@
   gap: 6px;
 }
 
+/* ---- Sheet geometry ------------------------------------------------------ */
+/* The Publish sheet can be taller than a phone screen: cap it, scroll the
+   body, and keep the buttons in view at the bottom (HIG: sheet actions are
+   always reachable). Scoped with :has so the generic Sheet keeps its layout. */
+.fm-sheet:has(.fm-pub) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 10vh - 16px);
+}
+.fm-sheet:has(.fm-pub) .fm-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.fm-sheet:has(.fm-pub) .fm-sheet__top,
+.fm-sheet:has(.fm-pub) .fm-sheet__actions,
+.fm-sheet:has(.fm-pub) .fm-sheet__note {
+  flex: none;
+}
+.fm-pub-group__head:focus {
+  outline: none;
+}
+.fm-pub-group__head:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--fm-accent);
+  border-radius: var(--fm-radius-lg);
+}
+.fm-pub-reversal {
+  margin: 0;
+  color: var(--fm-orange-ink);
+  font-weight: 500;
+}
+
 /* ---- Phone width --------------------------------------------------------- */
 @media (max-width: 599px) {
   .fm-pub-kv__row {
@@ -329,6 +362,15 @@
   }
   .fm-pub-result__actions .fm-btn {
     flex: 1 1 auto;
+    min-height: 44px;
+  }
+  .fm-pub-choice {
+    min-height: 44px;
+  }
+}
+@media (max-width: 699px) {
+  .fm-sheet:has(.fm-pub) {
+    max-height: calc(100dvh - 24px);
   }
 }
 

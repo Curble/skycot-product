@@ -4,7 +4,7 @@ import { items } from "../../../plain/fixtures.test-helpers";
 import { groupTimelineItems } from "./grouping";
 
 describe("groupTimelineItems", () => {
-  it("folds a run's tool activity into one card placed at the first tool item", () => {
+  it("folds a run's tool activity into one card placed after the asks it made", () => {
     const list = [
       items.user("Add a Christmas page"),
       items.assistant("On it."),
@@ -18,17 +18,31 @@ describe("groupTimelineItems", () => {
     expect(entries.map((e) => (e.kind === "work" ? "work" : e.item.type))).toEqual([
       "user_message",
       "assistant_message",
-      "work",
       "approval_request",
+      "work",
       "assistant_message",
     ]);
-    const work = entries[2]!;
+    const work = entries[3]!;
     expect(work.kind === "work" && work.items.map((i) => i.type)).toEqual([
       "reasoning",
       "command_execution",
       "file_change",
     ]);
-    expect(work.kind === "work" && work.index).toBe(2);
+    expect(work.kind === "work" && work.index).toBe(5);
+  });
+
+  it("keeps the card where it is while the run only adds tool items", () => {
+    const list = [
+      items.reasoning("Looking"),
+      items.command("ls"),
+      items.fileChange("a.html"),
+      items.assistant("Done."),
+    ];
+    const entries = groupTimelineItems(list);
+    expect(entries.map((e) => (e.kind === "work" ? "work" : e.item.type))).toEqual([
+      "work",
+      "assistant_message",
+    ]);
   });
 
   it("keeps separate runs separate", () => {

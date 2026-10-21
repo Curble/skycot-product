@@ -110,8 +110,23 @@ export function parseMarkdown(source: string): ReadonlyArray<Block> {
 }
 
 // Underscore emphasis only at word edges, so snake_case names stay intact.
+// Any `[label](target)` is matched; only http(s) and mailto targets become
+// links, everything else (javascript:, data:, relative paths) shows its label.
 const INLINE =
-  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(?<!\w)(__[^_\n]+__)(?!\w)|(\*[^*\n]+\*)|(?<!\w)(_[^_\n]+_)(?!\w)|(\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^)\s]+\))/;
+  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(?<!\w)(__[^_\n]+__)(?!\w)|(\*[^*\n]+\*)|(?<!\w)(_[^_\n]+_)(?!\w)|(\[[^\]\n]+\]\([^)\s]+\))/;
+
+const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
+
+/** "example.com" for an http(s) link; null for mailto. Shown so a reader knows where a link goes. */
+export function linkHost(href: string): string | null {
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
 
 export function renderInline(text: string): ReactNode {
   const nodes: Array<ReactNode> = [];
@@ -136,11 +151,17 @@ export function renderInline(text: string): ReactNode {
       const close = token.indexOf("](");
       const label = token.slice(1, close);
       const href = token.slice(close + 2, -1);
-      nodes.push(
-        <a key={key} href={href} target="_blank" rel="noopener noreferrer">
-          {renderInline(label)}
-        </a>,
-      );
+      if (!SAFE_HREF.test(href)) {
+        nodes.push(<Fragment key={key}>{renderInline(label)}</Fragment>);
+      } else {
+        const host = linkHost(href);
+        nodes.push(
+          <a key={key} href={href} target="_blank" rel="noopener noreferrer">
+            {renderInline(label)}
+            {host && !label.includes(host) ? <span className="fm-md__host">({host})</span> : null}
+          </a>,
+        );
+      }
     }
     rest = rest.slice(match.index + token.length);
   }

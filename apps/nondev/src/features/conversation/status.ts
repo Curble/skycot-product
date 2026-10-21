@@ -32,6 +32,31 @@ export interface ConversationStatus {
   readonly tone: PillTone;
   /** Dot in the list: orange for waiting, blue for done-and-unseen. */
   readonly attention: "none" | "waiting" | "ready";
+  /** The run ended by asking something in a plain message, so a reply is the next step. */
+  readonly needsReply?: true;
+}
+
+const ASKS_FOR_REPLY =
+  /\b(please (allow|let me know|tell me|confirm|choose|pick|say|send|share|decide)|let me know|which (one|ones|of these|would|should|do)|would you (like|prefer|rather)|do you want|should i|shall i|can you|could you|what would you like|your (choice|call|decision|pick)|up to you|tell me (which|what|how|whether)|confirm (that|whether|which)|before i (go ahead|continue|change|proceed))\b/i;
+
+/**
+ * True when the Crew's last message is really a question for the person —
+ * it ends on a question mark or asks for an answer in so many words — so a
+ * finished run must not read as "All done".
+ */
+export function asksForReply(text: string): boolean {
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/[*_`>#]/g, "")
+    .trim();
+  if (clean.length === 0) return false;
+  const sentences = clean
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const tail = sentences.slice(-3);
+  if (tail.some((sentence) => sentence.endsWith("?"))) return true;
+  return ASKS_FOR_REPLY.test(tail.join(" "));
 }
 
 export function describeThreadStatus(shell: EnvironmentThreadShell): ConversationStatus {
@@ -130,6 +155,17 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
         attention: "none",
       };
     default: {
+      const latest = shell.source.latestVisibleMessage;
+      if (latest !== null && latest.role === "assistant" && asksForReply(latest.text)) {
+        return {
+          kind: "waiting",
+          headline: "Waiting for you · needs your reply",
+          presence: "Waiting for you · it asked you something",
+          tone: "waiting",
+          attention: "waiting",
+          needsReply: true,
+        };
+      }
       const unseen = isUnseenSince(shell.lastVisitedAt, run.completedAt);
       return unseen
         ? {
@@ -159,6 +195,9 @@ function isUnseenSince(lastVisitedAt: string | null | undefined, completedAt: st
 /** "Crew: Done — GST is on the invoice total." / "You: add a vegan option" */
 export function conversationPreview(shell: EnvironmentThreadShell, status: ConversationStatus) {
   const latest = shell.source.latestVisibleMessage;
+  if (status.needsReply && latest !== null && latest.text.trim().length > 0) {
+    return `Crew asks: ${firstLine(latest.text)}`;
+  }
   if (status.kind === "waiting" || status.kind === "working" || status.kind === "preparing") {
     return `Crew: ${status.headline}`;
   }

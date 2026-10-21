@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseMarkdown, plainFirstLine } from "./Markdown";
+import { linkHost, parseMarkdown, plainFirstLine } from "./Markdown";
 
 describe("parseMarkdown", () => {
   it("splits paragraphs, headings, lists and fenced code", () => {
@@ -52,5 +52,14 @@ describe("plainFirstLine", () => {
   it("strips markers and truncates", () => {
     expect(plainFirstLine("## **Bold** plan\nmore")).toBe("Bold plan");
     expect(plainFirstLine("- a very long line ".repeat(20), 20).endsWith("…")).toBe(true);
+  });
+});
+
+describe("linkHost", () => {
+  it("names the site for web links and nothing for the rest", () => {
+    expect(linkHost("https://www.littleferncafe.com.au/menu")).toBe("littleferncafe.com.au");
+    expect(linkHost("mailto:hi@example.com")).toBeNull();
+    expect(linkHost("javascript:alert(1)")).toBeNull();
+    expect(linkHost("not a url")).toBeNull();
   });
 });
