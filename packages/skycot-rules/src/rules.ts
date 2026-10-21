@@ -9,6 +9,8 @@
 
 import { isOutsideProject, isSecretPath, type PromptFile } from "./files.ts";
 import {
+  commandSubstitutions,
+  innerShellScript,
   normalizeForMatching,
   programBaseName,
   programTokens,
@@ -130,12 +132,22 @@ export interface RuleContext {
   readonly projectRoot?: string | null | undefined;
   /** The branch everyone sees, when the engine knows it. */
   readonly defaultBranch?: string | null | undefined;
+  /**
+   * The branch checked out where the command runs, so a bare `git push` can be judged.
+   * Leave it unset when unknown: the push is then held, because the rules cannot tell
+   * which branch would go up.
+   */
+  readonly currentBranch?: string | null | undefined;
 }
 
 export interface RuleMatch {
   readonly rule: HardRule;
   /** The token or segment that tripped the rule, for "Show details". */
   readonly detail?: string;
+  /** When set, this match carries a different weight than the rule's default. */
+  readonly risk?: HardRuleRisk;
+  /** When set, the card says this instead of the rule's `held` sentence. */
+  readonly held?: string;
 }
 
 export type RuleRisk = "low" | "medium" | "high";
@@ -154,7 +166,7 @@ function evaluation(matches: ReadonlyArray<RuleMatch>): RuleEvaluation {
     seen.add(match.rule.id);
     return true;
   });
-  const risk: RuleRisk = unique.some((m) => m.rule.risk === "high")
+  const risk: RuleRisk = unique.some((m) => (m.risk ?? m.rule.risk) === "high")
     ? "high"
     : unique.length > 0
       ? "medium"
@@ -295,6 +307,14 @@ const DEPLOY_PROGRAMS = new Set([
   "eas",
   "fastlane",
 ]);
+/** The same programs when a package manager runs them from `node_modules/.bin`. */
+const RUNNABLE_BINS: ReadonlySet<string> = new Set([...DEPLOY_PROGRAMS, "stripe", "twine", "gh"]);
+/** The bare `git push` whose checked-out branch nobody could name. */
+export const UNKNOWN_BRANCH_PUSH =
+  "sends your work online — SKYCOT can't tell which branch this uploads to";
+/** `npm run deploy`: a script named like a deploy is one until proven otherwise. */
+const DEPLOY_SCRIPT_NAMES =
+  /^(deploy|publish|release|ship|promote|prod|production|go-live|golive)(:.*)?$/i;
 const DEPLOY_SUBCOMMANDS =
   /^(deploy|publish|release|apply|up|launch|rollout|prod|promote|submit|update|install|upgrade|scale|run|push|alias|ship)$/;
 const LIVE_BRANCHES = new Set([
@@ -352,10 +372,17 @@ function hasRemoteTarget(args: ReadonlyArray<string>): boolean {
 }
 
 function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
+  // `sh -c "a && b"`: every command inside is judged, not only the first.
+  const inner = innerShellScript(segment);
+  if (inner !== null) {
+    return splitShellSegments(normalizeForMatching(inner)).flatMap((part) =>
+      evaluateSegment(part, ctx),
+    );
+  }
   const matches: Array<RuleMatch> = [];
   const hit = (id: HardRuleId, detail: string = segment) =>
     matches.push({ rule: hardRule(id), detail });
-  const tokens = programTokens(segment);
+  const tokens = programTokens(segment, { bins: RUNNABLE_BINS });
   const program = tokens[0];
   // `> file` or `: > file` on its own empties the file.
   if (program === undefined || program === ">" || program === ":") {
@@ -392,10 +419,31 @@ function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
     if (sub === "push") {
       const live = new Set(LIVE_BRANCHES);
       if (ctx.defaultBranch) live.add(ctx.defaultBranch);
-      // `git push <remote> <ref>…`; `HEAD:main` and `+main` name the far side.
-      const refs = positional.slice(2);
-      if (refs.some((ref) => live.has(ref.replace(/^\+/, "").replace(/^.*:/, "")))) {
+      if (args.some((arg) => arg === "--all" || arg === "--mirror" || arg === "--branches")) {
         hit("pushes-to-live");
+      }
+      // `git push <remote> <ref>…`; `HEAD:main` and `+main` name the far side.
+      const refs = positional.slice(2).filter((ref) => !/^--?\w/.test(ref));
+      const farSide = (ref: string) => {
+        const target = ref.replace(/^\+/, "").replace(/^.*:/, "");
+        return target === "HEAD" || target === "" ? null : target;
+      };
+      const named = refs.map(farSide);
+      if (named.some((ref) => ref !== null && live.has(ref))) hit("pushes-to-live");
+      // No far-side name (`git push`, `git push origin`, `git push origin HEAD`): the
+      // checked-out branch goes up. Judge it, or hold when nobody knows which it is.
+      if (named.every((ref) => ref === null)) {
+        const current = ctx.currentBranch ?? null;
+        if (current === null) {
+          matches.push({
+            rule: hardRule("pushes-to-live"),
+            detail: `${segment} (current branch unknown)`,
+            risk: "medium",
+            held: UNKNOWN_BRANCH_PUSH,
+          });
+        } else if (live.has(current)) {
+          hit("pushes-to-live", `${segment} (on ${current})`);
+        }
       }
     }
   }
@@ -406,6 +454,14 @@ function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
   if (DEPLOY_PROGRAMS.has(base)) {
     const deploys = sub === "" || DEPLOY_SUBCOMMANDS.test(sub) || args.includes("--prod");
     if (deploys) hit("publishes-or-deploys");
+  }
+  if (["npm", "pnpm", "yarn", "bun"].includes(base)) {
+    // `npm run deploy`, `yarn deploy`, `yarn npm publish` (Yarn Berry).
+    const script =
+      sub === "run" || sub === "run-script" ? positional[1] : base === "npm" ? undefined : sub;
+    if (script !== undefined && DEPLOY_SCRIPT_NAMES.test(script)) hit("publishes-or-deploys");
+    if (base === "yarn" && sub === "npm" && positional[1] === "publish")
+      hit("publishes-or-deploys");
   }
   if (
     (["npm", "pnpm", "yarn", "bun"].includes(base) &&
@@ -496,6 +552,10 @@ export function evaluateCommand(command: string, ctx: RuleContext = {}): RuleEva
     matches.push({ rule: hardRule("pipes-to-shell"), detail: command.trim() });
   }
   for (const segment of splitShellSegments(text)) matches.push(...evaluateSegment(segment, ctx));
+  // `x=$(npx vercel --prod)`, `` echo `wrangler deploy` ``: what runs inside counts too.
+  for (const inner of commandSubstitutions(text)) {
+    for (const segment of splitShellSegments(inner)) matches.push(...evaluateSegment(segment, ctx));
+  }
   // Everything a destructive pattern catches also counts as deleting or rewriting where that
   // is what it does, so the card can say the specific thing.
   return evaluation(matches);
@@ -578,7 +638,7 @@ export function evaluateRequest(request: RuleRequest, ctx: RuleContext = {}): Ru
 
 /** "deletes files or folders and works outside your project folder" */
 export function describeMatches(matches: ReadonlyArray<RuleMatch>): string {
-  const parts = matches.map((match) => match.rule.held);
+  const parts = matches.map((match) => match.held ?? match.rule.held);
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }

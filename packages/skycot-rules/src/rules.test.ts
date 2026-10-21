@@ -8,6 +8,7 @@ import {
   evaluateFileRead,
   evaluateRequest,
   isDestructiveCommand,
+  UNKNOWN_BRANCH_PUSH,
 } from "./rules.ts";
 
 const ROOT = "/Users/me/site";
@@ -336,5 +337,188 @@ describe("evaluateRequest", () => {
     expect(describeMatches(result.matches)).toMatch(
       /^is a known-dangerous command, deletes files or folders and works outside your project folder$/,
     );
+  });
+});
+
+const DEPLOY_COMMANDS = [
+  "vercel --prod",
+  "vercel deploy --prod",
+  "netlify deploy --prod",
+  "wrangler deploy",
+  "fly deploy",
+  "firebase deploy",
+  "eas submit --platform ios",
+  "npm publish",
+];
+const WRAPPERS: ReadonlyArray<[string, (command: string) => string]> = [
+  ["npx", (c) => `npx ${c}`],
+  ["npx -y", (c) => `npx -y ${c}`],
+  ["npx --yes --package=x", (c) => `npx --yes --package=${c.split(" ")[0]} -- ${c}`],
+  ["npx -p pkg", (c) => `npx -p ${c.split(" ")[0]} ${c}`],
+  ["npx -c", (c) => `npx -c 'echo start && ${c}'`],
+  ["pnpm --filter", (c) => `pnpm --filter web exec ${c}`],
+  ["npm exec --", (c) => `npm exec -- ${c}`],
+  ["npm x", (c) => `npm x ${c}`],
+  ["pnpm dlx", (c) => `pnpm dlx ${c}`],
+  ["pnpm exec", (c) => `pnpm exec ${c}`],
+  ["pnpx", (c) => `pnpx ${c}`],
+  ["yarn dlx", (c) => `yarn dlx ${c}`],
+  ["yarn exec", (c) => `yarn exec ${c}`],
+  ["bunx", (c) => `bunx ${c}`],
+  ["bun x", (c) => `bun x ${c}`],
+  ["deno run -A npm:", (c) => `deno run -A npm:${c}`],
+  ["sudo", (c) => `sudo ${c}`],
+  ["sudo -u deploy", (c) => `sudo -u deploy ${c}`],
+  ["env VAR=1", (c) => `env CI=1 ${c}`],
+  ["VAR=1", (c) => `CI=1 ${c}`],
+  ["nice", (c) => `nice -n 10 ${c}`],
+  ["time", (c) => `time ${c}`],
+  ["timeout", (c) => `timeout 600 ${c}`],
+  ["xargs", (c) => `echo . | xargs -n 1 ${c}`],
+  ["sh -c", (c) => `sh -c '${c}'`],
+  ["bash -lc", (c) => `bash -lc "${c}"`],
+  ["zsh -lc wrapping npx", (c) => `/bin/zsh -lc 'cd /Users/me/site && npx ${c}'`],
+  ["command", (c) => `command ${c}`],
+  ["absolute path", (c) => `/usr/local/bin/${c}`],
+  ["node_modules/.bin", (c) => `./node_modules/.bin/${c}`],
+  ["$(which …)", (c) => `$(which ${c.split(" ")[0]}) ${c.split(" ").slice(1).join(" ")}`],
+  ["backtick which", (c) => `\`which ${c.split(" ")[0]}\` ${c.split(" ").slice(1).join(" ")}`],
+  ["env + npx", (c) => `env FOO=1 npx -y ${c}`],
+  ["sudo + sh -c + npx", (c) => `sudo sh -c "npx ${c}"`],
+  ["$(…) substitution", (c) => `out=$(${c})`],
+  ["backtick substitution", (c) => `echo \`npx ${c}\``],
+  ["env -S", (c) => `env -S '${c}'`],
+];
+
+describe("evaluateCommand — runner and shell wrappers are peeled before judging (QA-P2-2-01)", () => {
+  it.each(
+    WRAPPERS.flatMap(([name, wrap]) => DEPLOY_COMMANDS.map((c) => [name, c, wrap(c)] as const)),
+  )("holds %s · %s → %s", (_name, _command, wrapped) => {
+    const result = evaluateCommand(wrapped, { projectRoot: ROOT, currentBranch: "skycot/x" });
+    expect(result.decision).toBe("hold");
+    expect(result.risk).toBe("high");
+    expect(result.matches.map((m) => m.rule.id)).toContain("publishes-or-deploys");
+  });
+
+  it.each([
+    "sudo npm publish",
+    "env CI=1 npm publish --access public",
+    "sh -c 'npm publish'",
+    "pnpm publish",
+    "yarn npm publish",
+    "bun publish",
+    "npm run deploy",
+    "pnpm run deploy:prod",
+    "yarn release",
+    "yarn vercel --prod",
+    "pnpm wrangler deploy",
+    "npm run vercel -- --prod",
+    "npx @netlify/cli deploy --prod",
+    "npx firebase-tools deploy",
+    "npx eas-cli submit -p ios",
+    "node node_modules/vercel/dist/index.js --prod",
+    "npx -c 'vercel --prod'",
+    "npm exec --call='vercel --prod'",
+    "script -q /dev/null vercel --prod",
+    "script -c 'netlify deploy --prod' /dev/null",
+    "pnpm --filter web vercel --prod",
+  ])("holds %s as publishing", (command) => {
+    expect(ids(command)).toContain("publishes-or-deploys");
+  });
+
+  it.each([
+    "npx prettier --write .",
+    "npx prettier --check .",
+    "pnpm dlx tsc --noEmit",
+    "pnpm --filter web test",
+    "npx -c 'prettier --check . && tsc --noEmit'",
+    "out=$(git rev-parse HEAD)",
+    "script -q /dev/null pnpm test",
+    "npx -y prettier --check src",
+    "pnpm dlx eslint .",
+    "bunx tsc --noEmit",
+    "npm exec -- vitest run",
+    "yarn dlx serve dist",
+    "sudo npx prettier --write .",
+    "env CI=1 npx playwright test",
+    "deno run -A npm:prettier --check .",
+    "yarn build",
+    "pnpm test",
+    "npm run build",
+    "command -v vercel",
+    "which vercel",
+    "vercel ls",
+    "vercel env ls",
+    "wrangler dev",
+    "timeout 60 npx vitest run",
+    "./node_modules/.bin/vitest run",
+  ])("still allows the benign wrapper %s", (command) => {
+    const result = evaluateCommand(command, { projectRoot: ROOT, currentBranch: "skycot/x" });
+    expect(result.decision).toBe("allow");
+    expect(result.matches).toEqual([]);
+  });
+
+  it("judges every command inside sh -c, not only the first", () => {
+    expect(ids("sh -c 'echo hi && rm book.html'")).toContain("deletes-files");
+    expect(ids('bash -lc "pnpm test && npx vercel --prod"')).toContain("publishes-or-deploys");
+    expect(ids("sudo bash -c 'ls; cat /etc/hosts'")).toContain("reads-outside-project");
+  });
+
+  it("still judges delete, payment and data-out rules through a runner", () => {
+    expect(ids("npx rimraf dist")).toEqual([]); // rimraf is a package, not a known delete program
+    expect(ids("npx stripe payments create --amount 100")).toContain("payments");
+    expect(ids("sudo scp dist/ user@host:/srv")).toContain("sends-data-out");
+    expect(ids("env FOO=1 rm -rf dist")).toContain("deletes-files");
+  });
+});
+
+describe("evaluateCommand — a bare git push is judged by the checked-out branch (QA-P2-2-02)", () => {
+  const on = (branch: string | null | undefined, defaultBranch?: string) => ({
+    projectRoot: ROOT,
+    currentBranch: branch,
+    ...(defaultBranch === undefined ? {} : { defaultBranch }),
+  });
+
+  it.each(["git push", "git push origin", "git push origin HEAD", "git push -u origin HEAD"])(
+    "allows %s from a skycot/* branch",
+    (command) => {
+      const result = evaluateCommand(command, on("skycot/christmas-page"));
+      expect(result.decision).toBe("allow");
+      expect(result.matches).toEqual([]);
+    },
+  );
+
+  it.each(["git push", "git push origin", "git push origin HEAD", "git push -u origin HEAD"])(
+    "holds %s from main as high",
+    (command) => {
+      const result = evaluateCommand(command, on("main"));
+      expect(result.decision).toBe("hold");
+      expect(result.risk).toBe("high");
+      expect(result.matches.map((m) => m.rule.id)).toEqual(["pushes-to-live"]);
+    },
+  );
+
+  it("treats the repo's own default branch as live even when it has an unusual name", () => {
+    expect(evaluateCommand("git push", on("trunk-2026", "trunk-2026")).decision).toBe("hold");
+    expect(
+      evaluateCommand("git push origin trunk-2026", on("skycot/x", "trunk-2026")).decision,
+    ).toBe("hold");
+    expect(evaluateCommand("git push", on("skycot/x", "trunk-2026")).decision).toBe("allow");
+  });
+
+  it("holds as medium when nobody knows which branch is checked out", () => {
+    for (const ctx of [on(null), on(undefined), { projectRoot: ROOT }]) {
+      const result = evaluateCommand("git push", ctx);
+      expect(result.decision).toBe("hold");
+      expect(result.risk).toBe("medium");
+      expect(result.matches[0]!.rule.id).toBe("pushes-to-live");
+      expect(describeMatches(result.matches)).toBe(UNKNOWN_BRANCH_PUSH);
+    }
+  });
+
+  it("holds --all and --mirror pushes and keeps explicit live refs held", () => {
+    expect(evaluateCommand("git push --all", on("skycot/x")).decision).toBe("hold");
+    expect(evaluateCommand("git push --mirror origin", on("skycot/x")).decision).toBe("hold");
+    expect(evaluateCommand("git push origin HEAD:main", on("skycot/x")).risk).toBe("high");
   });
 });
