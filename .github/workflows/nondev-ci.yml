@@ -51,7 +51,7 @@ jobs:
         run: node --test nondev/scripts/*.test.ts
 
       - name: Check seams against SEAM-MANIFEST.md
-        run: node nondev/scripts/check-seams.ts
+        run: node nondev/scripts/check-seams.ts --strict
 
       - name: Typecheck @t3tools/nondev
         run: vp run --filter @t3tools/nondev typecheck
