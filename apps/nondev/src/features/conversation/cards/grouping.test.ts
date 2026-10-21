@@ -85,4 +85,26 @@ describe("groupTimelineItems", () => {
       "secret_request",
     ]);
   });
+
+  it("folds asks the SKYCOT rules answered into the run's card, which stays last", () => {
+    const list = [
+      items.user("Check the pages"),
+      items.command("ls"),
+      items.approval("command", { prompt: "pnpm test", requestId: "req-policy" }),
+      items.assistant("All pages open."),
+    ];
+    const entries = groupTimelineItems(list, {
+      absorb: (item) => item.type === "approval_request" && item.requestId === "req-policy",
+    });
+    expect(entries.map((e) => (e.kind === "work" ? "work" : e.item.type))).toEqual([
+      "user_message",
+      "work",
+      "assistant_message",
+    ]);
+    const work = entries[1]!;
+    expect(work.kind === "work" && work.items.map((i) => i.type)).toEqual([
+      "command_execution",
+      "approval_request",
+    ]);
+  });
 });

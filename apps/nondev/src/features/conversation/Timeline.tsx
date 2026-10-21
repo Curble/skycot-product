@@ -9,6 +9,8 @@ import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
+
 import { describeTurnItem } from "../../plain/narration";
 import { Bubble, DayDivider, TypingIndicator } from "../../ui/Bubble";
 import { groupTimelineItems } from "./cards";
@@ -33,6 +35,8 @@ const HIDDEN_BY_DEFAULT: ReadonlySet<TimelineItemType> = new Set<TimelineItemTyp
   "thread_created",
   "checkpoint",
   "compaction",
+  // Stop says so once, on its result line below; the request half is bookkeeping.
+  "run_interrupt_request",
 ]);
 
 function renderDefault(context: TimelineRenderContext): ReactNode {
@@ -43,6 +47,18 @@ function renderDefault(context: TimelineRenderContext): ReactNode {
     case "assistant_message":
       if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
       return <Bubble author="crew">{item.text}</Bubble>;
+    case "run_interrupt_result": {
+      const askedToStop = context.items.some(
+        (other) => other.type === "run_interrupt_request" && other.runId === item.runId,
+      );
+      return (
+        <Bubble author="crew" muted>
+          {askedToStop
+            ? "You stopped it. Nothing else will run until you reply."
+            : "The assistant stopped. Nothing else will run until you reply."}
+        </Bubble>
+      );
+    }
     default: {
       if (HIDDEN_BY_DEFAULT.has(item.type)) return null;
       const narration = describeTurnItem(
@@ -82,7 +98,17 @@ export function Timeline({
 }) {
   const items = projection.turnItems;
   const startedAt = shell?.createdAt ?? null;
-  const entries = groupTimelineItems(items);
+  // Asks the SKYCOT rules answered were never a question for the person: they
+  // live in the Working card's Show details, not as cards of their own.
+  const policyAnswered = new Set(
+    projection.runtimeRequests
+      .filter((request) => readPolicyDecision(request.answers) !== null)
+      .map((request) => request.id),
+  );
+  const entries = groupTimelineItems(items, {
+    absorb: (item) =>
+      item.type === "approval_request" && item.runId !== null && policyAnswered.has(item.requestId),
+  });
   const stream = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   // Follow the newest message like Messages does, but only while the reader is

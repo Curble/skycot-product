@@ -50,12 +50,19 @@ interface MutableWorkGroup {
  */
 export function groupTimelineItems(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
+  options: {
+    /**
+     * Items that would be their own card but belong in the run's card instead:
+     * asks the SKYCOT rules answered, which nobody was asked about.
+     */
+    readonly absorb?: (item: OrchestrationV2TurnItem) => boolean;
+  } = {},
 ): ReadonlyArray<TimelineEntry> {
   const entries: Array<TimelineEntry | MutableWorkGroup> = [];
   const byRun = new Map<RunId, MutableWorkGroup>();
   let adjacent: MutableWorkGroup | null = null;
   items.forEach((item, index) => {
-    if (!WORK_ITEM_TYPES.has(item.type)) {
+    if (!WORK_ITEM_TYPES.has(item.type) && !(options.absorb?.(item) ?? false)) {
       adjacent = null;
       entries.push({ kind: "item", item, index });
       return;

@@ -39,6 +39,10 @@ const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "waiting",
 ]);
 
+function lowerFirst(text: string): string {
+  return text.length === 0 ? text : text[0]!.toLowerCase() + text.slice(1);
+}
+
 function finishedTitle(status: OrchestrationV2Run["status"] | undefined, refused: boolean): string {
   switch (status) {
     case "failed":
@@ -99,9 +103,11 @@ export function WorkingCard({
   void threadId;
   const run = group.runId === null ? undefined : projection.runs.find((r) => r.id === group.runId);
   const requests = new Map(projection.runtimeRequests.map((r) => [r.id, r]));
+  const stopped = run?.status === "interrupted" || run?.status === "cancelled";
   const ctx: NarrationContext = {
     ...(projectName === null ? {} : { projectName }),
     runtimeRequests: requests,
+    ...(stopped ? { stopped: true } : {}),
   };
   // Approval cards are their own stream items, but the run's asks still count
   // for the clock and for "you said no" — the checklist and tool items come
@@ -114,11 +120,27 @@ export function WorkingCard({
             item.runId === group.runId &&
             (item.type === "approval_request" || item.type === "user_input_request"),
         );
-  const narrated = group.items.map((item) => ({ item, narration: describeTurnItem(item, ctx) }));
   const active = run
     ? ACTIVE_RUN.has(run.status)
-    : narrated.some((n) => n.narration.status === "running");
-  const { checklist } = summarizeRun(group.items, ctx);
+    : group.items.some((item) => describeTurnItem(item, ctx).status === "running");
+  const narrated = group.items.map((item) => {
+    const narration = describeTurnItem(item, ctx);
+    // A run that was stopped leaves its unfinished steps "about to …": they never ran.
+    if (stopped && (narration.status === "pending" || narration.status === "running")) {
+      return {
+        item,
+        narration: {
+          ...narration,
+          status: "denied" as const,
+          headline: `Cancelled: ${lowerFirst(narration.headline.replace(/^(About to|The assistant wants to) /, ""))}`,
+        },
+      };
+    }
+    return { item, narration };
+  });
+  // Asks the SKYCOT rules answered sit in this card's details only; they are not steps.
+  const toolItems = group.items.filter((item) => item.type !== "approval_request");
+  const { checklist } = summarizeRun(toolItems, ctx);
   // "Step N of M" is only honest when the agent published a to-do list; a
   // checklist inferred from tool calls has no known end.
   const planned = group.items.some((item) => item.type === "todo_list" && item.steps.length > 0);
@@ -131,7 +153,10 @@ export function WorkingCard({
   // count; a step the person refused never happened.
   const stepCount = narrated.filter(
     ({ item, narration }) =>
-      item.type !== "reasoning" && item.type !== "todo_list" && narration.status !== "denied",
+      item.type !== "reasoning" &&
+      item.type !== "todo_list" &&
+      item.type !== "approval_request" &&
+      narration.status !== "denied",
   ).length;
   const failed = narrated.filter((n) => n.narration.status === "failed").length;
   const deniedAsks = runAsks.filter((item) => {
@@ -147,7 +172,7 @@ export function WorkingCard({
     toIso(run?.completedAt ?? null),
     active,
   );
-  const hint = progressHint(group.items, run?.status ?? "running", ctx);
+  const hint = progressHint(toolItems, run?.status ?? "running", ctx);
   // "Working on it" is already the title; saying it three times tells nothing.
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
@@ -164,7 +189,7 @@ export function WorkingCard({
         elapsed,
       ]
     : [
-        refused
+        refused || (stopped && stepCount === 0)
           ? "Nothing was changed"
           : stepCount === 0
             ? "No files touched"

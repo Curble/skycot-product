@@ -4,7 +4,13 @@
 // the question form, and sends the chosen option's real payload. Nothing is
 // pre-selected: every button is the same weight and none has focus.
 import { useAtomValue } from "@effect/atom-react";
-import type { OrchestrationV2RuntimeRequest, OrchestrationV2TurnItem } from "@t3tools/contracts";
+import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type {
+  OrchestrationV2Run,
+  OrchestrationV2RuntimeRequest,
+  OrchestrationV2ThreadProjection,
+  OrchestrationV2TurnItem,
+} from "@t3tools/contracts";
 import {
   CircleHelp,
   KeyRound,
@@ -69,10 +75,40 @@ function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 
+const SETTLED_RUN = new Set<OrchestrationV2Run["status"]>([
+  "completed",
+  "interrupted",
+  "failed",
+  "cancelled",
+  "rolled_back",
+]);
+
+/**
+ * True once the ask's run is going away: Stop was pressed (the engine may not
+ * have confirmed yet) or the run already ended. An ask of such a run can no
+ * longer be answered, so the card stops offering buttons at once.
+ */
+export function askRunEnded(
+  item: RequestItem,
+  projection: OrchestrationV2ThreadProjection,
+  shell: EnvironmentThreadShell | null,
+): boolean {
+  if (item.runId === null) return false;
+  const run = projection.runs.find((candidate) => candidate.id === item.runId);
+  if (run && SETTLED_RUN.has(run.status)) return true;
+  if (shell?.latestRun?.runId === item.runId && shell.source.latestRunStopRequested === true) {
+    return true;
+  }
+  return projection.turnItems.some(
+    (other) => other.type === "run_interrupt_request" && other.runId === item.runId,
+  );
+}
+
 /** "You allowed this once · 8:42" once the request is settled; null while it waits. */
 function decidedLine(
   item: RequestItem,
   request: OrchestrationV2RuntimeRequest | undefined,
+  runEnded: boolean,
 ): string | null {
   const when = shortTime(request?.resolvedAt ?? item.completedAt ?? null);
   const stamp = when ? ` · ${when}` : "";
@@ -89,7 +125,7 @@ function decidedLine(
     }
   }
   const pending = request ? request.status === "pending" : PENDING_ITEM_STATUS.has(item.status);
-  if (pending) return null;
+  if (pending) return runEnded ? "You stopped the assistant — nothing ran" : null;
   if (item.type === "approval_request") {
     const decision = request ? describeDecision(request) : null;
     // Answered by the server's SKYCOT rules, not by a person: say so calmly;
@@ -148,7 +184,8 @@ export function RequestCard({
     ...(request ? { responseCapability: request.responseCapability.type } : {}),
     ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
   });
-  const decided = decidedLine(item, request);
+  const runEnded = askRunEnded(item, projection, shell);
+  const decided = decidedLine(item, request, runEnded);
   const decision = request ? describeDecision(request) : null;
   const crew = useCrew();
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
@@ -173,6 +210,8 @@ export function RequestCard({
   }, [pendingOnMount]);
 
   const choose = async (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => {
+    // Never answer into a stopped run, even from a click that raced the Stop.
+    if (askRunEnded(item, projection, shell)) return;
     setBusyId(option.id);
     setProblem(null);
     const result = await dispatch(option.decision, extras);
