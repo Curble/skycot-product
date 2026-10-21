@@ -293,10 +293,10 @@ function firstLine(text: string | undefined, max = 400): string {
 }
 
 /** One sentence per idea: a lead that already says "can't be undone" only gets the check line. */
-function withUndoWarning(lead: string): string {
+function withUndoWarning(lead: string, check: string = copy.checkTheCommand): string {
   return /can't be undone/i.test(lead)
-    ? `${lead} ${copy.checkTheCommand}`
-    : `${lead} ${copy.destructiveWarning}`;
+    ? `${lead} ${check}`
+    : `${lead} This can't be undone from inside the app. ${check}`;
 }
 
 const READS_OUTSIDE_SCOPE = "Reads one file outside the project; changes nothing.";
@@ -497,9 +497,9 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
       ifYouSayNo: copy.ifNoFileChange,
       risk,
       warning: deletes
-        ? withUndoWarning(`${deleteNoun} will be deleted.`)
+        ? withUndoWarning(`${deleteNoun} will be deleted.`, copy.checkTheFiles)
         : outside
-          ? withUndoWarning(`${outsideNoun} outside the project folder.`)
+          ? withUndoWarning(`${outsideNoun} outside the project folder.`, copy.checkTheFiles)
           : undefined,
       options: buildApprovalOptions(
         item.requestId,

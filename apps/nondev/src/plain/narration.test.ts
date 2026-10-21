@@ -431,6 +431,13 @@ describe("describeTurnItem — steps that never ran (QA-P2-2-06)", () => {
     expect(edit.headline).toBe("Asked to delete the book page — you said no");
   });
 
+  it("names a refused delete as a delete when the run's ask said so", () => {
+    const item = items.fileChange("/w/book.html", {}, { status: "cancelled" });
+    expect(describeTurnItem(item, { deletedPaths: new Set(["/w/book.html"]) }).headline).toBe(
+      "Asked to delete the book page — you said no",
+    );
+  });
+
   it("calls it cancelled when the run was stopped", () => {
     const rm = describeTurnItem(items.command("rm book.html", {}, { status: "interrupted" }), {
       stopped: true,

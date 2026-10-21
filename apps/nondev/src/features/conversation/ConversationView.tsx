@@ -5,12 +5,7 @@ import {
   threadRuntimeIsActive,
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
-import type {
-  EnvironmentId,
-  OrchestrationV2ThreadProjection,
-  RunId,
-  ThreadId,
-} from "@t3tools/contracts";
+import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
@@ -53,7 +48,7 @@ import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } fr
 import { latestReviewable } from "../review";
 import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
-import { waitedMillis, type AskItem } from "./WorkingCard";
+import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -67,31 +62,6 @@ function readerIsNearBottom(): boolean {
   const scroller = document.querySelector<HTMLElement>(".fm-stream");
   if (!scroller) return true;
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
-}
-
-/**
- * A run that ended because the person said no to a step, and changed nothing,
- * is a stop, not a success. The shell cannot see decisions, so this reads the
- * full projection; the list row still relies on the Crew's closing message.
- */
-export function endedOnRefusal(
-  projection: OrchestrationV2ThreadProjection,
-  latestRunId: string | null,
-): boolean {
-  if (latestRunId === null) return false;
-  const run = projection.runs.find((candidate) => candidate.id === latestRunId);
-  if (!run || run.status !== "completed") return false;
-  const declined = projection.turnItems.some(
-    (item) =>
-      item.type === "approval_request" &&
-      item.runId === run.id &&
-      projection.runtimeRequests.find((request) => request.id === item.requestId)?.decision ===
-        "decline",
-  );
-  if (!declined) return false;
-  return !projection.checkpoints.some(
-    (checkpoint) => checkpoint.runId === run.id && checkpoint.files.length > 0,
-  );
 }
 
 /**

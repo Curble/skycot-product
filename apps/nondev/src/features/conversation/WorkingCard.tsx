@@ -16,6 +16,7 @@ import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
 import { useElapsedLabel } from "../../app/useElapsed";
 import { describeDecision } from "../../plain/approvals";
+import { filesFromPrompt } from "../../plain/changes";
 import { progress } from "../../plain/copy";
 import {
   describeTurnItem,
@@ -104,10 +105,22 @@ export function WorkingCard({
   const run = group.runId === null ? undefined : projection.runs.find((r) => r.id === group.runId);
   const requests = new Map(projection.runtimeRequests.map((r) => [r.id, r]));
   const stopped = run?.status === "interrupted" || run?.status === "cancelled";
+  const deletedPaths = new Set(
+    projection.turnItems.flatMap((item) =>
+      item.type === "approval_request" &&
+      item.runId === group.runId &&
+      item.requestKind === "file-change"
+        ? filesFromPrompt(item.prompt)
+            .filter((file) => file.operation === "remove")
+            .map((file) => file.path)
+        : [],
+    ),
+  );
   const ctx: NarrationContext = {
     ...(projectName === null ? {} : { projectName }),
     runtimeRequests: requests,
     ...(stopped ? { stopped: true } : {}),
+    ...(deletedPaths.size > 0 ? { deletedPaths } : {}),
   };
   // Approval cards are their own stream items, but the run's asks still count
   // for the clock and for "you said no" — the checklist and tool items come
@@ -165,7 +178,8 @@ export function WorkingCard({
     const request = requests.get(item.requestId);
     return request?.decision === "decline";
   }).length;
-  const refused = run?.status === "completed" && deniedAsks > 0 && stepCount === 0;
+  // Same rule as the header and the list (endedOnRefusal): a "no" and no files changed.
+  const refused = run !== undefined && endedOnRefusal(projection, run.id);
 
   const startMillis = toIso(run?.workStartedAt ?? run?.startedAt ?? run?.requestedAt ?? null);
   const waited = waitedMillis(runAsks, requests);
@@ -309,5 +323,30 @@ export function WorkingCard({
         </CardBody>
       </Card>
     </Bubble>
+  );
+}
+
+/**
+ * A run that ended because the person said no to a step, and changed nothing,
+ * is a stop, not a success. Shared by the Working card, the header and (via
+ * state/conversations) the list.
+ */
+export function endedOnRefusal(
+  projection: OrchestrationV2ThreadProjection,
+  latestRunId: string | null,
+): boolean {
+  if (latestRunId === null) return false;
+  const run = projection.runs.find((candidate) => candidate.id === latestRunId);
+  if (!run || run.status !== "completed") return false;
+  const declined = projection.turnItems.some(
+    (item) =>
+      item.type === "approval_request" &&
+      item.runId === run.id &&
+      projection.runtimeRequests.find((request) => request.id === item.requestId)?.decision ===
+        "decline",
+  );
+  if (!declined) return false;
+  return !projection.checkpoints.some(
+    (checkpoint) => checkpoint.runId === run.id && checkpoint.files.length > 0,
   );
 }

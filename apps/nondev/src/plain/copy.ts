@@ -103,6 +103,7 @@ export const approvals = {
   destructiveWarning:
     "This can't be undone from inside the app. Check the exact command below before allowing it.",
   checkTheCommand: "Check the exact command below before allowing it.",
+  checkTheFiles: "Check the file names below before allowing it.",
   neverAlwaysAllow:
     "There is no 'always allow' for actions like this one — each time is a fresh question.",
   providerGone: "The assistant's process has gone away. Stop or restart the run to answer this.",

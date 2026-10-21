@@ -59,6 +59,11 @@ export interface NarrationContext {
    * not refused. Unset, a step that didn't run is one the person said no to.
    */
   readonly stopped?: boolean;
+  /**
+   * Files the run asked to delete (from its file-change asks). A refused delete
+   * arrives as a bare file item, so this is how the narrator knows the verb.
+   */
+  readonly deletedPaths?: ReadonlySet<string>;
   /** The thread's own note of when the provider's allowance resets, if it has one. */
   readonly usageLimitResetAt?: string | null;
 }
@@ -1631,7 +1636,7 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
     }
     case "file_change": {
       const described = describeFile(item.fileName);
-      const op = fileOperation(item);
+      const op = ctx.deletedPaths?.has(item.fileName) ? "deleted" : fileOperation(item);
       const status = narrationStatus(item.status);
       const verbFor = (past: string, present: string, future: string) =>
         tense(status, past, present, future);
