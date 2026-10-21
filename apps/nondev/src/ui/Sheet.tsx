@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+import { useModal } from "./useModal";
 
 export type SheetIconTone = "blue" | "orange" | "red" | "grey";
 
@@ -21,12 +23,11 @@ interface SheetProps {
   readonly dismissOnBackdrop?: boolean;
 }
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
- * macOS-style modal sheet. Traps focus, closes on Escape, restores focus to
- * the opener, and portals to <body> so it escapes any overflow clipping.
+ * macOS-style modal sheet. Traps focus, closes on Escape (even when focus has
+ * fallen to <body>), restores focus to the opener, makes the app behind it
+ * inert, and portals to <body> so it escapes any overflow clipping. Taller
+ * than the window, the body scrolls and the actions stay pinned.
  */
 export function Sheet({
   open,
@@ -45,54 +46,9 @@ export function Sheet({
   const titleId = useId();
   const descriptionId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
-  const openerRef = useRef<Element | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    openerRef.current = document.activeElement;
-    const sheet = sheetRef.current;
-    if (sheet) {
-      if (initialFocus === "first") {
-        const first = sheet.querySelector<HTMLElement>(FOCUSABLE);
-        (first ?? sheet).focus();
-      } else {
-        sheet.focus();
-      }
-    }
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      const opener = openerRef.current;
-      if (opener instanceof HTMLElement) opener.focus();
-    };
-  }, [open, initialFocus]);
+  useModal(sheetRef, { open, onClose, initialFocus });
 
   if (!open) return null;
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    if (event.key !== "Tab" || !sheetRef.current) return;
-    const focusable = [...sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || active === sheetRef.current)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
 
   return createPortal(
     <div
@@ -109,7 +65,6 @@ export function Sheet({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={`fm-sheet${wide ? " fm-sheet--wide" : ""}`}
-        onKeyDown={onKeyDown}
       >
         <div className="fm-sheet__top">
           {Icon ? (

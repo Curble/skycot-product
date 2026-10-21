@@ -40,7 +40,7 @@
   border-radius: 0;
   padding: 10px 12px;
 }
-.fm-settings--stack .fm-settings__nav .fm-listrow + .fm-listrow {
+.fm-settings--stack .fm-settings__nav .fm-list__item + .fm-list__item > .fm-listrow {
   border-top: 0.5px solid var(--fm-sep);
 }
 .fm-settings__nav .fm-listrow--selected {
@@ -103,6 +103,9 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+.fm-settings__header-spacer {
+  flex: 1;
+}
 .fm-settings__panes {
   display: flex;
   flex-direction: column;
@@ -110,6 +113,14 @@
   width: 100%;
   max-width: 720px;
   padding: 10px 24px 28px;
+}
+/* Settings sections in the stacked (phone) list are separated by their <li> wrappers. */
+.fm-settings__header .fm-btn--primary {
+  min-width: 64px;
+}
+/* Inline hints under a control that is not ready (e.g. no days picked). */
+.fm-form__hint {
+  margin: 8px 0 0;
 }
 .fm-settings--stack .fm-settings__panes {
   padding: 8px 16px 24px;
@@ -415,11 +426,15 @@
   /* Rows whose trailing side holds controls drop them under the text; rows with
      only a chevron or pill stay on one line. */
   .fm-group .fm-listrow:has(.fm-listrow__trailing button),
-  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) {
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button),
+  .fm-group .fm-listrow:has(.fm-listrow__trailing select),
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing select) {
     grid-template-columns: auto 1fr;
   }
   .fm-group .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing,
-  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing {
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing,
+  .fm-group .fm-listrow:has(.fm-listrow__trailing select) .fm-listrow__trailing,
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing select) .fm-listrow__trailing {
     grid-column: 2;
     justify-content: flex-start;
     flex-wrap: wrap;

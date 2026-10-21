@@ -31,7 +31,39 @@ export function applyPlatformClasses(): () => void {
   return () => wco?.removeEventListener("geometrychange", update);
 }
 
-/** The stock developer UI lives at the origin root in every deployment (dev, npx t3, desktop). */
-export function advancedModeUrl(): string {
-  return `${window.location.origin}/`;
+/**
+ * Which interface the person last chose. Read by the stock UI's "Back to
+ * SKYCOT" link (the `web-back-to-skycot` seam) to know SKYCOT exists at all,
+ * and intended for the server's root handler to honour so a relaunch lands in
+ * the mode last used.
+ */
+export const UI_MODE_KEY = "skycot:uiMode";
+export type UiMode = "simple" | "advanced";
+
+export function writeUiMode(mode: UiMode) {
+  try {
+    window.localStorage.setItem(UI_MODE_KEY, mode);
+  } catch {
+    // Storage blocked: nothing to remember.
+  }
+}
+
+/**
+ * The stock developer UI. In every packaged deployment (npx t3, desktop) it is
+ * served at the origin root beside us. Single-origin dev is the one exception:
+ * our Vite serves `/simple/` and redirects `/` back to it, while the stock
+ * client runs on its own port, which vite.config.ts hands us as a number only
+ * (never a baked origin), so remote dev browsers still reach the right host.
+ */
+export function advancedModeUrl(path = ""): string {
+  const { protocol, hostname, origin } = window.location;
+  const devPort = import.meta.env.VITE_SKYCOT_DEV_WEB_PORT;
+  const base = devPort ? `${protocol}//${hostname}:${devPort}/` : `${origin}/`;
+  return `${base}${path.replace(/^\/+/, "")}`;
+}
+
+/** Leaves for the developer interface, remembering the choice. */
+export function openAdvancedMode(path = ""): void {
+  writeUiMode("advanced");
+  window.location.assign(advancedModeUrl(path));
 }

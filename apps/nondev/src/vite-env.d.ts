@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_RELAY_OTLP_TRACES_TOKEN: string;
   readonly T3CODE_DESKTOP_UPDATE_REPOSITORY: string;
   readonly APP_VERSION: string;
+  /** Dev only: the stock web client's port; empty in production builds. */
+  readonly VITE_SKYCOT_DEV_WEB_PORT: string;
 }
 
 interface ImportMeta {

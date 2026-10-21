@@ -11,6 +11,17 @@ export const PRIVATE_COPY_COPY = {
   initExplainer: "SKYCOT will start tracking changes so you can undo.",
   firstVersion: (projectTitle: string) => `Start keeping versions of ${projectTitle}`,
   undoOff: "Undo is off for this conversation.",
+  /** The confirmation before anything is written to a folder that was not tracked. */
+  tracking: {
+    title: "Start keeping versions of this folder?",
+    body: (projectTitle: string) =>
+      `“${projectTitle}” isn't tracked yet. SKYCOT will add a hidden folder called .git inside it and save a first version of everything in it, so every change can be undone. Nothing leaves this Mac.`,
+    ignoreLabel: "Leave out passwords, keys and downloaded add-ons",
+    ignoreHint:
+      "Recommended. Adds a small list (.gitignore) so files like .env, *.key and node_modules are never saved in a version.",
+    confirm: "Start tracking",
+    cancel: "Not now",
+  },
 } as const;
 
 export type FolderReadiness =
@@ -24,6 +35,36 @@ export function folderReadiness(status: VcsStatusResult): FolderReadiness {
   if (status.refName === null) return { kind: "no-branch" };
   return { kind: "ready", baseBranch: status.refName };
 }
+
+/**
+ * The ignore list written before the first version of a previously untracked
+ * folder: secrets, keys, dependency caches and OS litter never belong in a
+ * version, and a non-developer cannot be expected to know that.
+ */
+export const STARTER_GITIGNORE = [
+  "# Added by SKYCOT when it started keeping versions of this folder.",
+  "# Secrets and keys",
+  ".env",
+  ".env.*",
+  "*.pem",
+  "*.key",
+  "*.p12",
+  "*.pfx",
+  "# Installed add-ons and build output (re-created automatically)",
+  "node_modules/",
+  "dist/",
+  "build/",
+  ".next/",
+  ".cache/",
+  "# System litter",
+  ".DS_Store",
+  "Thumbs.db",
+  "# Local databases",
+  "*.sqlite",
+  "*.sqlite3",
+  "*.db",
+  "",
+].join("\n");
 
 /**
  * `skycot/christmas-menu-page-3fa2`: the request's first words, Git-safe,

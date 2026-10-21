@@ -15,6 +15,8 @@ interface SegmentedControlProps<T extends string> {
   readonly label: string;
   readonly size?: "sm" | "md";
   readonly block?: boolean;
+  /** Options flow onto a second row when the box is too narrow, instead of clipping. */
+  readonly wrap?: boolean;
   readonly disabled?: boolean;
 }
 
@@ -26,10 +28,16 @@ export function SegmentedControl<T extends string>({
   label,
   size = "md",
   block = false,
+  wrap = false,
   disabled = false,
 }: SegmentedControlProps<T>) {
   const id = useId();
-  const classes = ["fm-seg", size === "sm" ? "fm-seg--sm" : "", block ? "fm-seg--block" : ""]
+  const classes = [
+    "fm-seg",
+    size === "sm" ? "fm-seg--sm" : "",
+    block ? "fm-seg--block" : "",
+    wrap ? "fm-seg--wrap" : "",
+  ]
     .filter(Boolean)
     .join(" ");
 

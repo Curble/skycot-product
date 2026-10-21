@@ -59,7 +59,11 @@ const devProxyTarget = resolveDevProxyTarget(process.env.T3CODE_PORT, configured
 
 const webSrc = new URL("../web/src/", import.meta.url).pathname;
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
+  // Dev only: the stock client runs on its own port beside us, and `/` on our
+  // port redirects back to `/simple/`. A port number is not an origin, so
+  // remote dev browsers still reach the right host (AGENTS.md rule #3).
+  const devWebPort = command === "serve" && port !== webPort ? String(webPort) : "";
   return {
     // Served beside the stock UI at <server>/simple/ (apps/server/scripts/cli.ts
     // copies dist/ to dist/client/simple). Routes live in the URL hash so the
@@ -83,6 +87,7 @@ export default defineConfig(() => {
       "import.meta.env.VITE_HOSTED_APP_CHANNEL": JSON.stringify(""),
       "import.meta.env.T3CODE_DESKTOP_UPDATE_REPOSITORY": JSON.stringify(""),
       "import.meta.env.APP_VERSION": JSON.stringify(configuredAppVersion),
+      "import.meta.env.VITE_SKYCOT_DEV_WEB_PORT": JSON.stringify(devWebPort),
     },
     resolve: {
       // Order matters: the specific shim first keeps apps/web's composer draft

@@ -105,6 +105,9 @@
   display: block;
   color: var(--fm-label-3);
 }
+.fm-sidebar__footer-row .fm-btn--block {
+  justify-content: flex-start;
+}
 
 .fm-list-column {
   display: flex;
@@ -218,14 +221,19 @@
 .fm-convrow__title {
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .fm-convrow__time {
   font-size: 12px;
   color: var(--fm-label-2);
   white-space: nowrap;
+  align-self: start;
+  padding-top: 1px;
 }
 .fm-convrow__preview {
   font-size: 13px;
@@ -385,8 +393,8 @@
 .fm-composer__send {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   margin-bottom: 1px;
   border: 0;
   border-radius: 50%;
@@ -452,6 +460,11 @@
   font-size: 14px;
   color: var(--fm-label-2);
 }
+.fm-home__nav {
+  display: flex;
+  align-items: center;
+  margin: -6px 0 -4px -6px;
+}
 .fm-home__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
@@ -476,8 +489,11 @@
   padding: 24px 16px;
   background: var(--fm-bg-window);
 }
+.fm-standalone > * {
+  width: min(480px, 100%);
+}
 .fm-standalone__card {
-  width: min(440px, 100%);
+  width: 100%;
   padding: 28px 28px 24px;
   text-align: center;
 }
@@ -528,10 +544,14 @@
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--fm-bg-fill);
+  box-shadow: inset 0 0 0 0.5px var(--fm-sep-2);
   font-size: 12px;
   line-height: 1.5;
   color: var(--fm-label-2);
   text-align: left;
+}
+html.dark .fm-standalone__foot {
+  background: var(--fm-bg-fill-2);
 }
 
 /* Folder browser inside the Open folder sheet */
@@ -549,14 +569,43 @@
 .fm-browse__crumbs {
   flex: 1;
   min-width: 0;
-  font-family: var(--fm-mono);
-  font-size: 12px;
-  color: var(--fm-label-2);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fm-label);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   direction: rtl;
   text-align: left;
+}
+.fm-browse__crumbs bdi {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.fm-browse__crumbs .fm-browse__sep {
+  color: var(--fm-label-3);
+  margin: 0 4px;
+}
+.fm-browse__tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fm-browse__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fm-label-2);
+  cursor: default;
+}
+.fm-browse__toggle input {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--fm-accent);
 }
 .fm-browse__list {
   max-height: 300px;
@@ -607,6 +656,22 @@
 }
 .fm-shell[data-columns="1"] .fm-msg {
   max-width: 86%;
+}
+
+/* Phones: the autonomy control wraps into rows; labels are never clipped. */
+.fm-shell[data-columns="1"] .fm-composer__context {
+  gap: 8px;
+}
+.fm-shell[data-columns="1"] .fm-composer__context .fm-seg {
+  width: 100%;
+}
+.fm-shell[data-columns="1"] .fm-composer__context .fm-seg__option {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+}
+.fm-shell[data-columns="1"] .fm-composer__label {
+  flex-basis: 100%;
 }
 
 /* Sidebar as an overlay drawer when it no longer fits */

@@ -4,6 +4,7 @@ import {
   useId,
   useRef,
   useState,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
@@ -28,9 +29,11 @@ interface PopoverProps {
 }
 
 /**
- * Anchored, non-modal popover. Closes on Escape, outside click, or when the
- * content calls `close()`. The trigger stays in the document flow; the panel is
- * absolutely positioned against it, which keeps it cheap (no layout observers).
+ * Anchored, non-modal popover. Closes on Escape, outside click, when focus
+ * leaves it (Tab), or when the content calls `close()`; focus returns to the
+ * trigger on every close that started from the keyboard. The trigger stays in
+ * the document flow; the panel is absolutely positioned against it, which
+ * keeps it cheap (no layout observers).
  */
 export function Popover({
   trigger,
@@ -54,7 +57,16 @@ export function Popover({
       '[role="menuitem"], [role="menuitemradio"], button, input, [tabindex]:not([tabindex="-1"])',
     );
     (first ?? panelRef.current)?.focus();
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    const anchor = anchorRef.current;
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      // Whatever closed the panel, focus must not be left on <body>: the
+      // trigger is where the person was before it opened.
+      const active = document.activeElement;
+      if (active === null || active === document.body || !anchor || anchor.contains(active)) {
+        anchor?.querySelector<HTMLElement>("button, [tabindex]")?.focus();
+      }
+    };
   }, [open]);
 
   const close = () => setOpen(false);
@@ -65,18 +77,30 @@ export function Popover({
       close();
       return;
     }
-    if (role !== "menu") return;
-    const delta = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
-    if (delta === 0 || !panelRef.current) return;
-    event.preventDefault();
+    if (role !== "menu" || !panelRef.current) return;
     const items = [
       ...panelRef.current.querySelectorAll<HTMLElement>(
         '[role="menuitem"], [role="menuitemradio"]',
       ),
     ];
     if (items.length === 0) return;
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      items[event.key === "Home" ? 0 : items.length - 1]!.focus();
+      return;
+    }
+    const delta = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    if (delta === 0) return;
+    event.preventDefault();
     const index = items.findIndex((item) => item === document.activeElement);
     items[(index + delta + items.length) % items.length]!.focus();
+  };
+
+  // Tab out of the panel closes it; a menu left open behind the focus is a trap.
+  const onBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && anchorRef.current?.contains(next)) return;
+    if (next !== null) close();
   };
 
   return (
@@ -96,6 +120,7 @@ export function Popover({
           tabIndex={-1}
           className={`fm-popover fm-popover--${placement}`}
           onKeyDown={onKeyDown}
+          onBlur={onBlur}
         >
           {typeof children === "function" ? children(close) : children}
         </div>

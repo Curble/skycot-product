@@ -62,8 +62,15 @@ const layerConnectivity = Connectivity.layer({
   ),
 });
 
+// The connection banner's "Try now": the same wakeup a returning tab sends,
+// which resets the retry back-off instead of waiting out a long delay.
+const reconnectRequests = new Set<() => void>();
+export function requestReconnect(): void {
+  for (const offer of reconnectRequests) offer();
+}
+
 const layerWakeups = Wakeups.layer({
-  changes: Stream.callback<"application-active">((queue) =>
+  changes: Stream.callback<"application-active" | "application-active-reconnect">((queue) =>
     Effect.acquireRelease(
       Effect.sync(() => {
         const listener = () => {
@@ -71,12 +78,17 @@ const layerWakeups = Wakeups.layer({
             Queue.offerUnsafe(queue, "application-active");
           }
         };
+        const reconnect = () => {
+          Queue.offerUnsafe(queue, "application-active-reconnect");
+        };
         document.addEventListener("visibilitychange", listener);
-        return listener;
+        reconnectRequests.add(reconnect);
+        return { listener, reconnect };
       }),
-      (listener) =>
+      ({ listener, reconnect }) =>
         Effect.sync(() => {
           document.removeEventListener("visibilitychange", listener);
+          reconnectRequests.delete(reconnect);
         }),
     ).pipe(Effect.asVoid),
   ),

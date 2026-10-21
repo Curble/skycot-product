@@ -30,7 +30,7 @@ interface SidebarItemProps {
   readonly glyph?: ReactNode;
   readonly label: string;
   readonly count?: number;
-  /** Show an attention dot instead of a count. */
+  /** Show an attention dot beside the count. */
   readonly attention?: boolean;
   readonly selected?: boolean;
   readonly muted?: boolean;
@@ -64,7 +64,8 @@ export function SidebarItem({
       <span className="fm-sidebar-item__label">{label}</span>
       {attention ? (
         <span className="fm-sidebar-item__dot" role="img" aria-label="Needs attention" />
-      ) : count !== undefined && count > 0 ? (
+      ) : null}
+      {count !== undefined && count > 0 ? (
         <span className="fm-sidebar-item__count">{count}</span>
       ) : null}
     </>
