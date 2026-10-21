@@ -1,0 +1,380 @@
+/* Review ("What changed") card and the Versions rail.
+   Owned by features/review and features/versions. Everything reads from the
+   tokens in apple.css; the only monospace surface is inside the code disclosure. */
+
+/* ---------------------------------------------------------------------------
+   Shell: a fourth column for the rail (or a thin strip holding its toggle)
+   --------------------------------------------------------------------------- */
+.fm-shell[data-inspector="open"] .fm-body {
+  grid-template-columns: var(--fm-sidebar-width) var(--fm-list-width) minmax(0, 1fr) var(
+      --fm-inspector-width
+    );
+}
+.fm-shell[data-inspector="open"] .fm-body--no-list {
+  grid-template-columns: var(--fm-sidebar-width) minmax(0, 1fr) var(--fm-inspector-width);
+}
+.fm-shell[data-inspector="strip"] .fm-body {
+  grid-template-columns: var(--fm-sidebar-width) var(--fm-list-width) minmax(0, 1fr) 44px;
+}
+.fm-shell[data-inspector="strip"] .fm-body--no-list {
+  grid-template-columns: var(--fm-sidebar-width) minmax(0, 1fr) 44px;
+}
+.fm-shell[data-columns="2"][data-inspector="strip"] .fm-body {
+  grid-template-columns: var(--fm-list-width) minmax(0, 1fr) 44px;
+}
+.fm-shell[data-columns="2"][data-inspector="strip"] .fm-body--no-list {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.fm-versions-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  border-left: 1px solid var(--fm-sep);
+  background: var(--fm-bg-window);
+}
+.fm-versions-fab {
+  position: fixed;
+  right: 14px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-popover);
+}
+.fm-versions__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.fm-versions__head .fm-inspector__title {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Time Machine timeline
+   --------------------------------------------------------------------------- */
+.fm-tm {
+  position: relative;
+  margin: 6px 0 0;
+  padding: 0 0 0 22px;
+  list-style: none;
+}
+.fm-tm::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--fm-bg-fill-2);
+}
+.fm-tm__v {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0 10px;
+}
+.fm-tm__v::before {
+  content: "";
+  position: absolute;
+  left: -19px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fm-bg-card);
+  border: 2px solid var(--fm-label-3);
+}
+.fm-tm__v[data-current="true"]::before {
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
+  box-shadow: 0 0 0 4px var(--fm-accent-soft);
+}
+.fm-tm__v[data-kind="kept version"]::before {
+  border-color: var(--fm-green);
+  background: var(--fm-green);
+}
+.fm-tm__v[data-kind="live"]::before {
+  border-color: var(--fm-green-ink);
+  background: var(--fm-green-ink);
+}
+.fm-tm__text {
+  min-width: 0;
+}
+.fm-tm__title {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.fm-tm__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--fm-label-2);
+}
+.fm-tm__empty,
+.fm-tm__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-tm__explainer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fm-sep-2);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-tm__explainer p {
+  margin: 0 0 8px;
+}
+.fm-tm__explainer b {
+  color: var(--fm-label);
+  font-weight: 600;
+}
+.fm-tm__explainer svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+.fm-tm__advanced {
+  color: var(--fm-label-3);
+}
+
+/* Shared tick / cross colours (rail explainer and restore sheet) */
+.fm-restore-explainer__yes {
+  color: var(--fm-green-ink);
+  flex: none;
+}
+.fm-restore-explainer__no {
+  color: var(--fm-red);
+  flex: none;
+}
+.fm-restore-explainer {
+  display: grid;
+  gap: 10px;
+}
+.fm-restore-explainer__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+.fm-restore-explainer__list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  line-height: 1.4;
+}
+.fm-restore-explainer__list svg {
+  margin-top: 3px;
+}
+
+/* ---------------------------------------------------------------------------
+   What changed card
+   --------------------------------------------------------------------------- */
+.fm-review__flag {
+  margin-top: 10px;
+}
+.fm-review__footnote {
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+.fm-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.fm-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.fm-tag--new {
+  background: var(--fm-green-soft);
+  color: var(--fm-green-ink);
+}
+.fm-tag--changed {
+  background: var(--fm-accent-soft);
+  color: var(--fm-accent);
+}
+.fm-tag--removed {
+  background: var(--fm-red-soft);
+  color: var(--fm-red-ink);
+}
+
+/* Disclosure ("Show the code changes") */
+.fm-disclosure {
+  margin-top: 10px;
+  border-top: 1px solid var(--fm-sep-2);
+  padding-top: 8px;
+}
+.fm-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: default;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fm-accent);
+  user-select: none;
+}
+.fm-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.fm-disclosure > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  margin: 0 4px 0 2px;
+  flex: none;
+}
+.fm-disclosure[open] > summary::before {
+  transform: rotate(45deg);
+  margin-top: -3px;
+}
+.fm-disclosure__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+
+/* The diff viewer: fixed-height scroll surface, monospace only here. */
+.fm-code-changes {
+  margin-top: 10px;
+  height: min(60vh, 440px);
+  border: 1px solid var(--fm-sep-2);
+  border-radius: var(--fm-radius-md);
+  overflow: hidden;
+  background: var(--fm-bg-content);
+  --background: var(--fm-bg-content);
+  --font-mono: var(--fm-mono);
+  --font-sans: var(--fm-font);
+  --primary: var(--fm-accent);
+}
+.fm-code-changes > * {
+  height: 100%;
+}
+.fm-code-changes__fold {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+}
+.fm-code-changes__fold:hover {
+  opacity: 1;
+  background: var(--fm-bg-fill-2);
+}
+.fm-code-changes__raw {
+  margin: 10px 0 0;
+  max-height: 440px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-fill);
+  font-family: var(--fm-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.fm-code-changes__empty {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fm-label-2);
+}
+
+/* Phone: the card's three buttons stack, the footnote wraps. */
+@media (max-width: 699px) {
+  .fm-card__footer .fm-btn {
+    flex: 1 1 auto;
+  }
+  .fm-card__footer-note {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+  .fm-code-changes {
+    height: min(55vh, 380px);
+  }
+}
+
+/* Per-area groups inside the card */
+.fm-review__area {
+  margin-top: 8px;
+}
+.fm-review__area-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 2px;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fm-label-2);
+}
+.fm-review__area + .fm-review__area {
+  margin-top: 10px;
+}
+.fm-tm__explainer ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+.fm-tm__explainer li {
+  margin: 2px 0;
+}
+.fm-tm__explainer-head {
+  margin: 0 0 2px;
+  font-weight: 600;
+  color: var(--fm-label);
+}
+
+/* Tailwind's preflight makes svg block-level; the explainer heads inline their tick/cross. */
+.fm-tm__explainer-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fm-tm__explainer ul {
+  list-style: disc;
+}
+/* The card header keeps its file-count pill beside the title on a phone. */
+.fm-card[aria-label="What changed"] .fm-card__header {
+  flex-wrap: nowrap;
+}
