@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#0a0a0a" />
+    <script>
+      // Paint the right background before React mounts. Reads the same
+      // localStorage keys as the stock UI so both clients agree on dark/light.
+      (() => {
+        try {
+          const stored = window.localStorage.getItem("t3code:theme");
+          const mode = window.localStorage.getItem("t3code:theme-appearance-mode");
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const isDark =
+            stored === "dark" || mode === "dark"
+              ? true
+              : stored === "light" || mode === "light"
+                ? false
+                : prefersDark;
+          document.documentElement.classList.toggle("dark", isDark);
+          document.documentElement.style.backgroundColor = isDark ? "#0a0a0a" : "#ffffff";
+          document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        } catch {
+          // Storage can be blocked; the stylesheet's defaults take over.
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+      }
+    </style>
+    <title>T3 Code Simple</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/bootstrap.ts"></script>
+  </body>
+</html>

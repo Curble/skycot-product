@@ -1,0 +1,5 @@
+/* The stock theme, tokens and layers come from apps/web so both clients share
+   one look. Tailwind only scans this package by default, so the aliased
+   apps/web component files are declared as extra sources. */
+@import "../../web/src/index.css";
+@source "../../web/src/components/ui";
