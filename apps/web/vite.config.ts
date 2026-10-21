@@ -191,6 +191,7 @@ export default defineConfig(() => {
           { bundle: "web", path: new URL("./package.json", import.meta.url) },
           { bundle: "server", path: new URL("../server/package.json", import.meta.url) },
           { bundle: "desktop", path: new URL("../desktop/package.json", import.meta.url) },
+          { bundle: "web", path: new URL("../nondev/package.json", import.meta.url) }, // nondev-seam: L-3
         ],
       }),
       tanstackRouter({ autoCodeSplitting: true }),

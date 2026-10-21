@@ -5,10 +5,9 @@ folder records the **engineering changes to upstream files** that the licensing 
 one is a small appended change in the style of the existing `// nondev-seam:` markers and has a
 row in `SEAM-MANIFEST.md` ("Legal and security seams").
 
-**Status, 21 October 2026:** L-1, L-2 and L-5 are applied (see each section). L-3 is the only
-one still open — it lives in `apps/nondev/` and `apps/web/vite.config.ts`, which this pass did not
-own. L-4 is closed by a stronger measure than the one proposed here: the engine's own default is
-now off (`telemetry-default-off`), and `nondev/bin/skycot.cjs` is the supported CLI entry.
+**Status, 21 October 2026:** L-1, L-2, L-3 and L-5 are applied (see each section). L-4 is closed
+by a stronger measure than the one proposed here: the engine's own default is now off
+(`telemetry-default-off`), and `nondev/bin/skycot.cjs` is the supported CLI entry.
 
 ## Seam L-1: ship `LICENSE` and `NOTICE` inside the desktop bundle
 
@@ -62,7 +61,7 @@ notice text.
 
 ## Seam L-3: make the licence pipeline aware of `apps/nondev`
 
-**Open — needs the conductor** (`apps/web/vite.config.ts` and `apps/nondev/package.json` are outside this pass's ownership). One line; see below.
+**Applied** as seam `L-3` (one appended line in `apps/web/vite.config.ts`, declared in `SEAM-MANIFEST.md`).
 
 `apps/web/vite.config.ts` lists the root manifests the third-party-notice generator walks (`web`,
 `server`, `desktop`). Add:
