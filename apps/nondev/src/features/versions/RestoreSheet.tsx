@@ -10,8 +10,7 @@ import { threadEnvironment } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
-import { formatVersionTime, honestRestoreExplainer, restoreSentence } from "./timeline";
-import { useEscapeToClose } from "./useEscapeToClose";
+import { formatVersionTime, restoreSentence } from "./timeline";
 
 export type RestoreIntent = "undo" | "restore";
 
@@ -43,10 +42,9 @@ export function RestoreSheet({
   const revert = useAtomCommand(threadEnvironment.revertCheckpoint, { reportFailure: false });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  useEscapeToClose(open && !busy && entry !== null, onClose);
 
   if (!entry) return null;
-  const explainer = honestRestoreExplainer(entry.restoreExplainer.blockedBecause);
+  const explainer = entry.restoreExplainer;
   const title =
     intent === "undo"
       ? "Undo all of it?"

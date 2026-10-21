@@ -4,15 +4,11 @@ import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Check, GitCommitHorizontal, X } from "lucide-react";
 import { useState } from "react";
 
+import { restoreExplainerFor } from "../../plain/versions";
 import { Button } from "../../ui/Button";
 import { Pill, type PillTone } from "../../ui/Pill";
 import { RestoreSheet } from "./RestoreSheet";
-import {
-  formatVersionTime,
-  honestRestoreExplainer,
-  useVersionsTimeline,
-  type NumberedVersion,
-} from "./timeline";
+import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "./timeline";
 
 const KIND_TONE: Record<NumberedVersion["kind"], PillTone> = {
   "restore point": "neutral",
@@ -42,7 +38,7 @@ export function VersionsTimeline({
   const [restoring, setRestoring] = useState<NumberedVersion | null>(null);
   const [explained, setExplained] = useState<string | null>(null);
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
-  const explainer = honestRestoreExplainer();
+  const explainer = restoreExplainerFor();
 
   return (
     <>

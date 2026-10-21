@@ -16,7 +16,6 @@ import { versions as copy } from "../../plain/copy";
 import {
   buildVersionsTimeline,
   restoreExplainerFor,
-  type RestoreExplainer,
   type VersionEntry,
 } from "../../plain/versions";
 import { environmentThreads } from "../../state/threads";
@@ -54,8 +53,7 @@ export function canRollbackFilesFor(
 }
 
 /** The engine marks points after a restore target "stale"; nothing else does. */
-export const UNDONE_BLOCKER =
-  "You restored to an earlier point, so this one was undone and can't be brought back.";
+export const UNDONE_BLOCKER = copy.cannotRestoreStale;
 
 export const START_LABEL = "Before any changes were made";
 
@@ -95,9 +93,8 @@ export function decorateTimeline(
     .filter((entry) => !(entry.kind === "kept version" && foldedShas.has(entry.id)))
     .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
     .map((entry) => {
-      const undone = entry.restoreExplainer.blockedBecause === copy.cannotRestoreStale;
-      const base = undone ? withBlocker(entry, UNDONE_BLOCKER) : entry;
-      return { ...base, number: null, kept: keptByCheckpoint.get(entry.id) ?? null, undone };
+      const undone = entry.restoreExplainer.blockedBecause === UNDONE_BLOCKER;
+      return { ...entry, number: null, kept: keptByCheckpoint.get(entry.id) ?? null, undone };
     });
 
   // Hide empty restore points: keep only the oldest one, as the start line,
@@ -216,27 +213,6 @@ export function useVersionsTimeline(
   const projection = state ? Option.getOrNull(state.data) : null;
   const kept = useKeptVersions(threadId);
   return buildTimeline(projection, shell, kept);
-}
-
-/**
- * What a restore really does on this engine. The shared copy promises a fresh
- * restore point before restoring; the engine does not take one (the points
- * after the target go stale instead), so that line is replaced with the truth.
- */
-export function honestRestoreExplainer(blockedBecause?: string): RestoreExplainer {
-  const base = restoreExplainerFor(blockedBecause);
-  return {
-    ...base,
-    does: [
-      copy.restoreDoes[0],
-      "Keeps the whole conversation — what you asked for stays in the chat, so you can ask for it again.",
-    ],
-    doesNot: [
-      ...base.doesNot.filter((line) => !line.startsWith("Doesn't delete the versions")),
-      "Doesn't remove a kept version from the project's history — that needs a new, reversing change.",
-      "Can't itself be undone: the points after this one stop being restorable.",
-    ],
-  };
 }
 
 /**

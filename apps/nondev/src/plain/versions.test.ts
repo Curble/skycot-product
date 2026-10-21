@@ -23,10 +23,13 @@ describe("describeCheckpoint", () => {
       isCurrent: false,
     });
     expect(entry.technical).toContain("refs/t3/checkpoints/ckpt-1");
-    expect(entry.restoreExplainer.does).toHaveLength(3);
-    expect(entry.restoreExplainer.doesNot).toHaveLength(3);
+    expect(entry.restoreExplainer.does).toHaveLength(2);
+    expect(entry.restoreExplainer.doesNot).toHaveLength(4);
     expect(entry.restoreExplainer.does[0]).toMatch(/^Puts every file/);
+    // The engine takes no fresh restore point before restoring; the copy must not promise one.
+    expect(entry.restoreExplainer.does.join(" ")).not.toMatch(/restore point first/);
     expect(entry.restoreExplainer.doesNot[1]).toMatch(/database/);
+    expect(entry.restoreExplainer.doesNot[3]).toMatch(/Can't itself be undone/);
     expect(entry.restoreExplainer.blockedBecause).toBeUndefined();
   });
 
@@ -39,7 +42,7 @@ describe("describeCheckpoint", () => {
     });
     expect(
       describeCheckpoint(checkpoint({ status: "stale" })).restoreExplainer.blockedBecause,
-    ).toMatch(/outside the app/);
+    ).toMatch(/restored to an earlier point/);
     expect(describeCheckpoint(checkpoint(), { canRollbackFiles: false })).toMatchObject({
       canRestore: false,
       restoreExplainer: { blockedBecause: expect.stringMatching(/shared/) },

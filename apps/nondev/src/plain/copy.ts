@@ -112,18 +112,23 @@ export const versions = {
   restorePoint: "Restore point",
   keptVersion: "Kept version",
   live: "Live",
+  // What a restore really does on this engine: it takes no fresh restore point
+  // first (the points after the target go stale instead), so it cannot itself
+  // be undone. The copy says so rather than promising a safety net.
   restoreDoes: [
     "Puts every file in this project back to how it was at this point.",
-    "Adds a new restore point first, so you can undo the restore itself.",
-    "Keeps the whole conversation — later messages stay in the chat so you can re-apply them.",
+    "Keeps the whole conversation — what you asked for stays in the chat, so you can ask for it again.",
   ],
   restoreDoesNot: [
     "Doesn't touch anything already sent for review or put live.",
     "Doesn't change data in a database or account — only the project's files.",
-    "Doesn't delete the versions after this one; they stay in the list.",
+    "Doesn't remove a kept version from the project's history — that needs a new, reversing change.",
+    "Can't itself be undone: the points after this one stop being restorable.",
   ],
   cannotRestoreMissing: "This restore point is no longer on disk, so it can't be restored.",
-  cannotRestoreStale: "Files changed outside the app since this point, so restoring it isn't safe.",
+  // The engine marks points after a restore target "stale"; nothing else does.
+  cannotRestoreStale:
+    "You restored to an earlier point, so this one was undone and can't be brought back.",
   cannotRestoreShared:
     "This project folder is shared with other work, so files can't be rolled back here.",
   youWillLose: (when: string) => `You'll lose changes made after ${when}. They stay in the chat.`,
