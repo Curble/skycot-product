@@ -1,19 +1,23 @@
+import { Laptop, SearchX, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { resolveInitialServerAuthGateState } from "~/environments/primary/auth";
-import { Button } from "~/components/ui/button";
-import { StandalonePage, StandalonePageHeader } from "~/components/ui/standalone-page";
 
+import { AppShell } from "./app/AppShell";
+import { PRODUCT_NAME } from "./brand";
+import { AutomationsScreen, PeopleScreen } from "./features/stubs/Stubs";
+import { HOME_HREF, useRoute } from "./router";
 import { HomeRoute } from "./routes/Home";
-import { PairRoute } from "./routes/Pair";
+import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
-import { useRoute } from "./router";
+import { useColumns } from "./app/useColumns";
+import { Button } from "./ui/Button";
 
 type GateState = Awaited<ReturnType<typeof resolveInitialServerAuthGateState>>;
 
 type Gate =
   | { readonly status: "loading" }
-  | { readonly status: "failed"; readonly message: string }
+  | { readonly status: "failed" }
   | { readonly status: "resolved"; readonly state: GateState };
 
 // Same gate as apps/web/src/routes/__root.tsx: probe the session over HTTP
@@ -27,13 +31,8 @@ function useAuthGate(): Gate {
       (state) => {
         if (!cancelled) setGate({ status: "resolved", state });
       },
-      (error: unknown) => {
-        if (!cancelled) {
-          setGate({
-            status: "failed",
-            message: error instanceof Error ? error.message : "Could not reach the server.",
-          });
-        }
+      () => {
+        if (!cancelled) setGate({ status: "failed" });
       },
     );
     return () => {
@@ -46,29 +45,32 @@ function useAuthGate(): Gate {
 export function App() {
   const route = useRoute();
   const gate = useAuthGate();
+  const columns = useColumns();
 
   if (gate.status === "loading") {
     return (
-      <StandalonePage tone="brand">
-        <StandalonePageHeader
-          eyebrow="T3 Code Simple"
-          title="Connecting"
-          description="Checking your session with this environment."
-        />
+      <StandalonePage>
+        <span className="fm-standalone__icon" aria-hidden>
+          <Laptop size={30} strokeWidth={1.6} />
+        </span>
+        <h1 className="fm-standalone__title">Connecting to your Mac…</h1>
+        <p className="fm-standalone__text">{PRODUCT_NAME} is checking your connection.</p>
       </StandalonePage>
     );
   }
 
   if (gate.status === "failed") {
     return (
-      <StandalonePage tone="error">
-        <StandalonePageHeader
-          eyebrow="T3 Code Simple"
-          title="Could not reach the server"
-          description={gate.message}
-        />
-        <div className="mt-5">
-          <Button size="sm" onClick={() => window.location.reload()}>
+      <StandalonePage>
+        <span className="fm-standalone__icon fm-standalone__icon--danger" aria-hidden>
+          <WifiOff size={30} strokeWidth={1.6} />
+        </span>
+        <h1 className="fm-standalone__title">Can't reach your Mac</h1>
+        <p className="fm-standalone__text">
+          Check the Mac that runs {PRODUCT_NAME} is awake and on the same network, then try again.
+        </p>
+        <div className="fm-standalone__actions">
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Try again
           </Button>
         </div>
@@ -85,26 +87,45 @@ export function App() {
     );
   }
 
-  switch (route.name) {
-    case "home":
-    case "pair":
-      return <HomeRoute />;
-    case "thread":
-      return <ThreadRoute environmentId={route.environmentId} threadId={route.threadId} />;
-    case "not-found":
-      return (
-        <StandalonePage tone="error">
-          <StandalonePageHeader
-            eyebrow="T3 Code Simple"
-            title="Page not found"
-            description={`Nothing lives at #${route.path}.`}
-          />
-          <div className="mt-5">
-            <Button size="sm" render={<a href="#/" />}>
-              Go home
-            </Button>
-          </div>
-        </StandalonePage>
-      );
-  }
+  return (
+    <AppShell route={route}>
+      {(() => {
+        switch (route.name) {
+          case "home":
+          case "new":
+          case "pair":
+            return <HomeRoute />;
+          case "thread":
+            return (
+              <ThreadRoute
+                environmentId={route.environmentId}
+                threadId={route.threadId}
+                showBack={columns === 1}
+              />
+            );
+          case "automations":
+            return <AutomationsScreen />;
+          case "people":
+            return <PeopleScreen />;
+          case "not-found":
+            return (
+              <StandalonePage>
+                <span className="fm-standalone__icon fm-standalone__icon--muted" aria-hidden>
+                  <SearchX size={30} strokeWidth={1.6} />
+                </span>
+                <h1 className="fm-standalone__title">There's nothing here</h1>
+                <p className="fm-standalone__text">
+                  That link doesn't go anywhere in {PRODUCT_NAME}.
+                </p>
+                <div className="fm-standalone__actions">
+                  <Button variant="primary" onClick={() => (window.location.hash = HOME_HREF)}>
+                    Go home
+                  </Button>
+                </div>
+              </StandalonePage>
+            );
+        }
+      })()}
+    </AppShell>
+  );
 }

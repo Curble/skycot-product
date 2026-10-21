@@ -9,8 +9,12 @@ import { useSyncExternalStore } from "react";
 
 export type Route =
   | { readonly name: "home" }
+  /** The compose screen on a phone-width layout; identical to home elsewhere. */
+  | { readonly name: "new" }
   | { readonly name: "pair" }
   | { readonly name: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId }
+  | { readonly name: "automations" }
+  | { readonly name: "people" }
   | { readonly name: "not-found"; readonly path: string };
 
 export function parseRoute(hash: string): Route {
@@ -24,7 +28,20 @@ export function parseRoute(hash: string): Route {
   }
   const segments = raw.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) return { name: "home" };
-  if (segments[0] === "pair" && segments.length === 1) return { name: "pair" };
+  if (segments.length === 1) {
+    switch (segments[0]) {
+      case "pair":
+        return { name: "pair" };
+      case "new":
+        return { name: "new" };
+      case "automations":
+        return { name: "automations" };
+      case "people":
+        return { name: "people" };
+      default:
+        break;
+    }
+  }
   if (segments[0] === "thread" && segments.length === 3) {
     return {
       name: "thread",
@@ -34,6 +51,11 @@ export function parseRoute(hash: string): Route {
   }
   return { name: "not-found", path: raw };
 }
+
+export const HOME_HREF = "#/";
+export const NEW_HREF = "#/new";
+export const AUTOMATIONS_HREF = "#/automations";
+export const PEOPLE_HREF = "#/people";
 
 export function threadHref(environmentId: EnvironmentId, threadId: ThreadId): string {
   return `#/thread/${encodeURIComponent(environmentId)}/${encodeURIComponent(threadId)}`;
