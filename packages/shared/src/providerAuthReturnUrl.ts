@@ -1,10 +1,14 @@
 import { isLoopbackHost } from "./preview.ts";
 
+// nondev-seam: brand-scheme-return-url
+const DESKTOP_SCHEME = globalThis.process?.env?.T3CODE_DESKTOP_SCHEME ?? "t3code";
+
 export function providerAuthReturnUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);
-    const desktop = ["t3code:", "t3code-dev:"].includes(url.protocol) && url.host === "app";
+    const desktop =
+      [`${DESKTOP_SCHEME}:`, `${DESKTOP_SCHEME}-dev:`].includes(url.protocol) && url.host === "app";
     const web =
       ["http:", "https:"].includes(url.protocol) &&
       (isLoopbackHost(url.hostname) || url.origin === "https://app.t3.codes");

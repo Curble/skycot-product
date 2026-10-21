@@ -1,0 +1,19 @@
+{
+  "$comment": "Single source of truth for the fork's identity. Every value here is a PLACEHOLDER until the CEO picks the final name. Changing the name = edit this file + `apps/desktop/package.json` productName (the one JSON seam), then run `node nondev/scripts/apply-brand.ts` to confirm. Runtime values are injected as T3CODE_* environment defaults by `nondev/brand/env.cjs`; upstream code keeps its own defaults, so every seam stays upstreamable.",
+  "productName": "Foreman",
+  "appId": "com.skycot.foreman",
+  "protocolScheme": "foreman",
+  "homeDirName": ".foreman",
+  "userDataDirName": "foreman",
+  "cliName": "foreman",
+  "artifactPrefix": "Foreman",
+  "defaultClientEntry": "simple/index.html",
+  "updateRepository": "mark-hallam/t3code-nondev",
+  "telemetryEnabledByDefault": false,
+  "telemetry": {
+    "$comment": "Leave both null until we own a PostHog project. While they are null, enabling telemetry at runtime sends nothing (an empty key is rejected locally) rather than reporting into upstream's project.",
+    "posthogKey": null,
+    "posthogHost": null
+  },
+  "upstreamCredit": "Based on T3 Code (MIT) by T3 Tools Inc."
+}

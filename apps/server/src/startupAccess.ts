@@ -97,7 +97,8 @@ const resolveListeningPort = (address: unknown, fallbackPort: number): number =>
 
 export const buildPairingUrl = (connectionString: string, token: string): string => {
   const url = new URL(connectionString);
-  url.pathname = "/pair";
+  // nondev-seam: brand-client-entry-headless
+  url.pathname = process.env.T3CODE_CLIENT_ENTRY ?? "/pair";
   url.searchParams.delete("token");
   url.hash = new URLSearchParams([["token", token]]).toString();
   return url.toString();

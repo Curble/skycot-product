@@ -1208,7 +1208,8 @@ export const make = Effect.gen(function* () {
     issueStartupPairingCredential().pipe(
       Effect.map((issued) => {
         const url = new URL(baseUrl);
-        url.pathname = "/pair";
+        // nondev-seam: brand-client-entry-pairing
+        url.pathname = process.env.T3CODE_CLIENT_ENTRY ?? "/pair";
         url.searchParams.delete("token");
         url.hash = new URLSearchParams([["token", issued.credential]]).toString();
         return url.toString();
