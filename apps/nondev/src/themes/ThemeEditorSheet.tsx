@@ -251,9 +251,12 @@ export function ThemeEditorSheet({
                 <select
                   className="fm-select"
                   value={flavour[key]}
-                  onChange={(event) =>
-                    setFlavour((previous) => ({ ...previous, [key]: event.currentTarget.value }))
-                  }
+                  onChange={(event) => {
+                    // Read before the updater runs: React has already let go of
+                    // `currentTarget` by the time a state updater is called.
+                    const value = event.currentTarget.value;
+                    setFlavour((previous) => ({ ...previous, [key]: value }));
+                  }}
                 >
                   {FLAVOUR_OPTIONS[key].map((option) => (
                     <option key={option.value} value={option.value}>

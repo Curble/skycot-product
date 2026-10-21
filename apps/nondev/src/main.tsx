@@ -10,6 +10,7 @@ import { applyPlatformClasses, writeUiMode } from "./app/platform";
 import { startThemeSync } from "./app/theme";
 import { applyTextSize, readTextSize } from "./features/settings/localPrefs";
 import { FAVICON_DATA_URI, PRODUCT_NAME } from "./brand";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 
 function applyBranding() {
   document.title = PRODUCT_NAME;
@@ -33,9 +34,11 @@ export const startup = Promise.resolve().then(() => {
   writeUiMode("simple");
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <AppAtomRegistryProvider>
-        <App />
-      </AppAtomRegistryProvider>
+      <ErrorBoundary>
+        <AppAtomRegistryProvider>
+          <App />
+        </AppAtomRegistryProvider>
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 });
