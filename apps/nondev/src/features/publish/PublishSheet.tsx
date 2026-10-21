@@ -12,6 +12,7 @@ import type {
   EnvironmentId,
   GitRunStackedActionResult,
   OrchestrationV2ThreadProjection,
+  OrchestrationV2TurnItem,
   PullRequestRef,
   PullRequestReviewerCandidate,
   ThreadId,
@@ -52,6 +53,8 @@ import {
   vcsActionManager,
   vcsEnvironment,
 } from "./state";
+import { rememberKeptVersion } from "../review/keptVersions";
+import { latestReviewable } from "../review/turnReview";
 import { rememberUpload } from "./uploads";
 import { usePublishData } from "./usePublishData";
 
@@ -208,6 +211,21 @@ function PublishSheetBody({
 
   const finishStacked = (result: GitRunStackedActionResult, opensReview: boolean) => {
     const sentence = describeStackedResult(result);
+    // A commit made here is a kept version too: the What-changed card and the
+    // rail learn about it the same way as the card's own Keep button.
+    if (result.commit.status === "created" && result.commit.commitSha) {
+      const checkpoint = projection ? latestReviewable(projection) : undefined;
+      rememberKeptVersion(threadId, {
+        sha: result.commit.commitSha,
+        subject: (result.commit.subject ?? data.changes?.summary ?? "Kept version").replace(
+          /\.$/,
+          "",
+        ),
+        at: new Date().toISOString(),
+        ...(data.changes ? { fileCount: data.changes.counts.files } : {}),
+        ...(checkpoint ? { checkpointId: checkpoint.id } : {}),
+      });
+    }
     if (result.push.status === "pushed") {
       rememberUpload(threadId, {
         at: new Date().toISOString(),
@@ -241,6 +259,10 @@ function PublishSheetBody({
           actionId: randomUUID(),
           action: review.plan.input.action,
           ...(review.plan.input.featureBranch ? { featureBranch: true } : {}),
+          // Without a message the engine asks the assistant to write one — a
+          // paid call that can fail. The request plus the plain summary reads
+          // like the card's own Keep.
+          commitMessage: commitMessageFor(projection, data.changes?.summary ?? null),
           threadId,
           ...(shell ? { projectId: shell.projectId } : {}),
         });
@@ -529,6 +551,30 @@ function safetyBadge(lines: ReadonlyArray<SafetyLine>): StepBadgeState {
   if (lines.some((line) => line.state === "fail")) return "fail";
   if (lines.some((line) => line.state === "warn")) return "warn";
   return lines.length > 0 && lines.every((line) => line.state === "ok") ? "done" : "number";
+}
+
+/** First line of the latest request, plain summary underneath; git shows the first line in every log. */
+function commitMessageFor(
+  projection: OrchestrationV2ThreadProjection | null,
+  summary: string | null,
+): string {
+  // The latest real request, not a note added while the Crew worked.
+  const request = projection?.turnItems
+    .findLast(
+      (item): item is Extract<OrchestrationV2TurnItem, { type: "user_message" }> =>
+        item.type === "user_message" &&
+        item.inputIntent !== "steer" &&
+        item.inputIntent !== "promoted_queued_to_steer" &&
+        item.inputIntent !== "queued_turn",
+    )
+    ?.text.trim()
+    .split(/\r?\n/)[0]
+    ?.trim();
+  const source = (
+    request && request.length > 0 ? request : (summary ?? "Changes from SKYCOT")
+  ).replace(/\.$/, "");
+  const subject = source.length > 72 ? `${source.slice(0, 71).trimEnd()}…` : source;
+  return summary ? `${subject}\n\n${summary}` : subject;
 }
 
 function formatUploadTime(iso: string): string {

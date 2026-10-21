@@ -305,6 +305,15 @@ describe("describeFailure", () => {
       "GitHub didn't respond.",
     );
   });
+  it("names the version-description step when the assistant did not answer", () => {
+    const failure = describeFailure(
+      new Error(
+        "Text generation failed in generateCommitMessage: Codex CLI command failed: remote",
+      ),
+      { remote: "other" },
+    );
+    expect(failure.headline).toMatch(/description for this version/);
+  });
   it("keeps permission problems and unknown failures plain", () => {
     expect(describeFailure(new Error("missing scope: source-control:write")).headline).toMatch(
       /isn't allowed/,

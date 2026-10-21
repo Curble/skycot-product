@@ -113,7 +113,7 @@ export function parseMarkdown(source: string): ReadonlyArray<Block> {
 // Any `[label](target)` is matched; only http(s) and mailto targets become
 // links, everything else (javascript:, data:, relative paths) shows its label.
 const INLINE =
-  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(?<!\w)(__[^_\n]+__)(?!\w)|(\*[^*\n]+\*)|(?<!\w)(_[^_\n]+_)(?!\w)|(\[[^\]\n]+\]\([^)\s]+\))/;
+  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(?<!\w)(__[^_\n]+__)(?!\w)|(\*[^*\n]+\*)|(?<!\w)(_[^_\n]+_)(?!\w)|(\[[^\]\n]+\]\((?:[^()\s]|\([^()\s]*\))+\))/;
 
 const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
 

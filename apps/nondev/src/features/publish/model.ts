@@ -726,9 +726,16 @@ export function describeFailure(
     /remote_unreachable|could not read from remote|does not appear to be a git repository|repository .+ not found|network|ECONN|ENOTFOUND|timed? ?out|could not resolve host/i.test(
       detail,
     );
+  if (/generateCommitMessage|Text generation failed/i.test(detail)) {
+    return {
+      headline: "Couldn't write a description for this version.",
+      hint: "The assistant that names versions didn't answer. Try again in a moment; nothing was sent.",
+      detail,
+    };
+  }
   const mentionsGitHub = /github|gh\b|pull request/i.test(detail);
   const github = context.remote === "github" || (context.remote === undefined && mentionsGitHub);
-  if (unreachable || mentionsGitHub || /\bpush\b|\bfetch\b|\bremote\b/i.test(detail)) {
+  if (unreachable || mentionsGitHub || /pushCurrentBranch|\bgit push\b/i.test(detail)) {
     return github
       ? {
           headline: copy.errors.didNotRespond("GitHub"),

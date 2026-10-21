@@ -17,7 +17,7 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useId, useState } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useId, useState } from "react";
 
 import { randomUUID } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
@@ -98,6 +98,15 @@ export function ReviewSection({
   const runKeep = useAtomCommand(vcsActionManager.runStackedAction({ environmentId, cwd }), {
     reportFailure: false,
   });
+  // The folder's status can be stale when a card mounts (a stash, a commit made
+  // in Terminal); ask once so "Keep" is only offered when there is something.
+  const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, { reportFailure: false });
+  const refreshOnMount = useEffectEvent(() => {
+    if (cwd !== null) void refreshStatus({ environmentId, input: { cwd } });
+  });
+  useEffect(() => {
+    refreshOnMount();
+  }, []);
 
   const [showCode, setShowCode] = useState(false);
   const [keeping, setKeeping] = useState(false);
@@ -175,7 +184,7 @@ export function ReviewSection({
     commitMessage,
     filePaths,
   });
-  const nothingToKeep = gitStatus.data !== null && gitStatus.data.hasWorkingTreeChanges === false;
+  const nothingToKeep = gitStatus.data != null && gitStatus.data.hasWorkingTreeChanges === false;
   const keepBlocked = keptHere !== null || plan.kind !== "stacked" || cwd === null || !canOperate;
 
   // The timeline's view of "before" carries the truthful blockers (undone,

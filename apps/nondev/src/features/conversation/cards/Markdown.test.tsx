@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { linkHost, parseMarkdown, plainFirstLine } from "./Markdown";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { linkHost, parseMarkdown, plainFirstLine, renderInline } from "./Markdown";
 
 describe("parseMarkdown", () => {
   it("splits paragraphs, headings, lists and fenced code", () => {
@@ -61,5 +63,18 @@ describe("linkHost", () => {
     expect(linkHost("mailto:hi@example.com")).toBeNull();
     expect(linkHost("javascript:alert(1)")).toBeNull();
     expect(linkHost("not a url")).toBeNull();
+  });
+});
+
+describe("renderInline links", () => {
+  it("shows the label only for targets that are not web links", () => {
+    const html = renderToStaticMarkup(<>{renderInline("[click me](javascript:alert(1)) done")}</>);
+    expect(html).toContain("click me done");
+    expect(html).not.toContain("<a");
+    const link = renderToStaticMarkup(
+      <>{renderInline("[Menu](https://littleferncafe.com.au/menu)")}</>,
+    );
+    expect(link).toContain('href="https://littleferncafe.com.au/menu"');
+    expect(link).toContain("littleferncafe.com.au");
   });
 });
