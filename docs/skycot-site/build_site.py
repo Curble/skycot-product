@@ -1,6 +1,11 @@
-# Generates the SKYCOT draft site. Content is written once; two home variants share it.
-import os, html
+# Generates the SKYCOT product site (skycot.com): one home page whose light side is the calm look (was
+# variant A) and whose dark side is the bold look (was variant B), switched automatically by the visitor's
+# light/dark setting; privacy, terms, open-source and 404 pages; and the og.png share image.
+# The output folder is copied as-is into public/ of mark-hallam/skycot-research-site (branch product-site).
+import os, html, json, shutil, subprocess
 OUT = "/Users/me/t3code-nondev/docs/skycot-site/draft/"
+OG_DIR = "/Users/me/t3code-nondev/docs/skycot-site/og/"
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 LICENSE = open("/Users/me/t3code-nondev/LICENSE", encoding="utf-8").read().strip()
 
 MARK = '''<svg class="mark" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="15" fill="var(--accent)"/><circle cx="32" cy="32" r="21" fill="none" stroke="#fff" stroke-width="2.2" opacity=".5"/><circle cx="32" cy="32" r="13" fill="none" stroke="#fff" stroke-width="2.2" opacity=".8"/><circle cx="32" cy="32" r="5" fill="#fff"/><path d="M17 32h9M38 32h9M32 17v9M32 38v9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/></svg>'''
@@ -61,13 +66,10 @@ p{margin:0}
 .btn-small{min-height:32px;padding:0 14px;font-size:13px}
 .btn[aria-disabled="true"]{opacity:.55;cursor:default;filter:none}
 
-/* draft ribbon (remove before launch) */
-.draft{position:fixed;left:14px;bottom:14px;z-index:60;background:#fff3cd;color:#5c3d00;border:1px solid #e6c56a;border-radius:980px;padding:6px 12px;font-size:12px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.12)}
-
 /* hero */
 .hero{padding:88px 0 40px;text-align:center}
 .eyebrow{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
-.hero h1{font-size:clamp(38px,6.4vw,76px);max-width:16ch;margin:0 auto}
+.hero h1{font-size:clamp(38px,6.4vw,76px);max-width:16ch;margin:0 auto;text-wrap:balance}
 .hero .lede{font-size:clamp(19px,2.2vw,25px);color:var(--text2);max-width:36em;margin:22px auto 0;line-height:1.4}
 .actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
 .hero-note{font-size:13px;color:var(--text3);margin-top:14px}
@@ -75,23 +77,26 @@ p{margin:0}
 .frame img{width:100%}
 .caption{font-size:13px;color:var(--text3);text-align:center;margin-top:14px}
 
-/* bold variant B */
-body.b .nav{background:rgba(0,0,0,.8);border-bottom-color:rgba(255,255,255,.12)}
-body.b .nav .brand,body.b .nav ul a{color:#f5f5f7}
-body.b .brand .mark rect{fill:#fff}
-body.b .brand .mark circle,body.b .brand .mark path{stroke:#000}
-body.b .brand .mark circle:last-of-type{fill:#000}
-body.b .hero{background:#000;color:#f5f5f7;padding:110px 0 0;overflow:hidden}
-body.b .hero h1{font-size:clamp(44px,7.6vw,96px);font-weight:700;letter-spacing:-.03em;background:linear-gradient(180deg,#fff 40%,#8a8a8f);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:14ch}
-body.b .hero .lede{color:#a1a1a6;max-width:34em}
-body.b .eyebrow{color:#2997ff}
-body.b .hero .btn-primary{background:#fff;color:#000}
-body.b .hero .btn-secondary{border-color:#2997ff;color:#2997ff}
-body.b .hero-note{color:#86868b}
-body.b .hero .frame{border-radius:14px 14px 0 0;border-color:rgba(255,255,255,.14);box-shadow:0 -10px 80px rgba(41,151,255,.18)}
-body.b .hero .caption{color:#86868b;padding-bottom:0}
-body.b .hero-tail{background:linear-gradient(180deg,#000 0,#000 50%,var(--bg) 50%)}
-body.b .promise{padding-top:56px}
+/* dark mode = the bold look (was variant B): black nav and hero, gradient headline, dark screenshot.
+   Follows the visitor's light/dark setting automatically; there is no manual toggle. */
+@media (prefers-color-scheme:dark){
+.nav{background:rgba(0,0,0,.8);border-bottom-color:rgba(255,255,255,.12)}
+.nav .brand,.nav ul a{color:#f5f5f7}
+.brand .mark rect{fill:#fff}
+.brand .mark circle,.brand .mark path{stroke:#000}
+.brand .mark circle:last-of-type{fill:#000}
+.hero{background:#000;color:#f5f5f7;padding:110px 0 0;overflow:hidden}
+.hero h1{font-size:clamp(44px,7.6vw,96px);font-weight:700;letter-spacing:-.03em;background:linear-gradient(180deg,#fff 40%,#8a8a8f);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:16ch}
+.hero .lede{color:#a1a1a6;max-width:34em}
+.eyebrow{color:#2997ff}
+.hero .btn-primary{background:#fff;color:#000}
+.hero .btn-secondary{border-color:#2997ff;color:#2997ff}
+.hero-note{color:#86868b}
+.hero .frame{border-radius:14px 14px 0 0;border-color:rgba(255,255,255,.14);box-shadow:0 -10px 80px rgba(41,151,255,.18)}
+.hero .caption{color:#86868b;padding-bottom:0}
+.hero-tail{margin-top:56px;background:linear-gradient(180deg,#000 0,#000 50%,var(--bg) 50%)}
+.promise{padding-top:56px}
+}
 
 /* promise trio */
 .promise{padding:56px 0 20px}
@@ -221,49 +226,92 @@ footer .legal{margin-top:22px;max-width:70em;line-height:1.6}
 .doc p{margin:0 0 14px}
 .doc ul{margin:0 0 14px;padding-left:22px}
 .doc li{margin-bottom:6px}
-.notice{background:#fff3cd;color:#5c3d00;border:1px solid #e6c56a;border-radius:14px;padding:16px 18px;font-size:15px;margin:0 0 30px}
-.notice b{display:block;margin-bottom:4px}
+.doc code{font:15px ui-monospace,"SF Mono",Menlo,monospace}
+.notfound{padding:120px 0 140px;text-align:center}
+.notfound h1{font-size:clamp(34px,5vw,56px)}
+.notfound p{color:var(--text2);font-size:19px;margin-top:16px}
 pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;font:14px/1.55 ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;color:var(--text)}
 .doc table{border-collapse:collapse;width:100%;font-size:15px;margin:0 0 20px}
 .doc th,.doc td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--text2)}
 .doc th{color:var(--text);font-weight:600}
 '''
 
-def head(title, desc, extra_class=""):
+SITE = "https://skycot.com"
+LAST_UPDATED = "22 October 2026"
+H1 = "The AI developer for people who don't code."
+LEDE = ("Text it what you want, in plain English. SKYCOT builds it on your Mac with the AI you already pay for, "
+        "shows you what changed, and nothing goes live until you say so.")
+TITLE = "SKYCOT · The AI developer for people who don't code"
+DESC = ("Text SKYCOT what you want, in plain English. It builds it on your Mac with the AI you already pay for "
+        "(Claude Code, Codex, Cursor, Gemini and others), shows you what changed, and nothing goes live until you say so.")
+OG_ALT = "SKYCOT. The AI developer for people who don't code. SKYCOT for Mac, early access, skycot.com."
+
+# Identity metadata for search engines. Never add an address here (standing rule: no street, postal
+# or registered address anywhere on skycot.com).
+STRUCTURED = json.dumps({
+    "@context": "https://schema.org",
+    "@graph": [
+        {"@type": "Organization", "@id": SITE + "/#organization", "name": "SKYCOT",
+         "legalName": "Curble Pty Ltd", "url": SITE + "/", "email": "markhallam@skycot.com"},
+        {"@type": "WebSite", "@id": SITE + "/#website", "name": "SKYCOT", "url": SITE + "/",
+         "publisher": {"@id": SITE + "/#organization"}},
+        {"@type": "SoftwareApplication", "name": "SKYCOT", "operatingSystem": "macOS",
+         "applicationCategory": "DeveloperApplication", "publisher": {"@id": SITE + "/#organization"}},
+    ],
+}, separators=(",", ":"))
+
+def attr(text):
+    # Attribute-safe escaping that leaves apostrophes readable (attributes use double quotes).
+    return html.escape(text, quote=False).replace('"', '&quot;')
+
+def head(title, desc, path="/", robots=None):
+    url = SITE + path
+    robots_meta = f'\n<meta name="robots" content="{robots}">' if robots else ""
     return f'''<!doctype html>
 <html lang="en-AU">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)}</title>
-<meta name="description" content="{html.escape(desc)}">
+<title>{html.escape(title, quote=False)}</title>
+<meta name="description" content="{attr(desc)}">{robots_meta}
+<link rel="canonical" href="{url}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta property="og:title" content="{html.escape(title)}">
-<meta property="og:description" content="{html.escape(desc)}">
+<meta property="og:site_name" content="SKYCOT">
+<meta property="og:title" content="{attr(title)}">
+<meta property="og:description" content="{attr(desc)}">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://skycot.com/">
+<meta property="og:url" content="{url}">
+<meta property="og:image" content="{SITE}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{attr(OG_ALT)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{attr(title)}">
+<meta name="twitter:description" content="{attr(desc)}">
+<meta name="twitter:image" content="{SITE}/og.png">
+<script id="skycot-structured-data" type="application/ld+json">{STRUCTURED}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230071e3'/%3E%3Ccircle cx='32' cy='32' r='21' fill='none' stroke='%23fff' stroke-width='2.2' opacity='.5'/%3E%3Ccircle cx='32' cy='32' r='13' fill='none' stroke='%23fff' stroke-width='2.2' opacity='.8'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23fff'/%3E%3C/svg%3E">
 <style>{CSS}</style>
 </head>
-<body class="{extra_class}">
-<!-- DRAFT ribbon: delete this one element before launch -->
-<div class="draft" role="note">DRAFT · staged for Mark's approval · not live</div>
+<body>
 '''
 
-def nav(home="index.html"):
+# Links are root-relative clean URLs (/privacy, /#how) as Cloudflare Pages serves them.
+# To preview the generated folder locally, serve it (e.g. `npx wrangler pages dev draft`), not file://.
+def nav():
     return f'''<header class="nav"><div class="wrap">
-  <a class="brand" href="{home}" aria-label="SKYCOT home">{MARK}<span>SKYCOT</span></a>
+  <a class="brand" href="/" aria-label="SKYCOT home">{MARK}<span>SKYCOT</span></a>
   <ul>
-    <li><a href="{home}#how">How it works</a></li>
-    <li><a href="{home}#looks">Looks</a></li>
-    <li><a href="{home}#works-with">Works with</a></li>
-    <li><a href="{home}#safety">Safety</a></li>
-    <li><a href="{home}#faq">FAQ</a></li>
-    <li><a href="open-source.html">Open source</a></li>
+    <li><a href="/#how">How it works</a></li>
+    <li><a href="/#looks">Looks</a></li>
+    <li><a href="/#works-with">Works with</a></li>
+    <li><a href="/#safety">Safety</a></li>
+    <li><a href="/#faq">FAQ</a></li>
+    <li><a href="/open-source">Open source</a></li>
   </ul>
-  <a class="btn btn-primary btn-small cta" href="{home}#download">Get SKYCOT</a>
+  <a class="btn btn-primary btn-small cta" href="/#download">Get SKYCOT</a>
 </div></header>
 '''
 
@@ -271,19 +319,19 @@ FOOTER = '''<footer><div class="wrap">
   <div class="cols">
     <div class="brand" style="letter-spacing:.14em">SKYCOT</div>
     <ul>
-      <li><a href="index.html#how">How it works</a></li>
-      <li><a href="index.html#looks">Looks</a></li>
-      <li><a href="index.html#family">Family</a></li>
-      <li><a href="index.html#safety">Safety</a></li>
-      <li><a href="index.html#faq">FAQ</a></li>
-      <li><a href="privacy.html">Privacy</a></li>
-      <li><a href="terms.html">Terms</a></li>
-      <li><a href="open-source.html">Open source</a></li>
+      <li><a href="/#how">How it works</a></li>
+      <li><a href="/#looks">Looks</a></li>
+      <li><a href="/#family">Family</a></li>
+      <li><a href="/#safety">Safety</a></li>
+      <li><a href="/#faq">FAQ</a></li>
+      <li><a href="/privacy">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="/open-source">Open source</a></li>
       <li><a href="mailto:markhallam@skycot.com">Contact</a></li>
     </ul>
   </div>
   <p class="legal">SKYCOT is based on <a href="https://github.com/pingdotgg/t3code">T3 Code</a>, © T3 Tools Inc., used under the MIT licence. SKYCOT is not affiliated with or endorsed by T3 Tools Inc. Claude, Codex, Cursor and Gemini are products of their respective owners; SKYCOT is not affiliated with Anthropic, OpenAI, Anysphere or Google. Screenshots show an early build with a sample project.<br>
-  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading as SKYCOT · ABN 71 605 512 776. <span style="opacity:.7">Draft: legal pages await review and are not yet in force.</span></p>
+  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading as SKYCOT · ABN 71 605 512 776.</p>
 </div></footer>
 </body></html>
 '''
@@ -298,24 +346,23 @@ IC_STOP = ic('<rect x="4" y="4" width="16" height="16" rx="3"/>')
 IC_MAC = ic('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>')
 IC_WRENCH = ic('<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3l9.4-9.4z"/><path d="M14.7 6.3l3-3"/>')
 
-def home_body(variant):
-    hero_img = "assets/conversation-dark.jpg" if variant == "b" else "assets/what-changed.jpg"
-    hero_alt = ("SKYCOT in dark mode: a conversation where the assistant asked permission before each step, "
-                "a change was undone, and the Versions list on the right shows every point you can go back to.") if variant == "b" else (
-                "SKYCOT showing a What changed card: 4 pages and 1 style file changed in plain words, "
-                "with Keep these changes, Undo all of it and Ask for a tweak buttons, and the Versions list on the right.")
+# One alt text that is true of both hero screenshots (light: What changed card; dark: a conversation).
+HERO_ALT = ("An early build of SKYCOT: a plain-English conversation with the assistant, its summary of what changed "
+            "with buttons to keep or undo it, and the Versions list on the right showing every point you can go back to.")
+
+def home_body():
     hero = f'''<section class="hero"><div class="wrap">
   <span class="eyebrow">SKYCOT for Mac · early access</span>
-  <h1>Tell it what you want changed. In plain English.</h1>
-  <p class="lede">SKYCOT drives the AI coding assistant you already pay for, on your own Mac. See what changed before anything goes live. Undo like Time Machine.</p>
+  <h1>{html.escape(H1, quote=False)}</h1>
+  <p class="lede">{html.escape(LEDE, quote=False)}</p>
   <div class="actions">
     <a class="btn btn-primary" href="#download">Get SKYCOT for Mac</a>
     <a class="btn btn-secondary" href="#how">See how it works</a>
   </div>
-  <p class="hero-note">Works with Claude Code, Codex, Cursor, Gemini and others. Your files never leave your Mac unless you say so.</p>
-  {"" if variant != "b" else '<div class="hero-tail" style="margin-top:56px">'}
-  <div class="frame"{"" if variant == "b" else ""}><img src="{hero_img}" width="1200" height="707" alt="{html.escape(hero_alt)}"></div>
-  {"" if variant != "b" else "</div>"}
+  <p class="hero-note">Works with Claude Code, Codex, Cursor, Gemini and others. Your files stay on your Mac; only what each job needs goes to the AI you chose.</p>
+  <div class="hero-tail">
+  <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/conversation-dark.jpg" width="1200" height="707"><img src="assets/what-changed.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
+  </div>
   <p class="caption">Early build, sample café website. Nothing live was touched.</p>
 </div></section>
 '''
@@ -324,7 +371,7 @@ def home_body(variant):
   <div class="trio">
     <div><h3>See it before it's live</h3><p>Every change is listed in your words: which pages, what look-and-feel, what was not touched. The code is one click away if you want it.</p></div>
     <div><h3>Undo like Time Machine</h3><p>Each change is a version you can step back to. Restore puts every file back; your conversation stays.</p></div>
-    <div><h3>Your files stay on your Mac</h3><p>SKYCOT runs on your computer. Only what you send goes to the AI you chose, under your own account.</p></div>
+    <div><h3>Your files stay on your Mac</h3><p>SKYCOT runs on your computer. Only what each job needs goes to the AI you chose, under your own account.</p></div>
   </div>
 </div></section>
 
@@ -382,7 +429,7 @@ def home_body(variant):
   <div class="moment flip" style="padding-bottom:0">
     <div class="text"><h3>Themes are files. Yours to share.</h3>
       <p>Every theme is a small, plain data file. Import one a friend sent you, export yours, share it, or duplicate the one you are using and change the colours, the flavour and your crew's names.</p>
-      <ul><li>Import, export and share from Settings → Appearance.</li><li>Duplicate and edit: pick the colours that matter most, a flavour (hand-drawn, serif, glass), and who is on your crew.</li><li>Every theme has a light and a dark side, and can follow your Mac's setting.</li><li>Made something good? Community themes are welcome. See <a href="open-source.html#themes">how to contribute one</a>.</li></ul></div>
+      <ul><li>Import, export and share from Settings → Appearance.</li><li>Duplicate and edit: pick the colours that matter most, a flavour (hand-drawn, serif, glass), and who is on your crew.</li><li>Every theme has a light and a dark side, and can follow your Mac's setting.</li><li>Made something good? Community themes are welcome. See <a href="/open-source#themes">how to contribute one</a>.</li></ul></div>
     <div class="shot"><img src="assets/themes-settings.jpg" width="1200" height="707" alt="Settings → Appearance in the Workshop theme: four theme cards (Classic, Workshop, Paper, Night Ops), buttons to Import a theme, Export this theme, Share, and Duplicate and edit, and a Light or Dark switch."></div>
   </div>
 </div></section>
@@ -438,7 +485,7 @@ def home_body(variant):
     <div class="card"><div class="ic">{IC_SHIELD}</div><h3>Hard rules</h3><p>Some things always ask, in every mode, and cannot be switched off. They are printed under the message box so you never have to remember them.</p></div>
     <div class="card"><div class="ic">{IC_UNDO}</div><h3>Undo, always</h3><p>Work happens in a private copy of your project. Every change is a version. Restore is one click, and it tells you what it does and does not touch.</p></div>
     <div class="card"><div class="ic">{IC_STOP}</div><h3>One big Stop</h3><p>A red Stop button in the header halts everything the moment you press it. Nothing is pre-selected, nothing auto-confirms.</p></div>
-    <div class="card"><div class="ic">{IC_MAC}</div><h3>Your files stay put</h3><p>SKYCOT runs on your Mac. No analytics are switched on. Only what you send goes to the assistant you chose, under that company's terms, and you can see what that is first.</p></div>
+    <div class="card"><div class="ic">{IC_MAC}</div><h3>Your files stay put</h3><p>SKYCOT runs on your Mac. No analytics are switched on. Only what each job needs goes to the assistant you chose, under that company's terms, and it works only in the project folder you open.</p></div>
     <div class="card"><div class="ic">{IC_WRENCH}</div><h3>Advanced mode when you want it</h3><p>The full developer interface SKYCOT is built on (T3 Code's) is one switch away, in the same window, for you or the developer who helps you. Nothing is removed. Flip it back any time.</p></div>
   </div>
   <div class="rules">
@@ -454,9 +501,8 @@ def home_body(variant):
     <h3>Be first to try it.</h3>
     <p>Apple silicon Macs recommended. You will need an account with at least one supported assistant.</p>
     <div class="actions">
-      <!-- PLACEHOLDER LINKS: swap for the signed .dmg and a real notify form before launch -->
-      <a class="btn btn-primary" href="#download" aria-disabled="true" title="Signed Mac download coming">Download for Mac · coming soon</a>
-      <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=Notify%20me%20when%20SKYCOT%20for%20Mac%20is%20ready">Notify me</a>
+      <span class="btn btn-primary" aria-disabled="true" title="A signed, notarised Mac download is being prepared">Download for Mac · coming soon</span>
+      <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20early%20access">Notify me</a>
     </div>
     <p class="hero-note">Or join the conversation on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking; we email you once when it is ready.</p>
     <div class="status">
@@ -478,7 +524,7 @@ def home_body(variant):
     <details><summary>What does SKYCOT cost?</summary><p>Free during early access. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
     <details><summary>Where do my files go?</summary><p>They stay on your Mac. When you send a message, the assistant you chose receives what it needs for that task, under that company's terms. SKYCOT has no analytics switched on and no account of its own to send things to.</p></details>
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
-    <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="open-source.html">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
+    <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
     <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
   </div>
@@ -486,31 +532,33 @@ def home_body(variant):
 '''
     return hero + body
 
-DESC = "SKYCOT drives the AI coding assistant you already pay for, on your own Mac. Tell it what you want changed in plain English, see what changed before anything goes live, and undo like Time Machine."
-
 def write(name, content):
     with open(OUT + name, "w", encoding="utf-8") as f:
         f.write(content)
     print("wrote", name, len(content))
 
-write("index.html", head("SKYCOT · Tell it what you want changed", DESC) + nav() + home_body("a") + FOOTER)
-write("index-b.html", head("SKYCOT · Tell it what you want changed (variant B)", DESC, "b") + nav("index-b.html") + home_body("b") + FOOTER.replace('href="index.html#', 'href="index-b.html#'))
+write("index.html", head(TITLE, DESC, "/") + nav() + home_body() + FOOTER)
+# Variant B is now the dark side of index.html; the separate file is retired.
+if os.path.exists(OUT + "index-b.html"):
+    os.remove(OUT + "index-b.html")
 
 # ---------- legal pages ----------
-NOTICE = '''<div class="notice"><b>Draft, not yet in force.</b> This page was drafted for review by Curble Pty Ltd's lawyer before launch. It is not legal advice and has not been adopted. Wording, dates and the company details may change.</div>'''
+# Internal notes (open questions for a lawyer, and the clause-by-clause comparison with T3 Code's own
+# legal pages) live in docs/legal/WEBSITE-LEGAL-NOTES.md, never on the public pages.
 
 PRIVACY = f'''{nav()}
 <main class="doc"><div class="narrow">
   <h1>Privacy</h1>
-  <p class="meta">DRAFT · prepared 21 October 2026 · applies to the SKYCOT app and skycot.com</p>
-  {NOTICE}
+  <p class="meta">Last updated {LAST_UPDATED} · applies to the SKYCOT app and skycot.com</p>
   <p>SKYCOT is designed so that we hold as little about you as possible. The app runs on your Mac, your files stay on your Mac, and the only company that receives your work is the AI assistant you sign in to and choose to use. This page explains that in detail, and what the website does.</p>
 
   <h2>The short version</h2>
   <ul>
     <li>The SKYCOT app has no SKYCOT account, no SKYCOT servers that process your work, and no analytics switched on.</li>
-    <li>Your project files stay on your Mac. When you send a message, the assistant you chose (for example Claude Code or Codex) receives what it needs for that task, under that company's terms and your own account.</li>
+    <li>Your project files stay on your Mac. When you work, the assistant you chose (for example Claude Code or Codex) receives what it needs for that task, under that company's terms and your own account.</li>
+    <li>We never receive your files, your messages or the assistant's replies, so we cannot use them for anything, including training AI.</li>
     <li>skycot.com uses no cookies, no analytics and no third-party scripts, fonts or images.</li>
+    <li>We do not sell personal information or use it for advertising.</li>
     <li>If you email us or join our Discord, we hold what you send us, and Discord's own policy applies there.</li>
   </ul>
 
@@ -519,80 +567,104 @@ PRIVACY = f'''{nav()}
 
   <h2>2. The SKYCOT app</h2>
   <h3>What stays on your Mac</h3>
-  <p>Your project folders, the versions SKYCOT keeps so you can undo, your conversations, your settings and your sign-in tokens for each assistant are stored on your Mac (in your home folder under <code>~/.skycot</code> and the app's own data folder). You can delete them at any time by removing the app and those folders.</p>
+  <p>Your project folders stay where you keep them. The versions SKYCOT keeps so you can undo are stored inside each project's own folder history. Your conversations, settings and technical logs are stored in your home folder under <code>~/.skycot</code> and in the app's own data folder. Signing in to each assistant happens on that company's own sign-in page; the sign-in token that results is kept on your Mac, by SKYCOT or by the assistant's own tool, and SKYCOT never sees your password. You can delete all of this at any time by removing the app and those folders.</p>
   <h3>What is sent to the AI assistant you chose</h3>
-  <p>When you send a message, SKYCOT passes it, together with the parts of your project the assistant needs for that task, to the assistant you selected. That data is handled under that company's privacy policy and your agreement with them (Anthropic for Claude, OpenAI for Codex, Anysphere for Cursor, Google for Gemini and Antigravity). SKYCOT does not add a copy for itself. You can see what will be sent before it goes, and the hard rules mean customer details are always a question, never an assumption.</p>
+  <p>The assistant works in the project folder you open. When you send a message, the assistant's own tool reads what it needs from that folder for the task and sends it, with your message, to the company that makes it, under your account: Anthropic for Claude Code, OpenAI for Codex, Anysphere for Cursor, Google for Gemini and Antigravity, or the maker of any other assistant you connect. That company's privacy policy and your agreement with them govern what happens to it, including whether it may be used to improve or train their models; you can check and change that in your account with them. SKYCOT does not add a copy for itself. In Ask me first, the assistant stops and asks before doing anything beyond the plan, and the hard rules mean touching customer details is always a question, never an assumption.</p>
   <h3>What is sent to us</h3>
-  <p>Nothing by default. Usage analytics are off. If a future version offers optional diagnostics, it will be off until you switch it on, this page will be updated first, and it will never include your project files or conversations.</p>
-  <h3>Updates</h3>
-  <p>The app checks for new versions. That check contacts the update host (currently GitHub) and, like any web request, reveals your IP address to it. No other information is sent.</p>
+  <p>Nothing. SKYCOT has no usage analytics, crash reporting or diagnostics switched on, and in our builds the parts of the engine that could send them point nowhere. The online account and phone-pairing service that T3 Code offers is switched off in SKYCOT, so the app does not talk to T3 Tools Inc.'s servers either. If a future version offers optional diagnostics, it will be off until you switch it on, this page will be updated first, and it will never include your project files or conversations.</p>
+  <h3>Background downloads</h3>
+  <p>Like most apps, SKYCOT fetches a few public files on its own: it checks GitHub for new versions of SKYCOT, and it downloads public lists of AI models and their prices, also hosted on GitHub. If you add Gemini through Antigravity, it downloads Google's connector from Google. Like any web request, these reveal your IP address and the app's version to the host. Nothing about you or your projects is included.</p>
+  <h3>Permissions your Mac may ask for</h3>
+  <p>macOS may ask you to let SKYCOT open the folders you choose and show notifications. If you turn on sharing so that another of your devices can connect to SKYCOT, that device connects to your Mac directly over your own network, with no SKYCOT or T3 server in between. You can change these at any time in System Settings and in SKYCOT's Settings.</p>
   <h3>Publishing</h3>
   <p>If you connect a code-hosting account (for example GitHub) to send work for review or put it live, SKYCOT talks to that service on your instruction only, using your own account. Their terms and privacy policy apply to what you upload there.</p>
 
   <h2>3. The website, skycot.com</h2>
-  <p>The site is a set of plain pages served by Cloudflare. We set no cookies and run no analytics, advertising or tracking. Cloudflare, like any host, sees the technical details of each request (such as IP address and browser type) to deliver the page and protect the site; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
+  <p>The site is a set of plain pages served by Cloudflare. We set no cookies and run no analytics, advertising or tracking, so there is nothing for a browser's "Do Not Track" setting to switch off. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
 
   <h2>4. Email, Discord and early access</h2>
-  <p>If you email us to be notified when SKYCOT is ready, we keep your email address for that purpose only, email you when it is, and delete the list afterwards unless you ask to stay in touch. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
+  <p>If you email us to be notified when SKYCOT is ready, we keep your email address for that purpose only, email you when it is, and delete the list afterwards unless you ask to stay in touch. Other emails are kept for as long as we need them to help you and to keep ordinary business records, and are then deleted. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
 
-  <h2>5. Your rights</h2>
+  <h2>5. Companies that handle information for us</h2>
+  <ul>
+    <li><b>Cloudflare</b> hosts skycot.com.</li>
+    <li><b>Google Workspace</b> runs our email.</li>
+    <li><b>GitHub</b> hosts SKYCOT's updates and the public files the app downloads.</li>
+    <li><b>Discord</b> runs our community, if you choose to join it.</li>
+  </ul>
+  <p>These companies may store information outside Australia, including in the United States. We do not share personal information with anyone else, except where the law requires it, where it is needed to protect people or our rights against fraud or harm, or if the SKYCOT business is sold or reorganised, in which case this policy continues to apply to what we hold.</p>
+
+  <h2>6. Security</h2>
+  <p>We keep what we hold to a minimum and protect it with the security of the services above, with access limited to the people who need it. No system is perfectly secure. The security of your Mac, your AI accounts and anything you connect to SKYCOT is in your hands, so keep them up to date and protected. If you find a security problem in SKYCOT or skycot.com, please email <a href="mailto:markhallam@skycot.com?subject=Security">markhallam@skycot.com</a> with "Security" in the subject before telling anyone else, and do not include passwords or keys.</p>
+
+  <h2>7. Your rights</h2>
   <p>You can ask us what we hold about you, ask us to correct or delete it, or complain about how we handled it, by emailing <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We will respond within 30 days. If you are not satisfied you can contact the Office of the Australian Information Commissioner (oaic.gov.au). If you are in the UK or the European Union, you have equivalent rights under the UK GDPR and the EU GDPR, including the right to lodge a complaint with your local supervisory authority.</p>
 
-  <h2>6. Children</h2>
-  <p>SKYCOT is a work tool and is not directed at children under 16. We do not knowingly collect information from them. A Family profile, for a child using SKYCOT on a parent's Mac under the parent's supervision, is planned for the first release; because SKYCOT holds no account and sends nothing to us, this does not change what we collect, and this section will be revised before that profile ships.</p>
+  <h2>8. Children</h2>
+  <p>SKYCOT is a work tool and is not designed for children to use on their own. We do not knowingly collect information from children under 16. A Family profile, for a child using SKYCOT on a parent's Mac under the parent's supervision, is planned for the first release; because SKYCOT holds no account and sends nothing to us, this does not change what we collect, and this section will be revised before that profile ships. Each AI assistant sets its own minimum age, and some require users to be adults; those rules apply too.</p>
 
-  <h2>7. Changes</h2>
+  <h2>9. Changes</h2>
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
-
-  <p class="meta">Open questions for the lawyer: whether Curble Pty Ltd is an APP entity under the small business threshold; the wording for GDPR applicability if EU users are accepted; retention for the notify-me list; and the children's wording in section 6 once the Family profile ships (a child uses the app on a parent's Mac; the AI provider's own age terms still apply).</p>
 </div></main>
 '''
-write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what you send goes to the AI you chose, no analytics by default. Draft for legal review.") + PRIVACY + FOOTER)
+write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what each job needs goes to the AI you chose, no analytics, no cookies, no SKYCOT account.", "/privacy") + PRIVACY + FOOTER)
 
 TERMS = f'''{nav()}
 <main class="doc"><div class="narrow">
   <h1>Terms of use</h1>
-  <p class="meta">DRAFT · prepared 21 October 2026 · early access</p>
-  {NOTICE}
-  <p>These terms cover the SKYCOT app and the skycot.com website, made by Curble Pty Ltd ("we", "us"), Melbourne, Australia. By installing or using SKYCOT you agree to them. Plain-English summaries appear in italics and are not part of the terms.</p>
+  <p class="meta">Last updated {LAST_UPDATED} · early access</p>
+  <p>These terms cover the SKYCOT app and the skycot.com website, made by Curble Pty Ltd ("we", "us"), Melbourne, Australia. By installing or using SKYCOT you agree to them. If you use SKYCOT for a business, you agree to them on its behalf and confirm you are allowed to. Plain-English summaries appear in italics and are not part of the terms.</p>
 
   <h2>1. What SKYCOT is</h2>
-  <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It is in early access: features may change, be incomplete, or stop working between versions. <em>Summary: it is new, and we say so.</em></p>
+  <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It has no account of its own: you do not sign up with us to use it. It is in early access: features may change, be incomplete, contain mistakes, lose work or stop working between versions, so do not rely on SKYCOT as the only copy of anything important. <em>Summary: it is new, and we say so.</em></p>
 
-  <h2>2. Your AI assistant is a separate agreement</h2>
-  <p>SKYCOT does not provide AI services. You need your own account with at least one supported assistant (for example Claude Code by Anthropic, Codex by OpenAI, Cursor by Anysphere, or Gemini and Antigravity by Google). Your use of those services, their charges, limits and outputs are governed by your agreement with that company, not by us. We are not responsible for their availability, pricing or behaviour. <em>Summary: your AI plan is between you and them.</em></p>
+  <h2>2. Who can use SKYCOT</h2>
+  <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer and under that adult's supervision; the adult accepts these terms for the child and is responsible for that use. Each AI assistant also sets its own minimum age, which you must meet. <em>Summary: adults sign up for it; children use it with a grown-up.</em></p>
 
-  <h2>3. You direct the work and own the results</h2>
-  <p>You decide what to ask, what to allow, what to keep and what to publish. SKYCOT's safeguards (Ask me first, hard rules, versions and undo, a confirmation before anything leaves your Mac) reduce risk; they do not remove it. You remain responsible for your projects, your backups outside SKYCOT, and anything you put live. Anything you create with SKYCOT is yours, subject to your AI provider's terms. <em>Summary: you are the boss; we give you brakes, not a guarantee.</em></p>
+  <h2>3. Your AI assistant is a separate agreement</h2>
+  <p>SKYCOT does not provide AI services. You need your own account with at least one supported assistant (for example Claude Code by Anthropic, Codex by OpenAI, Cursor by Anysphere, or Gemini and Antigravity by Google). Your use of those services, their charges, limits and outputs are governed by your agreement with that company, not by us. They can change, stop working or change their prices without telling us, and we are not responsible for their availability, pricing or behaviour. <em>Summary: your AI plan is between you and them.</em></p>
 
-  <h2>4. Acceptable use</h2>
-  <p>Do not use SKYCOT to break the law, to access systems or data you are not entitled to, to harm others, or to circumvent the terms of the assistants you connect. Do not remove or alter the open-source and copyright notices in the app.</p>
+  <h2>4. You direct the work and own the results</h2>
+  <p>You decide what to ask, what to allow, what to keep and what to publish. AI assistants can produce work that is wrong, insecure or incomplete, so check what changed before you keep it or put it live. SKYCOT's safeguards (Ask me first, hard rules, versions and undo, a confirmation before anything leaves your Mac) reduce risk; they do not remove it. You remain responsible for your projects, your backups outside SKYCOT, and anything you put live. You confirm that you have the right to use the files and information you give an assistant, and that you will check your provider's terms before giving it confidential, regulated or personal information, such as customer details. Anything you create with SKYCOT is yours, subject to your AI provider's terms. <em>Summary: you are the boss; we give you brakes, not a guarantee.</em></p>
 
-  <h2>5. Licence to use SKYCOT</h2>
-  <p>SKYCOT is based on T3 Code, © T3 Tools Inc., licensed under the MIT licence; that licence continues to apply to that code and is reproduced in the app and on our <a href="open-source.html">open source page</a>. Our own additions are licensed to you for your use of SKYCOT under these terms during early access. The SKYCOT name and marks are ours and are not covered by the MIT licence. <em>Summary: the engine is open source; the SKYCOT name is ours.</em></p>
+  <h2>5. Acceptable use</h2>
+  <p>Do not use SKYCOT to break the law or anyone's rights; to access systems or data you are not entitled to; to spread malicious software or attack other systems; to harass, deceive or defraud anyone; to get around the terms, limits or safeguards of the assistants you connect; or to claim that an assistant's output was made or endorsed by us. Do not remove or alter the open-source and copyright notices in the app.</p>
 
-  <h2>6. Updates and changes</h2>
-  <p>The app checks for updates and may offer or install them. We may change or withdraw features, and we may change these terms; the new version will be posted here with its date, and continued use after that date means you accept it.</p>
+  <h2>6. Licence to use SKYCOT</h2>
+  <p>SKYCOT is based on T3 Code, © T3 Tools Inc., licensed under the MIT licence; that licence continues to apply to that code and is reproduced in the app and on our <a href="/open-source">open source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. Our own additions are licensed to you for your use of SKYCOT under these terms during early access. The SKYCOT name and marks are ours and are not covered by the MIT licence. <em>Summary: the engine is open source; the SKYCOT name is ours.</em></p>
 
-  <h2>7. Australian Consumer Law and warranties</h2>
-  <p>Nothing in these terms excludes, restricts or modifies any guarantee, right or remedy you have under the Australian Consumer Law or other law that cannot be excluded. Subject to that, SKYCOT is provided "as is" and "as available" during early access, without warranties of any kind, express or implied, including fitness for a particular purpose, and we do not warrant that it will be uninterrupted or error-free. <em>Summary: your legal consumer rights stay; beyond those, early-access software comes with no promises.</em></p>
+  <h2>7. Price</h2>
+  <p>SKYCOT is free during early access. You pay your AI provider, and anyone else whose service you use with SKYCOT, under their own terms. If we introduce a price, we will show it before it applies, and you will not be charged unless you agree to it.</p>
 
-  <h2>8. Limitation of liability</h2>
-  <p>To the extent permitted by law, we are not liable for any loss of data, loss of profit, business interruption, or indirect or consequential loss arising from your use of SKYCOT or of any AI assistant used with it, and our total liability for any claim is limited to the amount you paid us for SKYCOT in the twelve months before the claim (which during free early access is nil) or, where the law requires a remedy, to re-supplying the software. <em>For the lawyer: confirm the cap and wording against the ACL and the proposed business model.</em></p>
+  <h2>8. Privacy</h2>
+  <p>How we handle information is explained on our <a href="/privacy">privacy page</a>, which forms part of these terms.</p>
 
-  <h2>9. Ending</h2>
-  <p>You can stop using SKYCOT at any time by deleting it; your files remain yours and on your Mac. We may end your right to use SKYCOT if you breach these terms.</p>
+  <h2>9. Feedback and themes</h2>
+  <p>If you send us ideas, feedback, or a theme for us to include, you allow us to use, change, include and share it, free of charge and without any obligation to you. We credit the themes we include to their authors. You keep any rights you have in what you sent.</p>
 
-  <h2>10. Governing law</h2>
-  <p>These terms are governed by the laws of Victoria, Australia, and you submit to the non-exclusive jurisdiction of its courts.</p>
+  <h2>10. Updates and changes</h2>
+  <p>The app checks for updates and may offer or install them. We may change or withdraw features, and we may change these terms; the new version will be posted here with its date, and continued use after that date means you accept it. If a change materially affects you, we will also say so in the app where we reasonably can.</p>
 
-  <h2>11. Contact</h2>
+  <h2>11. Australian Consumer Law and warranties</h2>
+  <p>Nothing in these terms excludes, restricts or modifies any guarantee, right or remedy you have under the Australian Consumer Law or other law that cannot be excluded. Subject to that, SKYCOT is provided "as is" and "as available" during early access, without warranties of any kind, express or implied, including fitness for a particular purpose, and we do not warrant that it, or anything an AI assistant produces through it, will be uninterrupted, secure, accurate or error-free. <em>Summary: your legal consumer rights stay; beyond those, early-access software comes with no promises.</em></p>
+
+  <h2>12. Limitation of liability</h2>
+  <p>To the extent permitted by law, we are not liable for any loss of data, loss of profit, business interruption, or indirect or consequential loss arising from your use of SKYCOT or of any AI assistant used with it, and our total liability for any claim is limited to the amount you paid us for SKYCOT in the twelve months before the claim (which during free early access is nil) or, where the law requires a remedy, to re-supplying the software.</p>
+
+  <h2>13. Ending</h2>
+  <p>You can stop using SKYCOT at any time by deleting it; your files remain yours and on your Mac. We may end your right to use SKYCOT if you breach these terms. The parts of these terms that by their nature should continue after that (including the licence notices, sections 11 and 12, and governing law) continue.</p>
+
+  <h2>14. Problems and governing law</h2>
+  <p>If something goes wrong, please email us first; we will try in good faith to sort it out within 30 days. These terms are governed by the laws of Victoria, Australia, and you submit to the non-exclusive jurisdiction of its courts. Nothing here stops you from going to a consumer protection regulator or tribunal.</p>
+
+  <h2>15. General</h2>
+  <p>These terms and the privacy page are the whole agreement between you and us about SKYCOT. If any part is found unenforceable, the rest still applies. If we do not enforce a term straight away, we have not given it up. We are not responsible for delays or failures caused by events outside our reasonable control.</p>
+
+  <h2>16. Contact</h2>
   <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
-
-  <p class="meta">Open questions for the lawyer: whether a separate early-access or beta agreement is preferable; export-control and age wording; the liability cap once pricing exists; and whether any of our own code will be published under an open licence.</p>
 </div></main>
 '''
-write("terms.html", head("Terms of use · SKYCOT", "Draft terms of use for the SKYCOT app and website, for legal review before launch.") + TERMS + FOOTER)
+write("terms.html", head("Terms of use · SKYCOT", "Terms of use for the SKYCOT app and the skycot.com website, made by Curble Pty Ltd, Melbourne, Australia.", "/terms") + TERMS + FOOTER)
 
 OSS = f'''{nav()}
 <main class="doc"><div class="narrow">
@@ -609,7 +681,7 @@ OSS = f'''{nav()}
   <h2>What this means for you</h2>
   <ul>
     <li>The licence notice above ships inside every copy of SKYCOT (in the installer and under Settings → About → Open-source licences) and must stay there.</li>
-    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions, and the SKYCOT name, are © 2026 Curble Pty Ltd (trading as SKYCOT); see the <a href="terms.html">terms of use</a>. Whether our additions will also be published under an open licence is a decision still to be made and will be announced here.</li>
+    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions, and the SKYCOT name, are © 2026 Curble Pty Ltd (trading as SKYCOT); see the <a href="/terms">terms of use</a>. Whether our additions will also be published under an open licence is a decision still to be made and will be announced here.</li>
     <li>SKYCOT does not ship T3 Code's release pipeline, install scripts or telemetry configuration; our builds are published by Curble Pty Ltd from our own repository.</li>
   </ul>
 
@@ -625,4 +697,44 @@ OSS = f'''{nav()}
   <p>If you believe an attribution is missing or wrong, email <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a> and we will fix it.</p>
 </div></main>
 '''
-write("open-source.html", head("Open source · SKYCOT", "SKYCOT is based on T3 Code, © T3 Tools Inc., MIT licence. Full licence text, non-affiliation statement and third-party licences.") + OSS + FOOTER)
+write("open-source.html", head("Open source · SKYCOT", "SKYCOT is based on T3 Code, © T3 Tools Inc., MIT licence. Full licence text, non-affiliation statement and third-party licences.", "/open-source") + OSS + FOOTER)
+
+# ---------- 404 (Cloudflare Pages serves /404.html for any address it does not know) ----------
+NOTFOUND = f'''{nav()}
+<main class="notfound"><div class="narrow">
+  <h1>That page isn't here.</h1>
+  <p>The SKYCOT website was rebuilt in October 2026, so the page you were looking for may have moved or been retired.</p>
+  <div class="actions"><a class="btn btn-primary" href="/">Go to the home page</a><a class="btn btn-secondary" href="mailto:markhallam@skycot.com">Email us</a></div>
+</div></main>
+'''
+write("404.html", head("Page not found · SKYCOT", "This page is not on skycot.com.", "/404", robots="noindex") + NOTFOUND + FOOTER)
+
+# ---------- og.png share image (1200x630), rendered by headless Chrome from a tiny HTML card ----------
+OG_HTML = f'''<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><title>SKYCOT share card</title>
+<style>
+html,body{{margin:0;width:1200px;height:630px;overflow:hidden;background:#fff}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}}
+.card{{box-sizing:border-box;width:1200px;height:630px;padding:76px 88px 64px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(180deg,#ffffff 0%,#f5f5f7 100%)}}
+.brand{{display:flex;align-items:center;gap:18px;font-weight:700;letter-spacing:.16em;font-size:30px}}
+.brand svg{{width:64px;height:64px}}
+h1{{margin:0;font-size:86px;line-height:1.02;letter-spacing:-.035em;font-weight:700;max-width:16ch}}
+.foot{{display:flex;justify-content:space-between;align-items:center;font-size:26px;color:#6e6e73}}
+.foot b{{color:#0071e3;font-weight:600}}
+</style></head>
+<body><div class="card">
+  <div class="brand">{MARK.replace('width="28" height="28"', 'width="64" height="64"').replace('var(--accent)', '#0071e3')}<span>SKYCOT</span></div>
+  <h1>{html.escape(H1, quote=False)}</h1>
+  <div class="foot"><b>SKYCOT for Mac · early access</b><span>skycot.com</span></div>
+</div></body></html>
+'''
+os.makedirs(OG_DIR, exist_ok=True)
+with open(OG_DIR + "og-card.html", "w", encoding="utf-8") as f:
+    f.write(OG_HTML)
+if os.path.exists(CHROME):
+    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
+                    "--window-size=1200,630", "--screenshot=" + OUT + "og.png", "file://" + OG_DIR + "og-card.html"],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("wrote og.png")
+else:
+    print("Chrome not found; og.png not regenerated")
