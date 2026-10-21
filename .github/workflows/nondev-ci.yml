@@ -1,0 +1,69 @@
+# nondev fork: checks for our own code only. Upstream's ci.yml still runs the full T3 Code suite;
+# this workflow adds the fork-specific gates:
+#   - every upstream-owned file we changed is declared in SEAM-MANIFEST.md (check-seams)
+#   - unit tests for the fork tooling (node --test)
+#   - typecheck + build of @t3tools/nondev (our client) only
+#   - `vp run --filter t3 build` to prove the server bundle picks up our dist at dist/client/simple/
+# Branch protection on `main` should require the `nondev / check` status.
+name: nondev / check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nondev-ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Same sparse checkout as upstream's ci.yml (skips the vendored .repos/ reference trees).
+      # Full history so check-seams can find the merge-base with upstream/main.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+
+      - name: Fetch upstream main
+        run: |
+          git remote add upstream https://github.com/pingdotgg/t3code.git
+          git fetch --no-tags upstream main
+
+      - name: Setup Vite+ and install dependencies
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Test fork tooling
+        run: node --test nondev/scripts/*.test.ts
+
+      - name: Check seams against SEAM-MANIFEST.md
+        run: node nondev/scripts/check-seams.ts
+
+      - name: Typecheck @t3tools/nondev
+        run: vp run --filter @t3tools/nondev typecheck
+
+      - name: Build @t3tools/nondev
+        run: vp run --filter @t3tools/nondev build
+
+      - name: Build server bundle (copies clients into apps/server/dist/client)
+        run: vp run --filter t3 build
+
+      - name: Verify the server bundle contains our client at /simple/
+        run: |
+          test -f apps/server/dist/client/index.html || { echo "::error::stock web client missing from apps/server/dist/client"; exit 1; }
+          test -f apps/server/dist/client/simple/index.html || { echo "::error::apps/server/dist/client/simple/index.html missing: the cli.ts seam that copies apps/nondev/dist did not run"; exit 1; }
+          du -sh apps/server/dist/client/simple
