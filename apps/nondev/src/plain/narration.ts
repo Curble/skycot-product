@@ -59,6 +59,8 @@ export interface NarrationContext {
    * not refused. Unset, a step that didn't run is one the person said no to.
    */
   readonly stopped?: boolean;
+  /** The thread's own note of when the provider's allowance resets, if it has one. */
+  readonly usageLimitResetAt?: string | null;
 }
 
 export interface CommandClassification {
@@ -1419,6 +1421,39 @@ function fileOperation(
   return "edited";
 }
 
+/**
+ * "at 11:15 pm" / "on Thu at 9:00 am" from whichever field carries the reset:
+ * the failure's own time, the thread's note, or the provider's words ("try
+ * again at 11:15 PM", "resets in 2 hours"). Undefined when nothing says.
+ */
+export function describeResetTime(
+  resetAt: string | null,
+  message: string,
+  now: Date = new Date(),
+): string | undefined {
+  if (resetAt !== null) {
+    const date = new Date(resetAt);
+    if (!Number.isNaN(date.getTime()) && date.getTime() > now.getTime() - 60_000) {
+      const time = date
+        .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+        .toLowerCase();
+      return date.toDateString() === now.toDateString()
+        ? `at ${time}`
+        : `on ${date.toLocaleDateString(undefined, { weekday: "short" })} at ${time}`;
+    }
+  }
+  const spoken =
+    /\b(?:try again|resets?|available again|renews?)\s+(at\s+\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*\([^)]*\))?|in\s+(?:about\s+)?\d+\s+(?:minutes?|hours?|days?)|on\s+[A-Z][a-z]+(?:\s+\d{1,2})?(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)?|tomorrow)/i.exec(
+      message,
+    );
+  return spoken
+    ? spoken[1]!
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/(?<![ap]\.m)\.$/i, "")
+    : undefined;
+}
+
 /** Marks a headline for a step that never ran; `describeTurnItem` words it for the context. */
 const DID_NOT_RUN = "\u0000did-not-run:";
 
@@ -1730,7 +1765,9 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
       const failure = item.failure;
       const headline =
         failure.class === "usage_limit"
-          ? errors.usageLimit(failure.resetAt ?? undefined)
+          ? errors.usageLimit(
+              describeResetTime(failure.resetAt ?? ctx.usageLimitResetAt ?? null, failure.message),
+            )
           : failure.class === "transport_error"
             ? item.retry?.retryDelayMs !== undefined && item.retry.retryDelayMs !== null
               ? errors.didNotRespond(

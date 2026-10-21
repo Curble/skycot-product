@@ -58,10 +58,10 @@ export function ErrorNote({
   readonly item: ErrorItem;
   readonly context: TimelineRenderContext;
 }) {
-  const narration = describeTurnItem(
-    item,
-    context.projectName === null ? {} : { projectName: context.projectName },
-  );
+  const narration = describeTurnItem(item, {
+    ...(context.projectName === null ? {} : { projectName: context.projectName }),
+    usageLimitResetAt: context.shell?.runtime?.usageLimitResetAt ?? null,
+  });
   const retry = item.retry;
   const retryLine =
     retry && retry.maxAttempts !== null

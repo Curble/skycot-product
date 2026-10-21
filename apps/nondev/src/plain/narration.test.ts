@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { items } from "./fixtures.test-helpers";
+import { items, turnItem } from "./fixtures.test-helpers";
 import {
   classifyCommand,
   describeTurnItem,
   narrationStatus,
   progressHint,
   summarizeRun,
+  describeResetTime,
 } from "./narration";
 
 const PATH_LIKE = /\.(tsx?|jsx?|css|json|md)\b|\/src\/|^\/|~\//;
@@ -439,5 +440,34 @@ describe("describeTurnItem — steps that never ran (QA-P2-2-06)", () => {
 
   it("keeps finished steps in the past tense", () => {
     expect(describeTurnItem(items.command("rm book.html")).headline).toBe("Deleted the book page");
+  });
+});
+
+describe("describeResetTime (QA-P2-1-12)", () => {
+  const now = new Date("2026-10-21T10:00:00");
+
+  it("uses the reset time when any field carries one", () => {
+    expect(describeResetTime(new Date("2026-10-21T23:15:00").toISOString(), "", now)).toMatch(
+      /^at 11:15\s?pm$/i,
+    );
+    expect(
+      describeResetTime(null, "You've hit your usage limit. Try again at 11:15 PM.", now),
+    ).toBe("at 11:15 PM");
+    expect(describeResetTime(null, "Usage limit reached; resets in 2 hours", now)).toBe(
+      "in 2 hours",
+    );
+  });
+
+  it("says nothing it can't back up", () => {
+    expect(describeResetTime(null, "You've hit your usage limit.", now)).toBeUndefined();
+  });
+
+  it("tells the person what to do when no reset time is known", () => {
+    const item = turnItem("error", {
+      failure: { class: "usage_limit", message: "limit", code: null, retryable: false },
+    });
+    expect(describeTurnItem(item).headline).toBe(
+      "You've used up this assistant's allowance for now. Try again later or switch assistant in Settings.",
+    );
   });
 });

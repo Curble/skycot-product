@@ -194,8 +194,8 @@ export const errors = {
       : `${service} didn't respond. Trying again in ${retryInSeconds} s.`,
   usageLimit: (resetAt?: string) =>
     resetAt === undefined
-      ? "You've used up this assistant's allowance for now."
-      : `You've used up this assistant's allowance for now. It resets at ${resetAt}.`,
+      ? "You've used up this assistant's allowance for now. Try again later or switch assistant in Settings."
+      : `You've used up this assistant's allowance for now. It resets ${resetAt}.`,
   permission:
     "The assistant wasn't allowed to do that. You can allow it below or ask for another way.",
   somethingWentWrong: (what: string) =>
