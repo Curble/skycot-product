@@ -13,7 +13,7 @@ export const familyCopy = {
   alwaysAsks: "Family profile · the assistant always asks first",
   managedElsewhere: `Managed by the ${FAMILY_LABEL} — change it in Settings › Family.`,
   does: [
-    "Uses the Workshop look (Sam builds, Mo checks). Any look can still be picked.",
+    "Uses the Workshop look (Sam builds, Mo checks) unless you've already picked another.",
     "The assistant always asks before changing or running anything.",
     `Hides the riskier modes and the developer tools (${ADVANCED_MODE_LABEL}).`,
     "Asks for the parent code before publishing, creating an automation, or turning this off.",

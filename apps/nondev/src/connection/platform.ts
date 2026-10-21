@@ -107,7 +107,9 @@ function clientMetadata() {
   });
 }
 
-const ANALYTICS_DEVICE_ID_KEY = "t3code:analytics-device-id";
+// The runtime asks for a per-browser id; nothing in this client sends it
+// anywhere (Settings › Privacy says so), so the key is named for what it is.
+const DEVICE_ID_KEY = "skycot:device-id";
 
 const unsupported = (detail: string) =>
   new ConnectionBlockedError({ reason: "unsupported", detail });
@@ -129,13 +131,12 @@ const layerCapabilities = Layer.effectContext(
     const identity = ClientCapabilities.RelayDeviceIdentity.of({
       deviceId: Effect.succeedNone,
     });
-    // Shares the stock UI's key so one browser profile reads as one device.
     const analyticsDevice = {
       id: Effect.try(() => {
-        const existing = window.localStorage.getItem(ANALYTICS_DEVICE_ID_KEY);
+        const existing = window.localStorage.getItem(DEVICE_ID_KEY);
         if (existing) return existing;
         const created = randomUUID();
-        window.localStorage.setItem(ANALYTICS_DEVICE_ID_KEY, created);
+        window.localStorage.setItem(DEVICE_ID_KEY, created);
         return created;
       }).pipe(Effect.option),
     };

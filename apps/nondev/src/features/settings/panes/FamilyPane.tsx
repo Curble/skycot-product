@@ -42,7 +42,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
       <>
         <SettingsGroup
           title={familyCopy.title}
-          footer="For a child you look after. Turning it on applies the Workshop look, keeps the assistant on “Ask me first”, hides the developer tools, and guards publishing and automations with a parent code."
+          footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), keeps the assistant on “Ask me first”, hides the developer tools, and guards publishing and automations with a parent code."
         >
           <ListRow
             leading={<StepBadge state="todo" icon={Users} />}
@@ -194,6 +194,7 @@ function FamilyOnPane() {
         title={`Turn off the ${familyCopy.title}?`}
         description="Every guardrail it added goes: the assistant can be set to do more on its own, Advanced mode comes back, and publishing no longer asks for a code. The child's name and the code are forgotten."
         sober
+        dismissOnBackdrop={false}
         actions={
           <>
             <Button onClick={() => setConfirmOff(false)}>Keep it on</Button>

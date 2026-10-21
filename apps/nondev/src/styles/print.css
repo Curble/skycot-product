@@ -1,0 +1,59 @@
+/* Printing a conversation or a Settings pane: the window chrome goes, the
+   scrolling regions open up so the whole page flows onto paper. Nothing here
+   changes the on-screen layout. */
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+    overflow: visible;
+  }
+  .fm-shell {
+    display: block;
+    height: auto;
+    max-width: none;
+    overflow: visible;
+    background: #fff;
+    background-image: none;
+  }
+  .fm-titlebar,
+  .fm-sidebar,
+  .fm-list-column,
+  .fm-composer,
+  .fm-strip,
+  .fm-versions-strip,
+  .fm-inspector,
+  .fm-drawer,
+  .fm-drawer-backdrop,
+  .fm-conv-header__tools,
+  .fm-settings__nav,
+  .fm-settings__header .fm-btn {
+    display: none !important;
+  }
+  .fm-body,
+  .fm-settings {
+    display: block;
+  }
+  .fm-content,
+  .fm-stream,
+  .fm-home,
+  .fm-settings__detail,
+  .fm-settings--stack {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+  .fm-sheet-backdrop {
+    position: static;
+    padding: 0;
+    background: none;
+    overflow: visible;
+  }
+  .fm-sheet {
+    max-height: none;
+    box-shadow: none;
+  }
+  .fm-sheet__body {
+    overflow: visible;
+  }
+}
