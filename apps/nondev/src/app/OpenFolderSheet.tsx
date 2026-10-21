@@ -215,15 +215,20 @@ function OpenFolderSheetBody({
             }}
           />
           <span className="fm-browse__crumbs">
-            {crumbItems.map((crumb) => (
-              <bdi key={crumb.id}>
+            {crumbItems.map((crumb, index) => (
+              <span
+                key={crumb.id}
+                className={`fm-browse__crumb${
+                  index === crumbItems.length - 1 ? " fm-browse__crumb--last" : ""
+                }`}
+              >
                 {!crumb.first ? (
                   <span className="fm-browse__sep" aria-hidden>
                     ›
                   </span>
                 ) : null}
                 {crumb.label}
-              </bdi>
+              </span>
             ))}
           </span>
         </div>
