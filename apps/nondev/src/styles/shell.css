@@ -191,7 +191,7 @@
 }
 .fm-convrow--selected,
 .fm-convrow--selected:hover {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
 }
 .fm-convrow--selected + .fm-convrow::before,
@@ -205,7 +205,7 @@
   border-radius: 50%;
 }
 .fm-convrow__dot--attention {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
 }
 .fm-convrow__dot--waiting {
   background: var(--fm-orange);
@@ -407,7 +407,7 @@
   margin-bottom: 1px;
   border: 0;
   border-radius: 50%;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   flex: none;
 }

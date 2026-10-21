@@ -49,6 +49,8 @@ export const TOKEN_NAMES = [
   // Accent and system colours
   "--fm-accent",
   "--fm-accent-soft",
+  // Fill behind on-accent text (buttons, badges); falls back to --fm-accent.
+  "--fm-accent-fill",
   "--fm-on-accent",
   "--fm-on-status",
   "--fm-green",

@@ -98,7 +98,7 @@
 }
 .fm-tm__v[data-current="true"]::before {
   border-color: var(--fm-accent);
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   box-shadow: 0 0 0 4px var(--fm-accent-soft);
 }
 .fm-tm__v[data-kind="kept version"]::before {

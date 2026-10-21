@@ -33,6 +33,7 @@
       "--fm-label-4": "#b8afa3",
       "--fm-accent": "#c92d1a",
       "--fm-accent-soft": "rgba(201, 45, 26, 0.12)",
+      "--fm-accent-fill": "#c92d1a",
       "--fm-on-accent": "#fbf8f1",
       "--fm-on-status": "#fbf8f1",
       "--fm-green": "#1e6b3a",
@@ -104,6 +105,7 @@
       "--fm-label-4": "#4b4540",
       "--fm-accent": "#ff5a3c",
       "--fm-accent-soft": "rgba(255, 90, 60, 0.2)",
+      "--fm-accent-fill": "#ff5a3c",
       "--fm-on-accent": "#15120f",
       "--fm-on-status": "#15120f",
       "--fm-green": "#58b37c",
@@ -158,5 +160,10 @@
     "motion": "calm"
   },
   "voice": "neutral",
-  "preview": { "bg": "#f6f1e7", "surface": "#fbf8f1", "accent": "#c92d1a", "text": "#15120f" }
+  "preview": {
+    "bg": "#f6f1e7",
+    "surface": "#fbf8f1",
+    "accent": "#c92d1a",
+    "text": "#15120f"
+  }
 }

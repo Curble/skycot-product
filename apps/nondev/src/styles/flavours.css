@@ -161,7 +161,7 @@ html[data-flavour-borders="sketch"] .fm-settings__nav .fm-listrow--selected .fm-
   opacity: 1;
 }
 html[data-flavour-borders="sketch"] .fm-convrow--selected .fm-convrow__dot--attention {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
 }
 html[data-flavour-borders="sketch"] .fm-sidebar-item--selected .fm-sidebar-item__icon {
   color: var(--fm-accent);
@@ -613,7 +613,7 @@ html[data-flavour-accent-shape="square"] .fm-chip--on {
   left: 58%;
   --fall: 80px;
   --spin: 140deg;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   animation-delay: 0ms;
 }
 .fm-confetti__piece--1 {
@@ -669,7 +669,7 @@ html[data-flavour-accent-shape="square"] .fm-chip--on {
   left: 44%;
   --fall: 95px;
   --spin: 110deg;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   animation-delay: 180ms;
 }
 .fm-confetti__piece--9 {

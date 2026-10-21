@@ -44,7 +44,7 @@
   border-top: 0.5px solid var(--fm-sep);
 }
 .fm-settings__nav .fm-listrow--selected {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
 }
 .fm-settings__nav .fm-listrow--selected .fm-listrow__subtitle,
@@ -313,7 +313,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   font-size: calc(12px * var(--fm-text-scale));
   font-weight: 700;
@@ -372,7 +372,7 @@
   background: var(--fm-label-4);
 }
 .fm-steps__dot--on {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
 }
 
 /* ---------------------------------------------------------------------------
@@ -413,7 +413,7 @@
   cursor: pointer;
 }
 .fm-daypicker__day--on {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   border-color: var(--fm-accent);
   color: var(--fm-on-accent);
 }

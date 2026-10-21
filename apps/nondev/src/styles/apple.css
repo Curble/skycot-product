@@ -48,6 +48,7 @@
   /* Accent and system colours */
   --fm-accent: #0071e3;
   --fm-accent-soft: rgba(0, 113, 227, 0.12);
+  --fm-accent-fill: var(--fm-accent);
   --fm-on-accent: #ffffff;
   /* Text on a filled green/orange/red badge or button. */
   --fm-on-status: #ffffff;
@@ -143,6 +144,7 @@ html.dark {
 
   --fm-accent: #0a84ff;
   --fm-accent-soft: rgba(10, 132, 255, 0.2);
+  --fm-accent-fill: var(--fm-accent);
   --fm-green: #30d158;
   --fm-green-soft: rgba(48, 209, 88, 0.18);
   --fm-green-ink: #5ad67a;
@@ -263,7 +265,7 @@ a {
   filter: brightness(0.94);
 }
 .fm-btn--primary {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   border-color: transparent;
 }
@@ -426,7 +428,7 @@ a {
   background: var(--fm-bg-fill);
 }
 .fm-listrow--selected {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
 }
 .fm-listrow--selected .fm-listrow__subtitle,
@@ -553,7 +555,7 @@ a {
 }
 .fm-sidebar-item--selected,
 .fm-sidebar-item--selected:hover {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
 }
 .fm-sidebar-item--selected .fm-sidebar-item__icon,
@@ -823,7 +825,7 @@ a {
   background: var(--fm-green);
 }
 .fm-pill--working .fm-pill__dot {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
 }
 .fm-pill--danger .fm-pill__dot {
   background: var(--fm-red);
@@ -1038,7 +1040,7 @@ a {
 }
 .fm-menu-item:hover,
 .fm-menu-item:focus-visible {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   outline: none;
 }
@@ -1102,7 +1104,7 @@ a {
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
 }
 .fm-progress--green .fm-progress__bar {
   background: var(--fm-green);
@@ -1395,7 +1397,7 @@ a {
   color: var(--fm-on-status);
 }
 .fm-step--now {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   box-shadow: 0 0 0 4px var(--fm-accent-soft);
 }

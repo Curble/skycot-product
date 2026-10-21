@@ -232,7 +232,7 @@
   color: var(--fm-label);
 }
 .fm-who__card--on .fm-who__icon {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
 }
 .fm-who__title {

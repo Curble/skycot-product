@@ -360,7 +360,7 @@
   cursor: default;
 }
 .fm-chip--on {
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   border-color: var(--fm-accent);
   color: var(--fm-on-accent);
 }
@@ -382,7 +382,7 @@
   height: 32px;
   border: 0;
   border-radius: 50%;
-  background: var(--fm-accent);
+  background: var(--fm-accent-fill, var(--fm-accent));
   color: var(--fm-on-accent);
   display: grid;
   place-items: center;
