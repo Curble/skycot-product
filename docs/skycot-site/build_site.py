@@ -88,6 +88,7 @@ p{margin:0}
 .hero{background:#000;color:#f5f5f7;padding:110px 0 0;overflow:hidden}
 .hero h1{font-size:clamp(44px,7.6vw,96px);font-weight:700;letter-spacing:-.03em;background:linear-gradient(180deg,#fff 40%,#8a8a8f);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:16ch}
 .hero .lede{color:#a1a1a6;max-width:34em}
+.hero .lede2{color:#86868b}
 .eyebrow{color:#2997ff}
 .hero .btn-primary{background:#fff;color:#000}
 .hero .btn-secondary{border-color:#2997ff;color:#2997ff}
@@ -123,7 +124,7 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .moment li{padding:6px 0 6px 26px;position:relative}
 .moment li::before{content:"";position:absolute;left:0;top:13px;width:14px;height:14px;border-radius:50%;background:var(--accent-soft);border:2px solid var(--accent)}
 .shot{border-radius:14px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line);background:var(--card)}
-@media (max-width:900px){.moment{grid-template-columns:1fr;gap:22px;padding:28px 0}.moment.flip .text{order:0}}
+@media (max-width:900px){.moment,.moment.flip{grid-template-columns:1fr;gap:22px;padding:28px 0}.moment.flip .text{order:0}}
 
 /* looks (theme library) */
 .looks{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px}
@@ -198,6 +199,21 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .status .done b{color:var(--green)}.status .now b{color:var(--orange)}.status .next b{color:var(--text3)}
 @media (max-width:760px){.status{grid-template-columns:1fr}.dl{padding:32px 20px}}
 
+/* family-first additions (22 October 2026) */
+.hero .lede2{font-size:clamp(15px,1.5vw,17px);color:var(--text3);max-width:48em;margin:14px auto 0}
+.nw{white-space:nowrap}
+.moment.flip{grid-template-columns:7fr 5fr}
+.crewrow{display:flex;gap:28px;align-items:center;max-width:820px;margin:40px auto 8px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px 26px}
+.crewrow .crew{margin:0;flex:0 0 auto}
+.crewrow h3{font-size:22px;margin-bottom:6px}
+.crewrow p{color:var(--text2);font-size:16px}
+@media (max-width:600px){.crewrow{flex-direction:column;align-items:flex-start;padding:20px}}
+.cards.two{grid-template-columns:repeat(2,1fr)}
+.card .ask{color:var(--text);font-style:italic;margin-bottom:10px}
+.looks.two{grid-template-columns:repeat(2,1fr)}
+.honest.center-note{text-align:center;max-width:44em;margin-left:auto;margin-right:auto}
+@media (max-width:900px){.cards.two,.looks.two,.moment.flip{grid-template-columns:1fr}}
+
 /* faq */
 .faq{max-width:760px;margin:30px auto 0}
 details{border-top:1px solid var(--line2);padding:0}
@@ -238,13 +254,14 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 
 SITE = "https://skycot.com"
 LAST_UPDATED = "22 October 2026"
-H1 = "The AI developer for people who don't code."
-LEDE = ("Text it what you want, in plain English. SKYCOT builds it on your Mac with the AI you already pay for, "
-        "shows you what changed, and nothing goes live until you say so.")
-TITLE = "SKYCOT · The AI developer for people who don't code"
-DESC = ("Text SKYCOT what you want, in plain English. It builds it on your Mac with the AI you already pay for "
-        "(Claude Code, Codex, Cursor, Gemini and others), shows you what changed, and nothing goes live until you say so.")
-OG_ALT = "SKYCOT. The AI developer for people who don't code. SKYCOT for Mac, early access, skycot.com."
+H1 = "The family-friendly AI developer."
+LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
+        "Plain English, on your own Mac, with the AI you already pay for.")
+LEDE2 = "Grown-ups use it for their business too: no code, no jargon, nothing live until you say so."
+TITLE = "SKYCOT · The family-friendly AI developer"
+DESC = ("Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI "
+        "developer for families and small businesses, on your own Mac, with the AI you already pay for.")
+OG_ALT = "SKYCOT. The family-friendly AI developer. Kids dream it up, SKYCOT builds it. SKYCOT for Mac, early access, skycot.com."
 
 # Identity metadata for search engines. Never add an address here (standing rule: no street, postal
 # or registered address anywhere on skycot.com).
@@ -304,12 +321,12 @@ def nav():
     return f'''<header class="nav"><div class="wrap">
   <a class="brand" href="/" aria-label="SKYCOT home">{MARK}<span>SKYCOT</span></a>
   <ul>
+    <li><a href="/#family">Family</a></li>
+    <li><a href="/#ideas">What kids make</a></li>
     <li><a href="/#how">How it works</a></li>
-    <li><a href="/#looks">Looks</a></li>
-    <li><a href="/#works-with">Works with</a></li>
     <li><a href="/#safety">Safety</a></li>
+    <li><a href="/#looks">Looks</a></li>
     <li><a href="/#faq">FAQ</a></li>
-    <li><a href="/open-source">Open source</a></li>
   </ul>
   <a class="btn btn-primary btn-small cta" href="/#download">Get SKYCOT</a>
 </div></header>
@@ -319,10 +336,12 @@ FOOTER = '''<footer><div class="wrap">
   <div class="cols">
     <div class="brand" style="letter-spacing:.14em">SKYCOT</div>
     <ul>
-      <li><a href="/#how">How it works</a></li>
-      <li><a href="/#looks">Looks</a></li>
       <li><a href="/#family">Family</a></li>
+      <li><a href="/#ideas">What kids make</a></li>
+      <li><a href="/#how">How it works</a></li>
       <li><a href="/#safety">Safety</a></li>
+      <li><a href="/#looks">Looks</a></li>
+      <li><a href="/#grown-ups">For business</a></li>
       <li><a href="/#faq">FAQ</a></li>
       <li><a href="/privacy">Privacy</a></li>
       <li><a href="/terms">Terms</a></li>
@@ -346,66 +365,129 @@ IC_STOP = ic('<rect x="4" y="4" width="16" height="16" rx="3"/>')
 IC_MAC = ic('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>')
 IC_WRENCH = ic('<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3l9.4-9.4z"/><path d="M14.7 6.3l3-3"/>')
 
-# One alt text that is true of both hero screenshots (light: What changed card; dark: a conversation).
-HERO_ALT = ("An early build of SKYCOT: a plain-English conversation with the assistant, its summary of what changed "
-            "with buttons to keep or undo it, and the Versions list on the right showing every point you can go back to.")
+IC_GAME = ic('<rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/>')
+IC_FLAG = ic('<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>')
+IC_QUIZ = ic('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17h.01"/>')
+IC_PAW = ic('<circle cx="7" cy="10" r="1.8"/><circle cx="11" cy="6.5" r="1.8"/><circle cx="15.5" cy="7.5" r="1.8"/><circle cx="18" cy="11.5" r="1.8"/><path d="M8.5 17.5c0-2.5 2-5 4.5-5s4 2 4 4-1.5 3-3.5 3-2.5-1-5 0z"/>')
+IC_KEY = ic('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>')
+
+# One alt text for the hero (light: Workshop light; dark: Workshop dark). Both show Settings, Family.
+HERO_ALT = ("An early build of SKYCOT in the Workshop look, showing Settings, Family: the Family profile is on and "
+            "set up for a sample child called Ava, the assistant always asks first, the parent code guards the "
+            "developer tools and turning the profile off, and the crew Sam and Mo sit in the sidebar.")
 
 def home_body():
     hero = f'''<section class="hero"><div class="wrap">
   <span class="eyebrow">SKYCOT for Mac · early access</span>
-  <h1>{html.escape(H1, quote=False)}</h1>
+  <h1>{html.escape(H1, quote=False).replace("family-friendly", '<span class="nw">family-friendly</span>')}</h1>
   <p class="lede">{html.escape(LEDE, quote=False)}</p>
+  <p class="lede2">{html.escape(LEDE2, quote=False)} <a href="#grown-ups">See how</a></p>
   <div class="actions">
     <a class="btn btn-primary" href="#download">Get SKYCOT for Mac</a>
-    <a class="btn btn-secondary" href="#how">See how it works</a>
+    <a class="btn btn-secondary" href="#family">See the Family profile</a>
   </div>
-  <p class="hero-note">Works with Claude Code, Codex, Cursor, Gemini and others. Your files stay on your Mac; only what each job needs goes to the AI you chose.</p>
+  <p class="hero-note">Works with Claude Code, Codex, Cursor, Gemini and others, signed in with a grown-up's own account. Your files stay on your Mac; only what each job needs goes to the AI you chose.</p>
   <div class="hero-tail">
-  <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/conversation-dark.jpg" width="1200" height="707"><img src="assets/what-changed.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
+  <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/family-settings-dark.jpg" width="1200" height="707"><img src="assets/family-settings.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
   </div>
-  <p class="caption">Early build, sample café website. Nothing live was touched.</p>
+  <p class="caption">Early build: Settings, Family, in the Workshop look, set up for a sample child called Ava.</p>
 </div></section>
 '''
     body = f'''
 <section class="promise"><div class="wrap">
   <div class="trio">
-    <div><h3>See it before it's live</h3><p>Every change is listed in your words: which pages, what look-and-feel, what was not touched. The code is one click away if you want it.</p></div>
-    <div><h3>Undo like Time Machine</h3><p>Each change is a version you can step back to. Restore puts every file back; your conversation stays.</p></div>
-    <div><h3>Your files stay on your Mac</h3><p>SKYCOT runs on your computer. Only what each job needs goes to the AI you chose, under your own account.</p></div>
+    <div><h3>Kids dream it up</h3><p>A game for a friend, the school-fair website, a quiz for a little brother. Said in plain English, like a message.</p></div>
+    <div><h3>Sam builds it, carefully</h3><p>The assistant shows a plan and asks before every change. Undo puts every file back, any time.</p></div>
+    <div><h3>A grown-up holds the keys</h3><p>Nothing goes online without the parent code. It runs on your Mac, with your own AI account, with you nearby.</p></div>
   </div>
 </div></section>
 
-<section id="moments"><div class="wrap">
-  <div class="center"><p class="kicker">What it feels like</p><h2 class="title">Like texting a very careful colleague.</h2>
-  <p class="sub">No commands. No Terminal. You talk in a Messages-style conversation, and the important moments arrive as plain cards you can say yes or no to.</p></div>
+<section id="family"><div class="wrap">
+  <div class="center"><p class="kicker">Made for families</p><h2 class="title">A safe first workshop for young builders.</h2>
+  <p class="sub">Turn on the Family profile and SKYCOT becomes a place where a child can build real things with a grown-up's hand on the brakes. It runs on your Mac, signed in to your own AI account, and your child uses it with you nearby.</p></div>
 
-  <div class="moment">
-    <div class="text"><h3>Say it like you'd say it to staff.</h3>
-      <p>Open a project folder, type what you want, and press Return. "Add a Christmas menu page" beats describing how to build one.</p>
-      <ul><li>You choose how much it does on its own: <b>Ask me first</b> is the default.</li><li>The rules that always ask are printed right under the box, every time.</li><li>Lots of jobs at once, each in its own conversation.</li></ul></div>
-    <div class="shot"><img src="assets/home.jpg" width="1200" height="707" alt="SKYCOT home: a Good evening greeting, a list of conversations, and a message box with the Autonomy control set to Ask me first and the hard rules printed underneath."></div>
-  </div>
-
-  <div class="moment flip">
-    <div class="text"><h3>It asks before it acts.</h3>
-      <p>When the assistant wants to run something, you get a card like a macOS permission prompt: what it wants, why it matters, where it reaches, and what happens if you say no. Nothing is pre-selected.</p>
-      <ul><li>Allow once, allow for this conversation, or always allow this kind of thing.</li><li>"Don't allow" tells the assistant to find another way.</li><li>A red Stop button halts everything, instantly.</li></ul></div>
-    <div class="shot"><img src="assets/approval.jpg" width="1200" height="707" alt="A May I run this? card explaining Why it matters, Where it reaches and If you say no, with Don't allow, Allow once and Always allow buttons."></div>
+  <div class="crewrow">
+    <img class="crew" src="assets/crew.jpg" width="204" height="92" alt="Sam, who builds things, and Mo, who checks before anything risky: the crew characters from the Workshop look.">
+    <div><span class="tag">Built and in testing for the first release</span>
+      <h3>Sam builds. Mo checks.</h3>
+      <p>The Workshop look comes on with the profile: cream paper, marker pens, sticky-note tips and a named crew. The app says "Sam needs your OK" instead of "the assistant". Your child can pick another look any time; a look never changes what SKYCOT does.</p></div>
   </div>
 
   <div class="moment">
-    <div class="text"><h3>Undo all of it. Really.</h3>
-      <p>SKYCOT works in a private copy of your project, so Undo is always possible. Before it undoes, it tells you exactly what comes back and what it will not touch.</p>
-      <ul><li>Every change becomes a version in a Time Machine-style list.</li><li>Restore puts every file back to that point; the conversation stays.</li><li>It never reaches into anything already sent for review or put live.</li></ul></div>
-    <div class="shot"><img src="assets/undo.jpg" width="1200" height="707" alt="An Undo all of it? sheet listing what Restore does and does not do, with Cancel and Undo all of it buttons, over the Versions list."></div>
+    <div class="text"><h3>Set up in a minute, by a grown-up.</h3>
+      <p>The first thing SKYCOT asks is who it's for. Choose "A child I look after", add a first name if you like, and pick a parent code of 4 to 6 digits. The set-up screen says plainly what the profile does, and what it doesn't.</p>
+      <ul><li>Or turn it on later in Settings → Family.</li><li>The greeting uses your child's name: "Good evening, Ava."</li><li>Text comes up a little larger, for easier reading.</li></ul></div>
+    <div class="shot"><img src="assets/family-setup.jpg" width="1200" height="707" alt="The Set up the Family profile sheet over the Workshop look: an optional first name, a parent code typed twice, and two lists, What this does and What it does not do."></div>
   </div>
 
   <div class="moment flip">
-    <div class="text"><h3>Publishing is one plain question at a time.</h3>
-      <p>Nothing leaves your Mac until you press a button. A quick safety check, then one question: upload a draft, send for review, or put it live. The live option is the one that warns you.</p>
-      <ul><li>SKYCOT never uploads straight to the live version by default.</li><li>"What will happen" and "What won't" are spelled out before you confirm.</li><li>The developer words are there in small print, if you ever need them.</li></ul></div>
-    <div class="shot"><img src="assets/publish.jpg" width="1200" height="707" alt="The Publish sheet: Quick safety check, How would you like to publish, Upload a draft line with What will happen and What won't, then Not yet and Upload a draft line buttons."></div>
+    <div class="text"><h3>The assistant always asks first.</h3>
+      <p>In a Family profile, Ask me first is the only mode. The assistant shows a plan and asks before every command and every file change. The riskier modes aren't offered, and the developer tools are hidden from the sidebar.</p>
+      <ul><li>Some things ask in every mode: deleting, putting anything live, spending money.</li><li>A red Stop button halts everything, instantly.</li><li>Undo puts every file back to any earlier version.</li></ul></div>
+    <div class="shot"><img src="assets/family-always-asks.jpg" width="1200" height="707" alt="Settings, Autonomy and safety, in the Workshop look: Ask me first is fixed by the Family profile, followed by the list of what SKYCOT always asks about, such as deleting files, putting anything live and spending money."></div>
   </div>
+
+  <div class="moment">
+    <div class="text"><h3>Nothing goes online without your code.</h3>
+      <p>Sending work for review or putting it live gains a Parent code step before Confirm. The same code guards new automations, the developer tools and turning the profile off. Five wrong tries locks every code prompt for five minutes.</p>
+      <ul><li>Building, drafts and Undo work as normal.</li><li>You see what will happen, and what won't, before you confirm.</li><li>Change the code any time in Settings → Family.</li></ul></div>
+    <div class="shot"><img src="assets/family-parent-code.jpg" width="1200" height="707" alt="The Publish sheet for a sample café website in the Workshop look, with a Parent code step: Sending for review needs a parent's OK while the Family profile is on."></div>
+  </div>
+
+  <p class="honest"><b>An honest note.</b> The Family profile is a set of guardrails inside SKYCOT, not a security or parental-control product. It doesn't filter the web, decide what the AI may talk about, lock the Mac or replace Screen Time, and a determined teenager could get round it. SKYCOT runs on the parent's own Mac and AI account, under the parent's supervision, and each AI service's own age rules still apply (see <a href="#faq">the questions below</a>). It makes the first experience safe and kind. The rest is parenting.</p>
+</div></section>
+
+<section id="ideas" class="alt"><div class="wrap">
+  <div class="center"><p class="kicker">What kids make</p><h2 class="title">If they can say it, they can build it.</h2>
+  <p class="sub">Real projects, made by talking. Here are a few a child might start with, and what they end up with.</p></div>
+  <div class="cards two">
+    <div class="card"><div class="ic">{IC_GAME}</div><h3>A game for a friend</h3><p class="ask">"Make a game where you catch falling stars, and it gets faster."</p><p><b>What you get:</b> a little game that plays in the browser on your Mac, with a high score to beat.</p></div>
+    <div class="card"><div class="ic">{IC_FLAG}</div><h3>The school-fair website</h3><p class="ask">"A page with all the stalls, the times, and a map of the oval."</p><p><b>What you get:</b> a real website, ready on your Mac. It goes online only when a grown-up types the code.</p></div>
+    <div class="card"><div class="ic">{IC_QUIZ}</div><h3>A quiz for a little brother</h3><p class="ask">"A times-tables quiz that cheers when you get one right."</p><p><b>What you get:</b> a quiz that gets harder as he goes, and changes whenever you ask.</p></div>
+    <div class="card"><div class="ic">{IC_PAW}</div><h3>A page for the family dog</h3><p class="ask">"A page about Biscuit, with his tricks and a countdown to his birthday."</p><p><b>What you get:</b> a page the whole family can open, and Undo if a change goes wrong.</p></div>
+  </div>
+  <p class="fine center" style="margin:28px auto 0">Examples of what a child might ask for. What the assistant builds depends on the AI service you use, and a grown-up checks it before anything is shared.</p>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <div class="center"><p class="kicker">How it works</p><h2 class="title">Three steps. No new vocabulary.</h2></div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>A grown-up sets it up</h3><p>Install SKYCOT on your Mac, sign in to the AI you already pay for, and turn on the Family profile with a parent code. Your child doesn't need an account of their own.</p></div>
+    <div class="step"><div class="n">2</div><h3>Dream it up, in plain English</h3><p>Your child types what they want to make, like a message. Sam shows a plan and asks before every change. Sit alongside and build it together.</p></div>
+    <div class="step"><div class="n">3</div><h3>Keep it, undo it, or share it</h3><p>Read what changed, keep it, or undo all of it. When it's ready for the world, a grown-up types the code to put it online.</p></div>
+  </div>
+</div></section>
+
+<section id="works-with" class="alt"><div class="wrap center">
+  <p class="kicker">Bring your own AI</p>
+  <h2 class="title">Works with the AI you already pay for.</h2>
+  <p class="sub">SKYCOT doesn't resell AI or sit between you and your account. A grown-up signs in through each assistant's own sign-in, so SKYCOT never sees the password. Use whichever is best for the job, and switch any time.</p>
+  <div class="logos">
+    <div class="logo"><b>Claude Code</b><span>Anthropic</span></div>
+    <div class="logo"><b>Codex</b><span>OpenAI</span></div>
+    <div class="logo"><b>Cursor</b><span>Anysphere</span></div>
+    <div class="logo"><b>Gemini</b><span>Google · Antigravity</span></div>
+    <div class="logo"><b>And more</b><span>as they're added</span></div>
+  </div>
+  <p class="fine" style="margin-left:auto;margin-right:auto"><b>Each AI service sets its own age rules.</b> Some, including Anthropic's Claude and Cursor, are for adults only; others allow teenagers with a parent's permission. SKYCOT runs on the parent's account under the parent's supervision, and doesn't change those rules, so check your service's terms before a child uses SKYCOT with it. Product names belong to their owners. SKYCOT is independent and not affiliated with or endorsed by Anthropic, OpenAI, Anysphere or Google.</p>
+</div></section>
+
+<section id="safety"><div class="wrap">
+  <div class="center"><p class="kicker">Safety</p><h2 class="title">Careful by default. Kinder with a Family profile.</h2>
+  <p class="sub">The serious incidents with AI coding tools share one shape: a tool running on its own, a destructive command, and no backup. SKYCOT is built so that shape can't happen by default, and the Family profile locks the settings a child could stumble into.</p></div>
+  <div class="cards">
+    <div class="card"><div class="ic">{IC_HAND}</div><h3>Ask me first</h3><p>The default for everyone, and the only mode in a Family profile. The assistant shows a plan and checks before every change.</p></div>
+    <div class="card"><div class="ic">{IC_KEY}</div><h3>A parent code</h3><p>In a Family profile, putting work online, new automations, the developer tools and turning the profile off all need a code only the grown-up knows.</p></div>
+    <div class="card"><div class="ic">{IC_SHIELD}</div><h3>Hard rules</h3><p>Some things always ask, in every mode, and can't be switched off. They're printed under the message box so nobody has to remember them.</p></div>
+    <div class="card"><div class="ic">{IC_UNDO}</div><h3>Undo, always</h3><p>Work happens in a private copy of the project. Every change is a version. Restore is one click, and it says what it does and doesn't touch.</p></div>
+    <div class="card"><div class="ic">{IC_STOP}</div><h3>One big Stop</h3><p>A red Stop button in the header halts everything the moment it's pressed. Nothing is pre-selected, nothing auto-confirms.</p></div>
+    <div class="card"><div class="ic">{IC_MAC}</div><h3>Your files stay put</h3><p>SKYCOT runs on your Mac, with no analytics switched on. Only what each job needs goes to the assistant you chose, under that company's terms, and it works only in the project folder you open.</p></div>
+  </div>
+  <div class="rules">
+    <div><h3>Always asks, in every mode</h3><p>These are the hard rules. No setting turns them off.</p></div>
+    <ul><li>Deleting anything</li><li>Putting anything live</li><li>Spending money</li><li>Signing up to a service</li><li>Touching bookings or orders</li><li>Touching customer details</li></ul>
+  </div>
+  <p class="honest center-note">Guardrails inside SKYCOT, not web filtering and not Screen Time. A grown-up stays in charge.</p>
 </div></section>
 
 <section id="looks" class="alt"><div class="wrap">
@@ -414,12 +496,12 @@ def home_body():
   <div class="looks">
     <div class="look look-hero">
       <div class="pic"><img src="assets/look-workshop.jpg" width="1200" height="707" alt="SKYCOT in the Workshop theme: cream paper, hand-drawn borders, a yellow sticky-note tip, and a crew list in the sidebar showing Sam, who builds things, and Mo, who checks before anything risky."></div>
-      <div class="t"><span class="tag">The one for the kid in you</span><h3>Workshop</h3>
+      <div class="t"><span class="tag">On by default in a Family profile</span><h3>Workshop</h3>
         <p>Playful and hand-drawn: cream paper, marker pens, sticky-note tips, and a named crew. Sam builds things. Mo checks before anything risky. The app says "Sam needs your OK" instead of "the assistant".</p>
         <blockquote class="quote">"It makes me feel like a kid."<cite>Mark Hallam, founder, the first time he saw it</cite></blockquote></div>
     </div>
     <div class="look"><div class="pic"><img src="assets/look-classic.jpg" width="1200" height="707" alt="SKYCOT in the Classic theme: white panels, grey sidebar and one blue accent, in the style of Apple Messages."></div>
-      <div class="t"><h3>Classic</h3><p>The Apple Messages look. Calm, clean and familiar. The default.</p></div></div>
+      <div class="t"><h3>Classic</h3><p>The Apple Messages look. Calm, clean and familiar. The default for grown-ups.</p></div></div>
     <div class="look"><div class="pic"><img src="assets/look-paper.jpg" width="1200" height="707" alt="SKYCOT in the Paper theme: warm off-white background, serif headings and a single vermilion accent."></div>
       <div class="t"><h3>Paper</h3><p>Warm paper and ink. Serif headings, one vermilion accent, quiet everywhere else.</p></div></div>
     <div class="look"><div class="pic"><img src="assets/look-night-ops.jpg" width="1200" height="707" alt="SKYCOT in the Night Ops theme: dark navy panels with cyan highlights, like a mission-control console."></div>
@@ -428,102 +510,61 @@ def home_body():
 
   <div class="moment flip" style="padding-bottom:0">
     <div class="text"><h3>Themes are files. Yours to share.</h3>
-      <p>Every theme is a small, plain data file. Import one a friend sent you, export yours, share it, or duplicate the one you are using and change the colours, the flavour and your crew's names.</p>
-      <ul><li>Import, export and share from Settings → Appearance.</li><li>Duplicate and edit: pick the colours that matter most, a flavour (hand-drawn, serif, glass), and who is on your crew.</li><li>Every theme has a light and a dark side, and can follow your Mac's setting.</li><li>Made something good? Community themes are welcome. See <a href="/open-source#themes">how to contribute one</a>.</li></ul></div>
+      <p>Every theme is a small, plain data file. Import one a friend sent you, export yours, or duplicate the one you're using and change the colours, the flavour and your crew's names.</p>
+      <ul><li>Import, export and share from Settings → Appearance.</li><li>Duplicate and edit: the colours that matter most, a flavour (hand-drawn, serif, glass), and who's on your crew.</li><li>Every theme has a light and a dark side, and can follow your Mac's setting.</li><li>Made something good? Community themes are welcome. See <a href="/open-source#themes">how to contribute one</a>.</li></ul></div>
     <div class="shot"><img src="assets/themes-settings.jpg" width="1200" height="707" alt="Settings → Appearance in the Workshop theme: four theme cards (Classic, Workshop, Paper, Night Ops), buttons to Import a theme, Export this theme, Share, and Duplicate and edit, and a Light or Dark switch."></div>
   </div>
 </div></section>
 
-<section id="family"><div class="wrap">
-  <div class="center"><p class="kicker">Family</p><h2 class="title">Set up SKYCOT for a child.</h2>
-  <p class="sub">A Family profile turns SKYCOT into a safe first workshop: a place to build the website for the school fair or a little game for a friend, with a grown-up's hand on the brakes.</p></div>
-  <div class="family">
-    <div class="lead"><span class="tag">Coming in the first release</span>
-      <p>The Family profile is designed and is in the next build. It is not in the early-access version you can try today, and we will mark it done here when it ships rather than before. Here is what it does, as designed.</p>
-      <img class="crew" src="assets/crew.jpg" width="204" height="92" alt="Sam, who builds things, and Mo, who checks before anything risky: the crew characters from the Workshop theme."></div>
-    <div>
-      <div class="guard">
-        <div><h3>The Workshop look, on by default</h3><p>Sam and Mo, sticky notes and marker pens. A child gets the friendliest face of the app from the first minute.</p></div>
-        <div><h3>The assistant always asks first</h3><p>Ask me first is the only mode on offer. The assistant shows a plan and checks before every change, every time.</p></div>
-        <div><h3>The riskier modes and developer tools are hidden</h3><p>"Just do it" and "Fully hands-off" are not shown, and the Advanced mode switch is gone from the sidebar. Nothing to fall into by accident.</p></div>
-        <div><h3>Publishing needs a parent code</h3><p>Nothing leaves the Mac without a code only you know. Drafts and undo work as normal; the internet is a question for a grown-up.</p></div>
-      </div>
-      <p class="honest"><b>An honest note.</b> These are guardrails inside SKYCOT, on your child's own computer. They are not a security product: they do not filter the web, lock the Mac, or replace Screen Time, and they only apply inside SKYCOT. They make the first experience safe and kind. The rest is parenting.</p>
-    </div>
+<section id="grown-ups"><div class="wrap">
+  <div class="center"><p class="kicker">For grown-ups and small businesses too</p><h2 class="title">The same careful developer, for your business.</h2>
+  <p class="sub">{html.escape(LEDE2, quote=False)} Text it what you want, like "Add a Christmas menu page", and SKYCOT builds it on your Mac, shows you what changed, and waits for your yes.</p></div>
+  <div class="looks two">
+    <div class="look"><div class="pic"><img src="assets/approval.jpg" width="1200" height="707" alt="A May I run this? card explaining Why it matters, Where it reaches and If you say no, with Don't allow, Allow once and Always allow buttons."></div>
+      <div class="t"><h3>It asks before it acts.</h3><p>A card like a macOS permission prompt: what it wants, why it matters, and what happens if you say no. Nothing is pre-selected.</p></div></div>
+    <div class="look"><div class="pic"><img src="assets/what-changed.jpg" width="1200" height="707" alt="A What changed card listing the changes in plain words, with buttons to keep or undo them, and the Versions list on the right."></div>
+      <div class="t"><h3>See what changed, in your words.</h3><p>Which pages, what look-and-feel, what wasn't touched. The code is one click away if you ever want it.</p></div></div>
+    <div class="look"><div class="pic"><img src="assets/undo.jpg" width="1200" height="707" alt="An Undo all of it? sheet listing what Restore does and does not do, with Cancel and Undo all of it buttons, over the Versions list."></div>
+      <div class="t"><h3>Undo all of it. Really.</h3><p>Every change is a version in a Time Machine-style list. Restore puts every file back; the conversation stays.</p></div></div>
+    <div class="look"><div class="pic"><img src="assets/publish.jpg" width="1200" height="707" alt="The Publish sheet: Quick safety check, How would you like to publish, Upload a draft line with What will happen and What won't, then Not yet and Upload a draft line buttons."></div>
+      <div class="t"><h3>Publishing is one plain question at a time.</h3><p>Upload a draft, send for review, or put it live. The live option is the one that warns you.</p></div></div>
   </div>
+  <p class="fine center" style="margin:28px auto 0"><b>Already a developer, or have one?</b> Advanced mode is one switch away, at the bottom of the sidebar. It shows the full developer interface SKYCOT is built on (T3 Code's), in the same window, with nothing removed. In a Family profile it's hidden and needs the parent code.</p>
 </div></section>
 
-<section id="how" class="alt"><div class="wrap">
-  <div class="center"><p class="kicker">How it works</p><h2 class="title">Three steps. No new vocabulary.</h2></div>
-  <div class="steps">
-    <div class="step"><div class="n">1</div><h3>Open a folder</h3><p>Point SKYCOT at the folder that holds your website, app or documents. It becomes a project. Sign in to the assistant you already use.</p></div>
-    <div class="step"><div class="n">2</div><h3>Say what you want changed</h3><p>Plain English, like a message. The assistant shows a plan, asks before anything risky, and gets on with it while you do something else.</p></div>
-    <div class="step"><div class="n">3</div><h3>Keep, undo, or publish</h3><p>Read what changed. Keep it, undo all of it, or ask for a tweak. When you're happy, publish through one plain question at a time.</p></div>
-  </div>
-  <p class="fine center" style="margin:28px auto 0"><b>Already a developer, or have one?</b> Advanced mode is one switch away, at the bottom of the sidebar. It shows the full developer interface SKYCOT is built on (T3 Code's), in the same window, with nothing removed. Flip it back and the plain-language view returns.</p>
-</div></section>
-
-<section id="works-with"><div class="wrap center">
-  <p class="kicker">Bring your own AI</p>
-  <h2 class="title">Works with the AI you already pay for.</h2>
-  <p class="sub">SKYCOT does not resell AI or sit between you and your account. You sign in through each assistant's own sign-in, so SKYCOT never sees your password. Use whichever is best for the job, and switch any time.</p>
-  <div class="logos">
-    <div class="logo"><b>Claude Code</b><span>Anthropic</span></div>
-    <div class="logo"><b>Codex</b><span>OpenAI</span></div>
-    <div class="logo"><b>Cursor</b><span>Anysphere</span></div>
-    <div class="logo"><b>Gemini</b><span>Google · Antigravity</span></div>
-    <div class="logo"><b>And more</b><span>as they're added</span></div>
-  </div>
-  <p class="fine" style="margin-left:auto;margin-right:auto">Product names belong to their owners. SKYCOT is independent and not affiliated with or endorsed by Anthropic, OpenAI, Anysphere or Google. You need your own subscription or account with at least one assistant.</p>
-</div></section>
-
-<section id="safety" class="alt"><div class="wrap">
-  <div class="center"><p class="kicker">You stay in charge</p><h2 class="title">Careful by default. Not as an option.</h2>
-  <p class="sub">The serious incidents with AI coding tools all share one shape: a tool running on its own, a destructive command, and no backup. SKYCOT is built so that shape cannot happen by default.</p></div>
-  <div class="cards">
-    <div class="card"><div class="ic">{IC_HAND}</div><h3>Ask me first</h3><p>The default. The assistant shows a plan and checks before every change. "Just do it, carefully" and "Fully hands-off" exist, labelled honestly, and hands-off is time-boxed.</p></div>
-    <div class="card"><div class="ic">{IC_SHIELD}</div><h3>Hard rules</h3><p>Some things always ask, in every mode, and cannot be switched off. They are printed under the message box so you never have to remember them.</p></div>
-    <div class="card"><div class="ic">{IC_UNDO}</div><h3>Undo, always</h3><p>Work happens in a private copy of your project. Every change is a version. Restore is one click, and it tells you what it does and does not touch.</p></div>
-    <div class="card"><div class="ic">{IC_STOP}</div><h3>One big Stop</h3><p>A red Stop button in the header halts everything the moment you press it. Nothing is pre-selected, nothing auto-confirms.</p></div>
-    <div class="card"><div class="ic">{IC_MAC}</div><h3>Your files stay put</h3><p>SKYCOT runs on your Mac. No analytics are switched on. Only what each job needs goes to the assistant you chose, under that company's terms, and it works only in the project folder you open.</p></div>
-    <div class="card"><div class="ic">{IC_WRENCH}</div><h3>Advanced mode when you want it</h3><p>The full developer interface SKYCOT is built on (T3 Code's) is one switch away, in the same window, for you or the developer who helps you. Nothing is removed. Flip it back any time.</p></div>
-  </div>
-  <div class="rules">
-    <div><h3>Always asks, in every mode</h3><p>These are the hard rules. No setting turns them off.</p></div>
-    <ul><li>Deleting anything</li><li>Putting anything live</li><li>Spending money</li><li>Signing up to a service</li><li>Touching bookings or orders</li><li>Touching customer details</li></ul>
-  </div>
-</div></section>
-
-<section id="download"><div class="wrap">
+<section id="download" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">Get SKYCOT</p><h2 class="title">SKYCOT for Mac.</h2>
-  <p class="sub">Free during early access. You bring your own AI account. A signed, notarised Mac download is being prepared; leave your email and you will be first to know.</p></div>
+  <p class="sub">Free during early access. A grown-up brings their own AI account. A signed, notarised Mac download is being prepared; leave your email and you'll be first to know.</p></div>
   <div class="dl">
     <h3>Be first to try it.</h3>
-    <p>Apple silicon Macs recommended. You will need an account with at least one supported assistant.</p>
+    <p>Apple silicon Macs recommended. You'll need an account with at least one supported assistant.</p>
     <div class="actions">
       <span class="btn btn-primary" aria-disabled="true" title="A signed, notarised Mac download is being prepared">Download for Mac · coming soon</span>
       <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20early%20access">Notify me</a>
     </div>
-    <p class="hero-note">Or join the conversation on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking; we email you once when it is ready.</p>
+    <p class="hero-note">Or join the conversation on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking; we email you once when it's ready.</p>
     <div class="status">
-      <div class="done"><b>Built</b><p>Conversation, permission cards, What changed, Keep and Undo, Versions, Publish to a draft line, Settings, scheduled jobs. Exercised end to end on a real project with Codex.</p></div>
-      <div class="now"><b>Testing now</b><p>The signed Mac installer, one-click Claude sign-in, and "send for review" and "put it live" with a connected GitHub account.</p></div>
-      <div class="next"><b>Next</b><p>First invites, a proper app icon, and a Windows build. We would rather tell you where things stand than oversell it.</p></div>
+      <div class="done"><b>Built</b><p>Conversation, permission cards, What changed, Keep and Undo, Versions, Publish to a draft line, Settings, themes, scheduled jobs. Exercised end to end on a real project with Codex.</p></div>
+      <div class="now"><b>Testing now</b><p>The Family profile and parent code, the signed Mac installer, one-click Claude sign-in, and "send for review" and "put it live" with a connected GitHub account.</p></div>
+      <div class="next"><b>Next</b><p>First invites, a proper app icon, and a Windows build. We'd rather tell you where things stand than oversell it.</p></div>
     </div>
   </div>
 </div></section>
 
-<section id="faq" class="alt"><div class="wrap">
+<section id="faq"><div class="wrap">
   <div class="center"><p class="kicker">Questions</p><h2 class="title">Frequently asked.</h2></div>
   <div class="faq">
+    <details><summary>Is it safe for kids?</summary><p>It's designed to be a safe first workshop for a child using it with a grown-up nearby. With the <a href="#family">Family profile</a> on, the assistant shows a plan and asks before every change, the riskier modes and developer tools are hidden, Undo is always there, and nothing goes online without the parent code.</p><p>These are guardrails inside the app, not a security product, and the AI service's own safety settings and age rules still apply. Stay involved: build together, and look at what was made before it's shared.</p></details>
+    <details><summary>Does my child need an AI account?</summary><p>No. SKYCOT runs on a parent's own Mac and the parent's own AI account, and the parent sets it up and supervises. Your child doesn't sign up for anything, with us or with an AI service, and SKYCOT has no account of its own.</p><p>What your child types goes to the AI service you chose, under your account and that company's terms, so check its rules on age and on who may use your account.</p></details>
+    <details><summary>What can the parent code lock?</summary><p>Putting work online (both "send for review" and "put it live"), creating an automation, opening the developer tools (Advanced mode), running the welcome steps again, changing the code, and turning the Family profile off. Five wrong tries locks every code prompt for five minutes.</p><p>Everything else works as normal: building, drafts and Undo. The assistant still asks before every change.</p></details>
+    <details><summary>What does SKYCOT not do?</summary><p>It isn't a parental-control or security product. It doesn't filter the web, decide what the AI may talk about, lock the Mac, limit screen time or replace Screen Time, and it only works inside SKYCOT. The parent code is kept on your Mac, and a determined teenager could get round it.</p><p>SKYCOT also doesn't create AI accounts for anyone, sell AI time, or send anything to us: no analytics are switched on.</p></details>
+    <details><summary>Which AI does it use?</summary><p>The one you already pay for. A grown-up signs in to at least one supported assistant: Claude Code (Anthropic), Codex (OpenAI), Cursor, or Gemini via Antigravity (Google). SKYCOT runs on that plan; it doesn't sell AI time or stand between you and your account.</p><p>Each service sets its own age rules. As of October 2026, Anthropic's Claude and Cursor require every user to be 18 or over, and OpenAI's terms allow 13 to 17 year olds with a parent's permission; Google sets its own rules for Gemini and Antigravity. Check your service's current terms for your child's age before they use SKYCOT with it.</p></details>
     <details><summary>Do I need to know how to code?</summary><p>No. You describe what you want in plain English, read what changed in plain English, and decide. If you have a developer, they can flip on Advanced mode and see everything in their language, in the same window.</p></details>
-    <details><summary>Can I get at the developer tools?</summary><p>Yes. Advanced mode is a switch at the bottom of the sidebar. It opens the full developer interface SKYCOT is built on (T3 Code's) in the same window: every panel, terminal and setting, nothing removed. Flip it back and the plain-language view returns. In a Family profile the switch is hidden.</p></details>
     <details><summary>Can I change how it looks?</summary><p>Yes. SKYCOT ships with a <a href="#looks">library of themes</a> (Classic, Workshop, Paper and Night Ops), each with a light and a dark side. Themes are plain data files you can import, export and share, and you can duplicate one and edit the colours, the flavour and your crew's names. A theme changes how things look, never what they do.</p></details>
-    <details><summary>Is it suitable for children?</summary><p>A <a href="#family">Family profile</a> is designed and coming in the first release: the Workshop look, the assistant always asks first, the riskier modes and developer tools are hidden, and publishing needs a parent code. These are guardrails inside the app on your child's own computer, not a security product, and they are not in the early-access build you can try today.</p></details>
-    <details><summary>Which AI do I need?</summary><p>An account with at least one supported assistant: Claude Code (Anthropic), Codex (OpenAI), Cursor, or Gemini via Antigravity (Google). SKYCOT runs on your plan; it does not sell AI time or stand between you and your account.</p></details>
     <details><summary>What does SKYCOT cost?</summary><p>Free during early access. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
     <details><summary>Where do my files go?</summary><p>They stay on your Mac. When you send a message, the assistant you chose receives what it needs for that task, under that company's terms. SKYCOT has no analytics switched on and no account of its own to send things to.</p></details>
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
+    <details><summary>Can I get at the developer tools?</summary><p>Yes. Advanced mode is a switch at the bottom of the sidebar. It opens the full developer interface SKYCOT is built on (T3 Code's) in the same window: every panel, terminal and setting, nothing removed. Flip it back and the plain-language view returns. In a Family profile the switch is hidden and opening it needs the parent code.</p></details>
     <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
     <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
@@ -560,6 +601,7 @@ PRIVACY = f'''{nav()}
     <li>skycot.com uses no cookies, no analytics and no third-party scripts, fonts or images.</li>
     <li>We do not sell personal information or use it for advertising.</li>
     <li>If you email us or join our Discord, we hold what you send us, and Discord's own policy applies there.</li>
+    <li>A child can use SKYCOT on a parent's Mac and the parent's own AI account, under the parent's supervision. We do not knowingly collect children's information, and the Family profile sends nothing to us (section 8).</li>
   </ul>
 
   <h2>1. Who we are</h2>
@@ -600,8 +642,10 @@ PRIVACY = f'''{nav()}
   <h2>7. Your rights</h2>
   <p>You can ask us what we hold about you, ask us to correct or delete it, or complain about how we handled it, by emailing <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We will respond within 30 days. If you are not satisfied you can contact the Office of the Australian Information Commissioner (oaic.gov.au). If you are in the UK or the European Union, you have equivalent rights under the UK GDPR and the EU GDPR, including the right to lodge a complaint with your local supervisory authority.</p>
 
-  <h2>8. Children</h2>
-  <p>SKYCOT is a work tool and is not designed for children to use on their own. We do not knowingly collect information from children under 16. A Family profile, for a child using SKYCOT on a parent's Mac under the parent's supervision, is planned for the first release; because SKYCOT holds no account and sends nothing to us, this does not change what we collect, and this section will be revised before that profile ships. Each AI assistant sets its own minimum age, and some require users to be adults; those rules apply too.</p>
+  <h2>8. Children and the Family profile</h2>
+  <p>SKYCOT is designed so that a child uses it only on a parent's or guardian's own Mac, signed in to that adult's own AI account, with the Family profile turned on and the adult supervising. The adult installs SKYCOT, accepts our terms and the AI service's terms, and is responsible for the child's use. A child does not need, and should not create, an account with us or with an AI service to use SKYCOT; SKYCOT has no account of its own.</p>
+  <p>We do not knowingly collect personal information from children, and the Family profile does not change what we receive, which is nothing. The child's first name (if you give one) and a scrambled version of the parent code stay in SKYCOT's own storage on your Mac; they are never sent to us or to the AI service. skycot.com collects nothing from anyone, including children. If you believe a child has sent us personal information, for example by email, tell us and we will delete it.</p>
+  <p>What a child types into SKYCOT goes to the AI service the adult chose, under the adult's account and that company's privacy policy, exactly as with any other use. Each AI service sets its own minimum age and its own rules on who may use an account, and some require every user to be 18 or over. Those rules apply, and the adult is responsible for checking them before a child uses SKYCOT. The Family profile is a set of guardrails inside SKYCOT, not a parental-control product: it does not filter the web or decide what the AI may say.</p>
 
   <h2>9. Changes</h2>
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
@@ -619,7 +663,8 @@ TERMS = f'''{nav()}
   <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It has no account of its own: you do not sign up with us to use it. It is in early access: features may change, be incomplete, contain mistakes, lose work or stop working between versions, so do not rely on SKYCOT as the only copy of anything important. <em>Summary: it is new, and we say so.</em></p>
 
   <h2>2. Who can use SKYCOT</h2>
-  <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer and under that adult's supervision; the adult accepts these terms for the child and is responsible for that use. Each AI assistant also sets its own minimum age, which you must meet. <em>Summary: adults sign up for it; children use it with a grown-up.</em></p>
+  <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer, signed in to that adult's own AI account, and under that adult's supervision; we recommend turning on the Family profile first. The adult accepts these terms for the child and is responsible for that use, including what the child asks the assistant to do and anything put online. A child does not need, and should not create, an account with us or with an AI service in order to use SKYCOT.</p>
+  <p>Each AI service sets its own minimum age and its own rules on who may use an account, and you must follow them; some require every user to be 18 or over. The Family profile is a set of guardrails inside SKYCOT, not a parental-control or security product: it does not filter the web, limit screen time, or control what the AI service may say, and it can be got round. <em>Summary: a grown-up sets it up, signs in, and stays in charge; the AI service's own age rules still apply.</em></p>
 
   <h2>3. Your AI assistant is a separate agreement</h2>
   <p>SKYCOT does not provide AI services. You need your own account with at least one supported assistant (for example Claude Code by Anthropic, Codex by OpenAI, Cursor by Anysphere, or Gemini and Antigravity by Google). Your use of those services, their charges, limits and outputs are governed by your agreement with that company, not by us. They can change, stop working or change their prices without telling us, and we are not responsible for their availability, pricing or behaviour. <em>Summary: your AI plan is between you and them.</em></p>
@@ -718,13 +763,14 @@ body{{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica N
 .card{{box-sizing:border-box;width:1200px;height:630px;padding:76px 88px 64px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(180deg,#ffffff 0%,#f5f5f7 100%)}}
 .brand{{display:flex;align-items:center;gap:18px;font-weight:700;letter-spacing:.16em;font-size:30px}}
 .brand svg{{width:64px;height:64px}}
-h1{{margin:0;font-size:86px;line-height:1.02;letter-spacing:-.035em;font-weight:700;max-width:16ch}}
+h1{{margin:0;font-size:84px;line-height:1.02;letter-spacing:-.035em;font-weight:700;max-width:14ch}}
+.sub{{margin:18px 0 0;font-size:32px;line-height:1.3;color:#6e6e73;font-weight:500}}
 .foot{{display:flex;justify-content:space-between;align-items:center;font-size:26px;color:#6e6e73}}
 .foot b{{color:#0071e3;font-weight:600}}
 </style></head>
 <body><div class="card">
   <div class="brand">{MARK.replace('width="28" height="28"', 'width="64" height="64"').replace('var(--accent)', '#0071e3')}<span>SKYCOT</span></div>
-  <h1>{html.escape(H1, quote=False)}</h1>
+  <div><h1>{html.escape(H1, quote=False)}</h1><p class="sub">Kids dream it up. SKYCOT builds it.</p></div>
   <div class="foot"><b>SKYCOT for Mac · early access</b><span>skycot.com</span></div>
 </div></body></html>
 '''
