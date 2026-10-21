@@ -8,6 +8,8 @@
   height: 100%;
   min-height: 0;
   background: var(--fm-bg-window);
+  background-image: radial-gradient(var(--fm-paper-dot) 1px, transparent 1px);
+  background-size: 26px 26px;
   overflow: hidden;
   max-width: 100vw;
 }
@@ -126,6 +128,7 @@
 }
 .fm-list-column__title {
   margin: 0;
+  font-family: var(--fm-font-label);
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -141,6 +144,7 @@
 }
 .fm-list-column__group {
   padding: 10px 8px 4px;
+  font-family: var(--fm-font-label);
   font-size: 11px;
   font-weight: 700;
   color: var(--fm-label-3);
@@ -207,7 +211,7 @@
   background: var(--fm-orange);
 }
 .fm-convrow--selected .fm-convrow__dot--attention {
-  background: #fff;
+  background: var(--fm-on-accent);
 }
 .fm-convrow__body {
   min-width: 0;
@@ -246,7 +250,8 @@
 }
 .fm-convrow--selected .fm-convrow__time,
 .fm-convrow--selected .fm-convrow__preview {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--fm-on-accent);
+  opacity: 0.85;
 }
 
 /* Conversation header + status strip + stream + composer */
@@ -403,7 +408,7 @@
   border: 0;
   border-radius: 50%;
   background: var(--fm-accent);
-  color: #fff;
+  color: var(--fm-on-accent);
   flex: none;
 }
 .fm-composer__send:disabled {
@@ -455,6 +460,7 @@
 }
 .fm-home__greeting {
   margin: 0;
+  font-family: var(--fm-font-label);
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -508,18 +514,19 @@
   height: 64px;
   margin: 0 auto 14px;
   border-radius: 16px;
-  background: linear-gradient(180deg, #5ab0ff, #0a84ff);
-  color: #fff;
+  background: var(--fm-glyph-blue);
+  color: var(--fm-on-status);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 .fm-standalone__icon--muted {
-  background: linear-gradient(180deg, #a9a9ae, #8a8a8f);
+  background: var(--fm-glyph-grey);
 }
 .fm-standalone__icon--danger {
-  background: linear-gradient(180deg, #ff6b63, #ff3b30);
+  background: var(--fm-glyph-red);
 }
 .fm-standalone__title {
   margin: 0;
+  font-family: var(--fm-font-label);
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;

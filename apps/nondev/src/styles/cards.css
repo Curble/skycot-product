@@ -53,13 +53,10 @@
   font-size: 12.5px;
   padding: 1px 5px;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.06);
-}
-html.dark .fm-md code {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--fm-code-bg);
 }
 .fm-msg--me .fm-md code {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--fm-code-bg-me);
 }
 .fm-md pre {
   margin: 0;
@@ -130,6 +127,7 @@ html.dark .fm-md code {
 .fm-md--plan h3,
 .fm-md--plan h4 {
   color: var(--fm-label-2);
+  font-family: var(--fm-font-label);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -300,6 +298,7 @@ html.dark .fm-md code {
 .fm-question__header {
   display: block;
   padding: 0;
+  font-family: var(--fm-font-label);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;

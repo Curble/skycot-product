@@ -1,0 +1,685 @@
+/* Flavours: the parts of a theme that are not a colour or a length. themes/apply.ts
+   sets data-flavour-* on <html> from the theme file; everything in here keys off
+   those attributes and reads colours from the tokens, so a theme author never
+   writes CSS. Regions marked data-sober (approvals, destructive confirmations)
+   opt out of the playful rules: risk moments stay plain in every theme.
+   No continuously repainting animation anywhere in this file. */
+
+/* ---------------------------------------------------------------------------
+   borders: sketch — wobbly hand-drawn outlines and hard offset shadows
+   --------------------------------------------------------------------------- */
+html[data-flavour-borders="sketch"] {
+  --fm-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --fm-sketch-sm: 120px 8px 110px 8px / 8px 110px 8px 120px;
+  --fm-sketch-xs: 40px 6px 36px 6px / 6px 36px 6px 40px;
+}
+html[data-flavour-borders="sketch"] .fm-card:not([data-sober] *) {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch);
+  box-shadow: var(--fm-shadow-card);
+}
+html[data-flavour-borders="sketch"] .fm-card--tinted:not([data-sober] *) {
+  border-style: dashed;
+  border-color: var(--fm-sep);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-card__header {
+  padding: 14px 18px 8px;
+}
+html[data-flavour-borders="sketch"] .fm-card__body {
+  padding: 4px 18px 14px;
+}
+html[data-flavour-borders="sketch"] .fm-card__footer {
+  padding: 10px 18px 14px;
+  border-top: 1.5px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-card__icon {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-xs);
+}
+html[data-flavour-borders="sketch"] .fm-btn:not([data-sober] *) {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-sm);
+  box-shadow: var(--fm-shadow-button);
+  font-weight: 700;
+}
+html[data-flavour-borders="sketch"] .fm-btn--primary:not([data-sober] *) {
+  border-color: var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-btn--plain:not([data-sober] *),
+html[data-flavour-borders="sketch"] .fm-btn--icon:not([data-sober] *) {
+  border-color: transparent;
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-btn--quiet:not([data-sober] *) {
+  border-style: dashed;
+  border-color: var(--fm-sep);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-btn:not(:disabled):active:not([data-sober] *) {
+  filter: none;
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-pill {
+  border: 2px solid var(--fm-ink);
+  background: var(--fm-bg-card);
+  font-weight: 700;
+}
+html[data-flavour-borders="sketch"] .fm-chip {
+  border: 2px solid var(--fm-ink);
+  box-shadow: var(--fm-shadow-button);
+  font-weight: 700;
+}
+html[data-flavour-borders="sketch"] .fm-avatar {
+  border: 2px solid var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-step {
+  border: 2px solid var(--fm-ink);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-step--todo {
+  border-style: dashed;
+  border-color: var(--fm-label-3);
+}
+html[data-flavour-borders="sketch"] .fm-field,
+html[data-flavour-borders="sketch"] .fm-composer__input,
+html[data-flavour-borders="sketch"] .fm-question__custom,
+html[data-flavour-borders="sketch"] .fm-inline-reply__field,
+html[data-flavour-borders="sketch"] .fm-search,
+html[data-flavour-borders="sketch"] .fm-select,
+html[data-flavour-borders="sketch"] .fm-textarea {
+  border: 2px dashed var(--fm-sep);
+  background: var(--fm-bg-content);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-field:focus,
+html[data-flavour-borders="sketch"] .fm-composer__input:focus-within,
+html[data-flavour-borders="sketch"] .fm-question__custom:focus,
+html[data-flavour-borders="sketch"] .fm-inline-reply__field:focus {
+  border-style: solid;
+  border-color: var(--fm-ink);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-composer__send,
+html[data-flavour-borders="sketch"] .fm-inline-reply__send {
+  border: 2px solid var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-titlebar,
+html[data-flavour-borders="sketch"] .fm-conv-header,
+html[data-flavour-borders="sketch"] .fm-toolbar {
+  border-bottom: 2.5px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-sidebar,
+html[data-flavour-borders="sketch"] .fm-list-column,
+html[data-flavour-borders="sketch"] .fm-settings__nav {
+  border-right: 2.5px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-inspector,
+html[data-flavour-borders="sketch"] .fm-versions-strip {
+  border-left: 2.5px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-strip,
+html[data-flavour-borders="sketch"] .fm-composer {
+  border-color: var(--fm-sep);
+  border-style: dashed;
+  border-width: 1.5px;
+}
+html[data-flavour-borders="sketch"] .fm-sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-flavour-borders="sketch"] .fm-bubble {
+  border: 2px solid var(--fm-ink);
+  border-radius: 18px 18px 18px 4px;
+}
+html[data-flavour-borders="sketch"] .fm-msg--me .fm-bubble {
+  border-radius: 18px 18px 4px 18px;
+}
+html[data-flavour-borders="sketch"] .fm-bubble--muted {
+  border: 0;
+}
+html[data-flavour-borders="sketch"] .fm-typing {
+  border: 2px solid var(--fm-ink);
+}
+/* Selected rows are a card with an outline, not a filled bar (the mockup's `.proj.on`). */
+html[data-flavour-borders="sketch"] .fm-convrow--selected,
+html[data-flavour-borders="sketch"] .fm-convrow--selected:hover,
+html[data-flavour-borders="sketch"] .fm-sidebar-item--selected,
+html[data-flavour-borders="sketch"] .fm-sidebar-item--selected:hover,
+html[data-flavour-borders="sketch"] .fm-settings__nav .fm-listrow--selected {
+  background: var(--fm-bg-card);
+  color: var(--fm-label);
+  box-shadow:
+    inset 0 0 0 2px var(--fm-ink),
+    3px 3px 0 var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-convrow--selected .fm-convrow__time,
+html[data-flavour-borders="sketch"] .fm-convrow--selected .fm-convrow__preview,
+html[data-flavour-borders="sketch"] .fm-settings__nav .fm-listrow--selected .fm-listrow__subtitle {
+  color: var(--fm-label-2);
+  opacity: 1;
+}
+html[data-flavour-borders="sketch"] .fm-convrow--selected .fm-convrow__dot--attention {
+  background: var(--fm-accent);
+}
+html[data-flavour-borders="sketch"] .fm-sidebar-item--selected .fm-sidebar-item__icon {
+  color: var(--fm-accent);
+}
+html[data-flavour-borders="sketch"] .fm-sidebar-item--selected .fm-sidebar-item__count {
+  color: var(--fm-label-2);
+}
+html[data-flavour-borders="sketch"] .fm-sheet:not([data-sober]) {
+  border: 2.5px solid var(--fm-ink);
+  border-radius: 20px;
+  box-shadow: var(--fm-shadow-sheet);
+}
+html[data-flavour-borders="sketch"] .fm-sheet__icon {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-sm);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-popover {
+  border: 2px solid var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-progress {
+  height: 12px;
+  border: 2px solid var(--fm-ink);
+  border-radius: 999px;
+  background: var(--fm-bg-card);
+}
+html[data-flavour-borders="sketch"] .fm-progress--thin {
+  height: 10px;
+}
+html[data-flavour-borders="sketch"] .fm-progress--accent .fm-progress__bar {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--fm-marker) 0 8px,
+    var(--fm-marker-soft) 8px 16px
+  );
+}
+html[data-flavour-borders="sketch"] .fm-list,
+html[data-flavour-borders="sketch"] .fm-kv,
+html[data-flavour-borders="sketch"] .fm-details__log,
+html[data-flavour-borders="sketch"] .fm-details__pre,
+html[data-flavour-borders="sketch"] .fm-pub-group,
+html[data-flavour-borders="sketch"] .fm-browse__list {
+  border: 2px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-pub-group--danger {
+  border: 2px solid var(--fm-red);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-pub-choice {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-sm);
+  box-shadow: var(--fm-shadow-button);
+}
+html[data-flavour-borders="sketch"] .fm-pub-choice:not(:disabled):hover,
+html[data-flavour-borders="sketch"] .fm-pub-choice:focus-visible {
+  box-shadow: var(--fm-shadow-card);
+}
+html[data-flavour-borders="sketch"] .fm-rows__row,
+html[data-flavour-borders="sketch"] .fm-listrow,
+html[data-flavour-borders="sketch"] .fm-pub-row + .fm-pub-row,
+html[data-flavour-borders="sketch"] .fm-md--plan ol > li {
+  border-top-style: dashed;
+  border-top-width: 1.5px;
+  border-top-color: var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-listrow:first-child,
+html[data-flavour-borders="sketch"] .fm-rows__row:first-child,
+html[data-flavour-borders="sketch"] .fm-md--plan ol > li:first-child {
+  border-top: 0;
+}
+html[data-flavour-borders="sketch"] .fm-tm::before {
+  width: 0;
+  border-left: 2.5px dashed var(--fm-label-3);
+  background: transparent;
+}
+html[data-flavour-borders="sketch"] .fm-tm__v::before {
+  border-width: 2.5px;
+  border-color: var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-tm__v[data-current="true"]::before {
+  background: var(--fm-marker);
+  border-color: var(--fm-ink);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-seg {
+  border: 2px solid var(--fm-ink);
+  background: var(--fm-bg-card);
+}
+html[data-flavour-borders="sketch"] .fm-seg__option[aria-checked="true"] {
+  background: var(--fm-ink);
+  color: var(--fm-bg-card);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-seg__option[aria-checked="true"] .fm-seg__tag {
+  background: var(--fm-marker);
+  color: var(--fm-ink);
+}
+html[data-flavour-borders="sketch"] .fm-switch {
+  border: 2px solid var(--fm-ink);
+  width: 34px;
+  height: 20px;
+}
+html[data-flavour-borders="sketch"] .fm-switch__knob {
+  width: 12px;
+  height: 12px;
+  top: 2px;
+  left: 2px;
+  background: var(--fm-ink);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-switch[aria-checked="true"] .fm-switch__knob {
+  left: 16px;
+}
+html[data-flavour-borders="sketch"] .fm-empty__icon,
+html[data-flavour-borders="sketch"] .fm-standalone__icon {
+  border: 2px solid var(--fm-ink);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] :focus-visible {
+  outline: 2.5px dashed var(--fm-ink);
+}
+
+/* Sober regions keep a plain outline and the system radius, whatever the theme. */
+html[data-flavour-borders="sketch"] [data-sober] .fm-card {
+  border: 1.5px solid var(--fm-ink);
+  border-radius: var(--fm-radius-lg);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] [data-sober] .fm-btn {
+  border: 1.5px solid var(--fm-ink);
+  border-radius: 8px;
+  box-shadow: none;
+  font-weight: 600;
+}
+html[data-flavour-borders="sketch"] [data-sober] .fm-btn--destructive {
+  border-color: var(--fm-red);
+}
+html[data-flavour-borders="sketch"] .fm-sheet[data-sober] {
+  border: 1.5px solid var(--fm-ink);
+  border-radius: var(--fm-radius-lg);
+  box-shadow: var(--fm-shadow-sheet);
+}
+html[data-flavour-labels="handwritten"] [data-sober] .fm-sheet__title,
+html[data-flavour-labels="handwritten"] [data-sober] .fm-card__title,
+html[data-flavour-labels="handwritten"] [data-sober] .fm-crew-kicker {
+  font-family: var(--fm-font);
+}
+html [data-sober] .fm-marker-underline::after {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   labels: handwritten / serif — eyebrows and big headings only; body text keeps
+   the theme's body font. Headings take a marker underline in handwritten.
+   --------------------------------------------------------------------------- */
+html[data-flavour-labels="handwritten"] .fm-sidebar-section__title,
+html[data-flavour-labels="handwritten"] .fm-list-column__group,
+html[data-flavour-labels="handwritten"] .fm-group__title,
+html[data-flavour-labels="handwritten"] .fm-inspector__title,
+html[data-flavour-labels="handwritten"] .fm-question__header,
+html[data-flavour-labels="handwritten"] .fm-review__area-title,
+html[data-flavour-labels="handwritten"] .fm-md--plan h3,
+html[data-flavour-labels="handwritten"] .fm-md--plan h4 {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fm-label-2);
+}
+html[data-flavour-labels="handwritten"] .fm-home__greeting {
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+html[data-flavour-labels="handwritten"] .fm-list-column__title,
+html[data-flavour-labels="handwritten"] .fm-settings__title,
+html[data-flavour-labels="handwritten"] .fm-standalone__title {
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+html[data-flavour-labels="handwritten"] .fm-sheet__title {
+  font-size: 21px;
+  font-weight: 400;
+}
+html[data-flavour-labels="handwritten"] .fm-card__title,
+html[data-flavour-labels="handwritten"] .fm-pub-group__title,
+html[data-flavour-labels="handwritten"] .fm-conv-header__name {
+  font-weight: 700;
+}
+html[data-flavour-labels="handwritten"] .fm-crew-kicker,
+html[data-flavour-labels="handwritten"] .fm-titlebar__title {
+  font-family: var(--fm-font-label);
+  font-weight: 400;
+}
+html[data-flavour-labels="handwritten"] .fm-titlebar__title {
+  font-size: 17px;
+}
+html[data-flavour-labels="handwritten"] .fm-titlebar__title span {
+  font-family: var(--fm-font);
+  font-size: 13px;
+}
+/* Marker underline: a yellow swipe behind the words, hand-skewed. */
+html[data-flavour-labels="handwritten"] .fm-marker-underline {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+}
+html[data-flavour-labels="handwritten"] .fm-marker-underline::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 0.08em;
+  height: 0.38em;
+  z-index: -1;
+  border-radius: 6px;
+  background: var(--fm-marker);
+  transform: rotate(-1.2deg) skewX(-8deg);
+  opacity: 0.9;
+}
+html[data-flavour-labels="handwritten"] .fm-marker-underline--green::after {
+  background: var(--fm-green-soft);
+}
+
+html[data-flavour-labels="serif"] .fm-home__greeting,
+html[data-flavour-labels="serif"] .fm-list-column__title,
+html[data-flavour-labels="serif"] .fm-settings__title,
+html[data-flavour-labels="serif"] .fm-standalone__title,
+html[data-flavour-labels="serif"] .fm-sheet__title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+html[data-flavour-labels="serif"] .fm-home__greeting {
+  font-size: 28px;
+}
+html[data-flavour-labels="serif"] .fm-sidebar-section__title,
+html[data-flavour-labels="serif"] .fm-list-column__group,
+html[data-flavour-labels="serif"] .fm-group__title,
+html[data-flavour-labels="serif"] .fm-inspector__title,
+html[data-flavour-labels="serif"] .fm-review__area-title {
+  font-style: italic;
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html[data-flavour-labels="serif"] .fm-marker-underline {
+  box-shadow: inset 0 -2px 0 var(--fm-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   cards: sticky — tip cards become sticky notes with a strip of tape
+   --------------------------------------------------------------------------- */
+html[data-flavour-cards="sticky"] .fm-card--tip,
+html[data-flavour-cards="sticky"] .fm-tip {
+  position: relative;
+  background: var(--fm-marker-soft);
+  border: 2px solid var(--fm-ink);
+  border-radius: 6px;
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.16);
+  transform: rotate(-1.2deg);
+  overflow: visible;
+}
+html[data-flavour-cards="sticky"] .fm-card--tip::before,
+html[data-flavour-cards="sticky"] .fm-tip::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 54px;
+  height: 16px;
+  margin-left: -27px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  transform: rotate(-2deg);
+}
+html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__icon {
+  background: var(--fm-bg-card);
+  color: var(--fm-ink);
+}
+html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__title {
+  font-family: var(--fm-font-label);
+  font-weight: 400;
+  font-size: 16px;
+}
+html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__subtitle,
+html[data-flavour-cards="sticky"] .fm-tip {
+  color: var(--fm-label);
+  font-size: 13px;
+}
+html[data-flavour-cards="sticky"] .fm-tip {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--fm-green-soft);
+  transform: rotate(0.9deg);
+}
+html[data-flavour-cards="sticky"] .fm-tm__explainer {
+  margin-top: 22px;
+  padding: 14px 14px 10px;
+  border: 2px solid var(--fm-ink);
+  border-radius: 6px;
+  background: var(--fm-accent-soft);
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.16);
+  transform: rotate(-0.8deg);
+  color: var(--fm-label);
+  position: relative;
+}
+html[data-flavour-cards="sticky"] .fm-tm__explainer::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 22px;
+  width: 46px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  transform: rotate(-3deg);
+}
+
+/* ---------------------------------------------------------------------------
+   avatars: characters — the sticker crew
+   --------------------------------------------------------------------------- */
+.fm-crew-roster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+.fm-crew-roster__text {
+  min-width: 0;
+  line-height: 1.25;
+}
+.fm-crew-roster__text b {
+  display: block;
+  font-weight: 600;
+}
+.fm-crew-roster__text small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--fm-label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fm-character {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+  overflow: visible;
+}
+.fm-crew-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fm-label-2);
+}
+html[data-flavour-avatars="characters"] .fm-crew-kicker {
+  color: var(--fm-label);
+}
+html[data-flavour-avatars="characters"] .fm-approval .fm-crew-kicker {
+  padding: 2px 10px 2px 4px;
+  border: 2px solid var(--fm-ink);
+  border-radius: 999px;
+  background: var(--fm-marker-soft);
+}
+
+/* ---------------------------------------------------------------------------
+   accentShape — the corners of buttons, pills and chips
+   --------------------------------------------------------------------------- */
+html[data-flavour-accent-shape="round"] .fm-btn:not(.fm-btn--icon):not([data-sober] *),
+html[data-flavour-accent-shape="round"] .fm-chip,
+html[data-flavour-accent-shape="round"] .fm-seg {
+  border-radius: 999px;
+}
+html[data-flavour-accent-shape="round"] .fm-seg__option {
+  border-radius: 999px;
+}
+html[data-flavour-borders="sketch"][data-flavour-accent-shape="round"]
+  .fm-btn:not(.fm-btn--icon):not([data-sober] *) {
+  border-radius: var(--fm-sketch-sm);
+}
+html[data-flavour-accent-shape="square"] .fm-btn,
+html[data-flavour-accent-shape="square"] .fm-chip,
+html[data-flavour-accent-shape="square"] .fm-pill,
+html[data-flavour-accent-shape="square"] .fm-seg,
+html[data-flavour-accent-shape="square"] .fm-seg__option,
+html[data-flavour-accent-shape="square"] .fm-tag,
+html[data-flavour-accent-shape="square"] .fm-search,
+html[data-flavour-accent-shape="square"] .fm-field,
+html[data-flavour-accent-shape="square"] .fm-composer__input {
+  border-radius: 3px;
+}
+html[data-flavour-accent-shape="square"] .fm-avatar:not(.fm-avatar--square),
+html[data-flavour-accent-shape="square"] .fm-step,
+html[data-flavour-accent-shape="square"] .fm-composer__send,
+html[data-flavour-accent-shape="square"] .fm-inline-reply__send {
+  border-radius: 3px;
+}
+html[data-flavour-accent-shape="square"] .fm-btn--primary,
+html[data-flavour-accent-shape="square"] .fm-chip--on {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   motion: playful — one-shot confetti on "It's live"; nothing loops
+   --------------------------------------------------------------------------- */
+.fm-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fm-confetti__piece {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 14px;
+  border: 1.5px solid var(--fm-ink);
+  border-radius: 2px;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-flavour-motion="playful"] .fm-confetti__piece {
+    animation: fm-confetti-fall 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  }
+}
+@keyframes fm-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(var(--fall, 90px)) rotate(var(--spin, 120deg));
+  }
+}
+.fm-confetti__piece--0 {
+  left: 58%;
+  --fall: 80px;
+  --spin: 140deg;
+  background: var(--fm-accent);
+  animation-delay: 0ms;
+}
+.fm-confetti__piece--1 {
+  left: 64%;
+  --fall: 110px;
+  --spin: -120deg;
+  background: var(--fm-marker);
+  animation-delay: 60ms;
+}
+.fm-confetti__piece--2 {
+  left: 70%;
+  --fall: 70px;
+  --spin: 200deg;
+  background: var(--fm-glyph-blue);
+  animation-delay: 120ms;
+}
+.fm-confetti__piece--3 {
+  left: 76%;
+  --fall: 120px;
+  --spin: -80deg;
+  background: var(--fm-glyph-purple);
+  animation-delay: 40ms;
+}
+.fm-confetti__piece--4 {
+  left: 82%;
+  --fall: 90px;
+  --spin: 160deg;
+  background: var(--fm-green);
+  animation-delay: 150ms;
+}
+.fm-confetti__piece--5 {
+  left: 88%;
+  --fall: 60px;
+  --spin: -200deg;
+  background: var(--fm-accent-soft);
+  animation-delay: 90ms;
+}
+.fm-confetti__piece--6 {
+  left: 93%;
+  --fall: 100px;
+  --spin: 90deg;
+  background: var(--fm-marker);
+  animation-delay: 200ms;
+}
+.fm-confetti__piece--7 {
+  left: 50%;
+  --fall: 60px;
+  --spin: -150deg;
+  background: var(--fm-green-soft);
+  animation-delay: 240ms;
+}
+.fm-confetti__piece--8 {
+  left: 44%;
+  --fall: 95px;
+  --spin: 110deg;
+  background: var(--fm-accent);
+  animation-delay: 180ms;
+}
+.fm-confetti__piece--9 {
+  left: 97%;
+  --fall: 75px;
+  --spin: -60deg;
+  background: var(--fm-glyph-blue);
+  animation-delay: 300ms;
+}
+.fm-pub-group--success {
+  position: relative;
+  overflow: hidden;
+}

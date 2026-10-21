@@ -11,16 +11,22 @@ export type CardIconTone = "blue" | "green" | "orange" | "grey" | "red";
 export function Card({
   children,
   tinted = false,
+  tip = false,
   as: Tag = "section",
   label,
 }: {
   readonly children: ReactNode;
   readonly tinted?: boolean;
+  /** Side information (a tip, an explainer); playful themes draw it as a sticky note. */
+  readonly tip?: boolean;
   readonly as?: "section" | "div" | "article";
   readonly label?: string;
 }) {
+  const classes = ["fm-card", tinted ? "fm-card--tinted" : "", tip ? "fm-card--tip" : ""]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <Tag className={`fm-card${tinted ? " fm-card--tinted" : ""}`} aria-label={label}>
+    <Tag className={classes} aria-label={label}>
       {children}
     </Tag>
   );

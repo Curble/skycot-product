@@ -23,6 +23,8 @@ import {
   describeRuntimeRequest,
 } from "../../../plain/approvals";
 import { projectAtomOrEmpty } from "../../../state/projects";
+import { CrewAvatar } from "../../../themes/CrewAvatar";
+import { useCrew } from "../../../themes/useCrew";
 import { Banner } from "../../../ui/Banner";
 import { Bubble } from "../../../ui/Bubble";
 import { Button } from "../../../ui/Button";
@@ -148,6 +150,7 @@ export function RequestCard({
   });
   const decided = decidedLine(item, request);
   const decision = request ? describeDecision(request) : null;
+  const crew = useCrew();
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -193,7 +196,17 @@ export function RequestCard({
       full
       meta={decided ? undefined : shortTime(item.startedAt ?? item.updatedAt)}
     >
-      <div className={classes} ref={cardRef} tabIndex={decided ? undefined : -1}>
+      <div className={classes} ref={cardRef} tabIndex={decided ? undefined : -1} data-sober="">
+        {crew.named && !decided ? (
+          <p className="fm-crew-kicker">
+            <CrewAvatar role="builder" size="sm" />
+            {item.type === "approval_request"
+              ? `${crew.builder.name} needs your OK`
+              : item.type === "secret_request"
+                ? `${crew.builder.name} needs a key from you`
+                : `${crew.builder.name} has a question`}
+          </p>
+        ) : null}
         <Card label={card.title}>
           <CardHeader
             icon={Icon}

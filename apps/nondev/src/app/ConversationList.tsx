@@ -8,6 +8,7 @@ import { IconButton } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchField } from "../ui/SearchField";
 import { dateGroup, formatRowTime, type DateGroup } from "../features/conversation/status";
+import { useCrew } from "../themes/useCrew";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
 import { useConnected } from "./useConnection";
@@ -26,6 +27,7 @@ export function ConversationList({
   readonly onCompose: () => void;
 }) {
   const shell = useShellState();
+  const crew = useCrew();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const visible = filterRows(rows, shell.filter, shell.projectKey, shell.search);
@@ -44,11 +46,13 @@ export function ConversationList({
     <section className="fm-list-column" aria-label="Conversations">
       <div className="fm-list-column__top">
         <h2 className="fm-list-column__title">
-          {shell.filter === "waiting"
-            ? "Waiting for you"
-            : shell.filter === "ready"
-              ? "Ready to look at"
-              : "Conversations"}
+          <span className="fm-marker-underline">
+            {shell.filter === "waiting"
+              ? "Waiting for you"
+              : shell.filter === "ready"
+                ? "Ready to look at"
+                : "Conversations"}
+          </span>
         </h2>
         <IconButton icon={SquarePen} label="New conversation" onClick={onCompose} />
       </div>
@@ -69,7 +73,7 @@ export function ConversationList({
           </EmptyState>
         ) : visible.length === 0 ? (
           <EmptyState icon={MessageSquareDashed} title={emptyTitle(shell.filter, shell.search)}>
-            {emptyText(shell.filter, shell.search, rows.length)}
+            {emptyText(shell.filter, shell.search, rows.length, crew.builder.name)}
           </EmptyState>
         ) : (
           GROUP_ORDER.filter((group) => groups.has(group)).map((group) => (
@@ -98,9 +102,9 @@ function emptyTitle(filter: string, search: string): string {
   return "No conversations yet";
 }
 
-function emptyText(filter: string, search: string, total: number): string {
+function emptyText(filter: string, search: string, total: number, crewName: string): string {
   if (search.trim().length > 0) return "Try a different word, or clear the search.";
-  if (filter !== "all") return "You'll see a dot here when Crew needs you.";
+  if (filter !== "all") return `You'll see a dot here when ${crewName} needs you.`;
   return total === 0
     ? "Start one below: say what you'd like done, like you'd text a staff member."
     : "";

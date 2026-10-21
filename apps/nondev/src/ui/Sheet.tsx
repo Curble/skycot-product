@@ -21,6 +21,8 @@ interface SheetProps {
   /** Where focus lands on open. "body" focuses the sheet itself so no button is pre-chosen. */
   readonly initialFocus?: "body" | "first";
   readonly dismissOnBackdrop?: boolean;
+  /** A risk moment (undo, go live): playful themes switch their decoration off inside. */
+  readonly sober?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export function Sheet({
   wide = false,
   initialFocus = "body",
   dismissOnBackdrop = true,
+  sober = false,
 }: SheetProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -65,6 +68,7 @@ export function Sheet({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={`fm-sheet${wide ? " fm-sheet--wide" : ""}`}
+        data-sober={sober ? "" : undefined}
       >
         <div className="fm-sheet__top">
           {Icon ? (

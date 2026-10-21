@@ -55,7 +55,7 @@ export const SECTIONS: ReadonlyArray<SectionMeta> = [
   {
     id: "appearance",
     label: "Appearance",
-    summary: "Light, dark, system",
+    summary: "Theme, light, dark",
     icon: SunMoon,
     tone: "orange",
   },

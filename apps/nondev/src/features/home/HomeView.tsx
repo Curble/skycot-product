@@ -3,9 +3,9 @@ import { ChevronLeft, ListTodo, Sparkles } from "lucide-react";
 
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
-import { CREW_NAME } from "../../brand";
 import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
+import { useCrew } from "../../themes/useCrew";
 import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
@@ -22,6 +22,7 @@ import { summarySentence } from "./summary";
  */
 export function HomeView({ showBack = false }: { readonly showBack?: boolean }) {
   const shell = useShellState();
+  const crew = useCrew();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
 
@@ -54,7 +55,9 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
           ) : null}
           <div>
             {/* No name: the only label the client has is the Mac's, and "Good evening, iMac" is worse than none. */}
-            <h2 className="fm-home__greeting">{greeting()}.</h2>
+            <h2 className="fm-home__greeting">
+              <span className="fm-marker-underline">{greeting()}.</span>
+            </h2>
             <p className="fm-home__sub">
               {summarySentence(working, waiting, ready, rows.length, connected)}
             </p>
@@ -83,12 +86,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               ) : null}
             </Card>
             <div className="fm-home__side">
-              <Card label="Tip">
+              <Card label="Tip" tip>
                 <CardHeader
                   icon={Sparkles}
                   tone="grey"
                   title="Tip"
-                  subtitle={`Say it like you'd text a staff member. “Add a Christmas menu page” beats describing how to build one. ${CREW_NAME} will show you a plan before touching anything.`}
+                  subtitle={`Say it like you'd text a staff member. “Add a Christmas menu page” beats describing how to build one. ${crew.builder.name} will show you a plan before touching anything.`}
                 />
               </Card>
             </div>

@@ -2,6 +2,8 @@
 // theme keys after first paint (index.html handles first paint itself). The
 // Appearance choice made here (the mode key) wins; the stock UI's theme name is
 // only consulted when no mode was ever chosen, and otherwise the OS decides.
+import { reapplyActiveTheme } from "../themes/store";
+
 const THEME_KEY = "t3code:theme";
 const APPEARANCE_MODE_KEY = "t3code:theme-appearance-mode";
 const FOLLOW_SYSTEM_KEY = "t3code:theme-follow-system";
@@ -57,10 +59,8 @@ export function applyTheme(isDark: boolean) {
   const root = document.documentElement;
   root.classList.toggle("dark", isDark);
   root.style.colorScheme = isDark ? "dark" : "light";
-  // Match the window token so the gap before paint never flashes white/black.
-  root.style.backgroundColor = isDark ? "#1e1e1e" : "#f5f5f7";
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (meta) meta.content = isDark ? "#262628" : "#f6f6f8";
+  // The active theme owns the tokens, the window colour and theme-color for this mode.
+  reapplyActiveTheme(isDark ? "dark" : "light");
 }
 
 export function startThemeSync(): () => void {

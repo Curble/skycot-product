@@ -24,6 +24,8 @@ import {
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf } from "../state/conversations";
 import { environmentProjects } from "../state/projects";
+import { CrewAvatar } from "../themes/CrewAvatar";
+import { useCrew } from "../themes/useCrew";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
@@ -48,6 +50,7 @@ export function AppSidebar({
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const [folderSheetOpen, setFolderSheetOpen] = useState(false);
   const [advancedSheetOpen, setAdvancedSheetOpen] = useState(false);
+  const crew = useCrew();
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
@@ -130,6 +133,25 @@ export function AppSidebar({
             onClick={() => setFolderSheetOpen(true)}
           />
         </SidebarSection>
+
+        {crew.named ? (
+          <SidebarSection title="Your crew">
+            <li className="fm-crew-roster">
+              <CrewAvatar role="builder" size="md" />
+              <span className="fm-crew-roster__text">
+                <b>{crew.builder.name}</b>
+                <small>builds things</small>
+              </span>
+            </li>
+            <li className="fm-crew-roster">
+              <CrewAvatar role="checker" size="md" />
+              <span className="fm-crew-roster__text">
+                <b>{crew.checker.name}</b>
+                <small>checks before anything goes live</small>
+              </span>
+            </li>
+          </SidebarSection>
+        ) : null}
 
         <SidebarSection title="Automations">
           <SidebarItem

@@ -84,6 +84,7 @@ export function RestoreSheet({
       title={title}
       icon={RotateCcw}
       iconTone="red"
+      sober
       description={restoreSentence(intent, versionNumber, formatVersionTime(entry.timestamp))}
       // A stray click outside must not cancel (or confirm) a destructive step.
       dismissOnBackdrop={false}
