@@ -6,10 +6,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#f6f6f8" />
     <script>
       // Paint the right background before React mounts. Reads the same
-      // localStorage keys as the stock UI so both clients agree on dark/light.
+      // localStorage keys as the stock UI so both clients agree on dark/light;
+      // src/app/theme.ts keeps this in sync afterwards.
       (() => {
         try {
           const stored = window.localStorage.getItem("t3code:theme");
@@ -22,7 +23,7 @@
                 ? false
                 : prefersDark;
           document.documentElement.classList.toggle("dark", isDark);
-          document.documentElement.style.backgroundColor = isDark ? "#0a0a0a" : "#ffffff";
+          document.documentElement.style.backgroundColor = isDark ? "#1e1e1e" : "#f5f5f7";
           document.documentElement.style.colorScheme = isDark ? "dark" : "light";
         } catch {
           // Storage can be blocked; the stylesheet's defaults take over.
@@ -37,7 +38,8 @@
         margin: 0;
       }
     </style>
-    <title>T3 Code Simple</title>
+    <!-- Static fallback only: src/main.tsx sets the title and favicon from src/brand.ts. -->
+    <title>Foreman</title>
   </head>
   <body>
     <div id="root"></div>

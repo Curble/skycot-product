@@ -1,5 +1,11 @@
-/* The stock theme, tokens and layers come from apps/web so both clients share
-   one look. Tailwind only scans this package by default, so the aliased
-   apps/web component files are declared as extra sources. */
-@import "../../web/src/index.css";
-@source "../../web/src/components/ui";
+/* Tailwind supplies layout utilities only; every colour, radius and type size
+   comes from our own tokens in styles/apple.css so this client's look does not
+   depend on apps/web/src/index.css. The aliased apps/web modules we still
+   import are logic-only (auth, runtime, atoms), so no web component styles are
+   needed. */
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark, .dark *));
+
+@import "./styles/apple.css";
+@import "./styles/shell.css";

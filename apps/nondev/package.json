@@ -17,6 +17,7 @@
     "@t3tools/shared": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "effect": "catalog:",
+    "lucide-react": "^0.564.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwind-merge": "^3.4.0"
