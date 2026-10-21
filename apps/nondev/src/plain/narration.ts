@@ -374,6 +374,25 @@ function tokenize(segment: string): Array<string> {
 }
 
 /** Drops `cd x`, env assignments, `sudo`, `time`, `exec` and shell wrappers to find the real program. */
+/** `for f in …`, `if …`, `done`: shell control words, not programs. */
+const SHELL_CONTROL = new Set([
+  "for",
+  "if",
+  "elif",
+  "while",
+  "until",
+  "case",
+  "select",
+  "done",
+  "fi",
+  "esac",
+  "}",
+  ")",
+  "{",
+  "(",
+]);
+const SHELL_PREFIX = new Set(["do", "then", "else"]);
+
 function programTokens(segment: string): Array<string> {
   let tokens = tokenize(segment);
   // Strip leading env assignments and transparent wrappers.
@@ -390,12 +409,14 @@ function programTokens(segment: string): Array<string> {
     )
       tokens = tokens.slice(1);
     else if (head === "sudo" || head === "doas") tokens = tokens.slice(1);
+    else if (SHELL_PREFIX.has(head)) tokens = tokens.slice(1);
     else break;
   }
-  // `bash -c "…"` / `sh -lc "…"`: look inside.
+  if (tokens.length > 0 && SHELL_CONTROL.has(tokens[0]!)) return [];
+  // `bash -c "…"` / `/bin/zsh -lc "…"`: look inside.
   if (
     tokens.length >= 3 &&
-    /^(ba|z|da|k)?sh$/.test(tokens[0]!) &&
+    /^(ba|z|da|k)?sh$/.test(tokens[0]!.split("/").at(-1)!) &&
     /^-[a-z]*c[a-z]*$/.test(tokens[1]!)
   ) {
     return programTokens(tokens.slice(2).join(" "));
@@ -403,8 +424,106 @@ function programTokens(segment: string): Array<string> {
   return tokens;
 }
 
+/**
+ * Codex runs everything as `/bin/zsh -lc "<script>"`; narrate the script
+ * itself so `pwd && cat x` reads as two steps, not one mysterious program.
+ * Quoting layers are peeled the way a shell would, including the
+ * `"…'"'!x'"'…"` concatenations Codex emits.
+ */
+export function unwrapShellWrapper(command: string): string {
+  const raw = command.match(/"(?:[^"\\]|\\.)*"|'[^']*'|\S+/g) ?? [];
+  let index = 0;
+  while (index < raw.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(raw[index]!)) index += 1;
+  const program = raw[index]?.split("/").at(-1);
+  const flag = raw[index + 1];
+  if (!program || !/^(ba|z|da|k)?sh$/.test(program) || !flag || !/^-[a-z]*c[a-z]*$/.test(flag)) {
+    return command;
+  }
+  let position = 0;
+  for (let i = 0; i <= index + 1; i += 1)
+    position = command.indexOf(raw[i]!, position) + raw[i]!.length;
+  return shellUnquote(command.slice(position).trim());
+}
+
+function shellUnquote(text: string): string {
+  let out = "";
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]!;
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+      else out += ch;
+    } else if (quote === '"') {
+      if (ch === "\\" && i + 1 < text.length && /["\\$`]/.test(text[i + 1]!)) {
+        out += text[i + 1]!;
+        i += 1;
+      } else if (ch === '"') quote = null;
+      else out += ch;
+    } else if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === "\\" && i + 1 < text.length) {
+      out += text[i + 1]!;
+      i += 1;
+    } else out += ch;
+  }
+  return out;
+}
+
+/** `python3 - <<'PY' … PY`: the command is `python3 -`; the body is the script, not more steps. */
+const HEREDOC_PATTERN = /<<-?\s*['"]?\w+['"]?[\s\S]*$/;
+
 function stripFlags(args: ReadonlyArray<string>): Array<string> {
   return args.filter((arg) => !arg.startsWith("-"));
+}
+
+/** "look at the booking page" / "look at 3 files: …" for cat, head, sed -n and friends. */
+function lookAt(targets: ReadonlyArray<string>): Verb {
+  const what =
+    targets.length === 1
+      ? describeFile(targets[0]!).noun
+      : `${pluralize(targets.length, "file")}: ${joinList(targets.map((t) => describeFile(t).noun))}`;
+  return verb(`look at ${what}`, `looked at ${what}`, `looking at ${what}`);
+}
+
+/** Search flags that take a value, so `rg -g '*.html' -n booking` searches for "booking". */
+const SEARCH_VALUE_FLAGS = new Set([
+  "-g",
+  "--glob",
+  "--iglob",
+  "-t",
+  "--type",
+  "-T",
+  "--type-not",
+  "-m",
+  "--max-count",
+  "-A",
+  "-B",
+  "-C",
+  "--include",
+  "--exclude",
+  "--exclude-dir",
+  "-e",
+  "--regexp",
+  "-E",
+  "--extension",
+]);
+
+function searchPattern(base: string, args: ReadonlyArray<string>): string | undefined {
+  if (base === "find" || base === "locate") {
+    const named = args.findIndex((arg) => /^-i?name$|^-i?path$|^-i?regex$/.test(arg));
+    if (named !== -1) return args[named + 1];
+    return stripFlags(args).find((arg) => arg !== "." && arg !== "./");
+  }
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    if (arg.startsWith("-")) {
+      if (SEARCH_VALUE_FLAGS.has(arg)) i += 1;
+      continue;
+    }
+    // `-e pattern` names the pattern explicitly; otherwise the first positional is it.
+    return arg;
+  }
+  const explicit = args.findIndex((arg) => arg === "-e" || arg === "--regexp");
+  return explicit === -1 ? undefined : args[explicit + 1];
 }
 
 function describePackage(name: string): string {
@@ -896,14 +1015,29 @@ function classifySegment(segment: string): CommandClassification | null {
   }
 
   if (READ_PROGRAMS.has(base)) {
-    const target = stripFlags(args)[0];
-    if (
-      target &&
-      /^(cat|head|tail|less|more|bat|stat|file|wc)$/.test(base) &&
-      !target.startsWith("$")
-    ) {
-      const noun = describeFile(target).noun;
-      return make("read", "low", verb(`read ${noun}`, `read ${noun}`, `reading ${noun}`));
+    // `head -n 40 menu.html`: the count is a flag value, not a file.
+    const targets = stripFlags(args).filter((arg) => !arg.startsWith("$") && !/^\d+$/.test(arg));
+    if (targets.length > 0 && /^(cat|head|tail|less|more|bat|stat|file)$/.test(base)) {
+      return make("read", "low", lookAt(targets));
+    }
+    if (base === "wc") {
+      const what = targets.length === 1 ? describeFile(targets[0]!).noun : "some files";
+      return make(
+        "read",
+        "low",
+        verb(
+          `count the lines in ${what}`,
+          `counted the lines in ${what}`,
+          `counting the lines in ${what}`,
+        ),
+      );
+    }
+    if (base === "echo" || base === "printf") {
+      return make(
+        "read",
+        "low",
+        verb("print a message", "printed a message", "printing a message"),
+      );
     }
     return make(
       "read",
@@ -916,7 +1050,18 @@ function classifySegment(segment: string): CommandClassification | null {
     );
   }
   if (SEARCH_PROGRAMS.has(base)) {
-    const pattern = stripFlags(args)[0];
+    if (args.includes("--files")) {
+      return make(
+        "read",
+        "low",
+        verb(
+          "list the project's files",
+          "listed the project's files",
+          "listing the project's files",
+        ),
+      );
+    }
+    const pattern = searchPattern(base, args);
     const what = pattern ? ` for "${pattern}"` : "";
     return make(
       "search",
@@ -928,6 +1073,21 @@ function classifySegment(segment: string): CommandClassification | null {
       ),
     );
   }
+  if (
+    base === "sed" &&
+    args.includes("-n") &&
+    !args.some((arg) => arg.startsWith("-i") || arg === "--in-place")
+  ) {
+    const targets = stripFlags(args).filter((arg) => /[./]/.test(arg) && !arg.startsWith("$"));
+    return make(
+      "read",
+      "low",
+      targets.length > 0
+        ? lookAt(targets)
+        : verb("look at part of a file", "looked at part of a file", "looking at part of a file"),
+    );
+  }
+
   if (FILE_PROGRAMS.has(base)) {
     const v =
       base === "mkdir"
@@ -1225,7 +1385,8 @@ const TOUCH_ORDER: Record<CommandClassification["touches"], number> = {
  * (`a && b`) report the riskiest step's risk and list the steps.
  */
 export function classifyCommand(command: string): CommandClassification {
-  const trimmed = command.trim();
+  const unwrapped = unwrapShellWrapper(command.trim());
+  const trimmed = unwrapped.replace(HEREDOC_PATTERN, "").trim();
   const whole = SQL_DESTRUCTIVE_PATTERN.test(trimmed) || PIPE_TO_SHELL_PATTERN.test(trimmed);
   const classified = splitShellSegments(trimmed)
     .map(classifySegment)

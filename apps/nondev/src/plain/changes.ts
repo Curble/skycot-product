@@ -181,7 +181,8 @@ const PATH_RULES: ReadonlyArray<PathRule> = [
   {
     test: /\.(html?|vue|svelte|astro|erb|hbs|ejs|njk)$/i,
     area: "pages",
-    noun: (n) => `the ${n} page`,
+    // index.html is what a browser opens first: "the home page", not "the index page".
+    noun: (n) => (/^(index|home|default)$/i.test(n) ? "the home page" : `the ${n} page`),
   },
   {
     test: /(^|\/)(components?|ui|widgets|partials)\/.*\.(tsx|jsx)$/i,
@@ -206,6 +207,55 @@ const FALLBACK_RULE: PathRule = {
   area: "behind the scenes",
   noun: (n) => `the ${n} file`,
 };
+
+export type PromptFileOperation = "add" | "remove" | "change";
+
+export interface PromptFile {
+  readonly path: string;
+  readonly operation: PromptFileOperation;
+}
+
+const PROMPT_FILE_VERB =
+  /^(update|add|remove|create|delete|modify|edit|write|change|read|open|view)\s+/i;
+
+function promptOperation(verb: string | undefined): PromptFileOperation {
+  const value = verb?.toLowerCase() ?? "";
+  if (value === "add" || value === "create" || value === "write") return "add";
+  if (value === "remove" || value === "delete") return "remove";
+  return "change";
+}
+
+/**
+ * The files an approval prompt names. Providers phrase these differently:
+ * Codex sends one `update /abs/path` or `add /abs/path` per line, Claude a bare
+ * path, others "Edit 3 files: index.html, menu.html, style.css".
+ */
+export function filesFromPrompt(prompt: string | undefined): Array<PromptFile> {
+  if (!prompt) return [];
+  const files: Array<PromptFile> = [];
+  const seen = new Set<string>();
+  const push = (path: string, operation: PromptFileOperation) => {
+    const clean = path.replace(/[,;]+$/, "").trim();
+    if (clean.length === 0 || seen.has(clean)) return;
+    seen.add(clean);
+    files.push({ path: clean, operation });
+  };
+  for (const raw of prompt.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.length === 0) continue;
+    const several = line.match(/^(\w+)\s+\d+\s+files?:\s*(.+)$/i);
+    if (several) {
+      for (const path of several[2]!.split(/[,\s]+/)) push(path, promptOperation(several[1]));
+      continue;
+    }
+    const verb = line.match(PROMPT_FILE_VERB)?.[1];
+    const rest = line.replace(PROMPT_FILE_VERB, "").trim();
+    // Two or more spaces means prose, not a path; a single space may still be "verb path".
+    if (rest.length === 0 || /\s{2,}/.test(rest)) continue;
+    push(rest.split(/\s+/)[0]!, promptOperation(verb));
+  }
+  return files;
+}
 
 export function humanizeFileName(path: string): string {
   const base = path.split(/[\\/]/).findLast((segment) => segment.length > 0) ?? path;

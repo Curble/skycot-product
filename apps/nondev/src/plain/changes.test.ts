@@ -76,7 +76,7 @@ describe("describeFile", () => {
     ["src/pages/booking.tsx", "pages", "the booking page"],
     ["app/dashboard/page.tsx", "pages", "a page"],
     ["src/components/Header.tsx", "pages", "the header building block"],
-    ["index.html", "pages", "the index page"],
+    ["index.html", "pages", "the home page"],
     ["styles/globals.css", "styles", "the site's overall styling"],
     ["src/theme.ts", "styles", "the theme design settings"],
     ["README.md", "content", "the README notes"],

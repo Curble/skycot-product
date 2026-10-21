@@ -9,7 +9,7 @@ import type {
   UserInputAttachments,
 } from "@t3tools/contracts";
 
-import { describeFile } from "./changes";
+import { describeFile, filesFromPrompt, type PromptFile } from "./changes";
 import { approvals as copy, buttons, scopes } from "./copy";
 import { classifyCommand, type CommandClassification } from "./narration";
 
@@ -231,14 +231,6 @@ function firstLine(text: string | undefined, max = 400): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
-function pathFromPrompt(prompt: string | undefined): string | undefined {
-  if (!prompt) return undefined;
-  const candidate = firstLine(prompt)
-    .replace(/^(edit|write|create|modify|read|open|delete|view)\s+/i, "")
-    .trim();
-  return candidate.length > 0 && !/\s{2,}/.test(candidate) ? candidate.split(/\s+/)[0] : undefined;
-}
-
 function isOutsideProject(path: string | undefined, projectRoot: string | undefined): boolean {
   if (!path) return false;
   if (/^(~|\$HOME|\/etc|\/usr|\/var|\/private|\/System|\/Library|C:\\)/.test(path))
@@ -318,31 +310,76 @@ function whyCommandMatters(classified: CommandClassification): string {
   }
 }
 
+interface DescribedPromptFile extends PromptFile {
+  readonly noun: string;
+  readonly isConfigOrSecret: boolean;
+  readonly outside: boolean;
+}
+
+function describePromptFiles(
+  prompt: string | undefined,
+  projectRoot: string | undefined,
+): Array<DescribedPromptFile> {
+  return filesFromPrompt(prompt).map((file) => {
+    const described = describeFile(file.path);
+    return {
+      ...file,
+      noun: described.noun,
+      isConfigOrSecret: described.isConfigOrSecret,
+      outside: isOutsideProject(file.path, projectRoot),
+    };
+  });
+}
+
+function joinList(parts: ReadonlyArray<string>): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
+/** "change the booking page" / "create the christmas page" / "change 3 files: …, … (new) and …". */
+function fileChangePhrase(files: ReadonlyArray<DescribedPromptFile>): string {
+  if (files.length === 0) return "change a file";
+  if (files.length === 1) {
+    const only = files[0]!;
+    const verb =
+      only.operation === "add" ? "create" : only.operation === "remove" ? "delete" : "change";
+    return `${verb} ${only.noun}`;
+  }
+  const nouns = files.map((file) =>
+    file.operation === "add"
+      ? `${file.noun} (new)`
+      : file.operation === "remove"
+        ? `${file.noun} (deleted)`
+        : file.noun,
+  );
+  return `change ${files.length} files: ${joinList(nouns)}`;
+}
+
 function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
-  const path = pathFromPrompt(item.prompt);
-  const described = path ? describeFile(path) : undefined;
-  const outside = isOutsideProject(path, ctx.projectRoot);
-  const risk: ApprovalRisk = outside ? "high" : described?.isConfigOrSecret ? "medium" : "low";
-  const noun = described?.noun ?? "a file";
+  const files = describePromptFiles(item.prompt, ctx.projectRoot);
+  const outside = files.some((file) => file.outside);
+  const sensitive = files.some((file) => file.isConfigOrSecret);
+  const risk: ApprovalRisk = outside ? "high" : sensitive ? "medium" : "low";
+  const outsideNoun = files.length > 1 ? "At least one of these files is" : "This file is";
   return finishCard(
     {
-      title: "May I change this file?",
-      whatItWants: `The assistant wants to change ${noun}.`,
-      whyItMatters: described?.isConfigOrSecret
-        ? "This is a settings or secrets file. Mistakes here can break the project or leak keys."
+      title: files.length > 1 ? "May I change these files?" : "May I change this file?",
+      whatItWants: `The assistant wants to ${fileChangePhrase(files)}.`,
+      whyItMatters: sensitive
+        ? "This touches a settings or secrets file. Mistakes here can break the project or leak keys."
         : "Every change gets a restore point, so you can always go back.",
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileChange,
       risk,
       warning: outside
-        ? `This file is outside the project folder. ${copy.destructiveWarning}`
+        ? `${outsideNoun} outside the project folder. ${copy.destructiveWarning}`
         : undefined,
       options: buildApprovalOptions(
         item.requestId,
         risk,
         "file changes",
         item.options,
-        !outside && !described?.isConfigOrSecret,
+        !outside && !sensitive,
       ),
       technical: item.prompt ?? "file change",
     },
@@ -351,16 +388,22 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
 }
 
 function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
-  const path = pathFromPrompt(item.prompt);
-  const described = path ? describeFile(path) : undefined;
-  const outside = isOutsideProject(path, ctx.projectRoot);
-  const secret =
-    described?.isConfigOrSecret && /\.env|secret|credential|\.pem|\.key/i.test(path ?? "");
+  const files = describePromptFiles(item.prompt, ctx.projectRoot);
+  const outside = files.some((file) => file.outside);
+  const secret = files.some(
+    (file) => file.isConfigOrSecret && /\.env|secret|credential|\.pem|\.key/i.test(file.path),
+  );
   const risk: ApprovalRisk = secret ? "medium" : outside ? "medium" : "low";
+  const what =
+    files.length === 0
+      ? "a file"
+      : files.length === 1
+        ? files[0]!.noun
+        : `${files.length} files: ${joinList(files.map((file) => file.noun))}`;
   return finishCard(
     {
-      title: "May I read this file?",
-      whatItWants: `The assistant wants to read ${described?.noun ?? "a file"}.`,
+      title: files.length > 1 ? "May I read these files?" : "May I read this file?",
+      whatItWants: `The assistant wants to read ${what}.`,
       whyItMatters: secret
         ? "This file holds secrets. The assistant's service would see them."
         : outside

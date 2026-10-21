@@ -122,6 +122,49 @@ describe("describeRuntimeRequest — files and apps", () => {
     expect(decisions(card)).toContain("acceptAlways");
   });
 
+  it("reads Codex-style verb prefixes and several files at once", () => {
+    const one = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "update /Users/me/site/christmas.html" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(one.whatItWants).toBe("The assistant wants to change the christmas page.");
+    expect(one.risk).toBe("low");
+    expect(one.scope).toBe("only this project");
+
+    const many = describeRuntimeRequest(
+      items.approval("file-change", {
+        prompt:
+          "update /Users/me/site/book.html\nadd /Users/me/site/christmas.html\nupdate /Users/me/site/index.html",
+      }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(many.title).toBe("May I change these files?");
+    expect(many.whatItWants).toBe(
+      "The assistant wants to change 3 files: the book page, the christmas page (new) and the home page.",
+    );
+    expect(many.risk).toBe("low");
+
+    const listed = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "Edit 3 files: index.html, menu.html, style.css" }),
+    );
+    expect(listed.whatItWants).toBe(
+      "The assistant wants to change 3 files: the home page, the menu page and the site's overall styling.",
+    );
+    const created = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "add new.html" }),
+    );
+    expect(created.whatItWants).toBe("The assistant wants to create the new page.");
+  });
+
+  it("judges outside-the-project against the private copy's path", () => {
+    const card = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "update /tmp/copies/site/index.html" }),
+      { projectRoot: "/tmp/copies/site" },
+    );
+    expect(card.scope).toBe("only this project");
+    expect(card.risk).toBe("low");
+  });
+
   it("raises risk for settings files and blocks paths outside the project", () => {
     const settings = describeRuntimeRequest(items.approval("file-change", { prompt: ".env" }));
     expect(settings.risk).toBe("medium");
