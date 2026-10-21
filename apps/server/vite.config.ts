@@ -65,6 +65,7 @@ export default mergeConfig(
       tasks: {
         build: {
           command: "node scripts/cli.ts build",
+          // nondev-seam: B-2
           dependsOn: ["@t3tools/web#build", "@t3tools/nondev#build"],
           cache: false,
         },

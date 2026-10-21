@@ -96,6 +96,7 @@ const buildCmd = Command.make(
         yield* Effect.logWarning("[cli] Web dist not found — skipping client bundle.");
       }
 
+      // nondev-seam: B-1
       // Fork seam (SEAM-MANIFEST.md): the non-developer client ships beside the
       // stock UI and is served at /simple/ by the static handler's subdirectory
       // index resolution.

@@ -57,6 +57,7 @@
       "ignoreDependencies": [
         "@effect/platform-node-shared",
         "@t3tools/web",
+        // nondev-seam: B-4
         "@t3tools/nondev",
         "@napi-rs/keyring",
       ],
