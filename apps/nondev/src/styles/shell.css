@@ -270,13 +270,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Wraps to a second line instead of truncating ("… in a private c…" at
+   three columns, QA3-20); clamped so a very narrow header stays two lines. */
 .fm-conv-header__presence {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 12px;
+  line-height: 1.3;
   color: var(--fm-label-2);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .fm-conv-header__tools {
   display: flex;
@@ -644,20 +648,15 @@ html.dark .fm-standalone__foot {
   padding-left: 12px;
   padding-right: 12px;
 }
-/* The strip stays one line on a phone and swipes sideways instead of clipping. */
-.fm-shell[data-columns="1"] .fm-strip {
-  padding-left: 12px;
-  padding-right: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.fm-shell[data-columns="1"] .fm-strip::-webkit-scrollbar {
-  display: none;
-}
 .fm-shell[data-columns="1"] .fm-msg {
   max-width: 86%;
 }
 
+/* Phones: a thumb-sized Send (QA2-07); the field grows with it. */
+.fm-shell[data-columns="1"] .fm-composer__send {
+  width: 34px;
+  height: 34px;
+}
 /* Phones: the autonomy control wraps into rows; labels are never clipped. */
 .fm-shell[data-columns="1"] .fm-composer__context {
   gap: 8px;
