@@ -3,6 +3,11 @@
 // fall back to defaults and writes fail silently.
 import { useSyncExternalStore } from "react";
 
+import {
+  type AppearanceMode,
+  writeAppearanceMode as writeThemeAppearanceMode,
+} from "../../app/theme";
+
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
@@ -55,30 +60,18 @@ export function useOnboardingState(): OnboardingState {
   return raw === "done" || raw === "skipped" ? raw : null;
 }
 
-export const HANDS_OFF_MINUTES_KEY = "skycot:hands-off-minutes";
-
-export function readHandsOffMinutes(fallback: number): number {
-  const raw = read(HANDS_OFF_MINUTES_KEY);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-export function writeHandsOffMinutes(minutes: number) {
-  write(HANDS_OFF_MINUTES_KEY, String(minutes));
-}
-export function useHandsOffMinutes(fallback: number): number {
-  const raw = useStoredString(HANDS_OFF_MINUTES_KEY);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-// Appearance: the keys the stock UI and app/theme.ts already read.
+// The "hands-off timer" preference was removed (SEC-02): nothing on the server ever read it,
+// so the promise it made was false. A real time-box must live server-side.
+// Appearance: app/theme.ts owns the keys (ours and the stock UI's); this is the
+// React view of the mode key.
 const APPEARANCE_MODE_KEY = "t3code:theme-appearance-mode";
-export type AppearanceMode = "system" | "light" | "dark";
+export type { AppearanceMode } from "../../app/theme";
 
 export function useAppearanceMode(): AppearanceMode {
   const raw = useStoredString(APPEARANCE_MODE_KEY);
   return raw === "light" || raw === "dark" ? raw : "system";
 }
 export function writeAppearanceMode(mode: AppearanceMode) {
-  write(APPEARANCE_MODE_KEY, mode === "system" ? null : mode);
+  writeThemeAppearanceMode(mode);
+  for (const listener of listeners) listener();
 }

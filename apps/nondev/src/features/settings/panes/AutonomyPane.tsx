@@ -1,114 +1,107 @@
-import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId } from "@t3tools/contracts";
-import { ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import type { EnvironmentId, RuntimeMode } from "@t3tools/contracts";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 
-import { useAtomCommand } from "~/state/use-atom-command";
-
-import { CREW_NAME } from "../../../brand";
-import { AUTONOMY_LEVELS } from "../../../plain/autonomy";
-import { readAutonomy, writeAutonomy } from "../../../state/preferences";
-import { serverEnvironment } from "../../../state/server";
+import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../../../brand";
+import { AUTONOMY_LEVELS, describeAutonomyLevel } from "../../../plain/autonomy";
+import { writeAutonomy } from "../../../state/preferences";
+import {
+  useEnsureSafeServerDefault,
+  useServerDefaultRuntimeMode,
+  useSkycotPolicyEnabled,
+  useWriteServerDefaultRuntimeMode,
+} from "../../../state/autonomy";
 import { ListRow } from "../../../ui/ListRow";
 import { SegmentedControl } from "../../../ui/SegmentedControl";
 import { StepBadge } from "../../../ui/StepBadge";
 import {
-  ALWAYS_ASKS,
-  AUTONOMY_OPTIONS,
+  autonomyForRuntimeMode,
+  autonomyLevelOf,
+  HARD_RULE_TITLES,
+  hardRulesStatement,
+  PLAIN_AUTONOMY_OPTIONS,
   runtimeModeFor,
   type Autonomy,
 } from "../../compose/autonomy";
-import { useHandsOffMinutes, writeHandsOffMinutes } from "../localPrefs";
 import { SettingsGroup } from "../SettingsGroup";
 
-const LEVEL_INFO: Record<Autonomy, (typeof AUTONOMY_LEVELS)[keyof typeof AUTONOMY_LEVELS]> = {
-  "ask-first": AUTONOMY_LEVELS.askMeFirst,
-  carefully: AUTONOMY_LEVELS.justDoItCarefully,
-  "hands-off": AUTONOMY_LEVELS.fullyHandsOff,
-};
-
-/** The hard-rules sentence as rows, with the trailing full stop dropped. */
-export const HARD_RULES: ReadonlyArray<string> = ALWAYS_ASKS.replace(/\.$/, "")
-  .split(/,\s*|\s+or\s+/)
-  .map((rule) => rule.trim())
-  .filter((rule) => rule.length > 0)
-  .map((rule) => rule.charAt(0).toUpperCase() + rule.slice(1));
-
+/**
+ * Settings → Autonomy & safety. The engine's `defaultRuntimeMode` is the source of truth
+ * (SEC-03): the control shows what the server will do, not what this browser remembers.
+ * Only the two plain levels are offered; "Fully hands-off" is Advanced-mode only (SEC-01).
+ * The hard-rules list is generated from the shared rule table and introduced with a sentence
+ * that is true for this server: enforced only when it reports its policy is on.
+ */
 export function AutonomyPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const [autonomy, setAutonomy] = useState<Autonomy>(readAutonomy);
-  const timeBox = AUTONOMY_LEVELS.fullyHandsOff.timeBox!;
-  const minutes = useHandsOffMinutes(timeBox.defaultMinutes);
-  const settings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
-  const updateSettings = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
-  const info = LEVEL_INFO[autonomy];
+  useEnsureSafeServerDefault(environmentId);
+  const serverMode: RuntimeMode | null = useServerDefaultRuntimeMode(environmentId);
+  const writeServerMode = useWriteServerDefaultRuntimeMode(environmentId);
+  const policyEnforced = useSkycotPolicyEnabled(environmentId);
+
+  const serverAutonomy: Autonomy | null =
+    serverMode === null ? null : autonomyForRuntimeMode(serverMode);
+  const handsOffOnServer = serverMode === "full-access";
+  // The control can only show the plain levels; a hands-off server default is shown as a
+  // warning row with a one-tap way back instead of a selected segment.
+  const selected: Autonomy =
+    serverAutonomy === null || serverAutonomy === "hands-off" ? "ask-first" : serverAutonomy;
+  const info = AUTONOMY_LEVELS[autonomyLevelOf(selected)];
 
   const choose = (next: Autonomy) => {
-    setAutonomy(next);
     writeAutonomy(next);
-    // Keep the engine's own default in step so automations and the developer
-    // UI start from the same place as new conversations here.
-    const runtimeMode = runtimeModeFor(next, null);
-    if (settings && settings.defaultRuntimeMode !== runtimeMode) {
-      void updateSettings({ environmentId, input: { patch: { defaultRuntimeMode: runtimeMode } } });
-    }
+    void writeServerMode(runtimeModeFor(next, null));
   };
 
   return (
     <>
       <SettingsGroup
         title="How much should the AI do on its own?"
-        footer={`${info.description} ${info.hint}`}
+        footer={`${describeAutonomyLevel(autonomyLevelOf(selected), { policyEnforced })} ${info.hint}`}
       >
         <div className="fm-setting-block">
           <SegmentedControl
             label="Default autonomy"
-            value={autonomy}
+            value={selected}
             onChange={choose}
             block
-            options={AUTONOMY_OPTIONS.map((option) => ({
+            options={PLAIN_AUTONOMY_OPTIONS.map((option) => ({
               value: option.value,
               label: option.label,
               ...(option.tag ? { tag: option.tag } : {}),
             }))}
           />
-          {info.warning ? <p className="fm-setting-warning">{info.warning}</p> : null}
+          {handsOffOnServer ? (
+            <div className="fm-setting-warning" role="alert">
+              <p>
+                Your Mac is currently set to <b>{AUTONOMY_LEVELS.fullyHandsOff.label}</b> (chosen in{" "}
+                {ADVANCED_MODE_LABEL}). {AUTONOMY_LEVELS.fullyHandsOff.warning}
+              </p>
+              <button
+                type="button"
+                className="fm-btn fm-btn--primary fm-btn--sm"
+                onClick={() => choose("ask-first")}
+              >
+                Switch to {AUTONOMY_LEVELS.askMeFirst.label}
+              </button>
+            </div>
+          ) : null}
         </div>
       </SettingsGroup>
 
       <SettingsGroup
-        title="Hands-off timer"
-        footer="Fully hands-off switches itself back to Ask me first when the timer runs out, even mid-task."
+        title={`What ${PRODUCT_NAME} ${policyEnforced ? "always asks about" : "warns you about"}`}
+        footer={hardRulesStatement(policyEnforced, PRODUCT_NAME)}
       >
-        <ListRow
-          title="Switch off after"
-          subtitle="Applies every time you choose Fully hands-off."
-          trailing={
-            <select
-              className="fm-select"
-              aria-label="Hands-off timer"
-              value={String(minutes)}
-              onChange={(event) => writeHandsOffMinutes(Number(event.currentTarget.value))}
-            >
-              {timeBox.choicesMinutes.map((choice) => (
-                <option key={choice} value={String(choice)}>
-                  {choice < 60
-                    ? `${choice} minutes`
-                    : choice === 60
-                      ? "1 hour"
-                      : `${choice / 60} hours`}
-                </option>
-              ))}
-            </select>
-          }
-        />
-      </SettingsGroup>
-
-      <SettingsGroup
-        title={`${CREW_NAME} always asks before`}
-        footer="These can't be switched off. Each time is a fresh question, whatever the autonomy level."
-      >
-        {HARD_RULES.map((rule) => (
-          <ListRow key={rule} leading={<StepBadge state="ok" icon={ShieldCheck} />} title={rule} />
+        {HARD_RULE_TITLES.map((rule) => (
+          <ListRow
+            key={rule}
+            leading={
+              <StepBadge
+                state={policyEnforced ? "ok" : "warn"}
+                icon={policyEnforced ? ShieldCheck : ShieldAlert}
+              />
+            }
+            title={rule}
+          />
         ))}
       </SettingsGroup>
     </>

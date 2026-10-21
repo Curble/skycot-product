@@ -35,23 +35,38 @@ export const autonomy = {
   },
   justDoItCarefully: {
     label: "Just do it, carefully",
+    // Truthful about today's engine: without the server policy the provider itself decides.
     description:
-      "File changes happen without asking. Running things, installing add-ons and anything that leaves this project still needs your OK.",
+      "Edits happen without asking; the assistant decides when to ask before running something.",
+    // With the SKYCOT server policy on, every command is checked against the hard rules.
+    descriptionEnforced:
+      "Edits happen without asking. Every command is checked against the hard rules; you're only asked about the risky ones.",
     hint: "A good middle ground once you trust the task.",
   },
   fullyHandsOff: {
     label: "Fully hands-off",
     description:
       "Nothing is checked with you. The assistant can run any command on this computer, install anything and change any file.",
-    hint: "Only for tasks you completely trust. Switches itself off after the time you choose.",
+    hint: "Only for tasks you completely trust. Not offered here — Advanced mode only.",
     warning:
-      "Hands-off mode can delete files, spend money or send things to the internet without asking. Keep a restore point and a short timer.",
+      "Hands-off mode can delete files, spend money or send things to the internet without asking. No safety rules apply. Keep a restore point.",
   },
   fallback: (wanted: string, got: string, provider: string) =>
     `${provider} doesn't offer "${wanted}", so this conversation runs as "${got}" instead. That means more questions, never fewer.`,
   autoModeNote:
     "This assistant has its own built-in reviewer that waves through routine steps and asks you about the risky ones.",
 } as const;
+
+/**
+ * The one sentence that says what the hard rules guarantee. `enforced` is true only when the
+ * server reports the SKYCOT policy is on (ServerConfig.skycotPolicy); until then the client
+ * must not claim rules are enforced, because in "Just do it, carefully" the provider decides.
+ */
+export function hardRulesStatement(enforced: boolean, productName = "SKYCOT"): string {
+  return enforced
+    ? `${productName} checks every step against these rules on this computer and stops to ask when one matches — in Ask me first and Just do it, carefully. Fully hands-off (Advanced mode) asks nothing.`
+    : `In Ask me first, ${productName} shows you a question before every step. In Just do it, carefully, the assistant itself decides when to ask, so these rules shape the warnings on cards but are not enforced. Fully hands-off (Advanced mode) asks nothing.`;
+}
 
 export const care = {
   careful: {

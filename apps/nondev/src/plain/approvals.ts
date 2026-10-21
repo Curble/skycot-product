@@ -9,9 +9,24 @@ import type {
   UserInputAttachments,
 } from "@t3tools/contracts";
 
+import { readPolicyDecision, SKYCOT_POLICY_NOTE } from "@t3tools/skycot-rules/decision";
+import { isOutsideProject } from "@t3tools/skycot-rules/files";
+import {
+  describeMatches,
+  evaluateCommand,
+  evaluateFileChange,
+  evaluateFileRead,
+  isDestructiveCommand,
+  type RuleEvaluation,
+} from "@t3tools/skycot-rules/rules";
+
 import { describeFile, filesFromPrompt, type PromptFile } from "./changes";
 import { approvals as copy, buttons, scopes } from "./copy";
 import { classifyCommand, type CommandClassification } from "./narration";
+
+// The destructive-command table lives in the shared rules package (one table for the server
+// policy and the cards); re-exported so existing callers keep working.
+export { isDestructiveCommand };
 
 export type ApprovalScope = keyof typeof scopes;
 export type ApprovalRisk = "low" | "medium" | "high" | "blocked";
@@ -92,27 +107,66 @@ export interface ApprovalContext {
   readonly responseCapability?: OrchestrationV2RuntimeRequest["responseCapability"]["type"];
   /** Set when the autonomy level is "fully hands-off"; destructive asks still show. */
   readonly handsOff?: boolean;
+  /** The branch everyone sees, when known, so "push to live" can name it. */
+  readonly defaultBranch?: string | null;
 }
 
-const DESTRUCTIVE_ALWAYS_BLOCKED_PATTERNS: ReadonlyArray<RegExp> = [
-  /\brm\s+(-[a-zA-Z]*[rRf][a-zA-Z]*\s+)+/, // rm -rf / rm -r / rm -f
-  /\brmdir\b.*\/[sS]\b/, // Windows rmdir /s
-  /\bgit\s+push\b[^|;&]*(--force\b|-f\b|--force-with-lease\b|\s\+[\w/-]+)/,
-  /\bgit\s+push\b[^|;&]*\b(origin|upstream)\s+(main|master|production|prod|release)\b/,
-  /\bgit\s+push\b[^|;&]*\bHEAD:(main|master|production|prod)\b/,
-  /\b(DROP\s+(TABLE|DATABASE|SCHEMA)|TRUNCATE)\b/i,
-  /\bDELETE\s+FROM\s+\w+\s*;?\s*$/i,
-  /\|\s*(sudo\s+)?(ba|z|da)?sh\b/,
-  /\b(stripe|paypal|braintree|adyen)\b.*\b(charge|payment|payout|refund|transfer)s?\b/i,
-  /\b(charge|payment|payout|refund|transfer)s?\b.*\b(stripe|paypal|braintree|adyen)\b/i,
-  /\bgit\s+(reset\s+--hard|clean\s+-[a-zA-Z]*[fd]|filter-branch|filter-repo)\b/,
-  /\b(mkfs|dd\s+if=|:\(\)\s*\{\s*:\|:&\s*\};:)/,
-  /\bsudo\s+rm\b/,
-  /\bchmod\s+(-R\s+)?777\b/,
-];
+const RISK_ORDER: Record<ApprovalRisk, number> = { low: 0, medium: 1, high: 2, blocked: 3 };
 
-export function isDestructiveCommand(command: string): boolean {
-  return DESTRUCTIVE_ALWAYS_BLOCKED_PATTERNS.some((pattern) => pattern.test(command));
+function maxRisk(a: ApprovalRisk, b: ApprovalRisk): ApprovalRisk {
+  return RISK_ORDER[b] > RISK_ORDER[a] ? b : a;
+}
+
+/** Rules whose match means "this can't be undone" rather than "this leaves the project". */
+const IRREVERSIBLE_RULES = new Set([
+  "deletes-files",
+  "destructive-git",
+  "destructive-command",
+  "pushes-to-live",
+  "publishes-or-deploys",
+  "payments",
+]);
+
+export type ApprovalDecidedBy = "user" | "policy";
+
+export interface ApprovalDecisionSummary {
+  readonly decidedBy: ApprovalDecidedBy;
+  /** "You allowed this once" / "Allowed by SKYCOT rules". */
+  readonly label: string;
+  /** For "Show details": which rules were checked and matched. */
+  readonly note?: string;
+}
+
+/**
+ * Who answered a resolved request and how to say it. The server policy signs its approvals
+ * in `answers.skycot`; anything else was a person.
+ */
+export function describeDecision(
+  request: Pick<OrchestrationV2RuntimeRequest, "decision" | "answers" | "status">,
+): ApprovalDecisionSummary | null {
+  if (request.status === "pending") return null;
+  const policy = readPolicyDecision(request.answers);
+  if (policy !== null) {
+    return {
+      decidedBy: "policy",
+      label: `Allowed by SKYCOT rules — no hard rule matched`,
+      note: SKYCOT_POLICY_NOTE,
+    };
+  }
+  switch (request.decision) {
+    case "accept":
+      return { decidedBy: "user", label: "You allowed this once" };
+    case "acceptForSession":
+      return { decidedBy: "user", label: "You allowed this for the rest of the conversation" };
+    case "acceptAlways":
+      return { decidedBy: "user", label: "You allowed this for the whole project" };
+    case "decline":
+      return { decidedBy: "user", label: "You said no" };
+    case "cancel":
+      return { decidedBy: "user", label: "You stopped the assistant" };
+    case undefined:
+      return null;
+  }
 }
 
 function respond(
@@ -231,20 +285,24 @@ function firstLine(text: string | undefined, max = 400): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
-function isOutsideProject(path: string | undefined, projectRoot: string | undefined): boolean {
-  if (!path) return false;
-  if (/^(~|\$HOME|\/etc|\/usr|\/var|\/private|\/System|\/Library|C:\\)/.test(path))
-    return !projectRoot || !path.startsWith(projectRoot);
-  if (path.startsWith("/") && projectRoot) return !path.startsWith(projectRoot);
-  return /(^|\/)\.\.(\/|$)/.test(path);
-}
-
 function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
   const command = item.prompt ?? "";
   const classified: CommandClassification = classifyCommand(command);
-  const destructive = isDestructiveCommand(command) || classified.risk === "high";
-  const risk: ApprovalRisk = destructive ? "high" : classified.risk;
-  const whatItWants = `The assistant wants to ${classified.infinitive}.`;
+  const rules: RuleEvaluation = evaluateCommand(command, {
+    projectRoot: ctx.projectRoot,
+    defaultBranch: ctx.defaultBranch,
+  });
+  const irreversible =
+    rules.matches.some((match) => IRREVERSIBLE_RULES.has(match.rule.id)) ||
+    classified.risk === "high";
+  const outsideOnly =
+    !irreversible && rules.matches.some((match) => match.rule.id === "outside-project");
+  const destructive = irreversible;
+  const risk: ApprovalRisk = maxRisk(classified.risk, rules.risk);
+  const readsOutside = rules.matches.find((match) => match.rule.id === "reads-outside-project");
+  const whatItWants = readsOutside
+    ? `The assistant wants to read a file outside your project${readsOutside.detail ? ` (${readsOutside.detail})` : ""}.`
+    : `The assistant wants to ${classified.infinitive}.`;
   const packages = classified.packages ?? [];
   const sizeOrCost =
     classified.kind === "install"
@@ -264,19 +322,30 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
           : classified.kind === "read" || classified.kind === "search"
             ? "looking around the files"
             : `running "${classified.program ?? "this"}"`;
-  const allowAlways = classified.risk === "low" && classified.touches === "only this project";
+  const allowAlways =
+    rules.decision === "allow" &&
+    classified.risk === "low" &&
+    classified.touches === "only this project";
+  const ruleLine =
+    rules.matches.length > 0 ? `This step ${describeMatches(rules.matches)}.` : undefined;
   return finishCard(
     {
-      title: destructive ? "Careful — this can't be undone" : "May I run this?",
+      title: destructive
+        ? "Careful — this can't be undone"
+        : outsideOnly
+          ? "May I work outside the project?"
+          : "May I run this?",
       whatItWants,
-      whyItMatters: whyCommandMatters(classified),
-      scope: classified.touches,
+      whyItMatters: ruleLine ?? whyCommandMatters(classified),
+      scope: readsOutside || outsideOnly ? "your computer" : classified.touches,
       sizeOrCost,
       ifYouSayNo: copy.ifNoCommand,
       risk,
       warning: destructive
         ? `${classified.warning ?? "This command deletes, overwrites or publishes something."} ${copy.destructiveWarning}`
-        : undefined,
+        : outsideOnly
+          ? `This touches files outside the project folder. ${copy.destructiveWarning}`
+          : undefined,
       options: buildApprovalOptions(item.requestId, risk, alwaysWhat, item.options, allowAlways),
       technical: command,
     },
@@ -357,29 +426,45 @@ function fileChangePhrase(files: ReadonlyArray<DescribedPromptFile>): string {
 
 function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
   const files = describePromptFiles(item.prompt, ctx.projectRoot);
+  const rules = evaluateFileChange(files, { projectRoot: ctx.projectRoot });
   const outside = files.some((file) => file.outside);
+  const deletes = files.some((file) => file.operation === "remove");
   const sensitive = files.some((file) => file.isConfigOrSecret);
-  const risk: ApprovalRisk = outside ? "high" : sensitive ? "medium" : "low";
+  // Any delete is a hard rule (QA2-03): red card, once-only buttons.
+  const risk: ApprovalRisk = maxRisk(
+    deletes || outside ? "high" : sensitive ? "medium" : "low",
+    rules.risk,
+  );
   const outsideNoun = files.length > 1 ? "At least one of these files is" : "This file is";
+  const deleteNoun =
+    files.filter((file) => file.operation === "remove").length > 1 ? "These files" : "This file";
   return finishCard(
     {
-      title: files.length > 1 ? "May I change these files?" : "May I change this file?",
+      title: deletes
+        ? "Careful — this deletes a file"
+        : files.length > 1
+          ? "May I change these files?"
+          : "May I change this file?",
       whatItWants: `The assistant wants to ${fileChangePhrase(files)}.`,
-      whyItMatters: sensitive
-        ? "This touches a settings or secrets file. Mistakes here can break the project or leak keys."
-        : "Every change gets a restore point, so you can always go back.",
+      whyItMatters: deletes
+        ? "Deleting is a hard rule: it is never done without a fresh question from you."
+        : sensitive
+          ? "This touches a settings or secrets file. Mistakes here can break the project or leak keys."
+          : "Every change gets a restore point, so you can always go back.",
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileChange,
       risk,
-      warning: outside
-        ? `${outsideNoun} outside the project folder. ${copy.destructiveWarning}`
-        : undefined,
+      warning: deletes
+        ? `${deleteNoun} will be deleted. ${copy.destructiveWarning}`
+        : outside
+          ? `${outsideNoun} outside the project folder. ${copy.destructiveWarning}`
+          : undefined,
       options: buildApprovalOptions(
         item.requestId,
         risk,
         "file changes",
         item.options,
-        !outside && !sensitive,
+        rules.decision === "allow" && !sensitive,
       ),
       technical: item.prompt ?? "file change",
     },
@@ -393,7 +478,8 @@ function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): App
   const secret = files.some(
     (file) => file.isConfigOrSecret && /\.env|secret|credential|\.pem|\.key/i.test(file.path),
   );
-  const risk: ApprovalRisk = secret ? "medium" : outside ? "medium" : "low";
+  const rules = evaluateFileRead(files, { projectRoot: ctx.projectRoot });
+  const risk: ApprovalRisk = maxRisk(secret ? "medium" : outside ? "medium" : "low", rules.risk);
   const what =
     files.length === 0
       ? "a file"
@@ -403,11 +489,13 @@ function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): App
   return finishCard(
     {
       title: files.length > 1 ? "May I read these files?" : "May I read this file?",
-      whatItWants: `The assistant wants to read ${what}.`,
+      whatItWants: outside
+        ? `The assistant wants to read ${what} — a file outside your project.`
+        : `The assistant wants to read ${what}.`,
       whyItMatters: secret
         ? "This file holds secrets. The assistant's service would see them."
         : outside
-          ? "This file is outside the project. Reading can't change it, but the assistant's service would see its contents."
+          ? "This reads a file outside your project. Reading can't change it, but the assistant's service would see its contents."
           : "Reading can't change anything. The assistant just needs to see what's there.",
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileRead,

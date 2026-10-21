@@ -1,6 +1,10 @@
 import type { ProviderOptionDescriptor, RuntimeMode } from "@t3tools/contracts";
 
-import { autonomy as copy, care as careCopy } from "./copy";
+import { HARD_RULES, type HardRule } from "@t3tools/skycot-rules/rules";
+
+import { autonomy as copy, care as careCopy, hardRulesStatement } from "./copy";
+
+export { HARD_RULES, hardRulesStatement, type HardRule };
 
 export type AutonomyLevel = "askMeFirst" | "justDoItCarefully" | "fullyHandsOff";
 
@@ -12,12 +16,6 @@ export interface AutonomyLevelInfo {
   readonly hint: string;
   readonly risk: "low" | "medium" | "high";
   readonly warning?: string;
-  /** Hands-off switches itself off; the UI shows a countdown and a banner while active. */
-  readonly timeBox?: {
-    readonly defaultMinutes: number;
-    readonly maxMinutes: number;
-    readonly choicesMinutes: ReadonlyArray<number>;
-  };
   readonly advanced: string;
 }
 
@@ -50,7 +48,6 @@ export const AUTONOMY_LEVELS: Readonly<Record<AutonomyLevel, AutonomyLevelInfo>>
     hint: copy.fullyHandsOff.hint,
     risk: "high",
     warning: copy.fullyHandsOff.warning,
-    timeBox: { defaultMinutes: 60, maxMinutes: 240, choicesMinutes: [15, 30, 60, 120, 240] },
     advanced: "Advanced: permission mode 'full-access' (no prompts, no sandbox)",
   },
 };
@@ -60,6 +57,49 @@ export const AUTONOMY_ORDER: ReadonlyArray<AutonomyLevel> = [
   "justDoItCarefully",
   "fullyHandsOff",
 ];
+
+/**
+ * The levels a plain surface (composer, onboarding, Settings) may offer. "Fully hands-off"
+ * stays in the data model for Advanced mode and for profiles that hide it, but it is never a
+ * plain choice: it asks nothing, so no safety promise can be kept there (SEC-01).
+ */
+export const PLAIN_AUTONOMY_ORDER: ReadonlyArray<AutonomyLevel> = [
+  "askMeFirst",
+  "justDoItCarefully",
+];
+
+export function plainAutonomyLevels(): ReadonlyArray<AutonomyLevelInfo> {
+  return PLAIN_AUTONOMY_ORDER.map((level) => AUTONOMY_LEVELS[level]);
+}
+
+export function isPlainAutonomyLevel(level: AutonomyLevel): boolean {
+  return PLAIN_AUTONOMY_ORDER.includes(level);
+}
+
+export interface AutonomyPolicyContext {
+  /** True only when the server reports `skycotPolicy: true` in its config. */
+  readonly policyEnforced: boolean;
+}
+
+/**
+ * The description to show for a level, honest about enforcement. Only the middle level
+ * changes: with the server policy on, every command is checked against the hard rules; off,
+ * the provider decides when to ask.
+ */
+export function describeAutonomyLevel(
+  level: AutonomyLevel,
+  context: AutonomyPolicyContext = { policyEnforced: false },
+): string {
+  if (level === "justDoItCarefully" && context.policyEnforced) {
+    return copy.justDoItCarefully.descriptionEnforced;
+  }
+  return AUTONOMY_LEVELS[level].description;
+}
+
+/** The hard-rule rows Settings lists, in order. */
+export function hardRuleTitles(): ReadonlyArray<string> {
+  return HARD_RULES.map((rule) => rule.title);
+}
 
 export function autonomyToRuntimeMode(level: AutonomyLevel): RuntimeMode {
   return AUTONOMY_LEVELS[level].runtimeMode;

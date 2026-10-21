@@ -7,8 +7,16 @@ import type {
   ProviderApprovalDecision,
 } from "@t3tools/contracts";
 
+import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
+import { isOutsideProject } from "@t3tools/skycot-rules/files";
+import { programTokens, splitShellSegments, unwrapShellWrapper } from "@t3tools/skycot-rules/shell";
+
 import { describeFile, humanizeFileName } from "./changes";
 import { errors, progress } from "./copy";
+
+// The shell primitives live in the shared rules package so the server policy and the
+// narrator split a command identically; re-exported for the tests and callers that had them.
+export { splitShellSegments, unwrapShellWrapper };
 
 export type NarrationKind =
   | "message"
@@ -43,7 +51,8 @@ export interface NarrationContext {
   /** Lets the narrator say "denied" for approvals the user declined. */
   readonly runtimeRequests?: ReadonlyMap<
     string,
-    Pick<OrchestrationV2RuntimeRequest, "decision" | "status">
+    Pick<OrchestrationV2RuntimeRequest, "decision" | "status"> &
+      Partial<Pick<OrchestrationV2RuntimeRequest, "answers">>
   >;
 }
 
@@ -334,141 +343,6 @@ function capitalize(text: string): string {
 }
 
 /** Splits on `&&`, `;`, `||` and `|` outside quotes. Good enough for narration, not for execution. */
-export function splitShellSegments(command: string): Array<string> {
-  const segments: Array<string> = [];
-  let current = "";
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < command.length; i += 1) {
-    const ch = command[i]!;
-    if (quote) {
-      current += ch;
-      if (ch === quote && command[i - 1] !== "\\") quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      current += ch;
-      continue;
-    }
-    const pair = command.slice(i, i + 2);
-    if (pair === "&&" || pair === "||") {
-      segments.push(current);
-      current = "";
-      i += 1;
-      continue;
-    }
-    if (ch === ";" || ch === "|" || ch === "\n") {
-      segments.push(current);
-      current = "";
-      continue;
-    }
-    current += ch;
-  }
-  segments.push(current);
-  return segments.map((segment) => segment.trim()).filter((segment) => segment.length > 0);
-}
-
-function tokenize(segment: string): Array<string> {
-  const tokens = segment.match(/"(?:[^"\\]|\\.)*"|'[^']*'|\S+/g) ?? [];
-  return tokens.map((token) => token.replace(/^["']|["']$/g, ""));
-}
-
-/** Drops `cd x`, env assignments, `sudo`, `time`, `exec` and shell wrappers to find the real program. */
-/** `for f in …`, `if …`, `done`: shell control words, not programs. */
-const SHELL_CONTROL = new Set([
-  "for",
-  "if",
-  "elif",
-  "while",
-  "until",
-  "case",
-  "select",
-  "done",
-  "fi",
-  "esac",
-  "}",
-  ")",
-  "{",
-  "(",
-]);
-const SHELL_PREFIX = new Set(["do", "then", "else"]);
-
-function programTokens(segment: string): Array<string> {
-  let tokens = tokenize(segment);
-  // Strip leading env assignments and transparent wrappers.
-  while (tokens.length > 0) {
-    const head = tokens[0]!;
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) tokens = tokens.slice(1);
-    else if (
-      head === "env" ||
-      head === "time" ||
-      head === "exec" ||
-      head === "command" ||
-      head === "nice" ||
-      head === "nohup"
-    )
-      tokens = tokens.slice(1);
-    else if (head === "sudo" || head === "doas") tokens = tokens.slice(1);
-    else if (SHELL_PREFIX.has(head)) tokens = tokens.slice(1);
-    else break;
-  }
-  if (tokens.length > 0 && SHELL_CONTROL.has(tokens[0]!)) return [];
-  // `bash -c "…"` / `/bin/zsh -lc "…"`: look inside.
-  if (
-    tokens.length >= 3 &&
-    /^(ba|z|da|k)?sh$/.test(tokens[0]!.split("/").at(-1)!) &&
-    /^-[a-z]*c[a-z]*$/.test(tokens[1]!)
-  ) {
-    return programTokens(tokens.slice(2).join(" "));
-  }
-  return tokens;
-}
-
-/**
- * Codex runs everything as `/bin/zsh -lc "<script>"`; narrate the script
- * itself so `pwd && cat x` reads as two steps, not one mysterious program.
- * Quoting layers are peeled the way a shell would, including the
- * `"…'"'!x'"'…"` concatenations Codex emits.
- */
-export function unwrapShellWrapper(command: string): string {
-  const raw = command.match(/"(?:[^"\\]|\\.)*"|'[^']*'|\S+/g) ?? [];
-  let index = 0;
-  while (index < raw.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(raw[index]!)) index += 1;
-  const program = raw[index]?.split("/").at(-1);
-  const flag = raw[index + 1];
-  if (!program || !/^(ba|z|da|k)?sh$/.test(program) || !flag || !/^-[a-z]*c[a-z]*$/.test(flag)) {
-    return command;
-  }
-  let position = 0;
-  for (let i = 0; i <= index + 1; i += 1)
-    position = command.indexOf(raw[i]!, position) + raw[i]!.length;
-  return shellUnquote(command.slice(position).trim());
-}
-
-function shellUnquote(text: string): string {
-  let out = "";
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i]!;
-    if (quote === "'") {
-      if (ch === "'") quote = null;
-      else out += ch;
-    } else if (quote === '"') {
-      if (ch === "\\" && i + 1 < text.length && /["\\$`]/.test(text[i + 1]!)) {
-        out += text[i + 1]!;
-        i += 1;
-      } else if (ch === '"') quote = null;
-      else out += ch;
-    } else if (ch === "'" || ch === '"') quote = ch;
-    else if (ch === "\\" && i + 1 < text.length) {
-      out += text[i + 1]!;
-      i += 1;
-    } else out += ch;
-  }
-  return out;
-}
-
-/** `python3 - <<'PY' … PY`: the command is `python3 -`; the body is the script, not more steps. */
 const HEREDOC_PATTERN = /<<-?\s*['"]?\w+['"]?[\s\S]*$/;
 
 function stripFlags(args: ReadonlyArray<string>): Array<string> {
@@ -999,24 +873,35 @@ function classifySegment(segment: string): CommandClassification | null {
             ? `the "${humanizeFileName(targets[0]!)}" folder and everything in it`
             : describeFile(targets[0]!).noun
           : `${pluralize(targets.length, "file or folder", "files or folders")}`;
-    if (recursive || dangerousPath) {
-      return make(
-        "command",
-        "high",
-        verb(`delete ${what}`, `deleted ${what}`, `deleting ${what}`),
-        dangerousPath ? "your computer" : "only this project",
-        {
-          warning:
-            "Deleting a folder removes everything inside it. This can't be undone from inside the app.",
-        },
-      );
-    }
-    return make("command", "medium", verb(`delete ${what}`, `deleted ${what}`, `deleting ${what}`));
+    // Every delete is a hard rule (QA2-03): high risk, once-only approval, however small.
+    return make(
+      "command",
+      "high",
+      verb(`delete ${what}`, `deleted ${what}`, `deleting ${what}`),
+      dangerousPath ? "your computer" : "only this project",
+      {
+        warning: recursive
+          ? "Deleting a folder removes everything inside it. This can't be undone from inside the app."
+          : "Deleting can't be undone from inside the app.",
+      },
+    );
   }
 
   if (READ_PROGRAMS.has(base)) {
     // `head -n 40 menu.html`: the count is a flag value, not a file.
     const targets = stripFlags(args).filter((arg) => !arg.startsWith("$") && !/^\d+$/.test(arg));
+    if (targets.some((target) => isOutsideProject(target, undefined))) {
+      return make(
+        "read",
+        "medium",
+        verb(
+          "read a file outside your project",
+          "read a file outside your project",
+          "reading a file outside your project",
+        ),
+        "your computer",
+      );
+    }
     if (targets.length > 0 && /^(cat|head|tail|less|more|bat|stat|file)$/.test(base)) {
       return make("read", "low", lookAt(targets));
     }
@@ -1050,6 +935,18 @@ function classifySegment(segment: string): CommandClassification | null {
     );
   }
   if (SEARCH_PROGRAMS.has(base)) {
+    if (stripFlags(args).some((target) => isOutsideProject(target, undefined))) {
+      return make(
+        "search",
+        "medium",
+        verb(
+          "search files outside your project",
+          "searched files outside your project",
+          "searching files outside your project",
+        ),
+        "your computer",
+      );
+    }
     if (args.includes("--files")) {
       return make(
         "read",
@@ -1744,9 +1641,12 @@ export function describeTurnItem(
               : item.requestKind === "mcp-elicitation" || item.requestKind === "permission"
                 ? `use ${item.appName ?? "a connected app"}`
                 : "do something";
+      const policy = readPolicyDecision(request?.answers);
       const headline =
         status === "done"
-          ? `You allowed the assistant to ${subject}`
+          ? policy !== null
+            ? `SKYCOT rules allowed the assistant to ${subject}`
+            : `You allowed the assistant to ${subject}`
           : status === "denied"
             ? `You said no to: ${subject}`
             : `The assistant wants to ${subject}`;
@@ -1754,7 +1654,7 @@ export function describeTurnItem(
         item.requestKind === "command" && item.prompt ? classifyCommand(item.prompt) : undefined;
       return {
         headline,
-        detail: classified?.warning,
+        detail: policy !== null && status === "done" ? policy.note : classified?.warning,
         kind:
           item.requestKind === "command"
             ? (classified?.kind ?? "command")

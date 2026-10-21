@@ -81,7 +81,7 @@ describe("classifyCommand", () => {
       "Ran a short python3 program",
     ],
     ["node -e 'console.log(1)'", "command", "medium", "Ran a short node program"],
-    ["rm build/cache.json", "command", "medium", "Deleted the cache data file"],
+    ["rm build/cache.json", "command", "high", "Deleted the cache data file"],
   ])("%s → %s/%s", (command, kind, risk, past) => {
     const classified = classifyCommand(command);
     expect(classified.kind).toBe(kind);

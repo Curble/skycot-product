@@ -3,9 +3,15 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   AUTONOMY_LEVELS,
   DEFAULT_AUTONOMY,
+  HARD_RULES,
   autoModeNote,
   autonomyToRuntimeMode,
+  describeAutonomyLevel,
   describeSpeedCare,
+  hardRuleTitles,
+  hardRulesStatement,
+  isPlainAutonomyLevel,
+  plainAutonomyLevels,
   resolveAutonomyForProvider,
   runtimeModeToAutonomy,
 } from "./autonomy";
@@ -26,16 +32,41 @@ describe("autonomy levels", () => {
     expect(runtimeModeToAutonomy("full-access")).toBe("fullyHandsOff");
   });
 
-  it("flags hands-off as high risk with a warning and a time box", () => {
+  it("flags hands-off as high risk with a warning that admits no rules apply", () => {
     const handsOff = AUTONOMY_LEVELS.fullyHandsOff;
     expect(handsOff.risk).toBe("high");
     expect(handsOff.warning).toMatch(/delete files|spend money/);
-    expect(handsOff.timeBox).toEqual({
-      defaultMinutes: 60,
-      maxMinutes: 240,
-      choicesMinutes: [15, 30, 60, 120, 240],
-    });
-    expect(AUTONOMY_LEVELS.askMeFirst.timeBox).toBeUndefined();
+    expect(handsOff.warning).toMatch(/No safety rules apply/);
+    expect(handsOff.hint).not.toMatch(/switches itself/i);
+  });
+
+  it("offers only the two asking levels on plain surfaces", () => {
+    expect(plainAutonomyLevels().map((level) => level.level)).toEqual([
+      "askMeFirst",
+      "justDoItCarefully",
+    ]);
+    expect(isPlainAutonomyLevel("fullyHandsOff")).toBe(false);
+    expect(AUTONOMY_LEVELS.fullyHandsOff).toBeDefined();
+  });
+
+  it("describes the middle level truthfully for each enforcement state", () => {
+    expect(describeAutonomyLevel("justDoItCarefully")).toBe(
+      "Edits happen without asking; the assistant decides when to ask before running something.",
+    );
+    expect(describeAutonomyLevel("justDoItCarefully", { policyEnforced: true })).toMatch(
+      /checked against the hard rules/,
+    );
+    expect(describeAutonomyLevel("askMeFirst", { policyEnforced: true })).toBe(
+      AUTONOMY_LEVELS.askMeFirst.description,
+    );
+  });
+
+  it("states the hard-rules guarantee only when the server enforces it", () => {
+    expect(hardRulesStatement(false)).toMatch(/not enforced/);
+    expect(hardRulesStatement(false)).not.toMatch(/every mode/);
+    expect(hardRulesStatement(true)).toMatch(/stops to ask when one matches/);
+    expect(hardRuleTitles()).toContain("Deleting files or folders");
+    expect(hardRuleTitles().length).toBe(HARD_RULES.length);
   });
 });
 

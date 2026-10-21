@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { describeRuntimeRequest, isDestructiveCommand, type ApprovalCard } from "./approvals";
+import {
+  describeDecision,
+  describeRuntimeRequest,
+  isDestructiveCommand,
+  type ApprovalCard,
+} from "./approvals";
 import { items, runtimeRequest } from "./fixtures.test-helpers";
 
 function decisions(card: ApprovalCard): Array<string> {
@@ -317,5 +322,113 @@ describe("isDestructiveCommand", () => {
     "DELETE FROM a WHERE id = 1",
   ])("not %s", (command) => {
     expect(isDestructiveCommand(command)).toBe(false);
+  });
+});
+
+describe("hard rules on cards (QA2-03)", () => {
+  it("treats every delete command as high risk with once-only buttons", () => {
+    for (const prompt of ["rm book.html", "trash old.html", "git rm book.html", "rmdir old"]) {
+      const card = describeRuntimeRequest(items.approval("command", { prompt }), {
+        projectRoot: "/Users/me/site",
+      });
+      expect(card.risk).toBe("high");
+      expect(card.title).toBe("Careful — this can't be undone");
+      expect(decisions(card)).toEqual(["accept", "decline"]);
+      expect(card.whyItMatters).toContain("deletes files or folders");
+    }
+  });
+
+  it("treats a file-change delete as high risk with once-only buttons", () => {
+    const card = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "delete /Users/me/site/book.html" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(card.risk).toBe("high");
+    expect(card.title).toBe("Careful — this deletes a file");
+    expect(card.whatItWants).toBe("The assistant wants to delete the book page.");
+    expect(decisions(card)).toEqual(["accept", "decline"]);
+    expect(card.warning).toContain("will be deleted");
+    expect(card.whyItMatters).toContain("no 'always allow'");
+  });
+
+  it("marks reads outside the project as medium with the agreed wording", () => {
+    const cat = describeRuntimeRequest(
+      items.approval("command", { prompt: "cat /Users/me/t3code-nondev/AGENTS.md" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(cat.risk).toBe("medium");
+    expect(cat.scope).toBe("your computer");
+    expect(cat.whatItWants).toMatch(/^The assistant wants to read a file outside your project/);
+    expect(cat.whyItMatters).toBe("This step reads a file outside your project.");
+    expect(decisions(cat)).not.toContain("acceptAlways");
+    const rg = describeRuntimeRequest(
+      items.approval("command", { prompt: "rg TODO ../other-site" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(rg.risk).toBe("medium");
+    const read = describeRuntimeRequest(items.approval("file-read", { prompt: "/etc/hosts" }), {
+      projectRoot: "/Users/me/site",
+    });
+    expect(read.risk).toBe("medium");
+    expect(read.whatItWants).toMatch(/a file outside your project\.$/);
+    expect(decisions(read)).not.toContain("acceptAlways");
+  });
+
+  it("holds writes and runs outside the project as high", () => {
+    const card = describeRuntimeRequest(
+      items.approval("command", { prompt: "cp menu.html /Users/me/Desktop/menu.html" }),
+      { projectRoot: "/Users/me/site" },
+    );
+    expect(card.risk).toBe("high");
+    expect(card.title).toBe("May I work outside the project?");
+    expect(card.scope).toBe("your computer");
+    expect(decisions(card)).toEqual(["accept", "decline"]);
+  });
+
+  it("names the live branch from the context", () => {
+    const card = describeRuntimeRequest(
+      items.approval("command", { prompt: "git push origin www" }),
+      {
+        projectRoot: "/Users/me/site",
+        defaultBranch: "www",
+      },
+    );
+    expect(card.risk).toBe("high");
+    expect(card.whyItMatters).toContain("uploads to the live version");
+  });
+
+  it("keeps routine in-project commands low risk with an always option", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "pnpm test" }), {
+      projectRoot: "/Users/me/site",
+    });
+    expect(card.risk).toBe("low");
+    expect(decisions(card)).toContain("acceptAlways");
+  });
+});
+
+describe("describeDecision", () => {
+  it("tells a policy approval from a person's", () => {
+    const policy = describeDecision(
+      runtimeRequest({
+        status: "resolved",
+        decision: "accept",
+        answers: {
+          skycot: { decidedBy: "policy", note: "allowed by SKYCOT rules", ruleIds: [], version: 1 },
+        },
+      }),
+    );
+    expect(policy).toEqual({
+      decidedBy: "policy",
+      label: "Allowed by SKYCOT rules — no hard rule matched",
+      note: "allowed by SKYCOT rules",
+    });
+    expect(describeDecision(runtimeRequest({ status: "resolved", decision: "accept" }))).toEqual({
+      decidedBy: "user",
+      label: "You allowed this once",
+    });
+    expect(
+      describeDecision(runtimeRequest({ status: "resolved", decision: "decline" }))?.label,
+    ).toBe("You said no");
+    expect(describeDecision(runtimeRequest({ status: "pending" }))).toBeNull();
   });
 });
