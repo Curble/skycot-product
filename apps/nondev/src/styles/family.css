@@ -2,14 +2,6 @@
    pill. Tokens from styles/apple.css; the code prompts are data-sober so
    flavours.css leaves them plain in every theme. */
 
-/* ---- Larger text ---------------------------------------------------------
-   One attribute on <html>, one rule: every length in the app is in CSS px, so
-   zoom scales type, controls and spacing together. Viewport units are not
-   zoomed, so sheets still fit the window. */
-html[data-text="large"] {
-  zoom: 1.12;
-}
-
 /* ---- Set-up form ------------------------------------------------------- */
 .fm-family-setup {
   display: flex;
@@ -50,7 +42,7 @@ html[data-text="large"] {
   border: 1px solid var(--fm-sep);
   border-radius: var(--fm-radius-md);
   background: var(--fm-bg-card);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fm-text-scale));
   line-height: 1.45;
 }
 .fm-family-honesty--compact {
@@ -63,7 +55,7 @@ html[data-text="large"] {
 }
 .fm-family-honesty h4 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   font-weight: 600;
   color: var(--fm-label-2);
 }
@@ -107,7 +99,7 @@ html[data-text="large"] {
   max-width: 320px;
 }
 .fm-family-code .fm-field {
-  font-size: 18px;
+  font-size: calc(18px * var(--fm-text-scale));
   letter-spacing: 0.3em;
   font-family: var(--fm-mono);
 }
@@ -131,11 +123,11 @@ html[data-text="large"] {
   border-radius: 999px;
   background: var(--fm-bg-fill-2);
   color: var(--fm-label);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   font-weight: 600;
 }
 .fm-family-lock__note {
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 
@@ -163,10 +155,10 @@ html[data-text="large"] {
   min-width: 0;
 }
 .fm-family-status__text b {
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
 }
 .fm-family-status__text small {
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 .fm-family-inline {
@@ -244,11 +236,11 @@ html[data-text="large"] {
 }
 .fm-who__title {
   font-family: var(--fm-font-label);
-  font-size: 15px;
+  font-size: calc(15px * var(--fm-text-scale));
   font-weight: 700;
 }
 .fm-who__text {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fm-text-scale));
   line-height: 1.45;
   color: var(--fm-label-2);
 }

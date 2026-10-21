@@ -325,26 +325,26 @@ html[data-flavour-labels="handwritten"] .fm-question__header,
 html[data-flavour-labels="handwritten"] .fm-review__area-title,
 html[data-flavour-labels="handwritten"] .fm-md--plan h3,
 html[data-flavour-labels="handwritten"] .fm-md--plan h4 {
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fm-label-2);
 }
 html[data-flavour-labels="handwritten"] .fm-home__greeting {
-  font-size: 30px;
+  font-size: calc(30px * var(--fm-text-scale));
   font-weight: 400;
   letter-spacing: 0;
 }
 html[data-flavour-labels="handwritten"] .fm-list-column__title,
 html[data-flavour-labels="handwritten"] .fm-settings__title,
 html[data-flavour-labels="handwritten"] .fm-standalone__title {
-  font-size: 24px;
+  font-size: calc(24px * var(--fm-text-scale));
   font-weight: 400;
   letter-spacing: 0;
 }
 html[data-flavour-labels="handwritten"] .fm-sheet__title {
-  font-size: 21px;
+  font-size: calc(21px * var(--fm-text-scale));
   font-weight: 400;
 }
 html[data-flavour-labels="handwritten"] .fm-card__title,
@@ -358,11 +358,11 @@ html[data-flavour-labels="handwritten"] .fm-titlebar__title {
   font-weight: 400;
 }
 html[data-flavour-labels="handwritten"] .fm-titlebar__title {
-  font-size: 17px;
+  font-size: calc(17px * var(--fm-text-scale));
 }
 html[data-flavour-labels="handwritten"] .fm-titlebar__title span {
   font-family: var(--fm-font);
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
 }
 /* Marker underline: a yellow swipe behind the words, hand-skewed. */
 html[data-flavour-labels="handwritten"] .fm-marker-underline {
@@ -396,7 +396,7 @@ html[data-flavour-labels="serif"] .fm-sheet__title {
   letter-spacing: -0.01em;
 }
 html[data-flavour-labels="serif"] .fm-home__greeting {
-  font-size: 28px;
+  font-size: calc(28px * var(--fm-text-scale));
 }
 html[data-flavour-labels="serif"] .fm-sidebar-section__title,
 html[data-flavour-labels="serif"] .fm-list-column__group,
@@ -405,7 +405,7 @@ html[data-flavour-labels="serif"] .fm-inspector__title,
 html[data-flavour-labels="serif"] .fm-review__area-title {
   font-style: italic;
   font-weight: 500;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fm-text-scale));
   letter-spacing: 0;
   text-transform: none;
 }
@@ -446,12 +446,12 @@ html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__icon {
 html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__title {
   font-family: var(--fm-font-label);
   font-weight: 400;
-  font-size: 16px;
+  font-size: calc(16px * var(--fm-text-scale));
 }
 html[data-flavour-cards="sticky"] .fm-card--tip .fm-card__subtitle,
 html[data-flavour-cards="sticky"] .fm-tip {
   color: var(--fm-label);
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
 }
 html[data-flavour-cards="sticky"] .fm-tip {
   margin-top: 14px;
@@ -490,7 +490,7 @@ html[data-flavour-cards="sticky"] .fm-tm__explainer::before {
   align-items: center;
   gap: 8px;
   padding: 4px 10px 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   min-width: 0;
 }
 .fm-crew-roster__text {
@@ -503,7 +503,7 @@ html[data-flavour-cards="sticky"] .fm-tm__explainer::before {
 }
 .fm-crew-roster__text small {
   display: block;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--fm-text-scale));
   color: var(--fm-label-2);
   white-space: nowrap;
   overflow: hidden;
@@ -520,7 +520,7 @@ html[data-flavour-cards="sticky"] .fm-tm__explainer::before {
   align-items: center;
   gap: 6px;
   margin: 0 0 6px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fm-text-scale));
   font-weight: 600;
   color: var(--fm-label-2);
 }
@@ -570,7 +570,7 @@ html[data-flavour-accent-shape="square"] .fm-btn--primary,
 html[data-flavour-accent-shape="square"] .fm-chip--on {
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
 }
 
 /* ---------------------------------------------------------------------------

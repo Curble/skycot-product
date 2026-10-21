@@ -30,7 +30,7 @@
   -webkit-app-region: no-drag;
 }
 .fm-titlebar__title {
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -79,7 +79,7 @@
   margin-top: auto;
   padding: 10px 6px 2px;
   border-top: 1px solid var(--fm-sidebar-line);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 .fm-sidebar__footer-row {
@@ -129,7 +129,7 @@
 .fm-list-column__title {
   margin: 0;
   font-family: var(--fm-font-label);
-  font-size: 20px;
+  font-size: calc(20px * var(--fm-text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -145,7 +145,7 @@
 .fm-list-column__group {
   padding: 10px 8px 4px;
   font-family: var(--fm-font-label);
-  font-size: 11px;
+  font-size: calc(11px * var(--fm-text-scale));
   font-weight: 700;
   color: var(--fm-label-3);
   letter-spacing: 0.01em;
@@ -223,7 +223,7 @@
   gap: 8px;
 }
 .fm-convrow__title {
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   font-weight: 600;
   line-height: 1.25;
   display: -webkit-box;
@@ -233,14 +233,14 @@
   overflow-wrap: anywhere;
 }
 .fm-convrow__time {
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
   white-space: nowrap;
   align-self: start;
   padding-top: 1px;
 }
 .fm-convrow__preview {
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   line-height: 1.3;
   color: var(--fm-label-2);
   display: -webkit-box;
@@ -269,7 +269,7 @@
 }
 .fm-conv-header__name {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -281,7 +281,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   line-height: 1.3;
   color: var(--fm-label-2);
   overflow: hidden;
@@ -301,7 +301,7 @@
   padding: 8px 18px;
   border-bottom: 1px solid var(--fm-sep-2);
   background: var(--fm-bg-window);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
   white-space: nowrap;
   overflow: hidden;
@@ -359,7 +359,7 @@
   margin-bottom: 10px;
 }
 .fm-composer__label {
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 .fm-composer__field {
@@ -390,7 +390,7 @@
   border: 0;
   background: transparent;
   color: var(--fm-label);
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   line-height: 1.4;
   resize: none;
   outline: none;
@@ -433,7 +433,7 @@
   align-items: center;
   gap: 10px;
   margin-top: 8px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--fm-text-scale));
   color: var(--fm-label-3);
 }
 .fm-composer__foot > span {
@@ -461,13 +461,13 @@
 .fm-home__greeting {
   margin: 0;
   font-family: var(--fm-font-label);
-  font-size: 22px;
+  font-size: calc(22px * var(--fm-text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .fm-home__sub {
   margin: 2px 0 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 .fm-home__nav {
@@ -527,13 +527,13 @@
 .fm-standalone__title {
   margin: 0;
   font-family: var(--fm-font-label);
-  font-size: 20px;
+  font-size: calc(20px * var(--fm-text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .fm-standalone__text {
   margin: 8px 0 0;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--fm-text-scale));
   line-height: 1.5;
   color: var(--fm-label-2);
 }
@@ -556,7 +556,7 @@
   border-radius: 10px;
   background: var(--fm-bg-fill);
   box-shadow: inset 0 0 0 0.5px var(--fm-sep-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   line-height: 1.5;
   color: var(--fm-label-2);
   text-align: left;
@@ -579,19 +579,26 @@ html.dark .fm-standalone__foot {
 }
 .fm-browse__crumbs {
   flex: 1;
+  display: flex;
+  align-items: baseline;
   min-width: 0;
-  font-size: 13px;
+  overflow: hidden;
+  font-size: calc(13px * var(--fm-text-scale));
   font-weight: 500;
   color: var(--fm-label);
   white-space: nowrap;
+}
+/* A long path trims each parent crumb from its end ("Deskt… › Sites › cafe") and
+   the current folder keeps at least a dozen characters. Left-to-right throughout:
+   the rtl trick for a leading ellipsis lays isolated crumbs out backwards. */
+.fm-browse__crumb {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
 }
-.fm-browse__crumbs bdi {
-  direction: ltr;
-  unicode-bidi: isolate;
+.fm-browse__crumb--last {
+  min-width: min(100%, 12ch);
 }
 .fm-browse__crumbs .fm-browse__sep {
   color: var(--fm-label-3);
@@ -608,7 +615,7 @@ html.dark .fm-standalone__foot {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   color: var(--fm-label-2);
   cursor: default;
 }

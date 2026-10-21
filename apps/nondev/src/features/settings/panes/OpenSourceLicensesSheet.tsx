@@ -51,7 +51,7 @@ const noticeStyle = {
   padding: "10px 12px",
   whiteSpace: "pre-wrap",
   fontFamily: "var(--fm-mono)",
-  fontSize: 11,
+  fontSize: "calc(11px * var(--fm-text-scale))",
   lineHeight: 1.5,
   maxHeight: "40vh",
   overflow: "auto",
@@ -71,18 +71,31 @@ function LicenseEntryRow({ entry }: { readonly entry: ThirdPartyLicenseEntry }) 
       <summary style={{ cursor: "pointer", display: "flex", gap: 8, alignItems: "baseline" }}>
         <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: "anywhere" }}>{entry.name}</span>
         {entry.version ? (
-          <span style={{ fontFamily: "var(--fm-mono)", fontSize: 11, color: "var(--fm-label-3)" }}>
+          <span
+            style={{
+              fontFamily: "var(--fm-mono)",
+              fontSize: "calc(11px * var(--fm-text-scale))",
+              color: "var(--fm-label-3)",
+            }}
+          >
             {entry.version}
           </span>
         ) : null}
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--fm-label)", flex: "none" }}>
+        <span
+          style={{
+            marginLeft: "auto",
+            fontSize: "calc(12px * var(--fm-text-scale))",
+            color: "var(--fm-label)",
+            flex: "none",
+          }}
+        >
           {entry.license} · {formatLicenseBundles(entry.bundles)}
         </span>
       </summary>
       {open ? (
         <>
           {entry.sourceUrl ? (
-            <p style={{ margin: "6px 0 0", fontSize: 12 }}>
+            <p style={{ margin: "6px 0 0", fontSize: "calc(12px * var(--fm-text-scale))" }}>
               Source:{" "}
               <a href={entry.sourceUrl} target="_blank" rel="noreferrer noopener">
                 {entry.sourceUrl}
@@ -141,7 +154,13 @@ function LicenseList() {
         placeholder="Search by name or licence"
         label="Search licences"
       />
-      <p style={{ margin: "10px 0 4px", fontSize: 12, color: "var(--fm-label-3)" }}>
+      <p
+        style={{
+          margin: "10px 0 4px",
+          fontSize: "calc(12px * var(--fm-text-scale))",
+          color: "var(--fm-label-3)",
+        }}
+      >
         {entries.length === state.manifest.entries.length
           ? `${String(entries.length)} components`
           : `${String(entries.length)} of ${String(state.manifest.entries.length)} components`}

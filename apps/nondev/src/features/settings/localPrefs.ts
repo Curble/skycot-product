@@ -76,8 +76,8 @@ export function writeAppearanceMode(mode: AppearanceMode) {
   for (const listener of listeners) listener();
 }
 
-// Larger text: one attribute on <html> (`data-text="large"`) that styles/family.css
-// turns into a 112% zoom. Default on for Family profiles; anyone can switch it.
+// Larger text: one attribute on <html> (`data-text="large"`) that styles/apple.css
+// turns into a 1.12 `--fm-text-scale`. Default on for Family profiles; anyone can switch it.
 export const TEXT_SIZE_KEY = "skycot:text";
 export type TextSize = "normal" | "large";
 

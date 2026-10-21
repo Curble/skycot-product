@@ -100,7 +100,7 @@
 .fm-settings__title {
   margin: 0;
   font-family: var(--fm-font-label);
-  font-size: 20px;
+  font-size: calc(20px * var(--fm-text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -136,7 +136,7 @@
 .fm-group__title {
   margin: 0 0 2px 12px;
   font-family: var(--fm-font-label);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   font-weight: 600;
   letter-spacing: 0.01em;
   text-transform: none;
@@ -144,7 +144,7 @@
 }
 .fm-group__footer {
   margin: 0 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   line-height: 1.45;
   color: var(--fm-label-2);
 }
@@ -164,7 +164,7 @@
 }
 .fm-setting-warning {
   margin: 10px 2px 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   line-height: 1.45;
   color: var(--fm-orange-ink);
 }
@@ -181,7 +181,7 @@
   box-shadow: var(--fm-shadow-button);
   color: var(--fm-label);
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   appearance: none;
   -webkit-appearance: none;
 }
@@ -193,7 +193,7 @@
   display: block;
   width: 100%;
   min-height: 34px;
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
 }
 .fm-textarea {
   display: block;
@@ -201,27 +201,27 @@
   padding: 8px 12px;
   resize: vertical;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   line-height: 1.4;
 }
 .fm-field--time {
   width: auto;
   min-height: 30px;
   padding: 3px 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
 }
 .fm-inline-field {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
 
 /* Code the person copies */
 .fm-code {
   font-family: var(--fm-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--fm-bg-fill-2);
@@ -254,7 +254,7 @@
   border-radius: 8px;
   background: var(--fm-bg-fill-2);
   color: var(--fm-label);
-  font-size: 14px;
+  font-size: calc(14px * var(--fm-text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -283,7 +283,7 @@
   padding: 12px 14px 14px;
   border-top: 0.5px solid var(--fm-sep);
   background: var(--fm-bg-card);
-  font-size: 13px;
+  font-size: calc(13px * var(--fm-text-scale));
 }
 .fm-howto--flat {
   border-top: 0.5px solid var(--fm-sep);
@@ -315,7 +315,7 @@
   border-radius: 50%;
   background: var(--fm-accent);
   color: var(--fm-on-accent);
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   font-weight: 700;
 }
 .fm-howto__step--done .fm-howto__num {
@@ -409,7 +409,7 @@
   background: var(--fm-bg-button);
   color: var(--fm-label);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--fm-text-scale));
   cursor: pointer;
 }
 .fm-daypicker__day--on {

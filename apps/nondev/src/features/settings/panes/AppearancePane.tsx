@@ -43,7 +43,7 @@ export function AppearancePane() {
       </SettingsGroup>
       <SettingsGroup
         title="Text size"
-        footer="Larger text makes everything about an eighth bigger: words, buttons and spacing together. On by default for a Family profile."
+        footer="Larger text makes every word in the app about an eighth bigger; buttons and rows grow to fit, and sheets still fit the window. On by default for a Family profile."
       >
         <ListRow
           title="Larger text"

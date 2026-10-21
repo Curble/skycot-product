@@ -62,7 +62,7 @@ function MitLicenseSheet({
           padding: "12px 14px",
           whiteSpace: "pre-wrap",
           fontFamily: "var(--fm-mono)",
-          fontSize: 12,
+          fontSize: "calc(12px * var(--fm-text-scale))",
           lineHeight: 1.55,
           maxHeight: "50vh",
           overflow: "auto",
