@@ -23,13 +23,27 @@ export interface ConversationRow {
   readonly at: string;
 }
 
+/**
+ * Runs the conversation view has seen end on a refusal. The shell cannot see
+ * decisions, so the list learns them here once a thread was opened; until then
+ * it reads the Crew's closing words (status.ts `saysRefused`).
+ */
+export const refusedRunIdsAtom = Atom.make<ReadonlySet<string>>(new Set<string>()).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("nondev-refused-run-ids"),
+);
+
 // Every open, top-level conversation across the enabled environments, newest
 // first, with its plain status. Reads the shell list only (no per-thread
 // subscription), which is what keeps the list cheap however many threads exist.
 export const conversationRowsAtom = Atom.make((get): ReadonlyArray<ConversationRow> => {
   const shells = get(environmentThreadShells.navigationThreadShellsAtom);
+  const refusedRuns = get(refusedRunIdsAtom);
   const rows = shells.map((shell): ConversationRow => {
-    const status = describeThreadStatus(shell);
+    const runId = shell.latestRun?.runId ?? null;
+    const status = describeThreadStatus(shell, {
+      refused: runId !== null && refusedRuns.has(runId),
+    });
     return {
       shell,
       project: get(

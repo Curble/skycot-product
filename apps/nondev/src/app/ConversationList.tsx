@@ -7,7 +7,12 @@ import { conversationRowsAtom, filterRows, type ConversationRow } from "../state
 import { IconButton } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchField } from "../ui/SearchField";
-import { dateGroup, formatRowTime, type DateGroup } from "../features/conversation/status";
+import {
+  conversationPreview,
+  dateGroup,
+  formatRowTime,
+  type DateGroup,
+} from "../features/conversation/status";
 import { useCrew } from "../themes/useCrew";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -83,6 +88,7 @@ export function ConversationList({
                 <ConversationRowButton
                   key={`${row.shell.environmentId}:${row.shell.id}`}
                   row={row}
+                  preview={conversationPreview(row.shell, row.status, crew.builder.name)}
                   selected={row.shell.id === selectedThreadId}
                   now={now}
                 />
@@ -112,10 +118,13 @@ function emptyText(filter: string, search: string, total: number, crewName: stri
 
 function ConversationRowButton({
   row,
+  preview,
   selected,
   now,
 }: {
   readonly row: ConversationRow;
+  /** The row's last line, in the theme's crew name ("Sam: …" in Workshop). */
+  readonly preview: string;
   readonly selected: boolean;
   readonly now: Date;
 }) {
@@ -151,7 +160,7 @@ function ConversationRowButton({
         </span>
         <span className="fm-convrow__preview">
           {row.project && row.title !== row.project.title ? `${row.project.title} · ` : ""}
-          {row.preview}
+          {preview}
         </span>
       </span>
     </button>

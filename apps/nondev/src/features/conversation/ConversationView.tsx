@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import {
   resolveThreadWorkingStartedAt,
@@ -29,6 +29,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { HOME_HREF } from "../../router";
+import { refusedRunIdsAtom } from "../../state/conversations";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import {
@@ -91,13 +92,6 @@ export function endedOnRefusal(
   );
 }
 
-const REFUSED_STATUS: Pick<ConversationStatus, "kind" | "headline" | "presence" | "tone"> = {
-  kind: "stopped",
-  headline: "Stopped — you said no to a step",
-  presence: "Stopped · you said no · ready when you are",
-  tone: "neutral",
-};
-
 /**
  * One conversation: contact header, status strip, the stream, and the reply
  * field. Subscribes to this thread only; the list column stays on shell data.
@@ -116,16 +110,20 @@ export function ConversationView({
   const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
-  const shellStatus = shell ? describeThreadStatus(shell) : null;
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
+  const latestRunId = shell?.latestRun?.runId ?? null;
   const refused =
     projection !== null && shell !== null && !active
-      ? endedOnRefusal(projection, shell.latestRun?.runId ?? null)
+      ? endedOnRefusal(projection, latestRunId)
       : false;
-  const status =
-    shellStatus && refused && (shellStatus.kind === "done" || shellStatus.kind === "ready")
-      ? { ...shellStatus, ...REFUSED_STATUS }
-      : shellStatus;
+  const status: ConversationStatus | null = shell ? describeThreadStatus(shell, { refused }) : null;
+  // Tell the list, which only has the shell, that this run ended on a refusal.
+  const refusedRuns = useAtomValue(refusedRunIdsAtom);
+  const setRefusedRuns = useAtomSet(refusedRunIdsAtom);
+  useEffect(() => {
+    if (!refused || latestRunId === null || refusedRuns.has(latestRunId)) return;
+    setRefusedRuns(new Set([...refusedRuns, latestRunId]));
+  }, [refused, latestRunId, refusedRuns, setRefusedRuns]);
   // Nothing is "working" while the Crew waits on an answer; the dots would lie.
   const waitingOnYou =
     shell !== null &&

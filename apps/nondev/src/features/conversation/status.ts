@@ -5,6 +5,7 @@
 // shell mapper.
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 
+import { CREW_NAME } from "../../brand";
 import { progress } from "../../plain/copy";
 import type { PillTone } from "../../ui/Pill";
 
@@ -34,7 +35,38 @@ export interface ConversationStatus {
   readonly attention: "none" | "waiting" | "ready";
   /** The run ended by asking something in a plain message, so a reply is the next step. */
   readonly needsReply?: true;
+  /** The run ended because the person said no to a step and nothing changed. */
+  readonly refused?: true;
 }
+
+export interface ThreadStatusOptions {
+  /**
+   * Set when the full projection shows the latest run ended on a refusal (the
+   * conversation view knows; the list learns it once the thread was opened).
+   */
+  readonly refused?: boolean;
+}
+
+/** The Crew's own words for "you said no": providers close a refused run with a statement. */
+const SAYS_REFUSED =
+  /\b(approval|permission|request|command|step)s?\b[^.!?\n]{0,40}\b(was|were|got|has been|have been)\s+(rejected|declined|denied|refused|not (granted|approved|allowed))\b|\byou (declined|rejected|denied|refused|said no|did ?n[o']t (approve|allow))\b|\b(declined|rejected|denied|refused) (the|my|this|that) (request|approval|command|permission|step)\b/i;
+
+/** True when the Crew's closing message says a step was refused. */
+export function saysRefused(text: string): boolean {
+  return SAYS_REFUSED.test(text.replace(/```[\s\S]*?```/g, " "));
+}
+
+export const REFUSED_STATUS: Pick<
+  ConversationStatus,
+  "kind" | "headline" | "presence" | "tone" | "attention" | "refused"
+> = {
+  kind: "stopped",
+  headline: "Stopped — you said no",
+  presence: "Stopped · you said no · ready when you are",
+  tone: "neutral",
+  attention: "none",
+  refused: true,
+};
 
 const ASKS_FOR_REPLY =
   /\b(please (allow|let me know|tell me|confirm|choose|pick|say|send|share|decide)|let me know|which (one|ones|of these|would|should|do)|would you (like|prefer|rather)|do you want|should i|shall i|can you|could you|what would you like|your (choice|call|decision|pick)|up to you|tell me (which|what|how|whether)|confirm (that|whether|which)|before i (go ahead|continue|change|proceed))\b/i;
@@ -59,7 +91,28 @@ export function asksForReply(text: string): boolean {
   return ASKS_FOR_REPLY.test(tail.join(" "));
 }
 
-export function describeThreadStatus(shell: EnvironmentThreadShell): ConversationStatus {
+export function describeThreadStatus(
+  shell: EnvironmentThreadShell,
+  options: ThreadStatusOptions = {},
+): ConversationStatus {
+  const runtimeStatus = shell.runtime?.status ?? "idle";
+  const live =
+    runtimeStatus === "preparing" ||
+    runtimeStatus === "queued" ||
+    runtimeStatus === "starting" ||
+    runtimeStatus === "running" ||
+    runtimeStatus === "waiting";
+  // Stop was pressed: the provider may take a while to confirm, but nothing
+  // will run and no ask can be answered, so every surface says so at once.
+  if (live && shell.source.latestRunStopRequested === true) {
+    return {
+      kind: "stopped",
+      headline: "Stopping…",
+      presence: "Stopping · nothing else will run",
+      tone: "neutral",
+      attention: "none",
+    };
+  }
   if (shell.hasPendingApprovals) {
     return {
       kind: "waiting",
@@ -87,8 +140,7 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
       attention: "waiting",
     };
   }
-  const runtime = shell.runtime?.status ?? "idle";
-  switch (runtime) {
+  switch (runtimeStatus) {
     case "preparing":
     case "queued":
     case "starting":
@@ -166,6 +218,13 @@ export function describeThreadStatus(shell: EnvironmentThreadShell): Conversatio
           needsReply: true,
         };
       }
+      if (
+        run.status === "completed" &&
+        (options.refused === true ||
+          (latest !== null && latest.role === "assistant" && saysRefused(latest.text)))
+      ) {
+        return { ...REFUSED_STATUS };
+      }
       const unseen = isUnseenSince(shell.lastVisitedAt, run.completedAt);
       return unseen
         ? {
@@ -192,20 +251,34 @@ function isUnseenSince(lastVisitedAt: string | null | undefined, completedAt: st
   return Date.parse(lastVisitedAt) < Date.parse(completedAt);
 }
 
-/** "Crew: Done — GST is on the invoice total." / "You: add a vegan option" */
-export function conversationPreview(shell: EnvironmentThreadShell, status: ConversationStatus) {
+/**
+ * "Crew: Done — GST is on the invoice total." / "You: add a vegan option".
+ * `crewName` is the theme's builder ("Sam" in Workshop); the default keeps the
+ * neutral name for callers outside React.
+ */
+export function conversationPreview(
+  shell: EnvironmentThreadShell,
+  status: ConversationStatus,
+  crewName: string = CREW_NAME,
+) {
   const latest = shell.source.latestVisibleMessage;
   if (status.needsReply && latest !== null && latest.text.trim().length > 0) {
-    return `Crew asks: ${firstLine(latest.text)}`;
+    return `${crewName} asks: ${firstLine(latest.text)}`;
   }
-  if (status.kind === "waiting" || status.kind === "working" || status.kind === "preparing") {
-    return `Crew: ${status.headline}`;
+  if (
+    status.kind === "waiting" ||
+    status.kind === "working" ||
+    status.kind === "preparing" ||
+    status.refused === true ||
+    status.headline === "Stopping…"
+  ) {
+    return `${crewName}: ${status.headline}`;
   }
   if (latest !== null && latest.text.trim().length > 0) {
-    const who = latest.role === "user" ? "You" : "Crew";
+    const who = latest.role === "user" ? "You" : crewName;
     return `${who}: ${firstLine(latest.text)}`;
   }
-  return `Crew: ${status.headline}`;
+  return `${crewName}: ${status.headline}`;
 }
 
 export function conversationTitle(shell: EnvironmentThreadShell): string {
