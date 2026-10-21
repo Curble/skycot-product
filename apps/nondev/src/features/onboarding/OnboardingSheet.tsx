@@ -8,6 +8,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Palette,
   PartyPopper,
   ShieldCheck,
   type LucideIcon,
@@ -23,6 +24,8 @@ import { HOME_HREF, navigate } from "../../router";
 import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/preferences";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
+import { ThemeGallery } from "../../themes/ThemeGallery";
+import { useActiveTheme } from "../../themes/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { List, ListRow } from "../../ui/ListRow";
@@ -42,8 +45,8 @@ import {
 } from "../settings/providerCatalog";
 import { ProviderRow } from "../settings/ProviderRows";
 
-type Step = "assistant" | "work" | "autonomy" | "done";
-const STEPS: ReadonlyArray<Step> = ["assistant", "work", "autonomy", "done"];
+type Step = "assistant" | "work" | "autonomy" | "look" | "done";
+const STEPS: ReadonlyArray<Step> = ["assistant", "work", "autonomy", "look", "done"];
 
 const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: string }> = {
   assistant: {
@@ -60,6 +63,12 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
     icon: ShieldCheck,
     title: "How much should the AI do on its own?",
     description: "You can change this any time, for everything or for one conversation.",
+  },
+  look: {
+    icon: Palette,
+    title: "Pick a look",
+    description:
+      "How the app looks is up to you; what it does never changes. Hover a card to try it on, click to keep it. You can change this any time in Settings → Appearance.",
   },
   done: {
     icon: PartyPopper,
@@ -132,6 +141,7 @@ export function OnboardingSheet({
       {step === "assistant" ? <AssistantStep environmentId={environmentId} /> : null}
       {step === "work" ? <WorkStep environmentId={environmentId} /> : null}
       {step === "autonomy" ? <AutonomyStep environmentId={environmentId} /> : null}
+      {step === "look" ? <LookStep /> : null}
       {step === "done" ? <DoneStep environmentId={environmentId} /> : null}
     </Sheet>
   );
@@ -341,6 +351,19 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
   );
 }
 
+function LookStep() {
+  const theme = useActiveTheme();
+  return (
+    <div className="fm-onboarding">
+      <ThemeGallery compact showActions={false} label="Pick a look" />
+      <p className="fm-help">
+        <b>{theme.name}.</b> {theme.description ?? ""} Risky moments (approvals, undo, going live)
+        stay plain in every look.
+      </p>
+    </div>
+  );
+}
+
 function DoneStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const projects = useAtomValue(environmentProjects.projectsAtom).filter(
@@ -349,6 +372,7 @@ function DoneStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
   const ready = (providers ?? []).filter(isProviderReady);
   const autonomy = readAutonomy();
   const autonomyLabel = AUTONOMY_OPTIONS.find((option) => option.value === autonomy)?.label;
+  const theme = useActiveTheme();
   return (
     <div className="fm-onboarding">
       <List label="Summary">
@@ -389,6 +413,11 @@ function DoneStep({ environmentId }: { readonly environmentId: EnvironmentId }) 
               Default
             </Pill>
           }
+        />
+        <ListRow
+          leading={<StepBadge state="done" />}
+          title={`${theme.name} look`}
+          subtitle="Your theme. Change it in Settings → Appearance."
         />
       </List>
     </div>
