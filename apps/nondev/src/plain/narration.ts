@@ -54,6 +54,11 @@ export interface NarrationContext {
     Pick<OrchestrationV2RuntimeRequest, "decision" | "status"> &
       Partial<Pick<OrchestrationV2RuntimeRequest, "answers">>
   >;
+  /**
+   * The run was stopped (Stop pressed): a step that never ran was cancelled,
+   * not refused. Unset, a step that didn't run is one the person said no to.
+   */
+  readonly stopped?: boolean;
 }
 
 export interface CommandClassification {
@@ -1414,17 +1419,36 @@ function fileOperation(
   return "edited";
 }
 
+/** Marks a headline for a step that never ran; `describeTurnItem` words it for the context. */
+const DID_NOT_RUN = "\u0000did-not-run:";
+
 /** Verb pairs: [past, present] keyed by what a tense needs. */
 function tense(status: NarrationStatus, past: string, present: string, future: string): string {
   if (status === "pending") return future;
   if (status === "running") return present;
+  // A refused or cancelled step never happened: never say it in the past tense.
+  if (status === "denied") return `${DID_NOT_RUN}${future.replace(/^About to /, "")}`;
   return past;
 }
 
+/**
+ * "Asked to delete the book page — you said no" / "Cancelled: delete the book
+ * page", so Show details never narrates a refused step as if it happened.
+ */
 export function describeTurnItem(
   item: OrchestrationV2TurnItem,
   ctx: NarrationContext = {},
 ): Narration {
+  const narration = narrateTurnItem(item, ctx);
+  if (!narration.headline.startsWith(DID_NOT_RUN)) return narration;
+  const what = narration.headline.slice(DID_NOT_RUN.length);
+  return {
+    ...narration,
+    headline: ctx.stopped ? `Cancelled: ${what}` : `Asked to ${what} — you said no`,
+  };
+}
+
+function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): Narration {
   const base = (status: NarrationStatus) => status;
   switch (item.type) {
     case "user_message": {

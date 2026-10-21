@@ -412,3 +412,32 @@ describe("progressHint", () => {
     expect(progressHint([], null)).toBe("Nothing has happened yet.");
   });
 });
+
+describe("describeTurnItem — steps that never ran (QA-P2-2-06)", () => {
+  it("never narrates a refused step in the past tense", () => {
+    const rm = describeTurnItem(items.command("rm book.html", {}, { status: "cancelled" }));
+    expect(rm.status).toBe("denied");
+    expect(rm.headline).toBe("Asked to delete the book page — you said no");
+    const edit = describeTurnItem(
+      items.fileChange(
+        "book.html",
+        { changes: [{ path: "book.html", operation: "delete" }] },
+        {
+          status: "cancelled",
+        },
+      ),
+    );
+    expect(edit.headline).toBe("Asked to delete the book page — you said no");
+  });
+
+  it("calls it cancelled when the run was stopped", () => {
+    const rm = describeTurnItem(items.command("rm book.html", {}, { status: "interrupted" }), {
+      stopped: true,
+    });
+    expect(rm.headline).toBe("Cancelled: delete the book page");
+  });
+
+  it("keeps finished steps in the past tense", () => {
+    expect(describeTurnItem(items.command("rm book.html")).headline).toBe("Deleted the book page");
+  });
+});
