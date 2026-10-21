@@ -479,7 +479,10 @@ function classifySegment(segment: string): CommandClassification | null {
     base === "source" ||
     base === "." ||
     base === "true" ||
-    base === "clear"
+    base === "clear" ||
+    // `exit "$failed"` only hands back the result; it is not a step.
+    base === "exit" ||
+    base === "return"
   ) {
     return null;
   }
@@ -1270,6 +1273,22 @@ function classifySegment(segment: string): CommandClassification | null {
       ),
     );
   }
+  // `python3 -m http.server 8765`, `php -S localhost:8000`: a preview of the site on this Mac.
+  if (
+    ((base === "python" || base === "python3" || base === "py") &&
+      /(^|\s)-m\s+(http\.server|SimpleHTTPServer)\b/.test(segment)) ||
+    (base === "php" && args.includes("-S"))
+  ) {
+    return make(
+      "command",
+      "low",
+      verb(
+        "start a local preview of the site",
+        "started a local preview of the site",
+        "starting a local preview of the site",
+      ),
+    );
+  }
   if (SCRIPT_PROGRAMS.has(base)) {
     // `python3 -c "…"`, `node -e "…"` and quoted one-liners are inline code, not a file.
     const inline = args.some((arg) => /^(-c|-e|--eval|-p|--print)$/.test(arg));
@@ -1338,9 +1357,12 @@ function describeReadOnlyLoop(command: string): CommandClassification | null {
   const list = match[2]!.trim();
   const body = match[3]!;
   const steps = splitShellSegments(body.replace(/\b(then|else|do)\b/g, ";"))
-    .map((segment) => segment.trim())
+    // `if curl …; then`: the test after `if` is the step.
+    .map((segment) => segment.trim().replace(/^(if|elif|while|until)\s+/, ""))
     .filter((segment) => segment.length > 0)
-    .filter((segment) => !LOOP_PLUMBING.test(segment.split(/\s+/)[0] ?? ""));
+    .filter((segment) => !LOOP_PLUMBING.test(segment.split(/\s+/)[0] ?? ""))
+    // `failed=1`: the loop keeping score, not a step.
+    .filter((segment) => !/^\w+=\S*$/.test(segment));
   const looksAtFiles = steps.every((segment) => {
     if (/^curl\b/.test(segment)) return /file:\/\//.test(segment) && !/\s-(o|O)\b/.test(segment);
     const classified = classifySegment(withoutQuietRedirects(segment));
@@ -1383,15 +1405,26 @@ export function classifyCommand(command: string): CommandClassification {
   const unwrapped = unwrapShellWrapper(command.trim());
   const trimmed = unwrapped.replace(HEREDOC_PATTERN, "").trim();
   const whole = SQL_DESTRUCTIVE_PATTERN.test(trimmed) || PIPE_TO_SHELL_PATTERN.test(trimmed);
-  const loop = describeReadOnlyLoop(trimmed);
-
+  // `failed=0; for …; done; exit "$failed"`: the score-keeping around a loop is not a step.
+  const loop = describeReadOnlyLoop(
+    trimmed
+      .replace(/^(\w+=\S*\s*[;\n]\s*)+/, "")
+      .replace(/[;\n]\s*exit\b[^;\n]*$/, "")
+      .trim(),
+  );
   if (loop !== null && !whole) return loop;
   const all = splitShellSegments(trimmed)
     .map((segment) => classifySegment(withoutQuietRedirects(segment)))
     .filter((c): c is CommandClassification => c !== null);
-  // `echo done`, `printf 'PASS'` next to real work is plumbing, not a step.
-  const work = all.filter((c) => !PRINTS.has(c.infinitive));
-  const classified = work.length > 0 ? work : all;
+  // `echo done`, `printf 'PASS'` next to real work is plumbing, not a step; and
+  // `pwd; rg --files` is one look around, not "looked around … and looked around …".
+  const work = all.filter((c) => !PRINTS.has(c.infinitive) && c.program !== "pwd");
+  const seen = new Set<string>();
+  const classified = (work.length > 0 ? work : all).filter((c) => {
+    if (seen.has(c.infinitive)) return false;
+    seen.add(c.infinitive);
+    return true;
+  });
   if (classified.length === 0) {
     return {
       kind: "command",

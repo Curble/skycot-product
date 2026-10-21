@@ -56,7 +56,7 @@ describe("classifyCommand", () => {
       "/bin/zsh -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"'\"",
       "read",
       "low",
-      "Ran 2 steps: looked around the project files and listed the project's files",
+      "Listed the project's files",
     ],
     [
       "/bin/zsh -lc 'for file in index.html menu.html book.html style.css; do cat \"$file\"; done'",
@@ -575,5 +575,31 @@ describe("retriedFailures — a failure redone successfully is not a failure (N-
     // A success earlier than the failure does not cover it.
     const ok = items.command("npm test", { exitCode: 0 });
     expect(retriedFailures([ok, failed]).size).toBe(0);
+  });
+});
+
+describe("narration nits (N-4)", () => {
+  it("calls a local web server a preview of the site", () => {
+    expect(classifyCommand("python3 -m http.server 8765 --bind 127.0.0.1").past).toBe(
+      "Started a local preview of the site",
+    );
+    expect(classifyCommand("php -S localhost:8000").infinitive).toBe(
+      "start a local preview of the site",
+    );
+  });
+
+  it("hides `pwd` and `exit` next to real work and says a repeated step once", () => {
+    expect(classifyCommand("pwd; rg --files -g 'AGENTS.md' -g '*.html'").past).toBe(
+      "Listed the project's files",
+    );
+    expect(classifyCommand("pwd").past).toBe("Looked around the project files");
+    expect(classifyCommand('rg --files; exit "$failed"').past).toBe("Listed the project's files");
+    expect(classifyCommand("ls -la; ls -la src").past).toBe("Looked around the project files");
+  });
+
+  it("reads the live check loop, score-keeping and all, as one check", () => {
+    const loop =
+      '/bin/zsh -lc \'failed=0\nfor file in *.html; do\n  if curl --fail --silent --show-error "file://$PWD/$file" | cmp -s "$file" -; then\n    printf \'"\'PASS %s\\\\n\' \\""\'$file"\n  else\n    printf \'"\'FAIL %s\\\\n\' \\""\'$file"\n    failed=1\n  fi\ndone\nexit "$failed"\'';
+    expect(classifyCommand(loop).past).toBe("Checked that every page opens");
   });
 });
