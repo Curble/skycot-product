@@ -1,3 +1,6 @@
+import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentId, ServerProvider } from "@t3tools/contracts";
+import { Atom } from "effect/reactivity";
 import { Laptop, SearchX, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -5,9 +8,16 @@ import { resolveInitialServerAuthGateState } from "~/environments/primary/auth";
 
 import { AppShell } from "./app/AppShell";
 import { PRODUCT_NAME } from "./brand";
-import { AutomationsScreen, PeopleScreen } from "./features/stubs/Stubs";
-import { HOME_HREF, useRoute } from "./router";
+import { AutomationsScreen } from "./features/automations/AutomationsScreen";
+import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
+import { shouldShowOnboarding } from "./features/onboarding/onboarding";
+import { PeopleScreen } from "./features/people/PeopleScreen";
+import { useOnboardingState } from "./features/settings/localPrefs";
+import { SettingsScreen } from "./features/settings/SettingsScreen";
+import { HOME_HREF, navigate, useRoute, type Route } from "./router";
 import { HomeRoute } from "./routes/Home";
+import { enabledEnvironmentIdsAtom } from "./state/catalog";
+import { serverEnvironment } from "./state/server";
 import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
 import { useColumns } from "./app/useColumns";
@@ -89,12 +99,16 @@ export function App() {
 
   return (
     <AppShell route={route}>
+      <OnboardingGate route={route} />
       {(() => {
         switch (route.name) {
           case "home":
           case "new":
           case "pair":
+          case "welcome":
             return <HomeRoute />;
+          case "settings":
+            return <SettingsScreen section={route.section} />;
           case "thread":
             return (
               <ThreadRoute
@@ -127,5 +141,37 @@ export function App() {
         }
       })()}
     </AppShell>
+  );
+}
+
+const EMPTY_PROVIDERS_ATOM = Atom.make<ReadonlyArray<ServerProvider> | null>(null).pipe(
+  Atom.withLabel("nondev-app-providers:empty"),
+);
+
+/**
+ * First-run onboarding, shown over the shell once the engine has reported its
+ * providers and none is ready, or whenever the person opens `#/welcome`.
+ * Dismissed state lives in this browser; Settings can reopen it.
+ */
+function OnboardingGate({ route }: { readonly route: Route }) {
+  const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
+  const environmentId: EnvironmentId | null = environmentIds[0] ?? null;
+  const providers = useAtomValue(
+    environmentId === null
+      ? EMPTY_PROVIDERS_ATOM
+      : serverEnvironment.providersValueAtom(environmentId),
+  );
+  const state = useOnboardingState();
+  // No local "dismissed" flag: closing the sheet writes the stored state and
+  // leaves `#/welcome`, and both of those already make `show` false.
+  const show = shouldShowOnboarding(route, providers, state);
+  if (!show || environmentId === null) return null;
+  return (
+    <OnboardingSheet
+      environmentId={environmentId}
+      onClose={() => {
+        if (route.name === "welcome") navigate(HOME_HREF);
+      }}
+    />
   );
 }

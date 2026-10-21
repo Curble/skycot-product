@@ -1,14 +1,23 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { Bell, CheckCircle2, CircleAlert, FolderPlus, MessageCircle, User } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  CircleAlert,
+  FolderPlus,
+  MessageCircle,
+  Settings,
+  User,
+} from "lucide-react";
 import { useId, useState } from "react";
 
 import { ADVANCED_MODE_LABEL } from "../brand";
-import { AUTOMATIONS_HREF, PEOPLE_HREF, type Route } from "../router";
+import { AUTOMATIONS_HREF, PEOPLE_HREF, SETTINGS_HREF, navigate, type Route } from "../router";
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf } from "../state/conversations";
 import { environmentProjects } from "../state/projects";
 import { Avatar } from "../ui/Avatar";
+import { IconButton } from "../ui/Button";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
 import { Switch } from "../ui/Switch";
 import { AdvancedModeSheet } from "./AdvancedModeSheet";
@@ -134,6 +143,13 @@ export function AppSidebar({
             <Avatar kind="person" value={environmentLabel} size="sm" label={environmentLabel} />
             <b>{environmentLabel}</b>
           </span>
+          <IconButton
+            icon={Settings}
+            label="Settings"
+            size="sm"
+            aria-current={route.name === "settings" ? "page" : undefined}
+            onClick={() => select(() => navigate(SETTINGS_HREF))}
+          />
         </div>
         <div className="fm-sidebar__footer-row">
           <span id={advancedLabelId}>
