@@ -30,7 +30,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { HOME_HREF } from "../../router";
-import { refusedRunIdsAtom } from "../../state/conversations";
+import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import {
@@ -124,7 +124,7 @@ export function ConversationView({
   const setRefusedRuns = useAtomSet(refusedRunIdsAtom);
   useEffect(() => {
     if (!refused || latestRunId === null || refusedRuns.has(latestRunId)) return;
-    setRefusedRuns(new Set([...refusedRuns, latestRunId]));
+    setRefusedRuns(withRefusedRun(refusedRuns, latestRunId));
   }, [refused, latestRunId, refusedRuns, setRefusedRuns]);
   // Nothing is "working" while the Crew waits on an answer; the dots would lie.
   const waitingOnYou =

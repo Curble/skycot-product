@@ -156,6 +156,8 @@ export function WorkingCard({
       item.type !== "reasoning" &&
       item.type !== "todo_list" &&
       item.type !== "approval_request" &&
+      // The engine's own set-up of the private copy is not one of the Crew's steps.
+      !(item.type === "command_execution" && /^preparing workspace$/i.test(item.input.trim())) &&
       narration.status !== "denied",
   ).length;
   const failed = narrated.filter((n) => n.narration.status === "failed").length;

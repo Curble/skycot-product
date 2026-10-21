@@ -23,12 +23,38 @@ export interface ConversationRow {
   readonly at: string;
 }
 
+const REFUSED_KEY = "skycot:refused-runs";
+/** Newest last; old runs fall off so the list never grows without bound. */
+const REFUSED_LIMIT = 200;
+
+function readRefusedRunIds(): ReadonlySet<string> {
+  try {
+    const raw = window.localStorage.getItem(REFUSED_KEY);
+    const value: unknown = raw === null ? [] : JSON.parse(raw);
+    return new Set(Array.isArray(value) ? value.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+/** The next set with `runId` in it, remembered across reloads when storage allows. */
+export function withRefusedRun(current: ReadonlySet<string>, runId: string): ReadonlySet<string> {
+  const next = [...current, runId].slice(-REFUSED_LIMIT);
+  try {
+    window.localStorage.setItem(REFUSED_KEY, JSON.stringify(next));
+  } catch {
+    // Storage blocked: this session still knows.
+  }
+  return new Set(next);
+}
+
 /**
  * Runs the conversation view has seen end on a refusal. The shell cannot see
- * decisions, so the list learns them here once a thread was opened; until then
- * it reads the Crew's closing words (status.ts `saysRefused`).
+ * decisions, so the list learns them here once a thread was opened (and
+ * remembers them across reloads); until then it reads the Crew's closing words
+ * (status.ts `saysRefused`).
  */
-export const refusedRunIdsAtom = Atom.make<ReadonlySet<string>>(new Set<string>()).pipe(
+export const refusedRunIdsAtom = Atom.make<ReadonlySet<string>>(readRefusedRunIds()).pipe(
   Atom.keepAlive,
   Atom.withLabel("nondev-refused-run-ids"),
 );
