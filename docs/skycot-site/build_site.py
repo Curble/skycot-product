@@ -283,7 +283,7 @@ FOOTER = '''<footer><div class="wrap">
     </ul>
   </div>
   <p class="legal">SKYCOT is based on <a href="https://github.com/pingdotgg/t3code">T3 Code</a>, © T3 Tools Inc., used under the MIT licence. SKYCOT is not affiliated with or endorsed by T3 Tools Inc. Claude, Codex, Cursor and Gemini are products of their respective owners; SKYCOT is not affiliated with Anthropic, OpenAI, Anysphere or Google. Screenshots show an early build with a sample project.<br>
-  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading as SKYCOT. <span style="opacity:.7">Draft: legal pages await review and are not yet in force.</span></p>
+  SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading as SKYCOT · ABN 71 605 512 776. <span style="opacity:.7">Draft: legal pages await review and are not yet in force.</span></p>
 </div></footer>
 </body></html>
 '''
@@ -515,7 +515,7 @@ PRIVACY = f'''{nav()}
   </ul>
 
   <h2>1. Who we are</h2>
-  <p>SKYCOT is made by Curble Pty Ltd (ABN to be inserted), Melbourne, Australia. You can reach us at <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We are bound by the Australian Privacy Act 1988 and the Australian Privacy Principles to the extent they apply to us, and we aim to meet them in any case.</p>
+  <p>SKYCOT is a registered business name of Curble Pty Ltd (ABN 71 605 512 776), Melbourne, Australia. You can reach us at <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We are bound by the Australian Privacy Act 1988 and the Australian Privacy Principles to the extent they apply to us, and we aim to meet them in any case.</p>
 
   <h2>2. The SKYCOT app</h2>
   <h3>What stays on your Mac</h3>
@@ -544,7 +544,7 @@ PRIVACY = f'''{nav()}
   <h2>7. Changes</h2>
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
 
-  <p class="meta">Open questions for the lawyer: the ABN; whether Curble Pty Ltd is an APP entity under the small business threshold; the wording for GDPR applicability if EU users are accepted; retention for the notify-me list; and the children's wording in section 6 once the Family profile ships (a child uses the app on a parent's Mac; the AI provider's own age terms still apply).</p>
+  <p class="meta">Open questions for the lawyer: whether Curble Pty Ltd is an APP entity under the small business threshold; the wording for GDPR applicability if EU users are accepted; retention for the notify-me list; and the children's wording in section 6 once the Family profile ships (a child uses the app on a parent's Mac; the AI provider's own age terms still apply).</p>
 </div></main>
 '''
 write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what you send goes to the AI you chose, no analytics by default. Draft for legal review.") + PRIVACY + FOOTER)
@@ -587,9 +587,9 @@ TERMS = f'''{nav()}
   <p>These terms are governed by the laws of Victoria, Australia, and you submit to the non-exclusive jurisdiction of its courts.</p>
 
   <h2>11. Contact</h2>
-  <p>Curble Pty Ltd, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
+  <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
 
-  <p class="meta">Open questions for the lawyer: ABN and registered address; whether a separate early-access or beta agreement is preferable; export-control and age wording; the liability cap once pricing exists; and whether any of our own code will be published under an open licence.</p>
+  <p class="meta">Open questions for the lawyer: the registered address to publish; whether a separate early-access or beta agreement is preferable; export-control and age wording; the liability cap once pricing exists; and whether any of our own code will be published under an open licence.</p>
 </div></main>
 '''
 write("terms.html", head("Terms of use · SKYCOT", "Draft terms of use for the SKYCOT app and website, for legal review before launch.") + TERMS + FOOTER)
