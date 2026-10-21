@@ -221,6 +221,14 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="Usage"
             onClick={handleUsageClick}
           />
+          {/* nondev-seam: web-back-to-skycot — the simple client at /simple/ writes this key, so the link appears only where it exists */}
+          {window.localStorage.getItem("skycot:uiMode") !== null ? (
+            <SidebarUtilityItem
+              icon={<ArrowLeftIcon />}
+              label="Back to SKYCOT"
+              onClick={() => window.location.assign("/simple/")}
+            />
+          ) : null}
         </>
       )}
       <SidebarUpdatePill />
