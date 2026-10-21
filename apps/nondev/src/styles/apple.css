@@ -46,8 +46,8 @@
   --fm-label-4: #c7c7cc;
 
   /* Accent and system colours */
-  --fm-accent: #007aff;
-  --fm-accent-soft: rgba(0, 122, 255, 0.12);
+  --fm-accent: #0071e3;
+  --fm-accent-soft: rgba(0, 113, 227, 0.12);
   --fm-on-accent: #ffffff;
   /* Text on a filled green/orange/red badge or button. */
   --fm-on-status: #ffffff;
@@ -69,7 +69,7 @@
   --fm-crew-checker: #34c759;
 
   /* Bubbles and inline code */
-  --fm-bubble-me: #007aff;
+  --fm-bubble-me: #0071e3;
   --fm-on-bubble-me: #ffffff;
   --fm-bubble-crew: #e9e9eb;
   --fm-code-bg: rgba(0, 0, 0, 0.06);
@@ -158,7 +158,7 @@ html.dark {
   --fm-crew-builder: #0a84ff;
   --fm-crew-checker: #30d158;
 
-  --fm-bubble-me: #0a84ff;
+  --fm-bubble-me: #0071e3;
   --fm-bubble-crew: #3a3a3c;
   --fm-code-bg: rgba(255, 255, 255, 0.1);
 
