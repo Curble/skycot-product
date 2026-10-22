@@ -223,7 +223,11 @@ function ProviderPill() {
   if (provider === null) return null;
   return (
     <span className="fm-usage-status">
-      <Pill tone="provider">Using {catalogEntryFor(String(provider.driver)).brand}</Pill>
+      <Pill tone="provider">
+        {/* A phone keeps the name and the ring; "Using" stays for screen readers. */}
+        <span className="fm-usage-status__using">Using </span>
+        {catalogEntryFor(String(provider.driver)).brand}
+      </Pill>
       {family.enabled ? null : <UsageIndicator />}
     </span>
   );

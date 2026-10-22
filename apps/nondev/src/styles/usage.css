@@ -8,6 +8,20 @@
   gap: 4px;
   min-width: 0;
 }
+/* On a narrow bar the project name gives way, never the assistant's name or the ring, so
+   the ring and its figure are never cut off at the edge. */
+.fm-titlebar > .fm-usage-status {
+  flex-shrink: 0;
+}
+.fm-shell[data-columns="1"] .fm-usage-status__using {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 
 .fm-usage__button {
   appearance: none;
