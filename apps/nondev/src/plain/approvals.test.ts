@@ -39,6 +39,33 @@ describe("describeRuntimeRequest — commands", () => {
     });
   });
 
+  // QA FK-04: `cat > index.html <<EOF` replaced the home page but the card said it only read.
+  it.each([
+    ["cat > index.html <<'EOF'\n<h1>Axolotl!</h1>\nEOF", "write the home page"],
+    ["cat <<'EOF' > index.html\n<h1>Axolotl!</h1>\nEOF", "write the home page"],
+    ["cat >> notes.txt <<EOF\nmore\nEOF", "add to"],
+    ["printf '<p>hi</p>' > index.html", "write the home page"],
+    ["echo 'body { color: pink }' > style.css", "write"],
+    ["echo hi >| index.html", "write the home page"],
+    ["tee index.html < draft.html", "write the home page"],
+    ["sed -i '' 's/blue/pink/' index.html", "change the home page"],
+  ])("calls %s a change, never a read", (prompt, wants) => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt }));
+    expect(card.whatItWants).toContain(wants);
+    expect(card.whatItWants).not.toMatch(/look at/);
+    expect(card.whyItMatters).not.toMatch(/only reads/);
+    expect(card.whyItMatters).not.toMatch(/can't change anything/);
+  });
+
+  it("still calls a plain read a read", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "cat index.html" }));
+    expect(card.whyItMatters).toBe("This only reads files. It can't change anything.");
+    const quiet = describeRuntimeRequest(
+      items.approval("command", { prompt: "cat index.html > /dev/null" }),
+    );
+    expect(quiet.whyItMatters).toBe("This only reads files. It can't change anything.");
+  });
+
   it("offers 'always allow' only for low-risk, project-only commands", () => {
     const checks = describeRuntimeRequest(items.approval("command", { prompt: "pnpm test" }));
     expect(decisions(checks)).toContain("acceptAlways");

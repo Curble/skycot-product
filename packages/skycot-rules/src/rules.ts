@@ -410,7 +410,7 @@ function pathTokens(args: ReadonlyArray<string>): Array<string> {
       // `--output=/x`, `key=/x`, `>/x`, `2>/x`
       const eq = arg.indexOf("=");
       if (eq > 0 && !arg.startsWith("/")) return [arg.slice(eq + 1)];
-      return [arg.replace(/^\d*>{1,2}/, "")];
+      return [arg.replace(/^(?:\d*|&)>{1,2}\|?/, "")];
     })
     .filter((candidate) => candidate.length > 0 && isPathLike(candidate));
 }
@@ -425,12 +425,61 @@ function hasRemoteTarget(args: ReadonlyArray<string>): boolean {
   );
 }
 
-function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
+/** Flags whose value is a name pattern to match, not a file the step opens. */
+const NAME_PATTERN_FLAGS = new Set([
+  "-g",
+  "--glob",
+  "--iglob",
+  "-name",
+  "-iname",
+  "-path",
+  "-ipath",
+  "-wholename",
+  "--include",
+  "--exclude",
+  "--exclude-dir",
+  "-E",
+  "--exclude-from",
+]);
+
+/**
+ * `rg --files -g '.npmrc'`, `find . -name .env`, `fd .env`: the step prints file names, so a
+ * secret file's name among its patterns is not the secret (QA FK-07). Only while nothing in
+ * the command feeds those names on to another program (`| xargs cat`, `-exec`).
+ */
+function listsNamesOnly(base: string, args: ReadonlyArray<string>): boolean {
+  if (base === "rg") return args.some((arg) => /^(--files|-l|--files-with-matches)$/.test(arg));
+  if (base === "find") {
+    return !args.some((arg) => /^-(exec|execdir|ok|okdir|delete|fprint\w*|fls)$/.test(arg));
+  }
+  return base === "fd" || base === "fdfind" || base === "ls" || base === "tree";
+}
+
+function secretPathCandidates(base: string, args: ReadonlyArray<string>, namesOnly: boolean) {
+  if (!namesOnly || !listsNamesOnly(base, args)) {
+    return args.filter((arg) => !arg.startsWith("-"));
+  }
+  const candidates: Array<string> = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    if (NAME_PATTERN_FLAGS.has(arg)) {
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    // A name lister's own positional is a folder to list or, for fd, a pattern.
+    if (base === "fd" || base === "fdfind") continue;
+    candidates.push(arg);
+  }
+  return candidates;
+}
+
+function evaluateSegment(segment: string, ctx: RuleContext, namesOnly = false): Array<RuleMatch> {
   // `sh -c "a && b"`: every command inside is judged, not only the first.
   const inner = innerShellScript(segment);
   if (inner !== null) {
     return splitShellSegments(normalizeForMatching(inner)).flatMap((part) =>
-      evaluateSegment(part, ctx),
+      evaluateSegment(part, ctx, namesOnly),
     );
   }
   const matches: Array<RuleMatch> = [];
@@ -591,7 +640,7 @@ function evaluateSegment(segment: string, ctx: RuleContext): Array<RuleMatch> {
 
   // Secrets.
   if (SECRET_VARIABLE_PATTERN.test(segment) || SECRET_TOOL_PATTERN.test(segment)) hit("secrets");
-  for (const arg of positional) {
+  for (const arg of secretPathCandidates(base, args, namesOnly)) {
     if (isSecretPath(arg)) {
       hit("secrets", arg);
       break;
@@ -627,10 +676,16 @@ export function evaluateCommand(command: string, ctx: RuleContext = {}): RuleEva
   ) {
     matches.push({ rule: hardRule("pipes-to-shell"), detail: command.trim() });
   }
-  for (const segment of splitShellSegments(text)) matches.push(...evaluateSegment(segment, ctx));
+  // Names printed into another program (`| xargs cat`, `while read`) may be opened after all.
+  const namesOnly = !/\bxargs\b|\bwhile\s+read\b|\bparallel\b|\$\(|`/.test(text);
+  for (const segment of splitShellSegments(text)) {
+    matches.push(...evaluateSegment(segment, ctx, namesOnly));
+  }
   // `x=$(npx vercel --prod)`, `` echo `wrangler deploy` ``: what runs inside counts too.
   for (const inner of commandSubstitutions(text)) {
-    for (const segment of splitShellSegments(inner)) matches.push(...evaluateSegment(segment, ctx));
+    for (const segment of splitShellSegments(inner)) {
+      matches.push(...evaluateSegment(segment, ctx, false));
+    }
   }
   // Everything a destructive pattern catches also counts as deleting or rewriting where that
   // is what it does, so the card can say the specific thing.

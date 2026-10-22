@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  fileWriteTargets,
   innerShellScript,
   normalizeForMatching,
   packageBinaryName,
@@ -13,6 +14,7 @@ describe("splitShellSegments", () => {
   it("splits on &&, ||, ;, | and newlines but not inside quotes", () => {
     expect(splitShellSegments("a && b || c; d | e\nf")).toEqual(["a", "b", "c", "d", "e", "f"]);
     expect(splitShellSegments("echo 'a && b' && c")).toEqual(["echo 'a && b'", "c"]);
+    expect(splitShellSegments("echo hi >| a.txt | wc")).toEqual(["echo hi >| a.txt", "wc"]);
   });
 });
 
@@ -111,5 +113,30 @@ describe("normalizeForMatching — command substitution wrappers", () => {
     expect(normalizeForMatching("`command -v rm` -rf x")).toBe("rm -rf x");
     expect(normalizeForMatching("$(npm bin)/vercel --prod")).toBe("vercel --prod");
     expect(normalizeForMatching("$(type -p git) push")).toBe("git push");
+  });
+});
+
+describe("fileWriteTargets", () => {
+  it("finds every output redirection that writes a file", () => {
+    expect(fileWriteTargets("cat > index.html")).toEqual([{ path: "index.html", append: false }]);
+    expect(fileWriteTargets("cat >> notes.txt")).toEqual([{ path: "notes.txt", append: true }]);
+    expect(fileWriteTargets("printf 'hi' >| a.txt")).toEqual([{ path: "a.txt", append: false }]);
+    expect(fileWriteTargets("echo hi >out.txt 2>err.log")).toEqual([
+      { path: "out.txt", append: false },
+      { path: "err.log", append: false },
+    ]);
+    expect(fileWriteTargets("npm test &> log.txt")).toEqual([{ path: "log.txt", append: false }]);
+    expect(fileWriteTargets('echo x > "my page.html"')).toEqual([
+      { path: "my page.html", append: false },
+    ]);
+  });
+
+  it("ignores discarded output, stream copies and quoted arrows", () => {
+    expect(fileWriteTargets("head a.txt > /dev/null 2>&1")).toEqual([]);
+    expect(fileWriteTargets("echo oops >&2")).toEqual([]);
+    expect(fileWriteTargets("grep '>' index.html")).toEqual([]);
+    expect(fileWriteTargets('echo "a > b"')).toEqual([]);
+    expect(fileWriteTargets("diff <(sort a) >(cat)")).toEqual([]);
+    expect(fileWriteTargets("rg -n '=>' src")).toEqual([]);
   });
 });

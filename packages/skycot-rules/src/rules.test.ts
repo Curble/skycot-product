@@ -227,6 +227,23 @@ describe("evaluateCommand — outside the project and secrets", () => {
     const result = evaluateCommand("cat .env", { projectRoot: ROOT });
     expect(result.risk).toBe("medium");
   });
+
+  // QA FK-07: listing file names with a secret file's name among the patterns read nothing.
+  it("does not hold a step that only lists names matching a secret file's", () => {
+    expect(
+      ids(
+        "rg --files -g 'AGENTS.md' -g 'package.json' -g 'package-lock.json' -g '.npmrc' -g 'yarn.lock'",
+      ),
+    ).toEqual([]);
+    expect(ids("find . -name .env -maxdepth 2")).toEqual([]);
+    expect(ids("fd .env")).toEqual([]);
+    // Reading the file, or handing the names on, is still the secret.
+    expect(ids("rg -n token .npmrc")).toContain("secrets");
+    expect(ids("find . -name .env -exec cat {} \\;")).toContain("secrets");
+    expect(ids("rg --files -g '.env' | xargs cat")).toContain("secrets");
+    expect(ids("cat $(rg --files -g .env)")).toContain("secrets");
+    expect(ids("ls .env")).toContain("secrets");
+  });
 });
 
 describe("isDestructiveCommand", () => {

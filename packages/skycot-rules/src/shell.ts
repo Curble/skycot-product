@@ -26,6 +26,11 @@ export function splitShellSegments(command: string): Array<string> {
       i += 1;
       continue;
     }
+    // `>|` writes a file even with noclobber set; it is not a pipe.
+    if (ch === "|" && command[i - 1] === ">") {
+      current += ch;
+      continue;
+    }
     if (ch === ";" || ch === "|" || ch === "\n") {
       segments.push(current);
       current = "";
@@ -497,4 +502,35 @@ export function normalizeForMatching(command: string): string {
       .replace(/(^|\s)"(\w+)"(\w)(?=\s|$)/g, "$1$2$3")
       .replace(/(^|\s)'(\w+)'(\w)(?=\s|$)/g, "$1$2$3")
   );
+}
+
+export interface FileWrite {
+  readonly path: string;
+  /** `>>`: adds to the end instead of replacing. */
+  readonly append: boolean;
+}
+
+/**
+ * The files a step's output redirections write: `> f`, `>> f`, `>| f`, `2> f`, `&> f`, `>f`.
+ * Not `> /dev/null`, `2>&1` or `>(…)`, and not a `>` inside quotes. A step with any of these
+ * changes a file, whatever its program (QA FK-04: `cat > index.html <<EOF` replaced the page).
+ */
+export function fileWriteTargets(segment: string): Array<FileWrite> {
+  const raw = segment.match(/"(?:[^"\\]|\\.)*"|'[^']*'|\S+/g) ?? [];
+  const writes: Array<FileWrite> = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const token = raw[i]!;
+    if (token.startsWith('"') || token.startsWith("'")) continue;
+    const match = /^(?:\d*|&)(>>?)\|?(.*)$/.exec(token);
+    if (match === null) continue;
+    let target = match[2]!;
+    if (target === "") {
+      target = (raw[i + 1] ?? "").replace(/^["']|["']$/g, "");
+      i += 1;
+    }
+    if (target === "" || target.startsWith("&") || target.startsWith("(")) continue;
+    if (target === "/dev/null" || target === "/dev/stdout" || target === "/dev/stderr") continue;
+    writes.push({ path: target, append: match[1] === ">>" });
+  }
+  return writes;
 }

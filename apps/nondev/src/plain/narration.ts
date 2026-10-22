@@ -10,7 +10,12 @@ import type {
 import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 import { isOutsideProject } from "@t3tools/skycot-rules/files";
 import { readCommandAsk } from "@t3tools/skycot-rules/rules";
-import { programTokens, splitShellSegments, unwrapShellWrapper } from "@t3tools/skycot-rules/shell";
+import {
+  fileWriteTargets,
+  programTokens,
+  splitShellSegments,
+  unwrapShellWrapper,
+} from "@t3tools/skycot-rules/shell";
 
 import { describeFile, humanizeFileName } from "./changes";
 import { errors, progress } from "./copy";
@@ -415,7 +420,11 @@ function capitalize(text: string): string {
 }
 
 /** Splits on `&&`, `;`, `||` and `|` outside quotes. Good enough for narration, not for execution. */
-const HEREDOC_PATTERN = /<<-?\s*['"]?\w+['"]?[\s\S]*$/;
+/**
+ * A here-document's body is data, not steps. What follows the marker on its own line still
+ * counts: `cat <<'EOF' > index.html` writes the page.
+ */
+const HEREDOC_PATTERN = /<<-?\s*(['"]?)\w+\1([^\n]*)[\s\S]*$/;
 
 function stripFlags(args: ReadonlyArray<string>): Array<string> {
   return args.filter((arg) => !arg.startsWith("-"));
@@ -478,7 +487,59 @@ function describePackage(name: string): string {
   return KNOWN_PACKAGES[bare] ?? `the "${bare}" add-on`;
 }
 
+/**
+ * A step that writes a file through `>`, `>>` or `tee` is an edit, never "only reads files"
+ * (QA FK-04). Commands with their own meaning (an install that logs to a file) keep it.
+ */
 function classifySegment(segment: string): CommandClassification | null {
+  const classified = classifySegmentProgram(segment);
+  const writes = fileWriteTargets(segment);
+  if (writes.length === 0) return classified;
+  if (classified !== null && classified.kind !== "read" && classified.kind !== "search") {
+    return classified;
+  }
+  const program = programTokens(segment)[0];
+  const emptiesOnly = program === undefined || program === ">" || program === ":";
+  return describeWrites(
+    writes.map((write) => write.path),
+    writes.every((write) => write.append),
+    emptiesOnly,
+    /(^|\s)(sudo|doas)\s/.test(segment),
+    classified?.program ?? null,
+  );
+}
+
+function describeWrites(
+  targets: ReadonlyArray<string>,
+  append: boolean,
+  emptiesOnly: boolean,
+  elevated: boolean,
+  program: string | null,
+): CommandClassification {
+  const unique = [...new Set(targets)];
+  const what = joinList(unique.map((target) => describeFile(target).noun));
+  const outside = unique.some((target) => isOutsideProject(target, undefined));
+  const v = emptiesOnly
+    ? verb(`empty ${what}`, `emptied ${what}`, `emptying ${what}`)
+    : append
+      ? verb(`add to ${what}`, `added to ${what}`, `adding to ${what}`)
+      : verb(`write ${what}`, `wrote ${what}`, `writing ${what}`);
+  const suffix = elevated ? " as the computer's administrator" : "";
+  return {
+    kind: "edit",
+    risk: elevated ? "high" : outside || emptiesOnly ? "medium" : "low",
+    past: capitalize(`${v.past}${suffix}`),
+    present: capitalize(`${v.present}${suffix}`),
+    infinitive: `${v.infinitive}${suffix}`,
+    program,
+    touches: outside || elevated ? "your computer" : "only this project",
+    ...(elevated
+      ? { warning: "Administrator commands can change anything on this computer." }
+      : {}),
+  };
+}
+
+function classifySegmentProgram(segment: string): CommandClassification | null {
   const elevated = /(^|\s)(sudo|doas)\s/.test(segment);
   const tokens = programTokens(segment);
   const program = tokens[0] ?? null;
@@ -1061,6 +1122,27 @@ function classifySegment(segment: string): CommandClassification | null {
     );
   }
 
+  if (base === "tee") {
+    const files = stripFlags(args);
+    if (files.length > 0) {
+      return describeWrites(
+        files,
+        args.includes("-a") || args.includes("--append"),
+        false,
+        elevated,
+        base,
+      );
+    }
+  }
+  if (base === "sed" && args.some((arg) => arg.startsWith("-i") || arg === "--in-place")) {
+    // `sed -i 's/a/b/' page.html`: the script is the first word that is not a file.
+    const files = stripFlags(args).filter((arg) => /[./]/.test(arg) && !/^s(.).*\1/.test(arg));
+    const what =
+      files.length === 0
+        ? "a file"
+        : joinList([...new Set(files.map((f) => describeFile(f).noun))]);
+    return make("edit", "low", verb(`change ${what}`, `changed ${what}`, `changing ${what}`));
+  }
   if (FILE_PROGRAMS.has(base)) {
     const v =
       base === "mkdir"
@@ -1439,7 +1521,7 @@ function describeReadOnlyLoop(command: string): CommandClassification | null {
  */
 export function classifyCommand(command: string): CommandClassification {
   const unwrapped = unwrapShellWrapper(command.trim());
-  const trimmed = unwrapped.replace(HEREDOC_PATTERN, "").trim();
+  const trimmed = unwrapped.replace(HEREDOC_PATTERN, (_match, _quote, rest: string) => rest).trim();
   const whole = SQL_DESTRUCTIVE_PATTERN.test(trimmed) || PIPE_TO_SHELL_PATTERN.test(trimmed);
   // `failed=0; for …; done; exit "$failed"`: the score-keeping around a loop is not a step.
   const loop = describeReadOnlyLoop(
