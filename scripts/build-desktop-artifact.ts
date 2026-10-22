@@ -43,6 +43,11 @@ import {
 import { loadRepoEnv } from "./lib/public-config.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+// nondev-seam: skycot-update-feed-build
+import {
+  readUpdateFeedSetting,
+  skycotPublishConfig,
+} from "../packages/skycot-brand/src/updateFeed.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -2878,7 +2883,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   // against, so writing update manifests then crashes on a null config.
   buildConfig.publish = null;
   if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
+    // nondev-seam: skycot-update-feed-build
+    // A SKYCOT build bakes only the brand's feed, or none; never GITHUB_REPOSITORY's.
+    const skycotFeed = readUpdateFeedSetting(
+      Option.getOrUndefined(yield* Config.String("T3CODE_SKYCOT_UPDATE_FEED").pipe(Config.option)),
+    );
+    const publishConfig = skycotFeed.branded
+      ? skycotPublishConfig(skycotFeed, updateChannel)
+      : yield* resolveGitHubPublishConfig(updateChannel);
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
     } else if (mockUpdates) {

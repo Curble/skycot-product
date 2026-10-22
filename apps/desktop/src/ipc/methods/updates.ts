@@ -7,6 +7,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import * as SkycotUpdates from "../../skycot/updates.ts"; // nondev-seam: skycot-update-family-gate
 import * as DesktopUpdates from "../../updates/DesktopUpdates.ts";
 import * as IpcChannels from "../channels.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
@@ -47,7 +48,7 @@ export const installUpdate = DesktopIpc.makeIpcMethod({
   result: DesktopUpdateActionResultSchema,
   handler: Effect.fn("desktop.ipc.updates.install")(function* () {
     const updates = yield* DesktopUpdates.DesktopUpdates;
-    return yield* updates.install;
+    return yield* SkycotUpdates.installWithFamilyRule(updates); // nondev-seam: skycot-update-family-gate
   }),
 });
 

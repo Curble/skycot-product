@@ -1,0 +1,71 @@
+/* SKYCOT's own updates: the title-bar pill, About's progress line and the restart sheet.
+   Tone tokens only, so every look, light and dark, follows. Nothing here animates. */
+
+.fm-titlebar > .fm-update-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+/* Narrower windows keep "Restart to update", a phone just "Update"; the pill's accessible
+   name always carries the whole sentence. */
+.fm-update-pill__short {
+  display: none;
+}
+.fm-shell[data-columns="1"] .fm-update-pill__short {
+  display: inline;
+}
+.fm-shell[data-columns="1"] .fm-update-pill__long {
+  display: none;
+}
+.fm-shell[data-columns="1"] .fm-update-pill__ready,
+.fm-shell[data-columns="2"] .fm-update-pill__ready {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.fm-update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.fm-update-progress .fm-progress {
+  max-width: 260px;
+}
+
+.fm-update-notes {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--fm-bg-fill-2);
+}
+.fm-update-notes__title {
+  margin: 0 0 4px;
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label-2);
+}
+.fm-update-notes ul {
+  margin: 0;
+  list-style: disc;
+  padding-left: 18px;
+  font-size: calc(13px * var(--fm-text-scale));
+  line-height: 1.5;
+}
+.fm-update-line,
+.fm-update-warning {
+  margin: 0 0 8px;
+  font-size: calc(13px * var(--fm-text-scale));
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-update-warning {
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--fm-label);
+  background: color-mix(in srgb, var(--fm-orange) 14%, transparent);
+}

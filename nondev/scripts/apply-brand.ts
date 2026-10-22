@@ -22,6 +22,8 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 
+import { updateFeedProblems } from "./update-feed-guard.ts";
+
 const require = NodeModule.createRequire(import.meta.url);
 const ROOT = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "../..");
 
@@ -422,10 +424,19 @@ function upstreamEnvKnobs(
       effective: env.T3CODE_DESKTOP_APP_USER_MODEL_ID!,
     },
     {
-      constant: "electron-updater feed repository",
+      constant: "electron-updater feed (baked into app-update.yml)",
       where:
-        "scripts/build-desktop-artifact.ts resolveGitHubPublishConfig (T3CODE_DESKTOP_UPDATE_REPOSITORY, else GITHUB_REPOSITORY, else no feed)",
+        "scripts/build-desktop-artifact.ts seam skycot-update-feed-build (T3CODE_SKYCOT_UPDATE_FEED; never GITHUB_REPOSITORY); the app re-checks it (seam skycot-update-feed)",
       upstreamDefault: "pingdotgg/t3code via GITHUB_REPOSITORY in upstream CI",
+      effective:
+        env.T3CODE_SKYCOT_UPDATE_FEED === "none"
+          ? "none (no updates yet)"
+          : env.T3CODE_SKYCOT_UPDATE_FEED!,
+    },
+    {
+      constant: "release links in Advanced mode",
+      where: "apps/web/vite.config.ts define (T3CODE_DESKTOP_UPDATE_REPOSITORY)",
+      upstreamDefault: "pingdotgg/t3code",
       effective: env.T3CODE_DESKTOP_UPDATE_REPOSITORY!,
     },
     {
@@ -536,7 +547,13 @@ function main(): number {
     return 0;
   }
 
-  const errors = [...validateBrand(brand), ...checkSeams(brand), ...checkEnv(brand, env)];
+  const errors = [
+    ...validateBrand(brand),
+    ...checkSeams(brand),
+    ...checkEnv(brand, env),
+    // SKYCOT's update feed: the brand's only, never T3 Code's (nondev/scripts/update-feed-guard.ts).
+    ...updateFeedProblems(ROOT),
+  ];
 
   if (!quiet) {
     const out: string[] = [];

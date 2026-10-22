@@ -49,8 +49,8 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   creating or switching on an automation, opening another folder as a project, changing the
   AI assistants (connecting, signing in or out, installing), handing the assistant a key or
   password it asks for, adding, changing or removing a child (names, pictures, voice, bedtime and limits), giving more time, opening Advanced mode, running the welcome steps
-  again (from Settings or by typing the address), changing the code, and turning the profile
-  off. The engine checks the same things, so a click elsewhere cannot skip them — see
+  again (from Settings or by typing the address), restarting the Mac app into a new SKYCOT
+  version, changing the code, and turning the profile off. The engine checks the same things, so a click elsewhere cannot skip them — see
   [What the engine checks](#what-the-engine-checks).
 - **The developer tools stay closed.** "Open Advanced mode" leaves the sidebar and the
   Settings list. With the profile on, any address that would show the developer interface —
@@ -197,6 +197,7 @@ Entering the code allows one thing, for this device, for a short time:
 | Another folder              | adding, moving or removing a project's folder      | 5 minutes  |
 | The AI assistants           | connecting, signing out, installing, other changes | 10 minutes |
 | A key or password, a rename | handing one over, the child's name                 | 10 minutes |
+| Restart to update           | restarting the Mac app into the downloaded version | 2 minutes  |
 | Advanced mode               | the developer interface and everything above       | 15 minutes |
 
 Settings → Family → **Lock again now** ends them all early.
@@ -254,6 +255,7 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                          | as the call it mirrors; otherwise Advanced mode                  | letting another device or an outside agent in                                            |
 | `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                  | Grown-up: AI assistants                                          | the children are part of the profile                                                     |
 | `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: the recap (or the Family settings' yes)                | a child's words and what needed a grown-up are a parent's to read                        |
+| `/api/skycot/updates/allow-restart`, then the Mac app's own install handler (it reads the profile and needs the engine's two-minute note for that version)                                                                                                                                                                                                                                                                                                                            | Grown-up: restart to update                                      | a new version replaces SKYCOT; checking and downloading stay open                        |
 | `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                        | The parent code, with the request                                | wakes SKYCOT for a child; nothing stays open afterwards                                  |
 | A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                 | Refused while SKYCOT is asleep for the child                     | bedtime and the daily limits; Advanced mode is exempt                                    |
 | Everything else: reading and watching (lists, diffs, files, status, searches), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                               | Open                                                             | the child's own work, or it only stops or takes away                                     |
@@ -307,6 +309,11 @@ Honestly, so a parent can decide how nearby to stay:
   the code.
 - **Another browser or device** can only reach SKYCOT after it has been paired with the Mac,
   and the engine enforces the same profile for it.
+- **Updates.** Anyone can check for and download a new SKYCOT version (nothing changes until
+  the restart). Restarting into it needs the code, and the Mac app checks for itself; someone who
+  can use Finder or Terminal on the Mac account could forge the two-minute note it reads. The
+  Advanced-mode update button does nothing while the profile is on: restart from Settings →
+  About. See [UPDATES.md](UPDATES.md).
 - **In an Advanced-mode tab left open** after the 15 minutes run out, refused actions (a
   setting snapping back, a terminal that does not open) are not explained there; reloading
   sends it back to SKYCOT.

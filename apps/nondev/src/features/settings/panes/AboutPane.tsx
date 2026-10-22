@@ -11,6 +11,7 @@ import mitLicenseText from "../../../../../../LICENSE?raw";
 import { ADVANCED_MODE_LABEL, COPYRIGHT_LINE, PRODUCT_NAME } from "../../../brand";
 import { serverEnvironment } from "../../../state/server";
 import { Mascot } from "../../brand/Mascot";
+import { AboutUpdates } from "../../updates/AboutUpdates";
 import { mascotCopy } from "../../brand/mascotCopy";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
@@ -93,6 +94,7 @@ export function AboutPane({ environmentId }: { readonly environmentId: Environme
         </span>
         <span className="fm-about-hero__line">{mascotCopy.aboutLine}</span>
       </div>
+      <AboutUpdates />
       <SettingsGroup title="Online" footer={`${COPYRIGHT_LINE}, Melbourne, Australia.`}>
         <ListRow
           leading={<StepBadge state="todo" icon={Globe} />}
