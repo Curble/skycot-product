@@ -60,6 +60,9 @@ function resolveBrandEnv(b, host) {
     T3CODE_DESKTOP_UPDATE_REPOSITORY: b.updateRepository,
     // `skycot update` release feed (seam: brand-cli-update-repo); same repository as the desktop feed.
     T3CODE_CLI_UPDATE_REPOSITORY: b.updateRepository,
+    // Info.plist NSHumanReadableCopyright / the macOS About panel and Windows file properties
+    // (seam: brand-copyright). Upstream's build derives "Copyright © <year> T3 Tools" otherwise.
+    ...(b.copyright ? { T3CODE_DESKTOP_COPYRIGHT: b.copyright } : {}),
     // electron-builder artifact file name (seam: brand-artifact-name). `${...}` are electron-builder macros.
     T3CODE_DESKTOP_ARTIFACT_NAME: `${b.artifactPrefix}-\${version}-\${arch}.\${ext}`,
     // Installed app icon, always the DAY drawing (brand guide: Finder / Start menu never switch;
@@ -70,6 +73,9 @@ function resolveBrandEnv(b, host) {
     T3CODE_DESKTOP_ICON_MAC_ICNS: "nondev/brand/assets/macos/AppIcon-day.icns",
     T3CODE_DESKTOP_ICON_LINUX_PNG: "nondev/brand/assets/linux/app-icon-day-512.png",
     T3CODE_DESKTOP_ICON_WIN_ICO: "nondev/brand/assets/windows/app-icon-day.ico",
+    // The DMG installer window ("Drag SKYCOT into Applications."); repo-relative, desktop build
+    // only (seam: brand-dmg-background). Upstream's says "Drag T3 Code" under T3's mark.
+    T3CODE_DESKTOP_DMG_BACKGROUND_SVG: "nondev/brand/assets/macos/dmg-background.svg",
     // Analytics: off by default, and never upstream's PostHog project (already env-driven upstream).
     T3CODE_TELEMETRY_ENABLED: b.telemetryEnabledByDefault ? "true" : "false",
     T3CODE_POSTHOG_KEY: telemetryKey || "",
@@ -79,6 +85,10 @@ function resolveBrandEnv(b, host) {
     T3CODE_DEFAULT_RUNTIME_MODE: "approval-required",
     // Safety (SEC-01): server-side hard rules for "Just do it, carefully" (seams: skycot-policy-*).
     T3CODE_SKYCOT_POLICY: "1",
+    // No T3 Connect (no Clerk account, no relay): a signed Mac build signs without passkey
+    // domains or a provisioning profile, and refuses to build if a Connect setting is present
+    // (seam: skycot-mac-signing, packages/skycot-brand/src/macBuild.ts).
+    T3CODE_SKYCOT_CONNECT: "off",
   };
 }
 

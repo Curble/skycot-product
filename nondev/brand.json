@@ -19,5 +19,6 @@
     "posthogKey": null,
     "posthogHost": null
   },
-  "upstreamCredit": "Based on T3 Code (MIT) by T3 Tools Inc."
+  "upstreamCredit": "Based on T3 Code (MIT) by T3 Tools Inc.",
+  "copyright": "Copyright © 2026 Curble Pty Ltd, trading as SKYCOT. Based on T3 Code © T3 Tools Inc. (MIT)."
 }

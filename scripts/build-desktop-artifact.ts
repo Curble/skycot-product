@@ -48,6 +48,11 @@ import {
   readUpdateFeedSetting,
   skycotPublishConfig,
 } from "../packages/skycot-brand/src/updateFeed.ts";
+// nondev-seam: skycot-mac-signing
+import {
+  rebrandMacInfoStrings,
+  resolveSkycotMacSigning,
+} from "../packages/skycot-brand/src/macBuild.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -2593,7 +2598,11 @@ export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
+  // nondev-seam: brand-dmg-background — repo-relative SVG for the installer window's artwork.
+  const brandDmgBackground = process.env.T3CODE_DESKTOP_DMG_BACKGROUND_SVG;
+  const sourcePath = brandDmgBackground
+    ? path.join(yield* RepoRoot, brandDmgBackground)
+    : path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
   if (!(yield* fs.exists(sourcePath))) {
     return yield* new DesktopDmgBackgroundSourceMissingError({ channel, sourcePath });
   }
@@ -2840,7 +2849,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   macPasskeySigning:
     | {
         readonly entitlementsPath: string;
-        readonly provisioningProfilePath: string;
+        readonly provisioningProfilePath: string | undefined; // nondev-seam: skycot-mac-signing
       }
     | undefined,
   wslRuntimeBundled = false,
@@ -2851,6 +2860,10 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     productName: resolveDesktopProductName(version),
     // nondev-seam: brand-artifact-name
     artifactName: process.env.T3CODE_DESKTOP_ARTIFACT_NAME ?? "T3-Code-${version}-${arch}.${ext}",
+    // nondev-seam: brand-copyright
+    ...(process.env.T3CODE_DESKTOP_COPYRIGHT
+      ? { copyright: process.env.T3CODE_DESKTOP_COPYRIGHT }
+      : {}),
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
@@ -2951,6 +2964,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           }
         : {}),
     };
+    // nondev-seam: skycot-mac-info-strings — permission prompts and scheme names say the product's name.
+    buildConfig.mac = rebrandMacInfoStrings(buildConfig.mac, process.env.T3CODE_APP_BASE_NAME);
   }
 
   if (platform === "mac" && target === "dmg") {
@@ -3871,8 +3886,16 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const stageProdResourcesDir = path.join(stageAppDir, "apps/desktop/prod-resources");
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
-  const configuredMacPasskeySigning =
+  // nondev-seam: skycot-mac-signing — SKYCOT signs without T3 Connect (no Clerk, no profile).
+  const skycotMacSigning =
     options.platform === "mac" && options.signed
+      ? yield* Effect.try({
+          try: () => resolveSkycotMacSigning(loadRepoEnv({ repoRoot })),
+          catch: MacPasskeySigningConfigurationResolutionError.fromCause,
+        })
+      : undefined;
+  const configuredMacPasskeySigning =
+    options.platform === "mac" && options.signed && !skycotMacSigning
       ? yield* Effect.try({
           try: () => resolveMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot })),
           catch: MacPasskeySigningConfigurationResolutionError.fromCause,
@@ -3887,9 +3910,14 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
         ),
       }
     : undefined;
-  const macEntitlementsPath = macPasskeySigning
-    ? path.join(stageAppDir, "entitlements.mac.plist")
-    : undefined;
+  const macEntitlementsPath =
+    macPasskeySigning || skycotMacSigning // nondev-seam: skycot-mac-signing
+      ? path.join(stageAppDir, "entitlements.mac.plist")
+      : undefined;
+  if (skycotMacSigning && macEntitlementsPath) {
+    // nondev-seam: skycot-mac-signing
+    yield* fs.writeFileString(macEntitlementsPath, skycotMacSigning.entitlementsPlist);
+  }
   let macWebAuthn: MacWebAuthnEntitlements | undefined;
   if (macPasskeySigning && macEntitlementsPath) {
     if (!(yield* fs.exists(macPasskeySigning.provisioningProfilePath))) {
@@ -3955,7 +3983,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
             entitlementsPath: macEntitlementsPath,
             provisioningProfilePath: macPasskeySigning.provisioningProfilePath,
           }
-        : undefined,
+        : skycotMacSigning && macEntitlementsPath // nondev-seam: skycot-mac-signing
+          ? { entitlementsPath: macEntitlementsPath, provisioningProfilePath: undefined }
+          : undefined,
       bundlesWslRuntime({ platform: options.platform, runtimeArchivePath: options.wslRuntime }),
       options.arch,
     ),
