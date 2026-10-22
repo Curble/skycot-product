@@ -1,13 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ThreadId } from "@t3tools/contracts";
-import { Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
+import { Atom } from "effect/reactivity";
+import { Archive, Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 
 import { Mascot } from "../features/brand/Mascot";
 import { useChildFirst } from "../features/family-limits/useChildFirst";
 import { navigate, threadHref } from "../router";
 import { conversationRowsAtom, filterRows, type ConversationRow } from "../state/conversations";
+import { oldConversationRowsAtom, oldConversationsLoadingAtom } from "../state/oldConversations";
 import { environmentProjects } from "../state/projects";
-import { IconButton } from "../ui/Button";
+import { Button, IconButton } from "../ui/Button";
+import { ContextMenu, type MenuPoint } from "../ui/ContextMenu";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchField } from "../ui/SearchField";
 import {
@@ -18,6 +22,9 @@ import {
 } from "../features/conversation/status";
 import { startOneHint } from "../features/home/tip";
 import { useStarters } from "../features/starters/StarterCards";
+import { ConversationMenuButton, ConversationMenuItems } from "../features/tidy/ConversationMenu";
+import { RenameSheet } from "../features/tidy/RenameSheet";
+import { useTidy } from "../features/tidy/useTidy";
 import { useCrew } from "../themes/useCrew";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -39,10 +46,15 @@ export function ConversationList({
   const shell = useShellState();
   const crew = useCrew();
   const { kids } = useStarters();
-  const rows = useAtomValue(conversationRowsAtom);
+  const old = shell.filter === "old";
+  const liveRows = useAtomValue(conversationRowsAtom);
+  const oldRows = useAtomValue(old ? oldConversationRowsAtom : EMPTY_ROWS_ATOM);
+  const oldLoading = useAtomValue(old ? oldConversationsLoadingAtom : NOT_LOADING_ATOM);
+  const rows = old ? oldRows : liveRows;
   const connected = useConnected();
   const projectCount = useAtomValue(environmentProjects.projectsAtom).length;
-  const visible = filterRows(rows, shell.filter, shell.projectKey, shell.search);
+  const visible = filterRows(rows, old ? "all" : shell.filter, shell.projectKey, shell.search);
+  const [renaming, setRenaming] = useState<ConversationRow | null>(null);
   const now = new Date();
   // With siblings, the child using SKYCOT sees their own conversations first.
   const split = useChildFirst(visible, (row) => row.shell.id);
@@ -66,7 +78,7 @@ export function ConversationList({
           },
         ].filter((section) => section.rows.length > 0);
   // An empty list before the engine has answered is "not loaded", not "nothing".
-  const waitingForData = rows.length === 0 && !connected;
+  const waitingForData = rows.length === 0 && (!connected || (old && oldLoading));
 
   return (
     <section className="fm-list-column" aria-label="Conversations">
@@ -77,7 +89,9 @@ export function ConversationList({
               ? "Waiting for you"
               : shell.filter === "ready"
                 ? "Ready to look at"
-                : "Conversations"}
+                : old
+                  ? "Old conversations"
+                  : "Conversations"}
           </span>
         </h2>
         <IconButton icon={SquarePen} label="New conversation" onClick={onCompose} />
@@ -94,8 +108,17 @@ export function ConversationList({
       ) : null}
       <div className="fm-list-column__scroll">
         {waitingForData ? (
-          <EmptyState icon={Laptop} title="Waiting for your Mac…">
-            Your conversations appear as soon as it's reachable.
+          <EmptyState icon={Laptop} title={old && connected ? "Looking…" : "Waiting for your Mac…"}>
+            {old && connected ? null : "Your conversations appear as soon as it's reachable."}
+          </EmptyState>
+        ) : old && visible.length === 0 ? (
+          <EmptyState
+            icon={Archive}
+            title={shell.search.trim() ? "Nothing matches" : "Nothing put away"}
+          >
+            {shell.search.trim()
+              ? "Try a different word, or clear the search."
+              : "Put a conversation away from its … menu to tidy the list. It waits here, with everything in it, until you bring it back."}
           </EmptyState>
         ) : rows.length === 0 && projectCount === 0 ? (
           <EmptyState art={<Mascot pose="hello" size={72} />} title="No projects yet">
@@ -112,39 +135,132 @@ export function ConversationList({
             {emptyText(shell.filter, shell.search, rows.length, crew.builder.name, kids)}
           </EmptyState>
         ) : (
-          sections.map((section) => {
-            const groups = new Map<DateGroup, ConversationRow[]>();
-            for (const row of section.rows) {
-              const group = dateGroup(row.at, now);
-              const list = groups.get(group);
-              if (list) list.push(row);
-              else groups.set(group, [row]);
-            }
-            return (
-              <div key={section.key}>
-                {section.title ? (
-                  <div className="fm-list-column__section">{section.title}</div>
-                ) : null}
-                {GROUP_ORDER.filter((group) => groups.has(group)).map((group) => (
-                  <div key={group}>
-                    <div className="fm-list-column__group">{group}</div>
-                    {groups.get(group)!.map((row) => (
-                      <ConversationRowButton
-                        key={`${row.shell.environmentId}:${row.shell.id}`}
-                        row={row}
-                        preview={conversationPreview(row.shell, row.status, crew.builder.name)}
-                        selected={row.shell.id === selectedThreadId}
-                        now={now}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            );
-          })
+          <>
+            {old ? (
+              <p className="fm-list-column__note">
+                Put away, not deleted. Everything in them is kept, and they still count on the
+                fridge and for stickers.
+              </p>
+            ) : null}
+            {sections.map((section) => {
+              const groups = new Map<DateGroup, ConversationRow[]>();
+              for (const row of section.rows) {
+                const group = dateGroup(row.at, now);
+                const list = groups.get(group);
+                if (list) list.push(row);
+                else groups.set(group, [row]);
+              }
+              return (
+                <div key={section.key}>
+                  {section.title ? (
+                    <div className="fm-list-column__section">{section.title}</div>
+                  ) : null}
+                  {GROUP_ORDER.filter((group) => groups.has(group)).map((group) => (
+                    <div key={group}>
+                      <div className="fm-list-column__group">{group}</div>
+                      {groups.get(group)!.map((row) => (
+                        <ConversationRowItem
+                          key={`${row.shell.environmentId}:${row.shell.id}`}
+                          row={row}
+                          archived={old}
+                          preview={conversationPreview(row.shell, row.status, crew.builder.name)}
+                          selected={row.shell.id === selectedThreadId}
+                          now={now}
+                          onRename={() => setRenaming(row)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </>
         )}
       </div>
+      <RenameSheet
+        shell={renaming?.shell ?? null}
+        currentTitle={renaming?.title ?? ""}
+        archived={old}
+        onClose={() => setRenaming(null)}
+      />
     </section>
+  );
+}
+
+const EMPTY_ROWS_ATOM = Atom.make<ReadonlyArray<ConversationRow>>([]).pipe(
+  Atom.withLabel("nondev-conversation-rows:empty"),
+);
+const NOT_LOADING_ATOM = Atom.make(false).pipe(Atom.withLabel("nondev-not-loading"));
+
+/**
+ * One row with its menu: "…" (or a right-click) for Rename… and Put away; an old
+ * conversation's row has Bring back beside it instead.
+ */
+function ConversationRowItem({
+  row,
+  archived,
+  preview,
+  selected,
+  now,
+  onRename,
+}: {
+  readonly row: ConversationRow;
+  readonly archived: boolean;
+  readonly preview: string;
+  readonly selected: boolean;
+  readonly now: Date;
+  readonly onRename: () => void;
+}) {
+  const tidy = useTidy();
+  const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
+  const [bringing, setBringing] = useState(false);
+  const openMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    setMenuAt({ x: event.clientX, y: event.clientY });
+  };
+  return (
+    <div
+      className={`fm-convrow-item${archived ? " fm-convrow-item--old" : ""}${
+        menuAt ? " fm-convrow-item--menu" : ""
+      }`}
+      onContextMenu={openMenu}
+    >
+      <ConversationRowButton row={row} preview={preview} selected={selected} now={now} />
+      {archived ? (
+        <span className="fm-convrow-item__bring">
+          <Button
+            size="sm"
+            disabled={bringing}
+            onClick={async () => {
+              setBringing(true);
+              const outcome = await tidy.bringBack(row.shell);
+              if (!outcome.ok) setBringing(false);
+            }}
+          >
+            {bringing ? "Bringing back…" : "Bring back"}
+          </Button>
+        </span>
+      ) : (
+        <span className="fm-convrow-item__more">
+          <ConversationMenuButton
+            shell={row.shell}
+            archived={false}
+            onRename={onRename}
+            size="sm"
+          />
+        </span>
+      )}
+      <ContextMenu at={menuAt} onClose={() => setMenuAt(null)} label={`${row.title}`}>
+        {(close) => (
+          <ConversationMenuItems
+            shell={row.shell}
+            archived={archived}
+            onRename={onRename}
+            close={close}
+          />
+        )}
+      </ContextMenu>
+    </div>
   );
 }
 

@@ -1,0 +1,151 @@
+/* Tidying the list: the row's "…" and right-click menu, Old conversations, the toast. */
+
+/* The row's own button keeps the look; its menu controls sit beside it, not inside it. */
+.fm-convrow-item {
+  position: relative;
+}
+.fm-convrow-item + .fm-convrow-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 64px;
+  right: 6px;
+  border-top: 0.5px solid var(--fm-sep-2);
+  pointer-events: none;
+}
+.fm-convrow-item:has(.fm-convrow--selected)::before,
+.fm-convrow-item:has(.fm-convrow--selected) + .fm-convrow-item::before {
+  border-top-color: transparent;
+}
+/* Room for the "…" at the end of the preview line. */
+.fm-convrow-item .fm-convrow__preview {
+  padding-right: 26px;
+}
+.fm-convrow-item__more {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  opacity: 0;
+}
+.fm-convrow-item:hover .fm-convrow-item__more,
+.fm-convrow-item:focus-within .fm-convrow-item__more,
+.fm-convrow-item--menu .fm-convrow-item__more,
+.fm-convrow-item__more:has([aria-expanded="true"]),
+.fm-convrow-item:has(.fm-convrow--selected) .fm-convrow-item__more {
+  opacity: 1;
+}
+.fm-convrow-item:has(.fm-convrow--selected) .fm-convrow-item__more .fm-btn--icon {
+  color: var(--fm-on-accent);
+}
+/* Touch screens have no hover: the "…" stays, quietly. */
+@media (hover: none) {
+  .fm-convrow-item__more {
+    opacity: 0.75;
+  }
+}
+.fm-convrow-item--menu .fm-convrow:not(.fm-convrow--selected) {
+  box-shadow: inset 0 0 0 2px var(--fm-accent);
+}
+
+/* Old conversations: Bring back under the row's words, so the name keeps its width. */
+.fm-convrow-item--old .fm-convrow {
+  padding-bottom: 46px;
+}
+.fm-convrow-item--old .fm-convrow__preview {
+  padding-right: 0;
+}
+.fm-convrow-item__bring {
+  position: absolute;
+  left: 80px;
+  bottom: 10px;
+}
+.fm-list-column__note {
+  margin: 2px 8px 6px;
+  font-size: calc(12px * var(--fm-text-scale));
+  line-height: 1.35;
+  color: var(--fm-label-2);
+}
+
+/* A menu's explanation under a row that can't be chosen yet. */
+.fm-menu-note {
+  max-width: 260px;
+  margin: 4px 10px 4px 30px;
+  font-size: calc(12px * var(--fm-text-scale));
+  line-height: 1.3;
+  color: var(--fm-label-2);
+}
+.fm-menu-item:disabled {
+  color: var(--fm-label-3);
+}
+.fm-menu-item:disabled:hover {
+  background: transparent;
+  color: var(--fm-label-3);
+}
+
+/* The right-click menu: a popover at the pointer. */
+.fm-context-menu {
+  position: fixed;
+  z-index: 60;
+}
+
+/* The conversation's name in its header. */
+h1.fm-conv-header__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-family: var(--fm-font-label);
+  font-size: calc(15px * var(--fm-text-scale));
+  line-height: 1.25;
+}
+
+/* "Put away · Undo": bottom centre, above everything, like the Finder's. */
+.fm-toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 70;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.fm-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--fm-label);
+  color: var(--fm-bg-content);
+  box-shadow: var(--fm-shadow-popover);
+  font-size: calc(14px * var(--fm-text-scale));
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.fm-toast__dot {
+  opacity: 0.6;
+}
+.fm-toast__action {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fm-toast {
+    animation: fm-toast-in 160ms ease-out;
+  }
+}
+@keyframes fm-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

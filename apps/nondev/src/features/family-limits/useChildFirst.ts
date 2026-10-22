@@ -1,7 +1,10 @@
+import { useEffect } from "react";
+
 import { useFamily } from "../family/FamilyProvider";
 import { childLabel } from "../family/children";
-import { childFirst, type ChildOrder } from "./order";
-import { useLimits } from "./store";
+
+import { childFirst, unknownThreadIds, type ChildOrder } from "./order";
+import { askWhoStarted, useLimits } from "./store";
 
 /**
  * The list split for the child using SKYCOT here, or null when there is nothing to split (no
@@ -14,7 +17,13 @@ export function useChildFirst<R>(
   const family = useFamily();
   const { today } = useLimits();
   const view = family.profile;
-  if (!family.enabled || view.children.length < 2) return null;
+  const splitting = family.enabled && view.children.length >= 2;
+  const unknown = splitting ? unknownThreadIds(rows, threadIdOf, today.threads).join(" ") : "";
+  // A conversation started here (or on another device) since the last read is someone's.
+  useEffect(() => {
+    if (unknown.length > 0) askWhoStarted(unknown.split(" "));
+  }, [unknown]);
+  if (!splitting) return null;
   const order = childFirst(rows, threadIdOf, today.threads, view.currentChildId);
   if (order === null) return null;
   const index = view.children.findIndex((child) => child.id === view.currentChildId);

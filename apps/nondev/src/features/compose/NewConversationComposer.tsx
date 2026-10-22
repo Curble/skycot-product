@@ -35,6 +35,7 @@ import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily } from "../family/FamilyProvider";
+import { noteStartedHere } from "../family-limits/store";
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
   autonomyLabel,
@@ -458,6 +459,8 @@ function ComposerField({
       return { kind: "failed", message: calm(squashAtomCommandFailure(started)) };
     }
     if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
+    // Family with siblings: list it under this child's conversations straight away.
+    noteStartedHere(threadId);
     writeLastProject({ environmentId, projectId: project.id });
     navigate(threadHref(environmentId, threadId));
     return { kind: "started" };

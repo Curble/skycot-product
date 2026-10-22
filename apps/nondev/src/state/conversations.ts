@@ -59,36 +59,46 @@ export const refusedRunIdsAtom = Atom.make<ReadonlySet<string>>(readRefusedRunId
   Atom.withLabel("nondev-refused-run-ids"),
 );
 
+/** One list row from a thread shell: its project, plain title, status and preview. */
+export function toConversationRow(
+  get: Atom.AtomContext,
+  shell: EnvironmentThreadShell,
+  refusedRuns: ReadonlySet<string>,
+): ConversationRow {
+  const runId = shell.latestRun?.runId ?? null;
+  const status = describeThreadStatus(shell, {
+    refused: runId !== null && refusedRuns.has(runId),
+  });
+  return {
+    shell,
+    project: get(
+      environmentProjects.projectAtom({
+        environmentId: shell.environmentId,
+        projectId: shell.projectId,
+      }),
+    ),
+    title: conversationTitle(shell),
+    status,
+    preview: conversationPreview(shell, status),
+    at: shell.updatedAt,
+  };
+}
+
+export function newestFirst(rows: ConversationRow[]): ConversationRow[] {
+  return rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
+
 // Every open, top-level conversation across the enabled environments, newest
 // first, with its plain status. Reads the shell list only (no per-thread
 // subscription), which is what keeps the list cheap however many threads exist.
 export const conversationRowsAtom = Atom.make((get): ReadonlyArray<ConversationRow> => {
   const shells = get(environmentThreadShells.navigationThreadShellsAtom);
   const refusedRuns = get(refusedRunIdsAtom);
-  const rows = shells.map((shell): ConversationRow => {
-    const runId = shell.latestRun?.runId ?? null;
-    const status = describeThreadStatus(shell, {
-      refused: runId !== null && refusedRuns.has(runId),
-    });
-    return {
-      shell,
-      project: get(
-        environmentProjects.projectAtom({
-          environmentId: shell.environmentId,
-          projectId: shell.projectId,
-        }),
-      ),
-      title: conversationTitle(shell),
-      status,
-      preview: conversationPreview(shell, status),
-      at: shell.updatedAt,
-    };
-  });
-  rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  return rows;
+  return newestFirst(shells.map((shell) => toConversationRow(get, shell, refusedRuns)));
 }).pipe(Atom.withLabel("nondev-conversation-rows"));
 
-export type ConversationFilter = "all" | "waiting" | "ready";
+/** "old" lists the conversations that were put away (archived). */
+export type ConversationFilter = "all" | "waiting" | "ready" | "old";
 
 export function filterRows(
   rows: ReadonlyArray<ConversationRow>,

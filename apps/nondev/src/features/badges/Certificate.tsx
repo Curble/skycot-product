@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import mascotYay from "../../assets/brand/mascot-yay-day.svg";
 import { STICKERS_HREF, navigate } from "../../router";
 import { conversationRowsAtom } from "../../state/conversations";
+import { oldConversationRowsAtom } from "../../state/oldConversations";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Mascot } from "../brand/Mascot";
@@ -48,14 +49,16 @@ export interface CertificateFacts {
   readonly at: number;
 }
 
-/** The creation's title as the conversation list shows it now, else as it was when made. */
+/** The creation's title as the conversation list (or Old conversations) shows it now, else as it was when made. */
 function useWorkTitle(earned: EarnedBadge | null): string | null {
   const rows = useAtomValue(conversationRowsAtom);
+  // A creation whose conversation was put away still earned its certificate.
+  const oldRows = useAtomValue(oldConversationRowsAtom);
   if (earned === null) return null;
   const live =
     earned.threadId === null
       ? undefined
-      : rows.find((row) => row.shell.id === earned.threadId)?.title;
+      : [...rows, ...oldRows].find((row) => row.shell.id === earned.threadId)?.title;
   const title = live ?? earned.title;
   return title ? clampTitle(title) : null;
 }

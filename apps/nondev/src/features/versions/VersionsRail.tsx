@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Columns } from "../../app/useColumns";
 import { canOperateEnvironmentAtom } from "../../state/session";
-import { environmentThreadShells } from "../../state/threads";
 import { IconButton } from "../../ui/Button";
 import { InspectorPanel } from "../../ui/InspectorPanel";
 import { Sheet } from "../../ui/Sheet";
 import { setVersionsRailOpen } from "./railState";
 import { VersionsTimeline } from "./VersionsTimeline";
+import { useConversationShell } from "../../state/oldConversations";
 
 const LEDE = "Every change is a point you can step back to, like Time Machine for this project.";
 
@@ -41,7 +41,8 @@ export function VersionsRailSlot({
   /** True when there is room for the full rail, so the strip's button reopens it rather than a sheet. */
   readonly expandable: boolean;
 }) {
-  const shell = useAtomValue(environmentThreadShells.threadShellAtom({ environmentId, threadId }));
+  // Put-away conversations too: their private copy is still theirs.
+  const { shell } = useConversationShell(environmentId, threadId);
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const [sheetOpen, setSheetOpen] = useState(false);
   // Hiding the rail unmounts its Hide button; keyboard focus moves to the

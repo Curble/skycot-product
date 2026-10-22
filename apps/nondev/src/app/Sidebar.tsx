@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
+  Archive,
   Bell,
   CheckCircle2,
   CircleAlert,
@@ -107,6 +108,12 @@ export function AppSidebar({
             count={ready}
             selected={conversationRoute && shell.filter === "ready"}
             onClick={() => showList(() => shell.setFilter("ready"))}
+          />
+          <SidebarItem
+            icon={Archive}
+            label="Old conversations"
+            selected={conversationRoute && shell.filter === "old"}
+            onClick={() => showList(() => shell.setFilter("old"))}
           />
           <SidebarItem
             glyph={<FridgeIcon size={15} />}

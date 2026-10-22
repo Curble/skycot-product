@@ -10,7 +10,7 @@ import {
   todaySummary,
   wallTimePhrase,
 } from "./limits";
-import { childFirst } from "./order";
+import { childFirst, unknownThreadIds, withStarter } from "./order";
 import { parseToday } from "./store";
 
 const ZONE = "Australia/Melbourne";
@@ -152,5 +152,25 @@ describe("the child's conversations first", () => {
       others: [{ id: "t1" }, { id: "t3" }],
     });
     expect(childFirst(rows, (row) => row.id, owners, null)).toBeNull();
+  });
+});
+
+// F2: a brand-new conversation showed under "Everyone else's" until the page reloaded.
+describe("a conversation started here", () => {
+  it("is the child's straight away, before the engine is asked again", () => {
+    const owners = { t1: "leo" };
+    const rows = [{ id: "new" }, { id: "t1" }];
+    expect(unknownThreadIds(rows, (row) => row.id, owners)).toEqual(["new"]);
+    const noted = withStarter(owners, "new", "ava");
+    expect(childFirst(rows, (row) => row.id, noted, "ava")).toEqual({
+      mine: [{ id: "new" }],
+      others: [{ id: "t1" }],
+    });
+    expect(unknownThreadIds(rows, (row) => row.id, noted)).toEqual([]);
+  });
+
+  it("never changes who started a conversation the engine already named", () => {
+    const owners = { t1: "leo" };
+    expect(withStarter(owners, "t1", "ava")).toBe(owners);
   });
 });
