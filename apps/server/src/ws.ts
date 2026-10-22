@@ -3183,7 +3183,8 @@ export const layer = Layer.unwrap(
           const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket;
           yield* RpcServer.make(ServerWsRpcGroup, WS_RPC_SERVER_OPTIONS).pipe(
             Effect.provideService(RpcServer.Protocol, withTerminalOutputWindow(protocol)),
-            // nondev-seam: skycot-family-rpc (Family-profile check in front of the scope check below)
+            // nondev-seam: skycot-family-rpc (Family-profile check in front of the scope check below; two provides on purpose: the outer one is the scope check this wraps)
+            // @effect-diagnostics-next-line multipleEffectProvide:off
             Effect.provide(
               SkycotFamilyGate.layerRpcAuthorization(skycotFamilyGate, session.sessionId),
             ),
