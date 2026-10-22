@@ -332,6 +332,15 @@ function seams(): Seam[] {
       mechanism: "env seam",
     },
     {
+      id: "brand-package-name",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: 'packaged app name (Keychain "<name> Safe Storage", updater cache)',
+      envName: "T3CODE_DESKTOP_PACKAGE_NAME",
+      upstreamDefault: '"t3code"',
+      effective: (e) => e.T3CODE_DESKTOP_PACKAGE_NAME!,
+      mechanism: "env seam",
+    },
+    {
       id: "brand-dmg-background",
       file: "scripts/build-desktop-artifact.ts",
       constant: "DMG installer window artwork",

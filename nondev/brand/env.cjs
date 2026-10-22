@@ -45,6 +45,10 @@ function resolveBrandEnv(b, host) {
     // macOS bundle id / Windows AppUserModelID (seam: brand-app-id; AppUserModelID already env-driven).
     T3CODE_DESKTOP_APP_ID: b.appId,
     T3CODE_DESKTOP_APP_USER_MODEL_ID: b.appId,
+    // The packaged app's package.json `name`. Electron keys its macOS Keychain secret
+    // "<name> Safe Storage" and electron-updater its cache "<name>-updater" by it; upstream's
+    // "t3code" made SKYCOT ask for T3 Code's own Keychain key (seam: brand-package-name).
+    T3CODE_DESKTOP_PACKAGE_NAME: b.cliName,
     // Chromium profile directory under the OS app-data dir (seam: brand-userdata).
     T3CODE_DESKTOP_USER_DATA_DIR: b.userDataDirName,
     // What the desktop window loads under `${scheme}://app/` (seam: brand-client-entry).
