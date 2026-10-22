@@ -553,7 +553,7 @@ export function rewriteWithNicknames(text: string): string {
 export function personalCategories(
   details: ReadonlyArray<Pick<PersonalDetail, "category">>,
 ): Array<PersonalCategory> {
-  const present = new Set(details.map((detail) => detail.category));
+  const present = new Set<PersonalCategory>(details.map((detail) => detail.category));
   return PERSONAL_CATEGORIES.map((info) => info.id).filter((id) => present.has(id));
 }
 

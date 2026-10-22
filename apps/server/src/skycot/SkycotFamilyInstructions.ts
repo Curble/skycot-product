@@ -16,14 +16,37 @@
 // slash commands: a message that starts with "/" would otherwise reach Claude as a native
 // command, or Codex as a plain request, with no rules at all (QA FK-01). `/compact` still
 // works: it is routed on the stored text and each adapter sends its own compaction request.
+//
+// Two more SKYCOT instructions ride the same seam:
+//   - The personal-details shield (`@t3tools/skycot-rules/personal`). The client asks before
+//     sending a full name, a school or an address; this is the defence in depth for every
+//     other way in (another client, a raw RPC, a follow-up typed mid-turn). While the profile
+//     is on, what the detector finds is hidden before the provider sees it, and the log names
+//     only the kinds of detail, never the values. A grown-up who allowed one message with the
+//     parent code (see `allowPersonalDetailsOnce`) lets that message through as typed.
+//   - "How did you do that?" explain mode (`@t3tools/skycot-rules/explain`): on by default in
+//     the Family profile, off otherwise, and switched per message by the marker the client
+//     appends, which is stripped here.
 
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import {
+  EXPLAIN_INSTRUCTIONS,
+  explainDefault,
+  readExplainMarker,
+} from "@t3tools/skycot-rules/explain";
+import {
+  describePersonalCategories,
+  redactPersonalDetails,
+  type PersonalCategory,
+} from "@t3tools/skycot-rules/personal";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import type * as SkycotFamily from "./SkycotFamily.ts";
 
 export const FAMILY_RULES_TAG = "skycot_family_rules";
+export const EXPLAIN_TAG = "skycot_explain";
 const REQUEST_TAG = "user_request";
 
 export const FAMILY_RULES_TEXT = [
@@ -44,19 +67,76 @@ export const FAMILY_RULES_TEXT = [
  */
 function neutralizeTags(text: string): string {
   return text.replace(
-    new RegExp(`<\\s*/?\\s*(${FAMILY_RULES_TAG}|${REQUEST_TAG})\\s*>`, "gi"),
+    new RegExp(`<\\s*/?\\s*(${FAMILY_RULES_TAG}|${EXPLAIN_TAG}|${REQUEST_TAG})\\s*>`, "gi"),
     (_match, name: string) => `[${name}]`,
   );
 }
 
+const block = (tag: string, body: string) => `<${tag}>\n${body}\n</${tag}>`;
+
+/** The rules block's extra line when the shield hid something from this message. */
+export function shieldNote(categories: ReadonlyArray<PersonalCategory>): string {
+  return `- SKYCOT hid ${describePersonalCategories(categories)} from this message to keep the child safe. Do not ask for it or guess it; use a nickname or a placeholder instead.`;
+}
+
+export interface TurnInstructions {
+  readonly family: boolean;
+  readonly explain: boolean;
+  /** Kinds of detail the shield hid from this message; empty when none. */
+  readonly hidden?: ReadonlyArray<PersonalCategory>;
+}
+
+/** The text a provider receives for one message. Unchanged when no instruction applies. */
+export function wrapTurnText(text: string, instructions: TurnInstructions): string {
+  if (!instructions.family && !instructions.explain) return text;
+  const hidden = instructions.hidden ?? [];
+  const rules = instructions.family
+    ? block(
+        FAMILY_RULES_TAG,
+        hidden.length > 0 ? `${FAMILY_RULES_TEXT}\n${shieldNote(hidden)}` : FAMILY_RULES_TEXT,
+      )
+    : null;
+  const explain = instructions.explain ? block(EXPLAIN_TAG, EXPLAIN_INSTRUCTIONS) : null;
+  return [rules, explain, block(REQUEST_TAG, neutralizeTags(text))]
+    .filter((part): part is string => part !== null)
+    .join("\n\n");
+}
+
 export function wrapWithFamilyRules(text: string): string {
-  return `<${FAMILY_RULES_TAG}>\n${FAMILY_RULES_TEXT}\n</${FAMILY_RULES_TAG}>\n\n<${REQUEST_TAG}>\n${neutralizeTags(text)}\n</${REQUEST_TAG}>`;
+  return wrapTurnText(text, { family: true, explain: false });
 }
 
 /**
- * The message a provider receives: wrapped while the Family profile is on, the same object
- * otherwise. `family` is optional so upstream services that never see the profile (tests,
- * other builds) stay unchanged.
+ * Messages a grown-up allowed to go as typed, personal details and all. The Family gate sees
+ * the session (and so the parent's "yes", `approve` for `shield:<messageId>`) at the RPC;
+ * this layer sees the message only when the provider turn starts, so the gate leaves word
+ * here. Each pass is spent by the one turn it was for, and lapses unused after ten minutes.
+ */
+const PASS_TTL_MS = 10 * 60_000;
+const shieldPasses = new Map<string, number>();
+
+/** The approval id a grown-up's code is checked against for one message. */
+export const shieldApprovalId = (messageId: string) => `shield:${messageId}`;
+
+export const allowPersonalDetailsOnce = (messageId: string): Effect.Effect<void> =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    for (const [id, expiresAt] of shieldPasses) if (expiresAt <= now) shieldPasses.delete(id);
+    shieldPasses.set(messageId, now + PASS_TTL_MS);
+  });
+
+const takeShieldPass = (messageId: string): Effect.Effect<boolean> =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    const expiresAt = shieldPasses.get(messageId);
+    if (expiresAt === undefined) return false;
+    shieldPasses.delete(messageId);
+    return expiresAt > now;
+  });
+
+/**
+ * The message a provider receives. While the Family profile is on: the rules, the shield
+ * and (by default) explain mode; otherwise explain mode only when the message asked for it.
+ * The same object when nothing applies. `family` is optional so upstream services that never
+ * see the profile (tests, other builds) stay unchanged.
  */
 export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnMessage>(
   family: Option.Option<SkycotFamily.SkycotFamily["Service"]>,
@@ -64,11 +144,38 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
 ): Effect.Effect<M> =>
   Option.isNone(family)
     ? Effect.succeed(message)
-    : family.value.isEnabled.pipe(
-        Effect.map((enabled) =>
-          enabled ? { ...message, text: wrapWithFamilyRules(message.text) } : message,
-        ),
-      );
+    : Effect.gen(function* () {
+        const enabled = yield* family.value.isEnabled;
+        const marked = readExplainMarker(message.text);
+        const explain = marked.choice === null ? explainDefault(enabled) : marked.choice === "on";
+        if (!enabled) {
+          if (!explain && marked.choice === null) return message;
+          return { ...message, text: wrapTurnText(marked.text, { family: false, explain }) };
+        }
+        const allowed = yield* takeShieldPass(message.messageId);
+        const redaction = allowed
+          ? { text: marked.text, categories: [] }
+          : redactPersonalDetails(marked.text);
+        if (redaction.categories.length > 0) {
+          // The kinds only: the values never reach a log.
+          yield* Effect.logInfo("skycot-shield.hidden", {
+            messageId: message.messageId,
+            categories: redaction.categories,
+          });
+        } else if (allowed) {
+          yield* Effect.logInfo("skycot-shield.allowed-by-grown-up", {
+            messageId: message.messageId,
+          });
+        }
+        return {
+          ...message,
+          text: wrapTurnText(redaction.text, {
+            family: true,
+            explain,
+            hidden: redaction.categories,
+          }),
+        };
+      });
 
 /** A provider-session input with its message wrapped (start and steer share the shape). */
 const inputWithFamilyRules = <

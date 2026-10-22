@@ -24,6 +24,10 @@
       "types": "./src/family.ts",
       "import": "./src/family.ts"
     },
+    "./explain": {
+      "types": "./src/explain.ts",
+      "import": "./src/explain.ts"
+    },
     "./personal": {
       "types": "./src/personal.ts",
       "import": "./src/personal.ts"
