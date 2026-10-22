@@ -75,6 +75,8 @@ export const FAMILY_PURPOSES = [
   "openFolder",
   "settings",
   "advanced",
+  /** Reading a child's recap (what they made, asked for, and what needed a grown-up). */
+  "recap",
 ] as const;
 export type FamilyPurpose = (typeof FAMILY_PURPOSES)[number];
 
@@ -85,6 +87,7 @@ export const GRANT_TTL_MS: Readonly<Record<FamilyPurpose, number>> = {
   openFolder: 5 * 60_000,
   settings: 10 * 60_000,
   advanced: 15 * 60_000,
+  recap: 10 * 60_000,
 };
 
 export const UNLOCK_COOKIE_NAME = "skycot_family_unlock";

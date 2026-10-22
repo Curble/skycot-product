@@ -43,7 +43,9 @@ import * as ServerHttp from "../http.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SkycotFridge from "./family-fridge/SkycotFridge.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
@@ -86,9 +88,30 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
       },
     }),
   );
-  const layerApp = Layer.mergeAll(SkycotFamilyHttp.layer, ServerHttp.layerStaticAndDevRoute).pipe(
-    Layer.provideMerge(NodeHttpPlatform.layer),
+  const pins: Array<unknown> = [];
+  // Stand-ins: the recap and fridge contents have their own tests; these check the doors.
+  const layerMade = SkycotFamilyHttp.layerMadeRoutes.pipe(
+    Layer.provide(
+      Layer.merge(
+        Layer.mock(SkycotFamilyRecap.SkycotFamilyRecap)({
+          recap: ({ childId, range }) =>
+            Effect.succeed(childId === "nobody" ? null : ({ childId, range } as never)),
+        }),
+        Layer.mock(SkycotFridge.SkycotFridge)({
+          list: Effect.succeed([]),
+          pin: (input) => {
+            pins.push(input);
+            return Effect.succeed([]);
+          },
+        }),
+      ),
+    ),
   );
+  const layerApp = Layer.mergeAll(
+    SkycotFamilyHttp.layerCore,
+    layerMade,
+    ServerHttp.layerStaticAndDevRoute,
+  ).pipe(Layer.provideMerge(NodeHttpPlatform.layer));
   const services = yield* Layer.build(
     HttpRouter.serve(layerApp, { disableListenLog: true }).pipe(
       Layer.provideMerge(layerDependencies),
@@ -112,7 +135,7 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
             headers: { authorization: BEARER, ...options.headers },
           }).pipe(HttpClientRequest.bodyJsonUnsafe(options.body)),
     );
-  return { send, pinned };
+  return { send, pinned, pins };
 });
 
 it.layer(
@@ -211,6 +234,43 @@ it.layer(
         grants: ReadonlyArray<unknown>;
       };
       assert.deepEqual(locked.grants, []);
+    }),
+  );
+
+  it.effect("shows a child's recap only after the parent code; the fridge stays open", () =>
+    Effect.gen(function* () {
+      const { send, pins } = yield* makeClient();
+      const status = (yield* (yield* send("POST", "/api/skycot/family/enable", {
+        body: { code: CODE, childName: "Ava" },
+      })).json) as { children: ReadonlyArray<{ id: string }> };
+      const ava = status.children[0]!.id;
+      const resource = `/api/skycot/family/recap?childId=${ava}&range=week`;
+      const refused = yield* send("GET", resource);
+      assert.equal(refused.status, 403);
+      assert.equal(
+        ((yield* refused.json) as { requiredPermission: string }).requiredPermission,
+        SkycotFamilyGate.FAMILY_PERMISSION,
+      );
+      const unlock = yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "recap" },
+      });
+      assert.equal(unlock.status, 200);
+      const report = yield* send("GET", resource);
+      assert.equal(report.status, 200);
+      assert.deepEqual(yield* report.json, { childId: ava, range: "week" });
+      assert.equal((yield* send("GET", `${resource.replace("week", "year")}`)).status, 400);
+      assert.equal(
+        (yield* send("GET", "/api/skycot/family/recap?childId=nobody&range=session")).status,
+        400,
+      );
+      // Children pin and take down magnets freely.
+      yield* send("POST", "/api/skycot/family/lock", { body: {} });
+      assert.equal((yield* send("GET", "/api/skycot/family/fridge")).status, 200);
+      const pinned = yield* send("POST", "/api/skycot/family/fridge/pin", {
+        body: { threadId: "thread:space", pinned: true },
+      });
+      assert.equal(pinned.status, 200);
+      assert.deepEqual(pins, [{ threadId: "thread:space", pinned: true }]);
     }),
   );
 
@@ -435,10 +495,12 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
       return HttpServerResponse.jsonUnsafe(yield* request.json);
     }),
   );
-  const layerApp = Layer.mergeAll(SkycotFamilyHttp.layer, layerWs, layerPairing, layerMutate).pipe(
-    Layer.provide(SkycotFamilyHttp.layerApiGate),
-    Layer.provideMerge(NodeHttpPlatform.layer),
-  );
+  const layerApp = Layer.mergeAll(
+    SkycotFamilyHttp.layerCore,
+    layerWs,
+    layerPairing,
+    layerMutate,
+  ).pipe(Layer.provide(SkycotFamilyHttp.layerApiGate), Layer.provideMerge(NodeHttpPlatform.layer));
   const services = yield* Layer.build(
     HttpRouter.serve(layerApp, { disableListenLog: true }).pipe(
       Layer.provideMerge(layerGate),

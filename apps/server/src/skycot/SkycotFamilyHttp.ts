@@ -12,10 +12,17 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
+import { PERSONAL_CATEGORIES } from "@t3tools/skycot-rules/personal";
+
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
+import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SkycotFridge from "./family-fridge/SkycotFridge.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { RECAP_RANGES, type RecapRange } from "./family-recap/recap.ts";
+import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 
@@ -61,6 +68,8 @@ const expiredUnlockCookie = `${SkycotFamily.UNLOCK_COOKIE_NAME}=; Path=/; Max-Ag
 type Handler = (input: {
   readonly sessionId: string;
   readonly body: Record<string, unknown>;
+  /** The query string, for the GET routes that take one. */
+  readonly query: URLSearchParams;
   readonly family: SkycotFamily.SkycotFamily["Service"];
   readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
   /**
@@ -118,9 +127,11 @@ const route = (
               403,
             );
           }
+          const url = HttpServerRequest.toURL(request);
           return yield* handler({
             sessionId: session.sessionId,
             body,
+            query: Option.isSome(url) ? url.value.searchParams : new URLSearchParams(),
             family,
             limits,
             pinSafeDefault,
@@ -420,7 +431,101 @@ export const layerApiGate = HttpRouter.middleware(
   { global: true },
 );
 
-export const layer = Layer.mergeAll(
+const SHIELD_CATEGORIES: ReadonlySet<string> = new Set(PERSONAL_CATEGORIES.map((info) => info.id));
+
+/**
+ * The composer's shield card showed: noted for the grown-up recap by kind of detail only. The
+ * words never come here; anything that is not a known kind is dropped.
+ */
+const shieldCaughtRoute = route(
+  "POST",
+  "/shield-caught",
+  AuthOrchestrationOperateScope,
+  ({ limits, body, sessionId }) =>
+    Effect.gen(function* () {
+      const categories = Array.isArray(body["categories"])
+        ? [...new Set(body["categories"].filter((value) => SHIELD_CATEGORIES.has(String(value))))]
+        : [];
+      if (categories.length > 0) {
+        yield* limits.recordEvent({
+          sessionId,
+          kind: "shield",
+          categories: categories as string[],
+        });
+      }
+      return json({ ok: true });
+    }),
+);
+
+/** Routes that read what the children made; their services come with this module's layer. */
+const madeRoute = (
+  method: "GET" | "POST",
+  path: string,
+  handler: (
+    input: Parameters<Handler>[0] & {
+      readonly recap: SkycotFamilyRecap.SkycotFamilyRecap["Service"];
+      readonly fridge: SkycotFridge.SkycotFridge["Service"];
+    },
+  ) => ReturnType<Handler>,
+) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const recap = yield* SkycotFamilyRecap.SkycotFamilyRecap;
+      const fridge = yield* SkycotFridge.SkycotFridge;
+      return route(method, path, AuthOrchestrationOperateScope, (input) =>
+        handler({ ...input, recap, fridge }),
+      );
+    }),
+  );
+
+/**
+ * A child's recap, for a grown-up: the parent code opens it ("recap", ten minutes); the
+ * Family settings' own "yes" covers it too, since that one can already change the child.
+ */
+const recapRoute = madeRoute("GET", "/recap", ({ family, recap, query, sessionId }) =>
+  Effect.gen(function* () {
+    if (!(yield* family.isEnabled)) {
+      return yield* new SkycotFamily.FamilyError({ reason: "not-enabled" });
+    }
+    const open =
+      (yield* family.allows({ sessionId, purpose: "recap" })) ||
+      (yield* family.allows({ sessionId, purpose: "settings" }));
+    if (!open) return grownUpFirst;
+    const range = query.get("range") ?? "week";
+    if (!(RECAP_RANGES as ReadonlyArray<string>).includes(range)) {
+      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    }
+    const report = yield* recap.recap({
+      childId: query.get("childId") ?? "",
+      range: range as RecapRange,
+    });
+    if (report === null) return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    return json(report);
+  }),
+);
+
+/** Everything made here, one magnet per conversation, for the fridge. Open to children. */
+const fridgeRoute = madeRoute("GET", "/fridge", ({ fridge }) =>
+  fridge.list.pipe(Effect.map((items) => json({ items }))),
+);
+
+const fridgePinRoute = madeRoute("POST", "/fridge/pin", ({ fridge, body }) =>
+  Effect.gen(function* () {
+    const threadId = text(body["threadId"]);
+    if (threadId.length === 0) {
+      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    }
+    const items = yield* fridge.pin({ threadId, pinned: body["pinned"] === true });
+    return json({ items });
+  }),
+);
+
+/** The recap and fridge routes, without their services (tests provide stand-ins). */
+export const layerMadeRoutes = Layer.mergeAll(recapRoute, fridgeRoute, fridgePinRoute);
+
+/** The profile's own routes. */
+export const layerCore = Layer.mergeAll(
+  shieldCaughtRoute,
   statusRoute,
   enableRoute,
   verifyRoute,
@@ -436,6 +541,18 @@ export const layer = Layer.mergeAll(
   todayRoute,
   moreTimeRoute,
   lockRoute,
+);
+
+/** Every Family route; the recap and the fridge read the engine's projections. */
+export const layer = Layer.mergeAll(
+  layerCore,
+  layerMadeRoutes.pipe(
+    Layer.provide(
+      Layer.mergeAll(SkycotFamilyRecap.layer, SkycotFridge.layer).pipe(
+        Layer.provide(Layer.merge(ProjectionStore.layer, ProjectStore.layer)),
+      ),
+    ),
+  ),
 );
 
 const PAGE_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".shtml"]);
