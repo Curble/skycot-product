@@ -16,6 +16,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { ListRow, List } from "../../ui/ListRow";
 import { useFamily } from "../family/FamilyProvider";
 import { familyCopy } from "../family/copy";
+import { RecapScreen } from "../recap/RecapScreen";
 import { AboutPane } from "./panes/AboutPane";
 import { AdvancedPane } from "./panes/AdvancedPane";
 import { AiAssistantsPane } from "./panes/AiAssistantsPane";
@@ -35,7 +36,14 @@ export { SECTIONS } from "./sections";
  * The window title is derived from the route in AppShell, not set here, so
  * leaving Settings never leaves a stale title behind.
  */
-export function SettingsScreen({ section }: { readonly section: SettingsSection | null }) {
+export function SettingsScreen({
+  section,
+  recapChildId = null,
+}: {
+  readonly section: SettingsSection | null;
+  /** Settings › Family › "<child>'s week". */
+  readonly recapChildId?: string | null;
+}) {
   const columns = useColumns();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
@@ -75,51 +83,54 @@ export function SettingsScreen({ section }: { readonly section: SettingsSection 
   );
 
   const hiddenAdvanced = family.enabled && active === "advanced";
-  const detail = hiddenAdvanced ? (
-    <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
-      <header className="fm-settings__header">
-        <h2 id="fm-settings-title" className="fm-settings__title">
-          Family
-        </h2>
-        <span className="fm-settings__header-spacer" />
-        {done}
-      </header>
-      <div className="fm-settings__panes">
-        <EmptyState icon={Laptop} title={`Hidden by the ${familyCopy.title}`}>
-          A parent can open the developer tools from Settings › Family with the parent code.
-        </EmptyState>
-      </div>
-    </section>
-  ) : meta ? (
-    <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
-      <header className="fm-settings__header">
-        {columns === 1 ? (
-          <Button
-            variant="plain"
-            size="sm"
-            icon={ChevronLeft}
-            onClick={() => (window.location.hash = SETTINGS_HREF)}
-          >
-            Settings
-          </Button>
-        ) : null}
-        <h2 id="fm-settings-title" className="fm-settings__title">
-          {meta.label}
-        </h2>
-        <span className="fm-settings__header-spacer" />
-        {done}
-      </header>
-      <div className="fm-settings__panes">
-        {environmentId === null ? (
-          <EmptyState icon={Laptop} title="Connecting to your Mac…">
-            Settings appear as soon as the connection is up.
+  const detail =
+    recapChildId !== null ? (
+      <RecapScreen childId={recapChildId} environmentId={environmentId} />
+    ) : hiddenAdvanced ? (
+      <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
+        <header className="fm-settings__header">
+          <h2 id="fm-settings-title" className="fm-settings__title">
+            Family
+          </h2>
+          <span className="fm-settings__header-spacer" />
+          {done}
+        </header>
+        <div className="fm-settings__panes">
+          <EmptyState icon={Laptop} title={`Hidden by the ${familyCopy.title}`}>
+            A parent can open the developer tools from Settings › Family with the parent code.
           </EmptyState>
-        ) : (
-          <Pane section={meta.id} environmentId={environmentId} />
-        )}
-      </div>
-    </section>
-  ) : null;
+        </div>
+      </section>
+    ) : meta ? (
+      <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
+        <header className="fm-settings__header">
+          {columns === 1 ? (
+            <Button
+              variant="plain"
+              size="sm"
+              icon={ChevronLeft}
+              onClick={() => (window.location.hash = SETTINGS_HREF)}
+            >
+              Settings
+            </Button>
+          ) : null}
+          <h2 id="fm-settings-title" className="fm-settings__title">
+            {meta.label}
+          </h2>
+          <span className="fm-settings__header-spacer" />
+          {done}
+        </header>
+        <div className="fm-settings__panes">
+          {environmentId === null ? (
+            <EmptyState icon={Laptop} title="Connecting to your Mac…">
+              Settings appear as soon as the connection is up.
+            </EmptyState>
+          ) : (
+            <Pane section={meta.id} environmentId={environmentId} />
+          )}
+        </div>
+      </section>
+    ) : null;
 
   // The nav and the detail keep their child positions at every width, so a
   // window dragged across the one-column breakpoint re-lays the pane out

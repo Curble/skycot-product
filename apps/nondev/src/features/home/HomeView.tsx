@@ -15,6 +15,7 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
+import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { summarySentence } from "./summary";
 
@@ -113,6 +114,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               ) : null}
             </Card>
             <div className="fm-home__side">
+              <FridgeHomeTile />
               <Card label="Tip" tip>
                 <CardHeader
                   icon={Sparkles}

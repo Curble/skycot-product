@@ -18,6 +18,7 @@ import { FamilyProvider, useFamily } from "./features/family/FamilyProvider";
 import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
+import { FridgeScreen } from "./features/fridge/FridgeScreen";
 import { PeopleScreen } from "./features/people/PeopleScreen";
 import { useOnboardingState } from "./features/settings/localPrefs";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
@@ -129,6 +130,10 @@ export function App() {
                 return <HomeRoute showBack={route.name === "new" && columns === 1} />;
               case "settings":
                 return <SettingsScreen section={route.section} />;
+              case "recap":
+                return <SettingsScreen section="family" recapChildId={route.childId} />;
+              case "fridge":
+                return <FridgeScreen />;
               case "thread":
                 return (
                   <ThreadRoute

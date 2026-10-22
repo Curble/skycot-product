@@ -15,6 +15,10 @@ export type Route =
   | { readonly name: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId }
   | { readonly name: "automations" }
   | { readonly name: "people" }
+  /** The family fridge: everything the children made. */
+  | { readonly name: "fridge" }
+  /** Settings › Family › "<child>'s week". */
+  | { readonly name: "recap"; readonly childId: string }
   /** System Settings-style screen; `section` is null for the list on a phone. */
   | { readonly name: "settings"; readonly section: SettingsSection | null }
   /** First-run onboarding, re-enterable from Settings. */
@@ -60,6 +64,8 @@ export function parseRoute(hash: string): Route {
         return { name: "automations" };
       case "people":
         return { name: "people" };
+      case "fridge":
+        return { name: "fridge" };
       case "settings":
         return { name: "settings", section: null };
       case "welcome":
@@ -70,6 +76,14 @@ export function parseRoute(hash: string): Route {
   }
   if (segments[0] === "settings" && segments.length === 2 && isSettingsSection(segments[1]!)) {
     return { name: "settings", section: segments[1] };
+  }
+  if (
+    segments[0] === "settings" &&
+    segments[1] === "family" &&
+    segments[2] === "week" &&
+    segments.length === 4
+  ) {
+    return { name: "recap", childId: decodeURIComponent(segments[3]!) };
   }
   if (segments[0] === "thread" && segments.length === 3) {
     return {
@@ -85,11 +99,16 @@ export const HOME_HREF = "#/";
 export const NEW_HREF = "#/new";
 export const AUTOMATIONS_HREF = "#/automations";
 export const PEOPLE_HREF = "#/people";
+export const FRIDGE_HREF = "#/fridge";
 export const SETTINGS_HREF = "#/settings";
 export const WELCOME_HREF = "#/welcome";
 
 export function settingsHref(section: SettingsSection): string {
   return `#/settings/${section}`;
+}
+
+export function recapHref(childId: string): string {
+  return `#/settings/family/week/${encodeURIComponent(childId)}`;
 }
 
 export function threadHref(environmentId: EnvironmentId, threadId: ThreadId): string {

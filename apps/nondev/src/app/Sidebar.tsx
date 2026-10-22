@@ -13,6 +13,7 @@ import {
 import { ADVANCED_MODE_LABEL } from "../brand";
 import {
   AUTOMATIONS_HREF,
+  FRIDGE_HREF,
   HOME_HREF,
   PEOPLE_HREF,
   SETTINGS_HREF,
@@ -31,6 +32,7 @@ import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
 import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
+import { FridgeIcon } from "../features/fridge/FridgeIcon";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -103,6 +105,12 @@ export function AppSidebar({
             count={ready}
             selected={conversationRoute && shell.filter === "ready"}
             onClick={() => showList(() => shell.setFilter("ready"))}
+          />
+          <SidebarItem
+            glyph={<FridgeIcon size={15} />}
+            label="The fridge"
+            selected={route.name === "fridge"}
+            href={FRIDGE_HREF}
           />
         </SidebarSection>
 

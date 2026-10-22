@@ -190,6 +190,10 @@ function useTitleDetail(
       return "Automations";
     case "people":
       return "People";
+    case "fridge":
+      return "The fridge";
+    case "recap":
+      return "Family — Settings";
     case "new":
       return "New conversation";
     case "welcome":

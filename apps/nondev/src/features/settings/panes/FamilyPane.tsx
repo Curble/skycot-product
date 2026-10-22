@@ -1,9 +1,19 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { deviceTimeZone } from "../../../plain/daylight";
-import { ArrowLeftRight, KeyRound, Mic, Plus, Power, Users, Wrench } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  KeyRound,
+  Mic,
+  Plus,
+  Power,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
+import { navigate, recapHref } from "../../../router";
 import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { Banner } from "../../../ui/Banner";
 import { Button } from "../../../ui/Button";
@@ -601,6 +611,9 @@ function ChildCard({
         ) : null}
       </div>
       <div className="fm-child-card__actions">
+        <Button size="sm" icon={CalendarDays} onClick={() => navigate(recapHref(child.id))}>
+          {label}'s week
+        </Button>
         <Button size="sm" onClick={onEdit}>
           Edit…
         </Button>

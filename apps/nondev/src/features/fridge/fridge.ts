@@ -1,0 +1,78 @@
+// The family fridge, pure part of the client: the engine's magnets (`GET
+// /api/skycot/family/fridge`) grouped by child, pinned ones first, and the three the Home tile
+// shows. Nothing here deletes anything: "Take it down" only unpins.
+
+export interface FridgeItem {
+  readonly threadId: string;
+  readonly projectId: string;
+  readonly title: string;
+  readonly childId: string | null;
+  readonly madeAt: number;
+  readonly page: string;
+  readonly cwd: string;
+  readonly pinnedAt: number | null;
+}
+
+export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
+  if (typeof body !== "object" || body === null) return null;
+  const items = (body as Record<string, unknown>)["items"];
+  if (!Array.isArray(items)) return null;
+  return items.filter(
+    (item): item is FridgeItem =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as FridgeItem).threadId === "string" &&
+      typeof (item as FridgeItem).page === "string" &&
+      typeof (item as FridgeItem).cwd === "string" &&
+      typeof (item as FridgeItem).madeAt === "number",
+  );
+}
+
+/** Pinned magnets first (newest pin first), then everything else, newest first. */
+export function fridgeOrder(items: ReadonlyArray<FridgeItem>): Array<FridgeItem> {
+  return [...items].sort((a, b) => {
+    if ((a.pinnedAt === null) !== (b.pinnedAt === null)) return a.pinnedAt === null ? 1 : -1;
+    if (a.pinnedAt !== null && b.pinnedAt !== null && a.pinnedAt !== b.pinnedAt) {
+      return b.pinnedAt - a.pinnedAt;
+    }
+    return b.madeAt - a.madeAt;
+  });
+}
+
+export interface FridgeShelf {
+  /** null: work from before the Family profile, or SKYCOT without one. */
+  readonly childId: string | null;
+  readonly items: ReadonlyArray<FridgeItem>;
+}
+
+/**
+ * One shelf per child in the profile's order (a child with nothing yet still gets a shelf),
+ * then anything nobody is known to have made. `only` keeps one child's shelf.
+ */
+export function fridgeShelves(
+  items: ReadonlyArray<FridgeItem>,
+  childIds: ReadonlyArray<string>,
+  only: string | null = null,
+): Array<FridgeShelf> {
+  const known = new Set(childIds);
+  const shelves: Array<FridgeShelf> = childIds.map((childId) => ({
+    childId,
+    items: fridgeOrder(items.filter((item) => item.childId === childId)),
+  }));
+  const rest = items.filter((item) => item.childId === null || !known.has(item.childId));
+  if (rest.length > 0) shelves.push({ childId: null, items: fridgeOrder(rest) });
+  return only === null ? shelves : shelves.filter((shelf) => shelf.childId === only);
+}
+
+/** The Home tile: the three newest pinned magnets, topped up with the newest made. */
+export function homeMagnets(items: ReadonlyArray<FridgeItem>, count = 3): Array<FridgeItem> {
+  return fridgeOrder(items).slice(0, count);
+}
+
+/** "Made today", "Made yesterday", "Made 14 Oct". */
+export function madeLabel(madeAt: number, now: number): string {
+  const day = (at: number) => new Date(at).toDateString();
+  if (day(madeAt) === day(now)) return "Made today";
+  if (day(madeAt) === day(now - 24 * 60 * 60_000)) return "Made yesterday";
+  return `Made ${new Date(madeAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`;
+}
