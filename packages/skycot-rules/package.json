@@ -31,6 +31,10 @@
     "./personal": {
       "types": "./src/personal.ts",
       "import": "./src/personal.ts"
+    },
+    "./badges": {
+      "types": "./src/badges.ts",
+      "import": "./src/badges.ts"
     }
   },
   "scripts": {
