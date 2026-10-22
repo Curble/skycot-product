@@ -6,6 +6,7 @@ import {
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
+import { withExplainMarker } from "@t3tools/skycot-rules/explain";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
@@ -42,6 +43,7 @@ import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCar
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
+import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { describeThreadStatus, type ConversationStatus } from "./status";
@@ -237,6 +239,8 @@ export function ConversationView({
           ) : null}
           <span className="fm-strip__dot">·</span>
           <span>{autonomyLabel(autonomyForRuntimeMode(shell.runtimeMode))}</span>
+          <span className="fm-strip__dot">·</span>
+          <ExplainToggle threadId={threadId} />
           {publish.status ? (
             <>
               <span className="fm-strip__dot">·</span>
@@ -429,6 +433,7 @@ function ReplyComposer({
   const pictures = usePictures();
   const family = useFamily();
   const shield = useShield();
+  const [explainOn] = useExplainMode(threadId, family.enabled);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
   if (seed !== appliedSeed) {
@@ -477,7 +482,7 @@ function ReplyComposer({
         message: {
           messageId: cleared.messageId,
           role: "user",
-          text: cleared.text,
+          text: withExplainMarker(cleared.text, explainOn, family.enabled),
           attachments: pictures.uploads(),
         },
         modelSelection: shell.modelSelection,

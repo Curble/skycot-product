@@ -12,12 +12,16 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 
+import { readExplainMarker, withExplainMarker } from "@t3tools/skycot-rules/explain";
+
 import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import type { ApprovalDecisionPayload } from "../../../plain/approvals";
+import { useExplainMode } from "../../explain/explainMode";
 import { isFamilyRefusal } from "../../family/cards";
 import { useFamily } from "../../family/FamilyProvider";
+import { shieldProblem } from "../../shield/shield";
 import { serverEnvironment } from "../../../state/server";
 import { threadEnvironment } from "../../../state/threads";
 
@@ -83,7 +87,15 @@ export function useDecisionDispatcher({
     reportDefect: false,
   });
 
+  const [explainOn] = useExplainMode(threadId, family.enabled);
+
   return async (payload, extras = {}) => {
+    if (payload.type === "send-message" && family.enabled) {
+      // A short reply gets the shield's sentence instead of its card; the engine would hide
+      // the detail anyway, so the child fixes it here first.
+      const problem = shieldProblem(readExplainMarker(extras.text ?? payload.text).text);
+      if (problem !== null) return problem;
+    }
     const outcome = await (async () => {
       switch (payload.type) {
         case "runtime-request.respond":
@@ -123,8 +135,12 @@ export function useDecisionDispatcher({
             input: { threadId, ...(extras.runId ? { runId: extras.runId } : {}) },
           });
         case "send-message": {
-          const text = (extras.text ?? payload.text).trim();
-          if (text.length === 0 || shell === null) return null;
+          const typed = (extras.text ?? payload.text).trim();
+          if (typed.length === 0 || shell === null) return null;
+          const text =
+            readExplainMarker(typed).choice === null
+              ? withExplainMarker(typed, explainOn, family.enabled)
+              : typed;
           return startTurn({
             environmentId,
             input: {

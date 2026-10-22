@@ -1,0 +1,140 @@
+/* "How did you do that?": the Explain card, the code peek, the switch and the button. */
+.fm-explain:focus {
+  outline: none;
+}
+.fm-explain:focus-visible .fm-card,
+.fm-explain[data-flash] .fm-card {
+  box-shadow: 0 0 0 3px var(--fm-marker-soft);
+}
+.fm-explain__how {
+  margin: 0;
+  font-size: calc(15px * var(--fm-text-scale));
+  line-height: 1.55;
+}
+.fm-explain__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--fm-green-soft);
+  font-size: calc(13.5px * var(--fm-text-scale));
+}
+.fm-explain__peek {
+  margin-top: 12px;
+}
+.fm-explain__note {
+  margin: 8px 0 0;
+  color: var(--fm-label-2);
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
+.fm-peek {
+  margin-top: 10px;
+}
+.fm-peek__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-peek__legend li::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  border: 1px solid var(--fm-sep);
+}
+.fm-peek__legend li[data-kind="added"]::before {
+  background: var(--fm-green-soft);
+  border-color: var(--fm-green);
+}
+.fm-peek__legend li[data-kind="removed"]::before {
+  background: var(--fm-red-soft);
+  border-color: var(--fm-red);
+}
+.fm-peek__legend li[data-kind="same"]::before {
+  background: var(--fm-bg-fill);
+}
+.fm-peek__file {
+  margin: 0 0 10px;
+}
+.fm-peek__file figcaption {
+  margin-bottom: 4px;
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
+.fm-peek__file figcaption code {
+  color: var(--fm-label-2);
+  font-family: var(--fm-mono);
+  font-size: 0.92em;
+}
+.fm-peek__code {
+  margin: 0;
+  padding: 6px 0;
+  border-radius: 10px;
+  background: var(--fm-bg-fill);
+  font-family: var(--fm-mono);
+  font-size: calc(12.5px * var(--fm-text-scale));
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.fm-peek__line {
+  display: block;
+  padding: 0 10px 0 0;
+}
+.fm-peek__line[data-kind="added"] {
+  background: var(--fm-green-soft);
+}
+.fm-peek__line[data-kind="removed"] {
+  background: var(--fm-red-soft);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--fm-red) 60%, transparent);
+}
+.fm-peek__line[data-kind="same"] {
+  color: var(--fm-label-2);
+}
+.fm-peek__mark {
+  display: inline-block;
+  width: 2em;
+  text-align: center;
+  font-weight: 700;
+  text-decoration: none;
+}
+.fm-peek__line[data-kind="added"] .fm-peek__mark {
+  color: var(--fm-green-ink);
+}
+.fm-peek__line[data-kind="removed"] .fm-peek__mark {
+  color: var(--fm-red-ink);
+}
+.fm-peek__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.fm-explain-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fm-explain-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fm-explain-ask__note {
+  color: var(--fm-label-2);
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
