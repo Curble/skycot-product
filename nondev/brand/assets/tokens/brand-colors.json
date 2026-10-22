@@ -1,0 +1,151 @@
+{
+  "$comment": "SKYCOT brand colours. Three variants of one mascot: day (06:00-ish local civil dawn to dusk), dusk (local civil dusk to dawn), minimal (one-colour, small sizes, grown-up contexts). The app UI keeps #0071E3 for buttons and links in every variant.",
+  "version": "1.0.0",
+  "date": "2026-10-22",
+  "ui": {
+    "accent": {
+      "value": "#0071E3",
+      "use": "App buttons, links, focus rings. Never changes with day/dusk."
+    },
+    "accentDarkMode": {
+      "value": "#3D9BFF",
+      "use": "Accent on dark UI surfaces (minimal dark icon)."
+    }
+  },
+  "shared": {
+    "ink": {
+      "value": "#2B2420",
+      "use": "Mascot outline, face, wordmark on light backgrounds"
+    },
+    "cloud": {
+      "value": "#FFFDF8",
+      "use": "Mascot body"
+    },
+    "cheek": {
+      "value": "#FFB4A2",
+      "use": "Mascot cheeks (90% opacity on the cloud = #FFBBAB solid)"
+    },
+    "star": {
+      "value": "#FFD166",
+      "use": "Dusk star; also Sam's hat (crew)"
+    },
+    "tomato": {
+      "value": "#F26B4E",
+      "use": "Sam (builds) - crew character"
+    },
+    "leaf": {
+      "value": "#3FA66F",
+      "use": "Mo (checks) - crew character"
+    }
+  },
+  "day": {
+    "skycotBlue": {
+      "value": "#0071E3",
+      "use": "Bottom of the icon sky; brand blue"
+    },
+    "morningSky": {
+      "value": "#8ED0FF",
+      "use": "Top of the icon sky"
+    },
+    "skyMid": {
+      "value": "#3A9DF6",
+      "use": "Icon sky gradient middle stop (55%)"
+    },
+    "workshopCream": {
+      "value": "#FFF6E6",
+      "use": "Warm page background, bottom of social skies"
+    },
+    "cardSkyTop": {
+      "value": "#BBDFFF",
+      "use": "Social / share-card sky top"
+    },
+    "cardSkyMid": {
+      "value": "#E8F4FF",
+      "use": "Social / share-card sky middle (62%)"
+    },
+    "bellyShade": {
+      "value": "#DDEBFA",
+      "use": "Soft shade at the bottom of the cloud body"
+    },
+    "mutedText": {
+      "value": "#6E615A",
+      "use": "Secondary text on day surfaces"
+    },
+    "darkSurface": {
+      "value": "#0B1E3A",
+      "use": "Dark band behind day artwork"
+    },
+    "iconGradient": ["#8ED0FF 0%", "#3A9DF6 55%", "#0071E3 100%"]
+  },
+  "dusk": {
+    "midnight": {
+      "value": "#171A45",
+      "use": "Top of the dusk sky; dark surfaces"
+    },
+    "indigo": {
+      "value": "#3C3486",
+      "use": "Dusk sky middle; dusk accent on light pages"
+    },
+    "violet": {
+      "value": "#8E5AA8",
+      "use": "Dusk sky lower band"
+    },
+    "horizon": {
+      "value": "#F4A27A",
+      "use": "Warm horizon at the bottom of the dusk sky"
+    },
+    "glow": {
+      "value": "#FFC891",
+      "use": "Horizon glow; accent text on dusk ('AI developer.')"
+    },
+    "moonCream": {
+      "value": "#FFF4DC",
+      "use": "Text and wordmark on dusk surfaces (instead of white)"
+    },
+    "lilacText": {
+      "value": "#D9D2EE",
+      "use": "Secondary text on dusk surfaces"
+    },
+    "lilacMark": {
+      "value": "#B9A8E8",
+      "use": "Motion marks / Zz on dusk poses"
+    },
+    "bellyShade": {
+      "value": "#EADFF3",
+      "use": "Soft shade at the bottom of the cloud body (dusk)"
+    },
+    "iconGradient": ["#171A45 0%", "#3C3486 52%", "#8E5AA8 82%", "#F4A27A 100%"]
+  },
+  "minimal": {
+    "skycotBlue": {
+      "value": "#0071E3",
+      "use": "Minimal mark on light; minimal icon background"
+    },
+    "white": {
+      "value": "#FFFFFF",
+      "use": "Minimal mark reversed"
+    },
+    "nearBlack": {
+      "value": "#1D1D1F",
+      "use": "Grown-up wordmark, legal / invoice text"
+    },
+    "silver": {
+      "value": "#F5F5F7",
+      "use": "Light neutral background"
+    },
+    "grey": {
+      "value": "#6E6E73",
+      "use": "Secondary text"
+    },
+    "black": {
+      "value": "#000000",
+      "use": "One-colour print, menu-bar template, Safari mask icon"
+    }
+  },
+  "timeOfDayRule": {
+    "dusk": "Switch to the dusk variant at local civil dusk (sun 6 degrees below the horizon, evening).",
+    "day": "Switch back to the day variant at local civil dawn (sun 6 degrees below the horizon, morning).",
+    "fallback": "If location is unknown, use the device time zone's representative city; if that fails, 18:30-06:30 local time.",
+    "notAffected": "UI accent #0071E3, the minimal mark, the grown-up wordmark, legal/invoice documents."
+  }
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="36.71mm" viewBox="0 0 316 116"><title>SKYCOT wordmark-grownup</title><g><g fill="none" stroke="#1D1D1F" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path transform="translate(6 0)" d="M31 48C28 42.5 23 40 17 40C9 40 4 44.5 4 51C4 57.5 9.5 60.5 17 62.5C25 64.5 31 67.5 31 75C31 83 25 90 16.5 90C10 90 4.5 87.5 2 83" />
+    <path transform="translate(54 0)" d="M4 8V90M33 42L5 69M15 59L35 90" />
+    <path transform="translate(99 0)" d="M1 42L20 89M39 42L15 106" />
+    <path transform="translate(149 0)" d="M46.6 52.5A25 25 0 1 0 46.6 77.5" />
+    <circle cx="230" cy="65" r="25" />
+    <path transform="translate(268 0)" d="M13 12V90M1 42H29" />
+  </g>
+</g></svg>

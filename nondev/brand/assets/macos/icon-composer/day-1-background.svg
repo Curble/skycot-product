@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="100 100 824 824"><title>SKYCOT icon layer day 1-background</title><defs><radialGradient id="v1sheen" cx=".5" cy="0" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".28" /><stop offset="1" stop-color="#fff" stop-opacity="0" /></radialGradient>
+<linearGradient id="v1sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ED0FF" /><stop offset=".55" stop-color="#3A9DF6" /><stop offset="1" stop-color="#0071E3" /></linearGradient>
+</defs><g><g><rect x="100" y="100" width="824" height="824" fill="url(#v1sky)" /><rect x="100" y="100" width="824" height="824" fill="url(#v1sheen)" /></g>
+</g></svg>

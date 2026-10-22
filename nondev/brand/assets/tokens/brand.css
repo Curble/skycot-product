@@ -1,0 +1,63 @@
+/* SKYCOT brand tokens (CSS custom properties). Generated 2026-10-22 alongside brand-colors.json.
+   Day is the default. Set data-skycot-time="dusk" on <html> between local civil dusk and dawn. */
+:root {
+  /* UI - never changes with day/dusk */
+  --skycot-accent: #0071e3;
+  --skycot-accent-dark: #3d9bff;
+
+  /* shared mascot colours */
+  --skycot-ink: #2b2420;
+  --skycot-cloud: #fffdf8;
+  --skycot-cheek: #ffb4a2;
+  --skycot-star: #ffd166;
+  --skycot-sam: #f26b4e;
+  --skycot-mo: #3fa66f;
+
+  /* day palette */
+  --skycot-day-blue: #0071e3;
+  --skycot-day-morning: #8ed0ff;
+  --skycot-day-sky-mid: #3a9df6;
+  --skycot-day-cream: #fff6e6;
+  --skycot-day-card-top: #bbdfff;
+  --skycot-day-card-mid: #e8f4ff;
+  --skycot-day-muted: #6e615a;
+  --skycot-day-icon-sky: linear-gradient(180deg, #8ed0ff 0%, #3a9df6 55%, #0071e3 100%);
+  --skycot-day-scene: linear-gradient(180deg, #bbdfff 0%, #e8f4ff 62%, #fff6e6 100%);
+
+  /* dusk palette */
+  --skycot-dusk-midnight: #171a45;
+  --skycot-dusk-indigo: #3c3486;
+  --skycot-dusk-violet: #8e5aa8;
+  --skycot-dusk-horizon: #f4a27a;
+  --skycot-dusk-glow: #ffc891;
+  --skycot-dusk-moon-cream: #fff4dc;
+  --skycot-dusk-lilac: #d9d2ee;
+  --skycot-dusk-icon-sky: linear-gradient(
+    180deg,
+    #171a45 0%,
+    #3c3486 52%,
+    #8e5aa8 82%,
+    #f4a27a 100%
+  );
+  --skycot-dusk-scene: linear-gradient(180deg, #171a45 0%, #3c3486 60%, #8e5aa8 88%, #f4a27a 100%);
+
+  /* minimal palette */
+  --skycot-min-blue: #0071e3;
+  --skycot-min-white: #ffffff;
+  --skycot-min-near-black: #1d1d1f;
+  --skycot-min-silver: #f5f5f7;
+  --skycot-min-grey: #6e6e73;
+
+  /* semantic aliases that follow the time of day */
+  --skycot-scene: var(--skycot-day-scene);
+  --skycot-brand-text: var(--skycot-ink);
+  --skycot-brand-text-muted: var(--skycot-day-muted);
+  --skycot-brand-highlight: var(--skycot-day-blue);
+}
+
+:root[data-skycot-time="dusk"] {
+  --skycot-scene: var(--skycot-dusk-scene);
+  --skycot-brand-text: var(--skycot-dusk-moon-cream);
+  --skycot-brand-text-muted: var(--skycot-dusk-lilac);
+  --skycot-brand-highlight: var(--skycot-dusk-glow);
+}

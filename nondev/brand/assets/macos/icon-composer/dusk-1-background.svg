@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="100 100 824 824"><title>SKYCOT icon layer dusk 1-background</title><defs><radialGradient id="v2glow" cx=".5" cy="1.02" r=".6"><stop offset="0" stop-color="#FFC891" stop-opacity=".8" /><stop offset="1" stop-color="#FFC891" stop-opacity="0" /></radialGradient>
+<linearGradient id="v2sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#171A45" /><stop offset=".52" stop-color="#3C3486" /><stop offset=".82" stop-color="#8E5AA8" /><stop offset="1" stop-color="#F4A27A" /></linearGradient>
+</defs><g><g><rect x="100" y="100" width="824" height="824" fill="url(#v2sky)" /><rect x="100" y="100" width="824" height="824" fill="url(#v2glow)" /><g><g fill="#fff"><circle cx="262" cy="248" r="7" opacity=".85" /><circle cx="356" cy="178" r="4.5" opacity=".6" /><circle cx="196" cy="420" r="4" opacity=".55" /><circle cx="640" cy="196" r="4.5" opacity=".6" /><circle cx="868" cy="470" r="4" opacity=".5" /><path d="M430 284Q433.2 296.8 446 300Q433.2 303.2 430 316Q426.8 303.2 414 300Q426.8 296.8 430 284Z" opacity=".8" /></g>
+</g></g>
+</g></svg>

@@ -1,0 +1,1485 @@
+{
+  "name": "SKYCOT brand assets",
+  "generated": "2026-10-22",
+  "source": "docs/brand/narrowing/2026-10-22 (Direction B, variants 1-3); master drawing reused unchanged",
+  "system": {
+    "day": "Variant 1 - blue morning sky, sticker mascot. Default; local civil dawn to dusk.",
+    "dusk": "Variant 2 - twilight sky + star. Local civil dusk to dawn; system Dark icon.",
+    "minimal": "Variant 3 - one-colour cloud with eye cut-outs. Mono, menu bar, <=16px, Clear/Tinted, embroidery, grown-up lockup."
+  },
+  "characterName": "pending (files use 'mascot')",
+  "guide": "docs/brand/SKYCOT-brand-guide.html",
+  "counts": {
+    "(root)": 1,
+    "ios-android": 8,
+    "linux": 18,
+    "macos": 42,
+    "poses": 24,
+    "print": 29,
+    "social": 34,
+    "svg": 27,
+    "tokens": 2,
+    "web": 20,
+    "windows": 16
+  },
+  "total": 222,
+  "files": [
+    {
+      "path": "contact-sheet.html",
+      "bytes": 24995,
+      "variant": "all",
+      "use": "Review page tiling every PNG with its true pixel size (open in a browser)"
+    },
+    {
+      "path": "ios-android/android/ic_launcher.xml",
+      "bytes": 459,
+      "variant": "day",
+      "use": "Android adaptive-icon XML example"
+    },
+    {
+      "path": "ios-android/android/ic_launcher_background.png",
+      "bytes": 48703,
+      "variant": "day",
+      "use": "Android adaptive icon background layer (108dp @xxxhdpi)",
+      "pixels": "432x432"
+    },
+    {
+      "path": "ios-android/android/ic_launcher_foreground.png",
+      "bytes": 9049,
+      "variant": "day",
+      "use": "Android adaptive icon foreground layer (art inside the 66dp safe zone)",
+      "pixels": "432x432"
+    },
+    {
+      "path": "ios-android/android/ic_launcher_monochrome.png",
+      "bytes": 2978,
+      "variant": "minimal",
+      "use": "Android 13+ themed-icon monochrome layer (minimal mark, white on transparent)",
+      "pixels": "432x432"
+    },
+    {
+      "path": "ios-android/ios/AppIcon.appiconset/AppIcon-dark-1024.png",
+      "bytes": 212305,
+      "variant": "dusk",
+      "use": "iOS app icon, Dark appearance = dusk",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "ios-android/ios/AppIcon.appiconset/AppIcon-day-1024.png",
+      "bytes": 141713,
+      "variant": "day",
+      "use": "iOS app icon (Any appearance), single-size 1024 for Xcode 15+",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "ios-android/ios/AppIcon.appiconset/AppIcon-tinted-1024.png",
+      "bytes": 7551,
+      "variant": "minimal",
+      "use": "iOS app icon, Tinted appearance = minimal (white on black; iOS tints it)",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "ios-android/ios/AppIcon.appiconset/Contents.json",
+      "bytes": 718,
+      "variant": "day+dusk+minimal",
+      "use": "Xcode asset-catalog descriptor (drop the folder into Assets.xcassets)"
+    },
+    {
+      "path": "linux/app-icon-day-128.png",
+      "bytes": 9929,
+      "variant": "day",
+      "use": "Linux hicolor icon 128x128 (install as hicolor/128x128/apps/skycot.png)",
+      "pixels": "128x128"
+    },
+    {
+      "path": "linux/app-icon-day-16.png",
+      "bytes": 554,
+      "variant": "day",
+      "use": "Linux hicolor icon 16x16 (install as hicolor/16x16/apps/skycot.png)",
+      "pixels": "16x16"
+    },
+    {
+      "path": "linux/app-icon-day-22.png",
+      "bytes": 763,
+      "variant": "day",
+      "use": "Linux hicolor icon 22x22 (install as hicolor/22x22/apps/skycot.png)",
+      "pixels": "22x22"
+    },
+    {
+      "path": "linux/app-icon-day-24.png",
+      "bytes": 783,
+      "variant": "day",
+      "use": "Linux hicolor icon 24x24 (install as hicolor/24x24/apps/skycot.png)",
+      "pixels": "24x24"
+    },
+    {
+      "path": "linux/app-icon-day-256.png",
+      "bytes": 25110,
+      "variant": "day",
+      "use": "Linux hicolor icon 256x256 (install as hicolor/256x256/apps/skycot.png)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "linux/app-icon-day-32.png",
+      "bytes": 1069,
+      "variant": "day",
+      "use": "Linux hicolor icon 32x32 (install as hicolor/32x32/apps/skycot.png)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "linux/app-icon-day-48.png",
+      "bytes": 2794,
+      "variant": "day",
+      "use": "Linux hicolor icon 48x48 (install as hicolor/48x48/apps/skycot.png)",
+      "pixels": "48x48"
+    },
+    {
+      "path": "linux/app-icon-day-512.png",
+      "bytes": 68146,
+      "variant": "day",
+      "use": "Linux hicolor icon 512x512 (install as hicolor/512x512/apps/skycot.png)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "linux/app-icon-day-64.png",
+      "bytes": 3882,
+      "variant": "day",
+      "use": "Linux hicolor icon 64x64 (install as hicolor/64x64/apps/skycot.png)",
+      "pixels": "64x64"
+    },
+    {
+      "path": "linux/app-icon-dusk-128.png",
+      "bytes": 10719,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 128x128 (install as hicolor/128x128/apps/skycot.png)",
+      "pixels": "128x128"
+    },
+    {
+      "path": "linux/app-icon-dusk-16.png",
+      "bytes": 605,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 16x16 (install as hicolor/16x16/apps/skycot.png)",
+      "pixels": "16x16"
+    },
+    {
+      "path": "linux/app-icon-dusk-22.png",
+      "bytes": 824,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 22x22 (install as hicolor/22x22/apps/skycot.png)",
+      "pixels": "22x22"
+    },
+    {
+      "path": "linux/app-icon-dusk-24.png",
+      "bytes": 939,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 24x24 (install as hicolor/24x24/apps/skycot.png)",
+      "pixels": "24x24"
+    },
+    {
+      "path": "linux/app-icon-dusk-256.png",
+      "bytes": 27336,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 256x256 (install as hicolor/256x256/apps/skycot.png)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "linux/app-icon-dusk-32.png",
+      "bytes": 1165,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 32x32 (install as hicolor/32x32/apps/skycot.png)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "linux/app-icon-dusk-48.png",
+      "bytes": 3215,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 48x48 (install as hicolor/48x48/apps/skycot.png)",
+      "pixels": "48x48"
+    },
+    {
+      "path": "linux/app-icon-dusk-512.png",
+      "bytes": 77594,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 512x512 (install as hicolor/512x512/apps/skycot.png)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "linux/app-icon-dusk-64.png",
+      "bytes": 4411,
+      "variant": "dusk",
+      "use": "Linux hicolor icon 64x64 (install as hicolor/64x64/apps/skycot.png)",
+      "pixels": "64x64"
+    },
+    {
+      "path": "macos/AppIcon-day.icns",
+      "bytes": 441860,
+      "variant": "day",
+      "use": "macOS app icon (day), all sizes 16-1024 @1x/@2x. Day is the shipped default; dusk is for the dark/dusk swap (setApplicationIconImage / Dock tile at runtime)."
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_128x128.png",
+      "bytes": 8085,
+      "variant": "day",
+      "use": "macOS iconset source (128pt @1x)",
+      "pixels": "128x128"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_128x128@2x.png",
+      "bytes": 19589,
+      "variant": "day",
+      "use": "macOS iconset source (128pt @2x)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_16x16.png",
+      "bytes": 485,
+      "variant": "day",
+      "use": "macOS iconset source (16pt @1x)",
+      "pixels": "16x16"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_16x16@2x.png",
+      "bytes": 918,
+      "variant": "day",
+      "use": "macOS iconset source (16pt @2x)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_256x256.png",
+      "bytes": 19589,
+      "variant": "day",
+      "use": "macOS iconset source (256pt @1x)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_256x256@2x.png",
+      "bytes": 52200,
+      "variant": "day",
+      "use": "macOS iconset source (256pt @2x)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_32x32.png",
+      "bytes": 917,
+      "variant": "day",
+      "use": "macOS iconset source (32pt @1x)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_32x32@2x.png",
+      "bytes": 1795,
+      "variant": "day",
+      "use": "macOS iconset source (32pt @2x)",
+      "pixels": "64x64"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_512x512.png",
+      "bytes": 52200,
+      "variant": "day",
+      "use": "macOS iconset source (512pt @1x)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "macos/AppIcon-day.iconset/icon_512x512@2x.png",
+      "bytes": 133013,
+      "variant": "day",
+      "use": "macOS iconset source (512pt @2x)",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/AppIcon-dusk.icns",
+      "bytes": 489228,
+      "variant": "dusk",
+      "use": "macOS app icon (dusk), all sizes 16-1024 @1x/@2x. Day is the shipped default; dusk is for the dark/dusk swap (setApplicationIconImage / Dock tile at runtime)."
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_128x128.png",
+      "bytes": 8561,
+      "variant": "dusk",
+      "use": "macOS iconset source (128pt @1x)",
+      "pixels": "128x128"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_128x128@2x.png",
+      "bytes": 21428,
+      "variant": "dusk",
+      "use": "macOS iconset source (128pt @2x)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_16x16.png",
+      "bytes": 581,
+      "variant": "dusk",
+      "use": "macOS iconset source (16pt @1x)",
+      "pixels": "16x16"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_16x16@2x.png",
+      "bytes": 1040,
+      "variant": "dusk",
+      "use": "macOS iconset source (16pt @2x)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_256x256.png",
+      "bytes": 21428,
+      "variant": "dusk",
+      "use": "macOS iconset source (256pt @1x)",
+      "pixels": "256x256"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_256x256@2x.png",
+      "bytes": 59473,
+      "variant": "dusk",
+      "use": "macOS iconset source (256pt @2x)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_32x32.png",
+      "bytes": 1049,
+      "variant": "dusk",
+      "use": "macOS iconset source (32pt @1x)",
+      "pixels": "32x32"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_32x32@2x.png",
+      "bytes": 2000,
+      "variant": "dusk",
+      "use": "macOS iconset source (32pt @2x)",
+      "pixels": "64x64"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_512x512.png",
+      "bytes": 59473,
+      "variant": "dusk",
+      "use": "macOS iconset source (512pt @1x)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "macos/AppIcon-dusk.iconset/icon_512x512@2x.png",
+      "bytes": 173078,
+      "variant": "dusk",
+      "use": "macOS iconset source (512pt @2x)",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/MenubarIconTemplate.png",
+      "bytes": 229,
+      "variant": "minimal",
+      "use": "macOS menu-bar status item, template image (18px). Name must end in 'Template'.",
+      "pixels": "18x18"
+    },
+    {
+      "path": "macos/MenubarIconTemplate@2x.png",
+      "bytes": 363,
+      "variant": "minimal",
+      "use": "macOS menu-bar status item, template image (36px). Name must end in 'Template'.",
+      "pixels": "36x36"
+    },
+    {
+      "path": "macos/icon-composer/README.md",
+      "bytes": 2813,
+      "variant": "day+dusk+minimal",
+      "use": "How to assemble the layered .icon in Apple's Icon Composer (Dark = dusk, Clear/Tinted = minimal)"
+    },
+    {
+      "path": "macos/icon-composer/day-1-background.png",
+      "bytes": 151554,
+      "variant": "day",
+      "use": "Icon Composer layer (day, background), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/day-1-background.svg",
+      "bytes": 728,
+      "variant": "day",
+      "use": "Icon Composer layer (day, background)"
+    },
+    {
+      "path": "macos/icon-composer/day-2-ground-shadow.png",
+      "bytes": 10371,
+      "variant": "day",
+      "use": "Icon Composer layer (day, ground-shadow), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/day-2-ground-shadow.svg",
+      "bytes": 281,
+      "variant": "day",
+      "use": "Icon Composer layer (day, ground-shadow)"
+    },
+    {
+      "path": "macos/icon-composer/day-3-mascot.png",
+      "bytes": 26191,
+      "variant": "day",
+      "use": "Icon Composer layer (day, mascot), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/day-3-mascot.svg",
+      "bytes": 1647,
+      "variant": "day",
+      "use": "Icon Composer layer (day, mascot)"
+    },
+    {
+      "path": "macos/icon-composer/dusk-1-background.png",
+      "bytes": 227431,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, background), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/dusk-1-background.svg",
+      "bytes": 1160,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, background)"
+    },
+    {
+      "path": "macos/icon-composer/dusk-2-ground-shadow.png",
+      "bytes": 10477,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, ground-shadow), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/dusk-2-ground-shadow.svg",
+      "bytes": 282,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, ground-shadow)"
+    },
+    {
+      "path": "macos/icon-composer/dusk-3-mascot.png",
+      "bytes": 26411,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, mascot), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/dusk-3-mascot.svg",
+      "bytes": 1648,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, mascot)"
+    },
+    {
+      "path": "macos/icon-composer/dusk-4-star.png",
+      "bytes": 82769,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, star), 1024 PNG",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/dusk-4-star.svg",
+      "bytes": 668,
+      "variant": "dusk",
+      "use": "Icon Composer layer (dusk, star)"
+    },
+    {
+      "path": "macos/icon-composer/minimal-0-background-blue.png",
+      "bytes": 4546,
+      "variant": "minimal",
+      "use": "Optional flat SKYCOT-blue background for a minimal-only icon",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/minimal-1-mascot-white.png",
+      "bytes": 10576,
+      "variant": "minimal",
+      "use": "Icon Composer layer for Clear/Tinted (white mark, transparent)",
+      "pixels": "1024x1024"
+    },
+    {
+      "path": "macos/icon-composer/minimal-1-mascot-white.svg",
+      "bytes": 528,
+      "variant": "minimal",
+      "use": "Icon Composer layer for Clear/Tinted appearances (white, eyes are holes)"
+    },
+    {
+      "path": "poses/day/mascot-ask-a-grown-up-day-512.png",
+      "bytes": 22386,
+      "variant": "day",
+      "use": "Pose 'Ask a grown-up' 512px: Approval cards: a parent needs to OK this",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-ask-a-grown-up-day.svg",
+      "bytes": 2361,
+      "variant": "day",
+      "use": "Pose 'Ask a grown-up': Approval cards: a parent needs to OK this"
+    },
+    {
+      "path": "poses/day/mascot-hello-day-512.png",
+      "bytes": 16631,
+      "variant": "day",
+      "use": "Pose 'Hello!' 512px: Onboarding, the empty chat, intro posts",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-hello-day.svg",
+      "bytes": 2092,
+      "variant": "day",
+      "use": "Pose 'Hello!': Onboarding, the empty chat, intro posts"
+    },
+    {
+      "path": "poses/day/mascot-night-night-day-512.png",
+      "bytes": 13033,
+      "variant": "day",
+      "use": "Pose 'Night-night' 512px: Bedtime, sign-off, 'see you tomorrow'",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-night-night-day.svg",
+      "bytes": 1992,
+      "variant": "day",
+      "use": "Pose 'Night-night': Bedtime, sign-off, 'see you tomorrow'"
+    },
+    {
+      "path": "poses/day/mascot-oops-day-512.png",
+      "bytes": 16901,
+      "variant": "day",
+      "use": "Pose 'Oops' 512px: Something went wrong, friendly error states",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-oops-day.svg",
+      "bytes": 2231,
+      "variant": "day",
+      "use": "Pose 'Oops': Something went wrong, friendly error states"
+    },
+    {
+      "path": "poses/day/mascot-thinking-day-512.png",
+      "bytes": 20969,
+      "variant": "day",
+      "use": "Pose 'Thinking' 512px: While the crew works on an idea",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-thinking-day.svg",
+      "bytes": 2246,
+      "variant": "day",
+      "use": "Pose 'Thinking': While the crew works on an idea"
+    },
+    {
+      "path": "poses/day/mascot-yay-day-512.png",
+      "bytes": 17418,
+      "variant": "day",
+      "use": "Pose 'Yay!' 512px: It works: a page shipped, a game runs",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/day/mascot-yay-day.svg",
+      "bytes": 2368,
+      "variant": "day",
+      "use": "Pose 'Yay!': It works: a page shipped, a game runs"
+    },
+    {
+      "path": "poses/dusk/mascot-ask-a-grown-up-dusk-512.png",
+      "bytes": 23278,
+      "variant": "dusk",
+      "use": "Pose 'Ask a grown-up' 512px: Approval cards: a parent needs to OK this",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-ask-a-grown-up-dusk.svg",
+      "bytes": 2547,
+      "variant": "dusk",
+      "use": "Pose 'Ask a grown-up': Approval cards: a parent needs to OK this"
+    },
+    {
+      "path": "poses/dusk/mascot-hello-dusk-512.png",
+      "bytes": 17309,
+      "variant": "dusk",
+      "use": "Pose 'Hello!' 512px: Onboarding, the empty chat, intro posts",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-hello-dusk.svg",
+      "bytes": 2263,
+      "variant": "dusk",
+      "use": "Pose 'Hello!': Onboarding, the empty chat, intro posts"
+    },
+    {
+      "path": "poses/dusk/mascot-night-night-dusk-512.png",
+      "bytes": 13998,
+      "variant": "dusk",
+      "use": "Pose 'Night-night' 512px: Bedtime, sign-off, 'see you tomorrow'",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-night-night-dusk.svg",
+      "bytes": 2178,
+      "variant": "dusk",
+      "use": "Pose 'Night-night': Bedtime, sign-off, 'see you tomorrow'"
+    },
+    {
+      "path": "poses/dusk/mascot-oops-dusk-512.png",
+      "bytes": 17784,
+      "variant": "dusk",
+      "use": "Pose 'Oops' 512px: Something went wrong, friendly error states",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-oops-dusk.svg",
+      "bytes": 2428,
+      "variant": "dusk",
+      "use": "Pose 'Oops': Something went wrong, friendly error states"
+    },
+    {
+      "path": "poses/dusk/mascot-thinking-dusk-512.png",
+      "bytes": 21755,
+      "variant": "dusk",
+      "use": "Pose 'Thinking' 512px: While the crew works on an idea",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-thinking-dusk.svg",
+      "bytes": 2426,
+      "variant": "dusk",
+      "use": "Pose 'Thinking': While the crew works on an idea"
+    },
+    {
+      "path": "poses/dusk/mascot-yay-dusk-512.png",
+      "bytes": 18156,
+      "variant": "dusk",
+      "use": "Pose 'Yay!' 512px: It works: a page shipped, a game runs",
+      "pixels": "512x512"
+    },
+    {
+      "path": "poses/dusk/mascot-yay-dusk.svg",
+      "bytes": 2570,
+      "variant": "dusk",
+      "use": "Pose 'Yay!': It works: a page shipped, a game runs"
+    },
+    {
+      "path": "print/lockup-horizontal-day-dark.pdf",
+      "bytes": 14693,
+      "variant": "day",
+      "use": "Vector PDF, 150mm wide, RGB. Reversed artwork: print on dark stock (transparent background, light ink).",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-day-dark.svg",
+      "bytes": 2433,
+      "variant": "day",
+      "use": "Print master at 150mm wide (scale freely). Reversed artwork: print on dark stock (transparent background, light ink)."
+    },
+    {
+      "path": "print/lockup-horizontal-day-light.pdf",
+      "bytes": 14695,
+      "variant": "day",
+      "use": "Vector PDF, 150mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-day-light.svg",
+      "bytes": 2434,
+      "variant": "day",
+      "use": "Print master at 150mm wide (scale freely)."
+    },
+    {
+      "path": "print/lockup-horizontal-dusk-dark.pdf",
+      "bytes": 14927,
+      "variant": "dusk",
+      "use": "Vector PDF, 150mm wide, RGB. Reversed artwork: print on dark stock (transparent background, light ink).",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-dusk-dark.svg",
+      "bytes": 2631,
+      "variant": "dusk",
+      "use": "Print master at 150mm wide (scale freely). Reversed artwork: print on dark stock (transparent background, light ink)."
+    },
+    {
+      "path": "print/lockup-horizontal-dusk-light.pdf",
+      "bytes": 14918,
+      "variant": "dusk",
+      "use": "Vector PDF, 150mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-dusk-light.svg",
+      "bytes": 2632,
+      "variant": "dusk",
+      "use": "Print master at 150mm wide (scale freely)."
+    },
+    {
+      "path": "print/lockup-horizontal-minimal-dark.pdf",
+      "bytes": 7669,
+      "variant": "minimal",
+      "use": "Vector PDF, 150mm wide, RGB. Reversed artwork: print on dark stock (transparent background, light ink).",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-minimal-dark.svg",
+      "bytes": 1177,
+      "variant": "minimal",
+      "use": "Print master at 150mm wide (scale freely). Reversed artwork: print on dark stock (transparent background, light ink)."
+    },
+    {
+      "path": "print/lockup-horizontal-minimal-light.pdf",
+      "bytes": 7673,
+      "variant": "minimal",
+      "use": "Vector PDF, 150mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-horizontal-minimal-light.svg",
+      "bytes": 1178,
+      "variant": "minimal",
+      "use": "Print master at 150mm wide (scale freely)."
+    },
+    {
+      "path": "print/lockup-stacked-day.pdf",
+      "bytes": 14779,
+      "variant": "day",
+      "use": "Vector PDF, 90mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-stacked-day.svg",
+      "bytes": 2426,
+      "variant": "day",
+      "use": "Print master at 90mm wide (scale freely)."
+    },
+    {
+      "path": "print/lockup-stacked-dusk.pdf",
+      "bytes": 15005,
+      "variant": "dusk",
+      "use": "Vector PDF, 90mm wide, RGB. Reversed artwork: print on dark stock (transparent background, light ink).",
+      "vector": true
+    },
+    {
+      "path": "print/lockup-stacked-dusk.svg",
+      "bytes": 2626,
+      "variant": "dusk",
+      "use": "Print master at 90mm wide (scale freely). Reversed artwork: print on dark stock (transparent background, light ink)."
+    },
+    {
+      "path": "print/mascot-day.pdf",
+      "bytes": 11550,
+      "variant": "day",
+      "use": "Vector PDF, 80mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/mascot-day.svg",
+      "bytes": 1559,
+      "variant": "day",
+      "use": "Print master at 80mm wide (scale freely)."
+    },
+    {
+      "path": "print/mascot-dusk.pdf",
+      "bytes": 11752,
+      "variant": "dusk",
+      "use": "Vector PDF, 80mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/mascot-dusk.svg",
+      "bytes": 1761,
+      "variant": "dusk",
+      "use": "Print master at 80mm wide (scale freely)."
+    },
+    {
+      "path": "print/mascot-minimal-mono-black.pdf",
+      "bytes": 4988,
+      "variant": "minimal",
+      "use": "Vector PDF, 80mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/mascot-minimal-mono-black.svg",
+      "bytes": 476,
+      "variant": "minimal",
+      "use": "Print master at 80mm wide (scale freely)."
+    },
+    {
+      "path": "print/mascot-minimal.pdf",
+      "bytes": 4992,
+      "variant": "minimal",
+      "use": "Vector PDF, 80mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/mascot-minimal.svg",
+      "bytes": 465,
+      "variant": "minimal",
+      "use": "Print master at 80mm wide (scale freely)."
+    },
+    {
+      "path": "print/sticker-sheet-art-only.pdf",
+      "bytes": 104759,
+      "variant": "day+dusk",
+      "use": "A4 sticker sheet PDF without the cut line",
+      "vector": true
+    },
+    {
+      "path": "print/sticker-sheet.pdf",
+      "bytes": 111217,
+      "variant": "day+dusk",
+      "use": "A4 sticker sheet PDF (cut line shown in magenta for proofing)",
+      "vector": true
+    },
+    {
+      "path": "print/sticker-sheet.svg",
+      "bytes": 15447,
+      "variant": "day+dusk",
+      "use": "A4 sticker sheet, 6 stickers (hello / yay / ask a grown-up in day and dusk). Layer 'CutContour' = kiss-cut path."
+    },
+    {
+      "path": "print/wordmark-grownup.pdf",
+      "bytes": 4008,
+      "variant": "minimal",
+      "use": "Vector PDF, 100mm wide, RGB.",
+      "vector": true
+    },
+    {
+      "path": "print/wordmark-grownup.svg",
+      "bytes": 791,
+      "variant": "minimal",
+      "use": "Print master at 100mm wide (scale freely)."
+    },
+    {
+      "path": "social/avatar-day-circle.png",
+      "bytes": 20978,
+      "variant": "day",
+      "use": "Profile avatar 400x400, pre-cut circle with transparent corners",
+      "pixels": "400x400"
+    },
+    {
+      "path": "social/avatar-day.png",
+      "bytes": 13229,
+      "variant": "day",
+      "use": "Profile avatar 400x400, square (art is circle-safe)",
+      "pixels": "400x400"
+    },
+    {
+      "path": "social/avatar-dusk-circle.png",
+      "bytes": 39957,
+      "variant": "dusk",
+      "use": "Profile avatar 400x400, pre-cut circle with transparent corners",
+      "pixels": "400x400"
+    },
+    {
+      "path": "social/avatar-dusk.png",
+      "bytes": 41254,
+      "variant": "dusk",
+      "use": "Profile avatar 400x400, square (art is circle-safe)",
+      "pixels": "400x400"
+    },
+    {
+      "path": "social/facebook-cover-day.png",
+      "bytes": 61057,
+      "variant": "day",
+      "use": "Facebook cover 1640x624 (content inside the mobile-safe centre 1110 wide)",
+      "pixels": "1640x624"
+    },
+    {
+      "path": "social/facebook-cover-dusk.png",
+      "bytes": 198218,
+      "variant": "dusk",
+      "use": "Facebook cover 1640x624 (content inside the mobile-safe centre 1110 wide)",
+      "pixels": "1640x624"
+    },
+    {
+      "path": "social/github-social-preview-day.png",
+      "bytes": 58484,
+      "variant": "day",
+      "use": "GitHub repository social preview 1280x640 (40px border kept clear)",
+      "pixels": "1280x640"
+    },
+    {
+      "path": "social/github-social-preview-dusk.png",
+      "bytes": 178188,
+      "variant": "dusk",
+      "use": "GitHub repository social preview 1280x640 (40px border kept clear)",
+      "pixels": "1280x640"
+    },
+    {
+      "path": "social/instagram-post-day.png",
+      "bytes": 75323,
+      "variant": "day",
+      "use": "Instagram square post template 1080x1080",
+      "pixels": "1080x1080"
+    },
+    {
+      "path": "social/instagram-post-dusk.png",
+      "bytes": 257442,
+      "variant": "dusk",
+      "use": "Instagram square post template 1080x1080",
+      "pixels": "1080x1080"
+    },
+    {
+      "path": "social/instagram-story-day.png",
+      "bytes": 103180,
+      "variant": "day",
+      "use": "Instagram story template 1080x1920 (top and bottom 250px kept clear for the UI)",
+      "pixels": "1080x1920"
+    },
+    {
+      "path": "social/instagram-story-dusk.png",
+      "bytes": 421051,
+      "variant": "dusk",
+      "use": "Instagram story template 1080x1920 (top and bottom 250px kept clear for the UI)",
+      "pixels": "1080x1920"
+    },
+    {
+      "path": "social/linkedin-banner-day.png",
+      "bytes": 44026,
+      "variant": "day",
+      "use": "LinkedIn personal banner 1584x396 (keeps clear of the profile photo on the left)",
+      "pixels": "1584x396"
+    },
+    {
+      "path": "social/linkedin-banner-dusk.png",
+      "bytes": 119228,
+      "variant": "dusk",
+      "use": "LinkedIn personal banner 1584x396 (keeps clear of the profile photo on the left)",
+      "pixels": "1584x396"
+    },
+    {
+      "path": "social/producthunt-thumbnail-day.png",
+      "bytes": 7500,
+      "variant": "day",
+      "use": "Product Hunt thumbnail 240x240",
+      "pixels": "240x240"
+    },
+    {
+      "path": "social/producthunt-thumbnail-dusk.png",
+      "bytes": 19260,
+      "variant": "dusk",
+      "use": "Product Hunt thumbnail 240x240",
+      "pixels": "240x240"
+    },
+    {
+      "path": "social/src/facebook-cover-day.svg",
+      "bytes": 4095,
+      "variant": "day",
+      "use": "Facebook cover 1640x624 (content inside the mobile-safe centre 1110 wide) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/facebook-cover-dusk.svg",
+      "bytes": 7610,
+      "variant": "dusk",
+      "use": "Facebook cover 1640x624 (content inside the mobile-safe centre 1110 wide) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/github-social-preview-day.svg",
+      "bytes": 3938,
+      "variant": "day",
+      "use": "GitHub repository social preview 1280x640 (40px border kept clear) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/github-social-preview-dusk.svg",
+      "bytes": 5744,
+      "variant": "dusk",
+      "use": "GitHub repository social preview 1280x640 (40px border kept clear) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/instagram-post-day.svg",
+      "bytes": 3999,
+      "variant": "day",
+      "use": "Instagram square post template 1080x1080 (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/instagram-post-dusk.svg",
+      "bytes": 6656,
+      "variant": "dusk",
+      "use": "Instagram square post template 1080x1080 (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/instagram-story-day.svg",
+      "bytes": 4003,
+      "variant": "day",
+      "use": "Instagram story template 1080x1920 (top and bottom 250px kept clear for the UI) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/instagram-story-dusk.svg",
+      "bytes": 9629,
+      "variant": "dusk",
+      "use": "Instagram story template 1080x1920 (top and bottom 250px kept clear for the UI) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/linkedin-banner-day.svg",
+      "bytes": 3753,
+      "variant": "day",
+      "use": "LinkedIn personal banner 1584x396 (keeps clear of the profile photo on the left) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/linkedin-banner-dusk.svg",
+      "bytes": 6620,
+      "variant": "dusk",
+      "use": "LinkedIn personal banner 1584x396 (keeps clear of the profile photo on the left) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/x-header-day.svg",
+      "bytes": 3903,
+      "variant": "day",
+      "use": "X / Twitter header 1500x500 (keeps clear of the round profile photo, bottom-left) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/x-header-dusk.svg",
+      "bytes": 7043,
+      "variant": "dusk",
+      "use": "X / Twitter header 1500x500 (keeps clear of the round profile photo, bottom-left) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/youtube-banner-day.svg",
+      "bytes": 5310,
+      "variant": "day",
+      "use": "YouTube channel art 2560x1440 (logo + text inside the 1546x423 all-devices safe area) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/src/youtube-banner-dusk.svg",
+      "bytes": 26945,
+      "variant": "dusk",
+      "use": "YouTube channel art 2560x1440 (logo + text inside the 1546x423 all-devices safe area) (editable source; text is live, set in the system font)"
+    },
+    {
+      "path": "social/x-header-day.png",
+      "bytes": 55301,
+      "variant": "day",
+      "use": "X / Twitter header 1500x500 (keeps clear of the round profile photo, bottom-left)",
+      "pixels": "1500x500"
+    },
+    {
+      "path": "social/x-header-dusk.png",
+      "bytes": 154265,
+      "variant": "dusk",
+      "use": "X / Twitter header 1500x500 (keeps clear of the round profile photo, bottom-left)",
+      "pixels": "1500x500"
+    },
+    {
+      "path": "social/youtube-banner-day.png",
+      "bytes": 113288,
+      "variant": "day",
+      "use": "YouTube channel art 2560x1440 (logo + text inside the 1546x423 all-devices safe area)",
+      "pixels": "2560x1440"
+    },
+    {
+      "path": "social/youtube-banner-dusk.png",
+      "bytes": 530649,
+      "variant": "dusk",
+      "use": "YouTube channel art 2560x1440 (logo + text inside the 1546x423 all-devices safe area)",
+      "pixels": "2560x1440"
+    },
+    {
+      "path": "svg/app-icon-day-small.svg",
+      "bytes": 795,
+      "variant": "day",
+      "use": "Simplified icon drawing for 24-63px (no outline, no cheeks, bigger eyes)."
+    },
+    {
+      "path": "svg/app-icon-day-tiny.svg",
+      "bytes": 790,
+      "variant": "day",
+      "use": "Simplified icon drawing for 16-23px."
+    },
+    {
+      "path": "svg/app-icon-day.svg",
+      "bytes": 2270,
+      "variant": "day",
+      "use": "App icon master, day, Apple 1024 grid (824 squircle, 100 margin). For sizes >= 64px."
+    },
+    {
+      "path": "svg/app-icon-dusk-small.svg",
+      "bytes": 1007,
+      "variant": "dusk",
+      "use": "Simplified icon drawing for 24-63px (no outline, no cheeks, bigger eyes)."
+    },
+    {
+      "path": "svg/app-icon-dusk-tiny.svg",
+      "bytes": 844,
+      "variant": "dusk",
+      "use": "Simplified icon drawing for 16-23px."
+    },
+    {
+      "path": "svg/app-icon-dusk.svg",
+      "bytes": 3174,
+      "variant": "dusk",
+      "use": "App icon master, dusk, Apple 1024 grid. For sizes >= 64px."
+    },
+    {
+      "path": "svg/app-icon-minimal.svg",
+      "bytes": 632,
+      "variant": "minimal",
+      "use": "Minimal app icon (flat blue). Reference for Clear/Tinted and grown-up listings."
+    },
+    {
+      "path": "svg/lockup-horizontal-day-dark.svg",
+      "bytes": 2432,
+      "variant": "day",
+      "use": "Horizontal lockup, day, for dark backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-horizontal-day-light.svg",
+      "bytes": 2433,
+      "variant": "day",
+      "use": "Horizontal lockup, day, for light backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-horizontal-dusk-dark.svg",
+      "bytes": 2630,
+      "variant": "dusk",
+      "use": "Horizontal lockup, dusk, for dark backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-horizontal-dusk-light.svg",
+      "bytes": 2631,
+      "variant": "dusk",
+      "use": "Horizontal lockup, dusk, for light backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-horizontal-minimal-dark.svg",
+      "bytes": 1159,
+      "variant": "minimal",
+      "use": "Horizontal lockup, minimal, for dark backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-horizontal-minimal-light.svg",
+      "bytes": 1160,
+      "variant": "minimal",
+      "use": "Horizontal lockup, minimal, for light backgrounds. Website header, email signature, About box."
+    },
+    {
+      "path": "svg/lockup-stacked-day-dark.svg",
+      "bytes": 2431,
+      "variant": "day",
+      "use": "Stacked lockup, day, for dark backgrounds. Splash screens, merch, flyers, square spaces."
+    },
+    {
+      "path": "svg/lockup-stacked-day.svg",
+      "bytes": 2432,
+      "variant": "day",
+      "use": "Stacked lockup, day, for light backgrounds. Splash screens, merch, flyers, square spaces."
+    },
+    {
+      "path": "svg/lockup-stacked-dusk-light.svg",
+      "bytes": 2632,
+      "variant": "dusk",
+      "use": "Stacked lockup, dusk, for light backgrounds. Splash screens, merch, flyers, square spaces."
+    },
+    {
+      "path": "svg/lockup-stacked-dusk.svg",
+      "bytes": 2631,
+      "variant": "dusk",
+      "use": "Stacked lockup, dusk, for dark backgrounds. Splash screens, merch, flyers, square spaces."
+    },
+    {
+      "path": "svg/mascot-day.svg",
+      "bytes": 1547,
+      "variant": "day",
+      "use": "Master mascot, day (sticker drawing). Website, app, light surfaces 06:00-dusk."
+    },
+    {
+      "path": "svg/mascot-dusk.svg",
+      "bytes": 1749,
+      "variant": "dusk",
+      "use": "Master mascot, dusk (sticker drawing + star). Dusk-to-dawn, dark surfaces."
+    },
+    {
+      "path": "svg/mascot-minimal-mono-black.svg",
+      "bytes": 432,
+      "variant": "minimal",
+      "use": "One-colour black: stamps, embossing, fax, laser engraving, single-colour print."
+    },
+    {
+      "path": "svg/mascot-minimal-mono-white.svg",
+      "bytes": 432,
+      "variant": "minimal",
+      "use": "One-colour white: reversed out of photos or dark colours, embroidery on dark fabric."
+    },
+    {
+      "path": "svg/mascot-minimal.svg",
+      "bytes": 434,
+      "variant": "minimal",
+      "use": "Minimal one-colour mark in SKYCOT blue. Small sizes, grown-up contexts."
+    },
+    {
+      "path": "svg/menubar-template.svg",
+      "bytes": 557,
+      "variant": "minimal",
+      "use": "macOS menu-bar template image source (black + transparency only; macOS recolours it)."
+    },
+    {
+      "path": "svg/wordmark-grownup-reversed.svg",
+      "bytes": 771,
+      "variant": "minimal",
+      "use": "Grown-up wordmark in white for dark backgrounds."
+    },
+    {
+      "path": "svg/wordmark-grownup.svg",
+      "bytes": 762,
+      "variant": "minimal",
+      "use": "Grown-up wordmark (no eyes). Invoices, legal, business pages."
+    },
+    {
+      "path": "svg/wordmark-reversed.svg",
+      "bytes": 928,
+      "variant": "day+dusk",
+      "use": "Wordmark in Moon Cream for dark / dusk backgrounds."
+    },
+    {
+      "path": "svg/wordmark.svg",
+      "bytes": 918,
+      "variant": "day+dusk",
+      "use": "Wordmark with the mascot's eyes in the 'o'. Ink, for light backgrounds."
+    },
+    {
+      "path": "tokens/brand-colors.json",
+      "bytes": 4365,
+      "variant": "day+dusk+minimal",
+      "use": "Brand colour tokens (JSON) for engineers and design tools"
+    },
+    {
+      "path": "tokens/brand.css",
+      "bytes": 2047,
+      "variant": "day+dusk+minimal",
+      "use": "CSS custom properties; day by default, dusk via data-skycot-time=\"dusk\""
+    },
+    {
+      "path": "web/apple-touch-icon-day.png",
+      "bytes": 13126,
+      "variant": "day",
+      "use": "iOS home-screen bookmark icon (opaque, iOS rounds the corners)",
+      "pixels": "180x180"
+    },
+    {
+      "path": "web/apple-touch-icon-dusk.png",
+      "bytes": 14990,
+      "variant": "dusk",
+      "use": "iOS home-screen bookmark icon (opaque, iOS rounds the corners)",
+      "pixels": "180x180"
+    },
+    {
+      "path": "web/favicon-day.svg",
+      "bytes": 757,
+      "variant": "day",
+      "use": "SVG favicon, day (tiny drawing, full-bleed). Swap at local dusk/dawn."
+    },
+    {
+      "path": "web/favicon-dusk.svg",
+      "bytes": 811,
+      "variant": "dusk",
+      "use": "SVG favicon, dusk (tiny drawing, full-bleed). Swap at local dusk/dawn."
+    },
+    {
+      "path": "web/favicon.ico",
+      "bytes": 15086,
+      "variant": "day",
+      "use": "Classic favicon.ico (16, 32, 48) for old browsers and /favicon.ico requests"
+    },
+    {
+      "path": "web/icon-192-day.png",
+      "bytes": 16981,
+      "variant": "day",
+      "use": "PWA icon 192px, purpose 'any'",
+      "pixels": "192x192"
+    },
+    {
+      "path": "web/icon-192-dusk.png",
+      "bytes": 18539,
+      "variant": "dusk",
+      "use": "PWA icon 192px, purpose 'any'",
+      "pixels": "192x192"
+    },
+    {
+      "path": "web/icon-512-day.png",
+      "bytes": 65092,
+      "variant": "day",
+      "use": "PWA icon 512px, purpose 'any'",
+      "pixels": "512x512"
+    },
+    {
+      "path": "web/icon-512-dusk.png",
+      "bytes": 78052,
+      "variant": "dusk",
+      "use": "PWA icon 512px, purpose 'any'",
+      "pixels": "512x512"
+    },
+    {
+      "path": "web/icon-maskable-192-day.png",
+      "bytes": 15329,
+      "variant": "day",
+      "use": "PWA icon 192px, purpose 'maskable' (art inside the 80% safe circle)",
+      "pixels": "192x192"
+    },
+    {
+      "path": "web/icon-maskable-192-dusk.png",
+      "bytes": 16458,
+      "variant": "dusk",
+      "use": "PWA icon 192px, purpose 'maskable' (art inside the 80% safe circle)",
+      "pixels": "192x192"
+    },
+    {
+      "path": "web/icon-maskable-512-day.png",
+      "bytes": 62848,
+      "variant": "day",
+      "use": "PWA icon 512px, purpose 'maskable' (art inside the 80% safe circle)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "web/icon-maskable-512-dusk.png",
+      "bytes": 77446,
+      "variant": "dusk",
+      "use": "PWA icon 512px, purpose 'maskable' (art inside the 80% safe circle)",
+      "pixels": "512x512"
+    },
+    {
+      "path": "web/mask-icon.svg",
+      "bytes": 521,
+      "variant": "minimal",
+      "use": "Safari pinned-tab mask icon (single black shape; colour set in <link color>)"
+    },
+    {
+      "path": "web/og-day.png",
+      "bytes": 83463,
+      "variant": "day",
+      "use": "Open Graph / link-preview image 1200x630",
+      "pixels": "1200x630"
+    },
+    {
+      "path": "web/og-dusk.png",
+      "bytes": 182939,
+      "variant": "dusk",
+      "use": "Open Graph / link-preview image 1200x630",
+      "pixels": "1200x630"
+    },
+    {
+      "path": "web/site.webmanifest",
+      "bytes": 748,
+      "variant": "day",
+      "use": "Example web app manifest (day icons; a manifest can't switch at dusk, so installed icons stay day)"
+    },
+    {
+      "path": "web/src/favicon-day-16.png",
+      "bytes": 497,
+      "variant": "day",
+      "use": "favicon.ico frame 16px",
+      "pixels": "16x16"
+    },
+    {
+      "path": "web/src/favicon-day-32.png",
+      "bytes": 1021,
+      "variant": "day",
+      "use": "favicon.ico frame 32px",
+      "pixels": "32x32"
+    },
+    {
+      "path": "web/src/favicon-day-48.png",
+      "bytes": 2663,
+      "variant": "day",
+      "use": "favicon.ico frame 48px",
+      "pixels": "48x48"
+    },
+    {
+      "path": "windows/app-icon-day.ico",
+      "bytes": 127260,
+      "variant": "day",
+      "use": "Windows app icon .ico (16, 24, 32, 48, 64, 128, 256); 256 stored as PNG, the rest as 32-bit BMP for maximum compatibility"
+    },
+    {
+      "path": "windows/app-icon-dusk.ico",
+      "bytes": 129486,
+      "variant": "dusk",
+      "use": "Windows app icon .ico (16, 24, 32, 48, 64, 128, 256); 256 stored as PNG, the rest as 32-bit BMP for maximum compatibility"
+    },
+    {
+      "path": "windows/src/app-icon-day-128.png",
+      "bytes": 9929,
+      "variant": "day",
+      "use": "Windows .ico frame 128px",
+      "pixels": "128x128"
+    },
+    {
+      "path": "windows/src/app-icon-day-16.png",
+      "bytes": 554,
+      "variant": "day",
+      "use": "Windows .ico frame 16px",
+      "pixels": "16x16"
+    },
+    {
+      "path": "windows/src/app-icon-day-24.png",
+      "bytes": 783,
+      "variant": "day",
+      "use": "Windows .ico frame 24px",
+      "pixels": "24x24"
+    },
+    {
+      "path": "windows/src/app-icon-day-256.png",
+      "bytes": 25110,
+      "variant": "day",
+      "use": "Windows .ico frame 256px",
+      "pixels": "256x256"
+    },
+    {
+      "path": "windows/src/app-icon-day-32.png",
+      "bytes": 1069,
+      "variant": "day",
+      "use": "Windows .ico frame 32px",
+      "pixels": "32x32"
+    },
+    {
+      "path": "windows/src/app-icon-day-48.png",
+      "bytes": 2794,
+      "variant": "day",
+      "use": "Windows .ico frame 48px",
+      "pixels": "48x48"
+    },
+    {
+      "path": "windows/src/app-icon-day-64.png",
+      "bytes": 3882,
+      "variant": "day",
+      "use": "Windows .ico frame 64px",
+      "pixels": "64x64"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-128.png",
+      "bytes": 10719,
+      "variant": "dusk",
+      "use": "Windows .ico frame 128px",
+      "pixels": "128x128"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-16.png",
+      "bytes": 605,
+      "variant": "dusk",
+      "use": "Windows .ico frame 16px",
+      "pixels": "16x16"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-24.png",
+      "bytes": 939,
+      "variant": "dusk",
+      "use": "Windows .ico frame 24px",
+      "pixels": "24x24"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-256.png",
+      "bytes": 27336,
+      "variant": "dusk",
+      "use": "Windows .ico frame 256px",
+      "pixels": "256x256"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-32.png",
+      "bytes": 1165,
+      "variant": "dusk",
+      "use": "Windows .ico frame 32px",
+      "pixels": "32x32"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-48.png",
+      "bytes": 3215,
+      "variant": "dusk",
+      "use": "Windows .ico frame 48px",
+      "pixels": "48x48"
+    },
+    {
+      "path": "windows/src/app-icon-dusk-64.png",
+      "bytes": 4411,
+      "variant": "dusk",
+      "use": "Windows .ico frame 64px",
+      "pixels": "64x64"
+    }
+  ]
+}

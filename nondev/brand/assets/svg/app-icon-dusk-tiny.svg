@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><title>SKYCOT app icon, dusk, tiny</title><defs><linearGradient id="v2skysm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B1E52" /><stop offset=".7" stop-color="#4A3C95" /><stop offset="1" stop-color="#A2639F" /></linearGradient>
+</defs><g><g><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#v2skysm)" /><g transform="translate(112.1 222) scale(6.45)"><path d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z" fill="#FFFDF8" />
+  <ellipse cx="48" cy="57" rx="9" ry="13.5" fill="#2B2420" /><ellipse cx="76" cy="57" rx="9" ry="13.5" fill="#2B2420" />
+</g><circle cx="800" cy="232" r="78" fill="#FFD166" /></g>
+</g></svg>

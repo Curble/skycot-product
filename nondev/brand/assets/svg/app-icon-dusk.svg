@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><title>SKYCOT app icon, dusk</title><defs><linearGradient id="v2belly" gradientUnits="userSpaceOnUse" x1="0" y1="62" x2="0" y2="86"><stop offset="0" stop-color="#EADFF3" stop-opacity="0" /><stop offset="1" stop-color="#EADFF3" /></linearGradient>
+<clipPath id="v2clip"><path d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z" /></clipPath>
+<radialGradient id="v2starglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFD166" stop-opacity=".45" /><stop offset="1" stop-color="#FFD166" stop-opacity="0" /></radialGradient>
+<radialGradient id="v2glow" cx=".5" cy="1.02" r=".6"><stop offset="0" stop-color="#FFC891" stop-opacity=".8" /><stop offset="1" stop-color="#FFC891" stop-opacity="0" /></radialGradient>
+<linearGradient id="v2sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#171A45" /><stop offset=".52" stop-color="#3C3486" /><stop offset=".82" stop-color="#8E5AA8" /><stop offset="1" stop-color="#F4A27A" /></linearGradient>
+</defs><g><g><g><g><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#v2sky)" /><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#v2glow)" /><g><g fill="#fff"><circle cx="262" cy="248" r="7" opacity=".85" /><circle cx="356" cy="178" r="4.5" opacity=".6" /><circle cx="196" cy="420" r="4" opacity=".55" /><circle cx="640" cy="196" r="4.5" opacity=".6" /><circle cx="868" cy="470" r="4" opacity=".5" /><path d="M430 284Q433.2 296.8 446 300Q433.2 303.2 430 316Q426.8 303.2 414 300Q426.8 296.8 430 284Z" opacity=".8" /></g>
+</g></g>
+</g><g><g><g><g><circle cx="796" cy="262" r="120" fill="url(#v2starglow)" /><path d="M796.0 196.0L813.6 237.7L858.8 241.6L824.5 271.3L834.8 315.4L796.0 292.0L757.2 315.4L767.5 271.3L733.2 241.6L778.4 237.7Z" fill="#FFD166" stroke="#FFD166" stroke-width="18" stroke-linejoin="round" /></g>
+</g><ellipse cx="512" cy="760" rx="220" ry="22" fill="#1A1240" opacity=".28" /><g transform="translate(192.08 270) scale(5.16)"><g><path d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z" fill="#FFFDF8" />
+  <g clip-path="url(#v2clip)">
+    <rect x="0" y="60" width="124" height="30" fill="url(#v2belly)" />
+    <ellipse cx="45" cy="30" rx="8" ry="4.2" fill="#fff" transform="rotate(-28 45 30)" />
+  </g>
+  <path d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z" fill="none" stroke="#2B2420" stroke-width="4.5" stroke-linejoin="round" />
+</g><g><g>
+  <ellipse cx="49" cy="58" rx="6" ry="9" fill="#2B2420" /><ellipse cx="75" cy="58" rx="6" ry="9" fill="#2B2420" />
+  <circle cx="51.3" cy="54" r="2.2" fill="#fff" /><circle cx="77.3" cy="54" r="2.2" fill="#fff" />
+  <ellipse cx="37" cy="69" rx="6" ry="4" fill="#FFB4A2" opacity=".9" /><ellipse cx="87" cy="69" rx="6" ry="4" fill="#FFB4A2" opacity=".9" />
+  <path d="M56 68Q62 74 68 68" fill="none" stroke="#2B2420" stroke-width="4.5" stroke-linecap="round" />
+</g>
+</g>
+</g></g>
+</g></g>
+</g></svg>

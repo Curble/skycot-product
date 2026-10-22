@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><title>SKYCOT app icon, day, tiny</title><defs><linearGradient id="v1sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ED0FF" /><stop offset=".55" stop-color="#3A9DF6" /><stop offset="1" stop-color="#0071E3" /></linearGradient>
+</defs><g><g><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#v1sky)" /><g transform="translate(112.1 177) scale(6.45)"><path d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z" fill="#FFFDF8" />
+  <ellipse cx="48" cy="57" rx="9" ry="13.5" fill="#2B2420" /><ellipse cx="76" cy="57" rx="9" ry="13.5" fill="#2B2420" />
+</g></g>
+</g></svg>
