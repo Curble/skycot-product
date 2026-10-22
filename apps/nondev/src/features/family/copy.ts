@@ -74,6 +74,8 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "Names, pictures, bedtimes and limits are a parent's to set.";
     case "switchChild":
       return "SKYCOT is asleep for this child, so a grown-up switches to someone else.";
+    case "seeRecap":
+      return "The recap shows what a child made, asked for and needed help with, so it's for grown-ups. The code opens it on this device for 10 minutes.";
     case "changeTheme":
       return "";
   }

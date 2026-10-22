@@ -1,0 +1,87 @@
+import { describe, expect, it } from "vite-plus/test";
+
+import { askLine, grownUpLines, madeSummary, minutesPhrase, parseRecap, weekBars } from "./recap";
+
+const MELBOURNE = "Australia/Melbourne";
+const file = (path: string, additions = 10) => ({
+  path,
+  kind: "modified",
+  additions,
+  deletions: 0,
+});
+
+describe("the recap in plain words", () => {
+  it("says time like a person", () => {
+    expect(minutesPhrase(1)).toBe("1 minute");
+    expect(minutesPhrase(45)).toBe("45 minutes");
+    expect(minutesPhrase(60)).toBe("1 hour");
+    expect(minutesPhrase(125)).toBe("2 hours 5 minutes");
+  });
+
+  it("puts a conversation's changes into one What-changed sentence", () => {
+    expect(
+      madeSummary({
+        changes: [
+          { checkpointId: "c1", at: 1, files: [file("index.html")] },
+          { checkpointId: "c2", at: 2, files: [file("index.html", 5), file("style.css")] },
+        ],
+      }),
+    ).toBe("Changed 2 files: 1 page and 1 style file (+25 / −0 lines). Over 2 changes.");
+    expect(madeSummary({ changes: [] })).toBeNull();
+  });
+
+  it("names only the kind of detail the shield kept out", () => {
+    expect(askLine({ text: "Make it blue", hidden: [] })).toBe("“Make it blue”");
+    const hidden = askLine({ text: null, hidden: ["full-name", "school"] });
+    expect(hidden).toContain("a full name and a school's name");
+    expect(hidden).toContain("kept the words out");
+  });
+
+  it("lists what needed a grown-up", () => {
+    expect(
+      grownUpLines({
+        timeZone: MELBOURNE,
+        grownUp: {
+          held: 2,
+          approved: 1,
+          moreTime: [
+            {
+              at: Date.parse("2026-10-22T17:00:00+11:00"),
+              kind: "extra",
+              minutes: 15,
+              reason: "time",
+            },
+          ],
+          shield: { "full-name": 2, school: 1 },
+          shieldAllowed: 1,
+        },
+      }),
+    ).toEqual([
+      "2 steps waited for a grown-up (the internet, an install, deleting, or outside the project); 1 was allowed with the parent code.",
+      "A grown-up gave 15 more minutes at 5:00 pm when the day's time ran out.",
+      "The shield spotted a full name (2 times) and a school's name before it was sent.",
+      "1 message went as typed after a grown-up said yes.",
+    ]);
+    expect(
+      grownUpLines({
+        timeZone: MELBOURNE,
+        grownUp: { held: 0, approved: 0, moreTime: [], shield: {}, shieldAllowed: 0 },
+      }),
+    ).toEqual([]);
+  });
+
+  it("draws the week against its busiest day", () => {
+    const bars = weekBars([
+      { date: "2026-10-21", minutes: 20, turns: 2 },
+      { date: "2026-10-22", minutes: 40, turns: 3 },
+    ]);
+    expect(bars.map((bar) => [bar.label, bar.share])).toEqual([
+      ["Wed", 0.5],
+      ["Thu", 1],
+    ]);
+  });
+
+  it("refuses an answer that is not a recap", () => {
+    expect(parseRecap({ error: "forbidden" })).toBeNull();
+  });
+});

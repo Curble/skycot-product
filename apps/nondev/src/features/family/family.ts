@@ -24,7 +24,8 @@ export type FamilyAction =
   | "saveSecret"
   | "voiceSettings"
   | "manageChildren"
-  | "switchChild";
+  | "switchChild"
+  | "seeRecap";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -50,6 +51,7 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "voiceSettings",
   "manageChildren",
   "switchChild",
+  "seeRecap",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -59,7 +61,8 @@ export type FamilyPurpose =
   | "automation"
   | "openFolder"
   | "settings"
-  | "advanced";
+  | "advanced"
+  | "recap";
 
 /**
  * The engine grant an action asks for. Turning the profile off and changing the code are not
@@ -77,6 +80,8 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
       return "openFolder";
     case "approve":
       return "approve";
+    case "seeRecap":
+      return "recap";
     case "aiSettings":
     case "rerunOnboarding":
     case "changeAutonomy":
@@ -122,6 +127,7 @@ const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
   "openFolder",
   "settings",
   "advanced",
+  "recap",
 ]);
 
 function parseGrants(value: unknown): ReadonlyArray<OpenGrant> | undefined {

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { newMessageId } from "~/lib/utils";
 
 import { useFamily } from "../family/FamilyProvider";
+import { reportShieldCatch } from "../recap/api";
 import { shieldFinding, type ShieldFinding } from "./shield";
 import { ShieldCard, type ShieldChoice } from "./ShieldCard";
 
@@ -31,6 +32,8 @@ export function useShield() {
     const messageId = newMessageId();
     const finding = family.enabled ? shieldFinding(text, pictureCount) : null;
     if (finding === null) return Promise.resolve({ kind: "send", text, messageId });
+    // For the grown-up recap: the kinds of detail only, once per card.
+    if (pending === null) reportShieldCatch(finding.categories);
     // A second Return while the card is up starts over with what is in the field now.
     pending?.resolve({ kind: "edit", dropPictures: false });
     return new Promise((resolve) => setPending({ finding, messageId, resolve }));

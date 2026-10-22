@@ -11,6 +11,7 @@ import { useTextSize, writeTextSize } from "../settings/localPrefs";
 import { useFamily } from "../family/FamilyProvider";
 import { currentChild } from "../family/family";
 import { saveOwnLook } from "../family/store";
+import { SessionRecapHost } from "../recap/SessionRecap";
 import { AsleepScreen } from "./AsleepScreen";
 import { ChildPicker } from "./ChildPicker";
 import { startLimitsClock, useLimits } from "./store";
@@ -70,7 +71,6 @@ const subscribeMinute = (onChange: () => void) => {
 export function FamilyLimitsHost() {
   const family = useFamily();
   const view = family.profile;
-  const { session } = useLimits();
   const requested = usePickerRequested();
   const [picked, setPicked] = useState(pickedThisWindow);
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
@@ -84,6 +84,27 @@ export function FamilyLimitsHost() {
   useChildLook(engineKnown ? currentChild(view) : null);
 
   if (!engineKnown) return null;
+  return (
+    <>
+      <LimitsCover now={now} requested={requested} picked={picked} setPicked={setPicked} />
+      <SessionRecapHost />
+    </>
+  );
+}
+
+function LimitsCover({
+  now,
+  requested,
+  picked,
+  setPicked,
+}: {
+  readonly now: number;
+  readonly requested: boolean;
+  readonly picked: boolean;
+  readonly setPicked: (picked: boolean) => void;
+}) {
+  const view = useFamily().profile;
+  const { session } = useLimits();
   const child = currentChild(view);
   const several = view.children.length > 1;
   if (requested || view.needsChoice || (several && !picked)) {

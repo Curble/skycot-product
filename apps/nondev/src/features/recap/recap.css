@@ -1,0 +1,240 @@
+/* The grown-up recap: a calm, Apple-style summary that also prints. Theme tokens only; the
+   Workshop look reaches it through the cards' own flavours. No animation. */
+.fm-recap {
+  display: grid;
+  gap: 14px;
+  max-width: 760px;
+}
+.fm-recap--compact {
+  gap: 12px;
+}
+.fm-recap__range {
+  margin-bottom: 4px;
+}
+.fm-recap__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.fm-recap__hero-text {
+  min-width: 0;
+}
+.fm-recap__kicker {
+  margin: 0;
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fm-label-2);
+}
+.fm-recap__title {
+  margin: 2px 0 0;
+  font-size: calc(26px * var(--fm-text-scale));
+  line-height: 1.15;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: var(--fm-label);
+}
+.fm-recap--compact .fm-recap__title {
+  font-size: calc(21px * var(--fm-text-scale));
+}
+.fm-recap__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.fm-recap__stat {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--fm-bg-card);
+  border: 1px solid var(--fm-sep);
+  color: var(--fm-label);
+}
+.fm-recap__stat svg {
+  color: var(--fm-accent);
+}
+.fm-recap__stat b {
+  font-size: calc(19px * var(--fm-text-scale));
+  line-height: 1.2;
+}
+.fm-recap__stat small {
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+html[data-flavour-borders="sketch"] .fm-recap__stat {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-sm, 14px);
+  box-shadow: var(--fm-shadow-button, none);
+}
+.fm-recap__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  height: 140px;
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  background: var(--fm-bg-card);
+  border: 1px solid var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-recap__week {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch, 14px);
+}
+.fm-recap__bar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  min-width: 0;
+  text-align: center;
+  gap: 4px;
+}
+.fm-recap__bar-value,
+.fm-recap__bar-label {
+  font-size: calc(11px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+  font-variant-numeric: tabular-nums;
+}
+.fm-recap__bar-track {
+  position: relative;
+  display: block;
+  border-radius: 6px;
+  background: var(--fm-bg-fill);
+}
+.fm-recap__bar-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  border-radius: 6px;
+  background: var(--fm-accent);
+}
+html[data-flavour-cards="sticky"] .fm-recap__bar-fill {
+  background: var(--fm-marker);
+  border: 2px solid var(--fm-ink);
+}
+.fm-recap__proud {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.fm-recap__proud-picture {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.fm-recap__proud-text p {
+  margin: 0 0 8px;
+  color: var(--fm-label-2);
+}
+.fm-recap__asks,
+.fm-recap__lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fm-recap__asks li {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: 10px;
+  line-height: 1.45;
+}
+.fm-recap__asks li[data-hidden] .fm-recap__ask-text {
+  color: var(--fm-label-2);
+  font-style: italic;
+}
+.fm-recap__ask-when {
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.fm-recap__lines li {
+  position: relative;
+  padding-left: 18px;
+  line-height: 1.45;
+}
+.fm-recap__lines li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fm-orange);
+}
+.fm-recap__privacy {
+  margin: 2px 0 0;
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-asleep__recap {
+  display: grid;
+  gap: 14px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  text-align: left;
+}
+@media (max-width: 560px) {
+  .fm-recap__stats {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .fm-recap__stat:first-child {
+    grid-column: 1 / -1;
+  }
+  .fm-recap__proud {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fm-recap__title {
+    font-size: calc(22px * var(--fm-text-scale));
+  }
+}
+
+/* Paper: the recap alone, black on white, no buttons. A recap in a sheet (or on the asleep
+   screen) prints without the app behind it. */
+@media print {
+  .fm-recap__range,
+  .fm-recap__noprint,
+  .fm-recap-screen .fm-settings__header .fm-btn,
+  .fm-sheet:has(.fm-recap) .fm-sheet__actions,
+  .fm-asleep__recap .fm-asleep__actions {
+    display: none !important;
+  }
+  body:has(.fm-sheet .fm-recap) #root,
+  body:has(.fm-asleep__recap) #root {
+    display: none;
+  }
+  body:has(.fm-asleep__recap) .fm-family-cover {
+    position: static;
+    display: block;
+    background: #fff;
+  }
+  body:has(.fm-asleep__recap) .fm-asleep__art,
+  body:has(.fm-asleep__recap) .fm-asleep__title,
+  body:has(.fm-asleep__recap) .fm-asleep__body {
+    display: none;
+  }
+  .fm-recap {
+    max-width: none;
+    color: #000;
+  }
+  .fm-recap .fm-card,
+  .fm-recap__stat,
+  .fm-recap__week {
+    break-inside: avoid;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .fm-recap__bar-fill {
+    background: #555 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

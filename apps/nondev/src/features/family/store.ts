@@ -166,6 +166,16 @@ export function applySession(session: {
   });
 }
 
+const parentYesListeners = new Set<(purpose: FamilyPurpose) => void>();
+
+/** Hears every parent code the engine accepted on this device (the recap's end-of-session card). */
+export function onParentYes(listener: (purpose: FamilyPurpose) => void): () => void {
+  parentYesListeners.add(listener);
+  return () => {
+    parentYesListeners.delete(listener);
+  };
+}
+
 /** One code try for a grown-up's "yes"; the engine records the grant for this device. */
 export function tryParentCode(
   code: string,
@@ -178,6 +188,7 @@ export function tryParentCode(
       setView({ ...view, attemptsLeft: 5, lockedUntil: null });
       // The engine says how long the new "yes" lasts.
       void refreshFamily();
+      for (const listener of parentYesListeners) listener(purpose);
     },
   );
 }
