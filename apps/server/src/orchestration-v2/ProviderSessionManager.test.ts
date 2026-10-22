@@ -52,6 +52,7 @@ import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as SkycotFamily from "../skycot/SkycotFamily.ts"; // nondev-seam: skycot-family-mcp-test
 
 const layerTestDatabase = SqlitePersistence.layerMemory;
 const layerTestStores = Layer.merge(EventStore.layer, ProjectionStore.layer).pipe(
@@ -3500,5 +3501,59 @@ it.effect(
         projectExists: false,
       });
       assert.isFalse(denied?.capabilities?.has("device"));
+    }),
+);
+
+// nondev-seam: skycot-family-mcp-test (with the Family profile on, the agent's credential carries none of the engine's own tools, page previews included, even with browser access on)
+it.effect(
+  "ProviderSessionManagerV2 gives a Family-profile thread none of the engine's own tools",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const registry = yield* McpSessionRegistry.McpSessionRegistry;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("thread-provider-session-manager-family");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        yield* eventSink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+        });
+        yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+
+        const captured = (yield* Ref.get(mcpConfigs))[0];
+        assert.isDefined(captured);
+        assert.equal(captured?.browserToolsAvailable, false);
+        const resolved = yield* registry.resolve(
+          captured!.authorizationHeader.replace(/^Bearer\s+/, ""),
+        );
+        assert.deepEqual(resolved?.capabilities, new Set());
+        yield* manager.close(providerSessionId);
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 1_000,
+            mcpConfigs,
+            serverSettingsLayer: ServerSettings.layerTest({
+              enableAgentBrowserAccess: true,
+            }).pipe(Layer.orDie),
+          }).pipe(
+            Layer.provide(
+              Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) }),
+            ),
+          ),
+        ),
+      );
     }),
 );

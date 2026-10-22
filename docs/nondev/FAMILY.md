@@ -82,9 +82,11 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   sent back with **Ask a grown-up**; the code allows that one site while the preview stays open.
   What the child points at with **Point at something** travels as words in their next message, so
   the shield reads it like anything they type.
-- **The assistant's own SKYCOT tools are trimmed.** It cannot start other conversations,
-  schedule automations or open pull requests through SKYCOT while the profile is on. Page
-  previews still work.
+- **The assistant's own SKYCOT tools are off.** While the profile is on, the engine gives the
+  assistant none of SKYCOT's own tools: it cannot start other conversations, schedule
+  automations, open pull requests, use other devices, or open, click and take pictures of pages
+  itself (those page tools would first download a browser of about 200 MB). The child's own
+  **Preview** button works as before; the assistant is told to suggest it instead.
 - **The look.** Workshop (cream paper, marker pens, Sam builds and Mo checks; SKYCOT's
   default look) stays on unless a parent picked another look, and larger text comes on. Both are ordinary preferences anyone can change; looks never change what
   SKYCOT does.
@@ -357,8 +359,9 @@ Honestly, so a parent can decide how nearby to stay:
   the project's own scripts (`npm run start`). With Codex, the engine's sandbox keeps the
   network off for those; with Claude, a project script that itself downloads something is
   not caught by name.
-- **The assistant's own previews** (opened through SKYCOT's preview tool) are not checked for the
-  internet; a typed preview address is.
+- **Rendering a page to a picture** (the assistant's `html_render` and `html_preview` tools) is
+  not switched off by the engine, only asked against in the assistant's instructions; the first use
+  on a computer without SKYCOT's small browser downloads it (about 200 MB).
 - **The live preview's start command runs outside the assistant's safe area.** SKYCOT checks its
   words (and the script it runs) for installs and the internet, not what the program then does: a
   project server that itself downloads something is not caught.

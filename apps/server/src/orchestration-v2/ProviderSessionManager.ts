@@ -459,9 +459,11 @@ export const layerWithOptions = (
                 >(["orchestration", "worktree", "pull-requests"]);
                 if (browserToolsAvailable) capabilities.add("preview");
                 if (deviceToolsAvailable) capabilities.add("device");
-                // nondev-seam: skycot-family-mcp (Family profile on: previews only, no thread control, scheduling or PRs)
-                if (Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled))
-                  SkycotFamily.keepFamilyMcpCapabilities(capabilities);
+                // nondev-seam: skycot-family-mcp (Family profile on: none of the engine's own tools: no thread control, scheduling, PRs, worktrees, devices or page previews)
+                const withheld =
+                  Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled)
+                    ? SkycotFamily.withholdFamilyMcpCapabilities(capabilities)
+                    : undefined;
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before the async resolve so a release cannot
@@ -483,7 +485,7 @@ export const layerWithOptions = (
                     resolved !== undefined &&
                     resolved.thread.threadId === threadId &&
                     resolved.thread.providerInstanceId === providerInstanceId &&
-                    resolved.capabilities.has("preview") === browserToolsAvailable &&
+                    resolved.capabilities.has("preview") === capabilities.has("preview") && // nondev-seam: skycot-family-mcp
                     resolved.capabilities.has("device") === capabilities.has("device") &&
                     resolved.capabilities.has("orchestration") ===
                       capabilities.has("orchestration") // nondev-seam: skycot-family-mcp
@@ -498,6 +500,7 @@ export const layerWithOptions = (
                   providerInstanceId,
                   browserToolsAvailable,
                   capabilities,
+                  ...(withheld === undefined ? {} : { withheld }), // nondev-seam: skycot-family-mcp
                 });
                 yield* mcpSessions.set(credential.config);
                 reserveMcpCredential(threadId, credential.config.providerSessionId);
