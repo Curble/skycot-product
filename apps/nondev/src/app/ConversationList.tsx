@@ -86,7 +86,7 @@ export function ConversationList({
           </EmptyState>
         ) : visible.length === 0 ? (
           <EmptyState
-            {...(rows.length === 0
+            {...(shell.filter === "all" && shell.search.trim().length === 0
               ? { art: <Mascot pose="hello" size={72} /> }
               : { icon: MessageSquareDashed })}
             title={emptyTitle(shell.filter, shell.search)}
@@ -126,7 +126,7 @@ function emptyText(filter: string, search: string, total: number, crewName: stri
   if (filter !== "all") return `You'll see a dot here when ${crewName} needs you.`;
   return total === 0
     ? "Start one below: say what you'd like done, like you'd text a staff member."
-    : "";
+    : "Start one below: say what you'd like done in this project.";
 }
 
 function ConversationRowButton({

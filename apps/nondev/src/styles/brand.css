@@ -16,7 +16,8 @@
 /* Brand guide: the day drawing belongs on a light, calm background. On a dark window it sits on
    a soft card of its own morning sky so the ink outline still reads. */
 html.dark .fm-mascot--day {
-  padding: 8%;
+  /* A percentage padding would follow the parent's width, not the mascot's. */
+  padding: calc(var(--fm-mascot-size) * 0.08);
   border-radius: 28%;
   background: linear-gradient(180deg, #bbdfff 0%, #e8f4ff 100%);
 }

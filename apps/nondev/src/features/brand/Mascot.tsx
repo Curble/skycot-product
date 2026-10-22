@@ -2,7 +2,7 @@
 // dusk). It is artwork, not chrome: themes never restyle it. The files are copies of
 // nondev/brand/assets/poses (node nondev/scripts/sync-brand-assets.ts) and stay unnamed until the
 // character has a name (MASCOT_NAME in src/brand.ts).
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import askDay from "../../assets/brand/mascot-ask-a-grown-up-day.svg";
 import askDusk from "../../assets/brand/mascot-ask-a-grown-up-dusk.svg";
@@ -55,7 +55,7 @@ export function Mascot({
   return (
     <span
       className={["fm-mascot", `fm-mascot--${phase}`, className].filter(Boolean).join(" ")}
-      style={{ width: px, height: px }}
+      style={{ width: px, height: px, "--fm-mascot-size": `${px}px` } as CSSProperties}
       {...(label ? { role: "img", "aria-label": spokenLabel(label) } : { "aria-hidden": true })}
     >
       <img

@@ -57,7 +57,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
             </div>
           ) : null}
           <div className="fm-home__hello">
-            <Mascot pose="hello" size={60} />
+            <Mascot pose="hello" size={72} />
             <div>
               {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
               <h2 className="fm-home__greeting">
