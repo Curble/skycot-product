@@ -16,7 +16,8 @@ import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
-import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
+import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
+import { homeTip } from "./tip";
 import { summarySentence } from "./summary";
 
 /**
@@ -32,6 +33,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
+  const { kids } = useStarters();
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
 
   const active = rows.filter(
@@ -120,7 +122,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   icon={Sparkles}
                   tone="grey"
                   title="Tip"
-                  subtitle={`Say it like you'd text a staff member. “Add a Christmas menu page” beats describing how to build one. ${crew.builder.name} will show you a plan before touching anything.`}
+                  subtitle={homeTip(kids, crew.builder.name)}
                 />
               </Card>
             </div>

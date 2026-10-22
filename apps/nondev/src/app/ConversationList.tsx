@@ -16,6 +16,8 @@ import {
   formatRowTime,
   type DateGroup,
 } from "../features/conversation/status";
+import { startOneHint } from "../features/home/tip";
+import { useStarters } from "../features/starters/StarterCards";
 import { useCrew } from "../themes/useCrew";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -36,6 +38,7 @@ export function ConversationList({
 }) {
   const shell = useShellState();
   const crew = useCrew();
+  const { kids } = useStarters();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const projectCount = useAtomValue(environmentProjects.projectsAtom).length;
@@ -106,7 +109,7 @@ export function ConversationList({
               : { icon: MessageSquareDashed })}
             title={emptyTitle(shell.filter, shell.search)}
           >
-            {emptyText(shell.filter, shell.search, rows.length, crew.builder.name)}
+            {emptyText(shell.filter, shell.search, rows.length, crew.builder.name, kids)}
           </EmptyState>
         ) : (
           sections.map((section) => {
@@ -152,11 +155,17 @@ function emptyTitle(filter: string, search: string): string {
   return "No conversations yet";
 }
 
-function emptyText(filter: string, search: string, total: number, crewName: string): string {
+function emptyText(
+  filter: string,
+  search: string,
+  total: number,
+  crewName: string,
+  kids: boolean,
+): string {
   if (search.trim().length > 0) return "Try a different word, or clear the search.";
   if (filter !== "all") return `You'll see a dot here when ${crewName} needs you.`;
   return total === 0
-    ? "Start one below: say what you'd like done, like you'd text a staff member."
+    ? startOneHint(kids)
     : "Start one below: say what you'd like done in this project.";
 }
 
