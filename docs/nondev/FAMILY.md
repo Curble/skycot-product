@@ -48,6 +48,10 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   default look) stays on unless a parent picked another look, and larger text comes on. Both are ordinary preferences anyone can change; looks never change what
   SKYCOT does.
 - **The greeting uses the child's name**, if one was given.
+- **Voice.** Replies are read aloud automatically (a voice on the Mac, a little slower), and
+  the child can talk instead of typing where the browser can listen. Voice typing sends the
+  sound to the browser's speech service; a parent can switch it off in Settings → Family
+  (parent code). See [VOICE.md](VOICE.md).
 
 ## Turning it on
 
@@ -152,6 +156,9 @@ Honestly, so a parent can decide how nearby to stay:
 - **During development builds** (`vp run dev`), the developer interface is served by its own
   port and is not sent back to SKYCOT. The engine's checks (Ask me first, publishing,
   automations, installs, the terminal, grown-up cards) still apply there.
+- **The voice-typing switch is kept by this browser**, not the engine (the microphone belongs
+  to the browser). Changing it asks for the parent code, but clearing the browser's site
+  data turns voice typing back on for that browser.
 - **Another browser or device** can only reach SKYCOT after it has been paired with the Mac,
   and the engine enforces the same profile for it.
 - **In an Advanced-mode tab left open** after the 15 minutes run out, refused actions (a
