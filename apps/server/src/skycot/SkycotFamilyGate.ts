@@ -208,6 +208,8 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
         ? { type: "projectFolder", cwd: input["worktreePath"] }
         : null;
     }
+    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's call.
+    if (input["type"] === "thread.delete") return { type: "grant", purpose: "advanced" };
     if (input["type"] !== "runtime-request.respond") return null;
     const decision = input["decision"];
     if (decision !== "accept" && decision !== "acceptForSession" && decision !== "acceptAlways") {

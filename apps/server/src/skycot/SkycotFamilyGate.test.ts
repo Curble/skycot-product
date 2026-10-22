@@ -664,6 +664,8 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
           });
         assert.isFalse(yield* refused(dispatch({ type: "thread.archive" })));
         assert.isFalse(yield* refused(dispatch({ type: "thread.unarchive" })));
+        // Deleting cannot be undone, so it needs the grown-up.
+        assert.isTrue(yield* refused(dispatch({ type: "thread.delete" })));
         assert.isFalse(
           yield* refused(
             dispatch({ type: "thread.metadata.update", title: "Mia's dinosaur game" }),
