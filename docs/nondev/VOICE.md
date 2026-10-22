@@ -8,7 +8,7 @@ Two things, both in the message box and on SKYCOT's replies:
   window or tab goes into the background.
 - **Read it to me.** A button under every reply. **Read replies aloud automatically**
   (Settings → Voice) reads a reply once it finishes, while that conversation is open; it is on
-  by default for a Family profile and off otherwise.
+  by default for a Family profile (each child's own setting) and off otherwise.
 
 ## Where the sound goes
 
@@ -33,9 +33,18 @@ password or key are not read out — they become "some code", "a link", "a file"
 
 ## Family profile
 
-Voice typing is on unless a parent switches it off in Settings → Family; changing it asks for
-the parent code. The switch is kept by the browser, not the engine (see
-[FAMILY.md](FAMILY.md#what-is-still-possible)).
+Each child has their own voice settings, kept by SKYCOT's engine with the rest of their profile
+(Settings → Family → the child's card → **Edit…**, parent code):
+
+- **Voice typing starts off** for every child, including profiles set up before siblings
+  existed. In Chrome and Edge the browser sends the child's voice to Google or Microsoft, so a
+  parent turns it on knowingly: switching it on shows where this browser sends the voice and
+  recommends Safari for children (on recent Macs Apple's dictation can stay on the Mac).
+- **Read aloud starts on**: it uses the Mac's own voices, so nothing leaves the Mac.
+
+The device switch, **Voice typing on this device** in Settings → Family, still exists: it keeps
+the microphone off in this browser for every child, whatever their settings say. It is kept by
+the browser, not the engine (see [FAMILY.md](FAMILY.md#what-is-still-possible)).
 
 ## Starter cards
 
