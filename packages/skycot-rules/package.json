@@ -23,6 +23,10 @@
     "./family": {
       "types": "./src/family.ts",
       "import": "./src/family.ts"
+    },
+    "./personal": {
+      "types": "./src/personal.ts",
+      "import": "./src/personal.ts"
     }
   },
   "scripts": {
