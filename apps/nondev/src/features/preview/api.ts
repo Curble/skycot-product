@@ -48,8 +48,12 @@ async function ask(
 
 export const fetchPreviewStatus = (threadId: string) => ask("GET", "", undefined, { threadId });
 
-export const startPreview = (threadId: string, approved: boolean) =>
-  ask("POST", "/start", { threadId, approved });
+/**
+ * `requestId` is the card the person said yes to: the engine only lets that yes start the
+ * command the card showed, and asks again when the start command changed since.
+ */
+export const startPreview = (threadId: string, approved: boolean, requestId?: string) =>
+  ask("POST", "/start", { threadId, approved, ...(requestId === undefined ? {} : { requestId }) });
 
 export const stopPreview = (threadId: string) => ask("POST", "/stop", { threadId });
 

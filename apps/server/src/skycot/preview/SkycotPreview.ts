@@ -79,6 +79,12 @@ export class SkycotPreview extends Context.Service<
       readonly sessionId: string;
       /** The person pressed "Start the preview" on the card. */
       readonly approved: boolean;
+      /**
+       * The card's `requestId`: the yes covers the start command it showed. When the command
+       * changed since (a retry after the assistant edited the start script), the yes does not
+       * carry over and the person is asked again.
+       */
+      readonly requestId?: string | undefined;
     }) => Effect.Effect<PreviewStatus, SkycotPreviewError>;
     readonly stop: (threadId: ThreadId) => Effect.Effect<PreviewStatus>;
     /** Whether the preview may go to an address (a link clicked inside it, "Open in browser"). */
@@ -326,12 +332,14 @@ export const make = Effect.gen(function* () {
             return current;
           }
           const { decision, requestId, command } = current;
-          if (decision.kind === "ask" && !input.approved) {
+          const approved =
+            input.approved && (input.requestId === undefined || input.requestId === requestId);
+          if (decision.kind === "ask" && !approved) {
             return yield* new SkycotPreviewError({ reason: "needs-approval", requestId });
           }
           if (
             decision.kind === "grown-up" &&
-            !(input.approved && (yield* grownUpSaid(input.sessionId, requestId)))
+            !(approved && (yield* grownUpSaid(input.sessionId, requestId)))
           ) {
             return yield* new SkycotPreviewError({ reason: "needs-grown-up", requestId });
           }

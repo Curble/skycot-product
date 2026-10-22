@@ -28,7 +28,13 @@ import { useModal } from "../../ui/useModal";
 import { Mascot } from "../brand/Mascot";
 import { Disclosure } from "../conversation/cards/Disclosure";
 import { useFamily } from "../family/FamilyProvider";
-import { checkPreviewAddress, fetchPreviewStatus, startPreview, type PreviewAnswer } from "./api";
+import {
+  checkPreviewAddress,
+  fetchPreviewStatus,
+  startPreview,
+  stopPreview,
+  type PreviewAnswer,
+} from "./api";
 import { BrowserPreviewFrame } from "./BrowserPreviewFrame";
 import {
   DesktopPreviewFrame,
@@ -41,6 +47,7 @@ import {
   previewSurface,
   SET_UP_MESSAGE,
   shortAddress,
+  startApproval,
   type PreviewStatusView,
 } from "./model";
 import { addPointer, closePreview, suggestMessage, type PointerDraft } from "./store";
@@ -160,7 +167,8 @@ function PreviewPanelBody({
   const start = async (approved: boolean) => {
     setBusy(true);
     setProblem(null);
-    let next = await startPreview(threadId, approved);
+    const yes = approved ? startApproval(status) : null;
+    let next = await startPreview(threadId, yes !== null, yes?.requestId);
     let cancelled = false;
     if (!next.ok && next.reason === "needs-grown-up" && next.requestId) {
       const allowed = await family.requireParentCode("approve", {
@@ -168,12 +176,26 @@ function PreviewPanelBody({
         reason: "Starting this preview needs a grown-up's yes.",
       });
       cancelled = !allowed;
-      if (allowed) next = await startPreview(threadId, true);
+      if (allowed) next = await startPreview(threadId, true, next.requestId);
     }
     setBusy(false);
     // A grown-up who chose Cancel needs no telling; anything else that stopped it is said plainly.
     if (!next.ok && !cancelled) setProblem(next.message);
     if (next.ok) setAnswer(next);
+    refresh();
+  };
+
+  // "Try again" after a failed start: clear it and go back through the engine's decision like a
+  // first start (the card for "Ask me first", by itself for "Just do it, carefully"). Never a
+  // pre-approved start: the start command may have changed since the person last saw it.
+  const tryAgain = async () => {
+    setBusy(true);
+    setProblem(null);
+    const next = await stopPreview(threadId);
+    autoStarted.current = false;
+    setBusy(false);
+    if (next.ok) setAnswer(next);
+    else setProblem(next.message);
     refresh();
   };
 
@@ -283,6 +305,7 @@ function PreviewPanelBody({
         builder={builder}
         busy={busy}
         onStart={start}
+        onTryAgain={() => void tryAgain()}
         onAsk={(text) => suggestMessage(threadId, text, "replace")}
         frame={
           status?.state === "running" && surface !== null ? (
@@ -399,6 +422,7 @@ function StatusBody({
   builder,
   busy,
   onStart,
+  onTryAgain,
   onAsk,
   frame,
 }: {
@@ -406,6 +430,7 @@ function StatusBody({
   readonly builder: string;
   readonly busy: boolean;
   readonly onStart: (approved: boolean) => Promise<void>;
+  readonly onTryAgain: () => void;
   readonly onAsk: (text: string) => void;
   readonly frame: ReactNode;
 }) {
@@ -447,7 +472,7 @@ function StatusBody({
             Ask {builder} to fix it — the message is written for you.
           </p>
           <span className="fm-preview__actions">
-            <Button disabled={busy} onClick={() => void onStart(true)}>
+            <Button disabled={busy} onClick={onTryAgain}>
               Try again
             </Button>
             <Button variant="primary" onClick={() => onAsk(fixItMessage(status))}>

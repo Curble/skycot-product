@@ -8,6 +8,7 @@ import {
   pointerFor,
   previewSurface,
   shortAddress,
+  startApproval,
   type PickedElement,
 } from "./model";
 
@@ -47,6 +48,29 @@ describe("parsePreviewStatus", () => {
     ).toBeNull();
     expect(parsePreviewStatus({ error: "needs-approval" })).toBeNull();
     expect(parsePreviewStatus("<html>")).toBeNull();
+  });
+});
+
+describe("startApproval (M3)", () => {
+  it("carries a yes only for the card the person saw, never from a failed start", () => {
+    const ask = {
+      state: "ready",
+      command,
+      decision: { kind: "ask", reasons: [] },
+      requestId: "skycot-preview:shown",
+    } as const;
+    expect(startApproval(ask)).toEqual({ approved: true, requestId: "skycot-preview:shown" });
+    expect(
+      startApproval({ ...ask, decision: { kind: "grown-up", reasons: ["installs something"] } }),
+    ).toEqual({ approved: true, requestId: "skycot-preview:shown" });
+    // "Try again" after a failure asks again: the start script may have changed since.
+    expect(
+      startApproval({ state: "failed", command, reason: "exited", output: "Cannot find module" }),
+    ).toBeNull();
+    // A start that needs no question needs no yes either.
+    expect(startApproval({ ...ask, decision: { kind: "start" } })).toBeNull();
+    expect(startApproval({ state: "running", command, url: SITE, frameable: true })).toBeNull();
+    expect(startApproval(null)).toBeNull();
   });
 });
 

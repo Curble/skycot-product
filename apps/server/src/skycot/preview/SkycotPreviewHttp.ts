@@ -88,10 +88,13 @@ export const layerRoutes = Layer.mergeAll(
   route("POST", "/start", true, ({ body, sessionId, preview }) => {
     const threadId = threadIdOf(body["threadId"]);
     if (threadId === null) return Effect.succeed(badRequest);
-    return preview.start({ threadId, sessionId, approved: body["approved"] === true }).pipe(
-      Effect.map((status) => json(status)),
-      Effect.catchTags({ SkycotPreviewError: (error) => Effect.succeed(refusal(error)) }),
-    );
+    const requestId = typeof body["requestId"] === "string" ? body["requestId"] : undefined;
+    return preview
+      .start({ threadId, sessionId, approved: body["approved"] === true, requestId })
+      .pipe(
+        Effect.map((status) => json(status)),
+        Effect.catchTags({ SkycotPreviewError: (error) => Effect.succeed(refusal(error)) }),
+      );
   }),
   route("POST", "/stop", true, ({ body, preview }) => {
     const threadId = threadIdOf(body["threadId"]);

@@ -346,3 +346,17 @@ export function pointerFor(element: PickedElement): Pointer {
     html: element.htmlPreview,
   };
 }
+
+/**
+ * The yes a click on the preview may carry to the engine: only the "Start the preview?" card's,
+ * for the command it showed. A failed start has none: "Try again" clears it and asks again like a
+ * first start (the start command may have changed since, for example after the assistant fixed
+ * it), and a start that needs no question goes ahead by itself.
+ */
+export function startApproval(
+  status: PreviewStatusView | null,
+): { readonly approved: true; readonly requestId: string } | null {
+  return status?.state === "ready" && status.decision.kind !== "start"
+    ? { approved: true, requestId: status.requestId }
+    : null;
+}

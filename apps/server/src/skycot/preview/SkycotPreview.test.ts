@@ -258,6 +258,65 @@ it.layer(NodeServices.layer)("SkycotPreview", (it) => {
       ),
     );
 
+    it.effect("asks again when the start command changed since the person said yes (M3)", () =>
+      withPreview({ packageJson: SITE }, ({ preview, folder, calls, emit }) =>
+        Effect.gen(function* () {
+          const shown = yield* preview.status(THREAD);
+          assert.equal(shown.state, "ready");
+          const seen = shown.state === "ready" ? shown.requestId : "";
+          yield* preview.start({
+            threadId: THREAD,
+            sessionId: SESSION,
+            approved: true,
+            requestId: seen,
+          });
+          yield* emit({
+            type: "exited",
+            threadId: THREAD,
+            terminalId: SkycotPreview.PREVIEW_TERMINAL_ID,
+            exitCode: 1,
+            exitSignal: null,
+          });
+          // The assistant changes the start script after the failure.
+          yield* FileSystem.FileSystem.pipe(
+            Effect.flatMap((fs) =>
+              fs.writeFileString(
+                `${folder}/package.json`,
+                JSON.stringify({ scripts: { dev: "node other.js" } }),
+              ),
+            ),
+            Effect.provide(NodeServices.layer),
+            Effect.orDie,
+          );
+
+          const retried = yield* Effect.flip(
+            preview.start({
+              threadId: THREAD,
+              sessionId: SESSION,
+              approved: true,
+              requestId: seen,
+            }),
+          );
+          assert.equal(retried.reason, "needs-approval");
+          assert.notEqual(retried.requestId, seen);
+          const fresh = yield* preview.status(THREAD);
+          assert.equal(fresh.state, "ready");
+          assert.equal(fresh.state === "ready" ? fresh.command.runner : "", "npm run dev");
+          assert.include(fresh.state === "ready" ? fresh.command.script : "", "other.js");
+          // Nothing ran a second time without a fresh yes.
+          assert.equal(calls.filter((call) => call.startsWith("write")).length, 1);
+
+          const again = yield* preview.start({
+            threadId: THREAD,
+            sessionId: SESSION,
+            approved: true,
+            requestId: fresh.state === "ready" ? fresh.requestId : "",
+          });
+          assert.equal(again.state, "starting");
+        }),
+      ),
+    );
+
     it.effect("gives up waiting for an address after the start timeout", () =>
       withPreview({ packageJson: SITE }, ({ preview }) =>
         Effect.gen(function* () {
