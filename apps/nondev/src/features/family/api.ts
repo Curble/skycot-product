@@ -17,15 +17,6 @@ import {
 
 export const FAMILY_API_PATH = "/api/skycot/family";
 
-async function call(
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-  query?: Record<string, string>,
-): Promise<Response> {
-  return callEngine(method, `${FAMILY_API_PATH}${path}`, body, query);
-}
-
 /** One request to the engine's own HTTP API (`/api/...`), with this client's credentials. */
 export async function callEngine(
   method: "GET" | "POST",
@@ -72,7 +63,7 @@ export async function engineRequest<A>(
   query?: Record<string, string>,
 ): Promise<FamilyResult<A>> {
   try {
-    const response = await call(method, fullPath, body, query);
+    const response = await callEngine(method, fullPath, body, query);
     const parsed: unknown = await response.json().catch(() => null);
     return readFamilyAnswer(response.status, parsed, decode);
   } catch {
