@@ -10,6 +10,11 @@
 // pause"). The step that is running finishes; nothing is interrupted half-way, so a project is
 // never left half-edited.
 //
+// Plan first is decided here too, for the provider layer: a message that builds an approved
+// plan (`message.dispatch` with `sourcePlanRef`), or one sent by a grown-up in Advanced mode,
+// may run without planning; every other turn of the child's runs as a plan
+// (SkycotFamilyInstructions.familyTurnInput).
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
 // those are closed separately by issuing Family-profile threads an MCP credential without the
 // orchestration, worktree and pull-request capabilities (`SkycotFamily.keepFamilyMcpCapabilities`).
@@ -355,6 +360,19 @@ export function sentMessage(
 }
 
 /**
+ * Pure: whether a call builds a proposed plan (Build it). The engine itself refuses a
+ * `sourcePlanRef` that is not a live plan of the same project, so the gate only reads it.
+ */
+export function buildsPlan(method: string, payload: unknown): boolean {
+  const input = record(payload);
+  return (
+    method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand &&
+    input["type"] === "message.dispatch" &&
+    typeof record(input["sourcePlanRef"])["planId"] === "string"
+  );
+}
+
+/**
  * The same rule for the HTTP API routes that change things (`/api/projects/mutate` is the
  * HTTP twin of `projects.mutate`). Revoking access stays open: it only ever takes away.
  */
@@ -624,11 +642,30 @@ const make = Effect.gen(function* () {
     });
   });
 
+  /**
+   * Plan first: the messages that may run without a plan. Left after the limits let the call
+   * through, like the shield's pass.
+   */
+  const passPlan = Effect.fn("SkycotFamilyGate.passPlan")(function* (
+    sessionId: string,
+    method: string,
+    payload: unknown,
+  ) {
+    const message = sentMessage(method, payload);
+    if (message === null || !(yield* family.isEnabled)) return;
+    if (buildsPlan(method, payload)) {
+      yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "builds-plan");
+    } else if (yield* family.allows({ sessionId, purpose: "advanced" })) {
+      yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "grown-up");
+    }
+  });
+
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
     Effect.suspend(() =>
       enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)).pipe(
         Effect.andThen(admit(input.sessionId, input.method, input.payload)),
         Effect.andThen(passShield(input.sessionId, input.method, input.payload)),
+        Effect.andThen(passPlan(input.sessionId, input.method, input.payload)),
       ),
     );
 

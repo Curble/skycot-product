@@ -1,4 +1,5 @@
 import {
+  Bell,
   Bot,
   Info,
   Laptop,
@@ -39,6 +40,13 @@ export const SECTIONS: ReadonlyArray<SectionMeta> = [
     summary: "How much it does alone",
     icon: ShieldCheck,
     tone: "green",
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    summary: "When it's done or needs you",
+    icon: Bell,
+    tone: "red",
   },
   {
     id: "family",

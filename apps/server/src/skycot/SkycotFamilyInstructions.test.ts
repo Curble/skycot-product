@@ -148,3 +148,74 @@ describe("explain mode", () => {
     }),
   );
 });
+
+describe("plan first in the Family profile", () => {
+  const turn = (
+    id: string,
+    interactionMode: "default" | "plan" = "default",
+  ): ProviderAdapter.ProviderAdapterV2TurnInput =>
+    ({
+      message: message("make a cat game", id),
+      runtimePolicy: { runtimeMode: "approval-required", interactionMode, cwd: "/tmp/kid" },
+    }) as unknown as ProviderAdapter.ProviderAdapterV2TurnInput;
+  const family = (enabled: boolean) => Option.getOrThrow(familyOn(enabled));
+
+  it("plans unless the message builds a plan or a grown-up sent it", () => {
+    assert.equal(Instructions.familyInteractionMode("default", null), "plan");
+    assert.equal(Instructions.familyInteractionMode("plan", null), "plan");
+    assert.equal(Instructions.familyInteractionMode("plan", "builds-plan"), "default");
+    assert.equal(Instructions.familyInteractionMode("default", "grown-up"), "default");
+    assert.equal(Instructions.familyInteractionMode("plan", "grown-up"), "plan");
+  });
+
+  it.effect("runs a child's ordinary turn as a plan, and says so in the rules", () =>
+    Effect.gen(function* () {
+      const wrapped = yield* Instructions.familyTurnInput(family(true), turn("plan-ordinary"));
+      assert.equal(wrapped.runtimePolicy.interactionMode, "plan");
+      assert.equal(wrapped.runtimePolicy.runtimeMode, "approval-required");
+      assert.include(wrapped.message.text, Instructions.PLAN_FIRST_NOTE);
+      assert.include(wrapped.message.text, "<user_request>\nmake a cat game\n</user_request>");
+    }),
+  );
+
+  it.effect("builds an approved plan, every time that message starts", () =>
+    Effect.gen(function* () {
+      yield* Instructions.letRunWithoutPlan("message:plan-build", "builds-plan");
+      for (const attempt of [1, 2]) {
+        const wrapped = yield* Instructions.familyTurnInput(
+          family(true),
+          turn("plan-build", "plan"),
+        );
+        assert.equal(wrapped.runtimePolicy.interactionMode, "default", `attempt ${attempt}`);
+        assert.notInclude(wrapped.message.text, Instructions.PLAN_FIRST_NOTE);
+      }
+      // Another message never borrows the pass.
+      const other = yield* Instructions.familyTurnInput(family(true), turn("plan-other"));
+      assert.equal(other.runtimePolicy.interactionMode, "plan");
+    }),
+  );
+
+  it.effect("lets a build pass lapse after twelve hours", () =>
+    Effect.gen(function* () {
+      yield* Instructions.letRunWithoutPlan("message:plan-late", "builds-plan");
+      yield* TestClock.adjust("13 hours");
+      const wrapped = yield* Instructions.familyTurnInput(family(true), turn("plan-late"));
+      assert.equal(wrapped.runtimePolicy.interactionMode, "plan");
+    }),
+  );
+
+  it.effect("keeps a grown-up's own mode", () =>
+    Effect.gen(function* () {
+      yield* Instructions.letRunWithoutPlan("message:plan-parent", "grown-up");
+      const wrapped = yield* Instructions.familyTurnInput(family(true), turn("plan-parent"));
+      assert.equal(wrapped.runtimePolicy.interactionMode, "default");
+    }),
+  );
+
+  it.effect("changes nothing while the profile is off", () =>
+    Effect.gen(function* () {
+      const input = turn("plan-off");
+      assert.strictEqual(yield* Instructions.familyTurnInput(family(false), input), input);
+    }),
+  );
+});

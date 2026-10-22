@@ -1,7 +1,9 @@
 // "Here's my plan": the proposed_plan item as an Apple link-preview card with
-// numbered steps and three chips. "Looks good" starts the real work from the
-// plan (the same `sourceProposedPlan` the stock UI sends); the other two open a
-// reply field inside the card so the conversation stays in the stream.
+// numbered steps and three chips. "Build it" starts the real work from the
+// plan (the same `sourceProposedPlan` the stock UI sends), in the conversation's
+// normal mode (not plan mode) and its usual autonomy, so "Ask me first" still asks
+// before each step. The other two open a reply field inside the card so the
+// conversation stays in the stream; with plan first on, that reply plans again.
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { ListChecks } from "lucide-react";
@@ -62,7 +64,7 @@ export function PlanCard({
     state === "writing"
       ? "Writing the plan…"
       : state === "accepted"
-        ? `You said go · ${shortTime(acceptedRun?.requestedAt ?? null)}`
+        ? `You pressed Build it · ${shortTime(acceptedRun?.requestedAt ?? null)}`
         : state === "superseded"
           ? "Replaced by a newer plan"
           : state === "completed"
@@ -109,12 +111,12 @@ export function PlanCard({
                     void run(
                       approve.decision.type === "send-message"
                         ? approve.decision.text
-                        : "Looks good — go ahead with the plan.",
+                        : "Build it: go ahead with the plan.",
                       true,
                     )
                   }
                 >
-                  {sending ? "Starting…" : "Looks good, go"}
+                  {sending ? "Starting…" : approve.label}
                 </Button>
                 <Button size="sm" disabled={sending} onClick={() => setMode("change")}>
                   Change the plan

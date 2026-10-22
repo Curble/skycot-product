@@ -152,3 +152,32 @@ export function useFamilyVoiceTypingOff(): boolean {
 export function writeFamilyVoiceTypingOff(off: boolean) {
   write(FAMILY_VOICE_TYPING_KEY, off ? "off" : null);
 }
+
+// Plan first (features/compose/planFirst.ts): this browser's choice for a grown-up. A Family
+// profile ignores it: plan first is on and locked there, and the engine holds it to that.
+export const PLAN_FIRST_KEY = "skycot:plan-first";
+
+export function usePlanFirstChoice(): boolean {
+  return useStoredString(PLAN_FIRST_KEY) === "on";
+}
+export function writePlanFirstChoice(on: boolean) {
+  write(PLAN_FIRST_KEY, on ? "on" : null);
+}
+
+// Notifications (features/notifications): each switch is "on", "off" or unset (follow the
+// profile's default: on for a Family profile, off otherwise).
+export const NOTIFY_KEY_PREFIX = "skycot:notify:";
+export type NotifyChoice = "on" | "off" | null;
+
+function parseNotify(raw: string | null): NotifyChoice {
+  return raw === "on" || raw === "off" ? raw : null;
+}
+export function useNotifyChoice(key: string): NotifyChoice {
+  return parseNotify(useStoredString(`${NOTIFY_KEY_PREFIX}${key}`));
+}
+export function readNotifyChoice(key: string): NotifyChoice {
+  return parseNotify(read(`${NOTIFY_KEY_PREFIX}${key}`));
+}
+export function writeNotifyChoice(key: string, choice: NotifyChoice) {
+  write(`${NOTIFY_KEY_PREFIX}${key}`, choice);
+}

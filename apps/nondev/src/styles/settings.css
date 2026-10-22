@@ -426,15 +426,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
   /* Rows whose trailing side holds controls drop them under the text; rows with
-     only a chevron or pill stay on one line. */
-  .fm-group .fm-listrow:has(.fm-listrow__trailing button),
-  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button),
+     only a chevron, a pill or a switch stay on one line (an iOS switch never wraps). */
+  .fm-group .fm-listrow:has(.fm-listrow__trailing button:not(.fm-switch)),
+  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button:not(.fm-switch)),
   .fm-group .fm-listrow:has(.fm-listrow__trailing select),
   .fm-onboarding .fm-listrow:has(.fm-listrow__trailing select) {
     grid-template-columns: auto 1fr;
   }
-  .fm-group .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing,
-  .fm-onboarding .fm-listrow:has(.fm-listrow__trailing button) .fm-listrow__trailing,
+  .fm-group .fm-listrow:has(.fm-listrow__trailing button:not(.fm-switch)) .fm-listrow__trailing,
+  .fm-onboarding
+    .fm-listrow:has(.fm-listrow__trailing button:not(.fm-switch))
+    .fm-listrow__trailing,
   .fm-group .fm-listrow:has(.fm-listrow__trailing select) .fm-listrow__trailing,
   .fm-onboarding .fm-listrow:has(.fm-listrow__trailing select) .fm-listrow__trailing {
     grid-column: 2;

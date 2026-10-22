@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { ServerConfig, ThreadId } from "@t3tools/contracts";
+import type { ProviderInteractionMode, ServerConfig, ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { AlertCircle, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -50,6 +50,8 @@ import type { ComposerSeed } from "../starters/StarterCards";
 import { useShield, type ShieldOutcome } from "../shield";
 import { firstMessageLabels } from "./firstMessage";
 import { MessageField } from "./MessageField";
+import { PlanFirstSwitch } from "./PlanFirstSwitch";
+import { requestMode, usePlanFirst } from "./planFirst";
 import { usePictures } from "./usePictures";
 import {
   folderReadiness,
@@ -97,6 +99,7 @@ export function NewConversationComposer({
     plainAutonomyOrDefault(readAutonomy()),
   );
   const autonomy: Autonomy = family.enabled ? "ask-first" : chosenAutonomy;
+  const planFirst = usePlanFirst();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -171,7 +174,7 @@ export function NewConversationComposer({
             }
           </Popover>
           {family.enabled ? (
-            <FamilyAutonomyLock />
+            <FamilyAutonomyLock planFirst />
           ) : (
             <>
               <span className="fm-composer__label">
@@ -193,6 +196,7 @@ export function NewConversationComposer({
                   ...(option.tag ? { tag: option.tag } : {}),
                 }))}
               />
+              <PlanFirstSwitch />
             </>
           )}
         </div>
@@ -200,6 +204,12 @@ export function NewConversationComposer({
         <p className="fm-help" style={{ marginBottom: 6 }}>
           <b>{autonomyLabel(autonomy)}.</b>{" "}
           {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
+          {planFirst.on ? (
+            <>
+              {" "}
+              <b>Plan first.</b> You'll see the plan before anything changes.
+            </>
+          ) : null}
         </p>
         {!phone ? (
           <p className="fm-rule" style={{ marginBottom: 10 }}>
@@ -218,6 +228,7 @@ export function NewConversationComposer({
           <ComposerField
             project={project}
             autonomy={autonomy}
+            interactionMode={requestMode(planFirst)}
             text={text}
             onText={setText}
             sending={sending}
@@ -268,6 +279,7 @@ type SendOutcome =
 function ComposerField({
   project,
   autonomy,
+  interactionMode,
   text,
   onText,
   sending,
@@ -279,6 +291,8 @@ function ComposerField({
 }: {
   readonly project: EnvironmentProject;
   readonly autonomy: Autonomy;
+  /** "plan" while plan first is on. */
+  readonly interactionMode: ProviderInteractionMode;
   readonly text: string;
   readonly onText: (value: string) => void;
   readonly sending: boolean;
@@ -410,7 +424,7 @@ function ComposerField({
           modelSelection,
           titleSeed: labels.title,
           runtimeMode,
-          interactionMode: "default",
+          interactionMode,
           createdAt,
           bootstrap: {
             createThread: {
@@ -419,7 +433,7 @@ function ComposerField({
               title: labels.title,
               modelSelection,
               runtimeMode,
-              interactionMode: "default",
+              interactionMode,
               branch: worktree?.baseBranch ?? null,
               worktreePath: null,
               createdAt,

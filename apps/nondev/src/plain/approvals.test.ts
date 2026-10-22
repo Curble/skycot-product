@@ -309,13 +309,13 @@ describe("describeRuntimeRequest — questions, secrets, plans", () => {
     expect(card.title).toBe("Here's the plan");
     expect(card.whyItMatters).toBe("Nothing happens until you choose.");
     expect(card.options.map((o) => o.label)).toEqual([
-      "Looks good — go ahead",
+      "Build it",
       "Change the plan",
       "Ask me something first",
     ]);
     expect(card.options[0]!.decision).toEqual({
       type: "send-message",
-      text: "Looks good — go ahead with the plan.",
+      text: "Build it: go ahead with the plan.",
     });
   });
 });

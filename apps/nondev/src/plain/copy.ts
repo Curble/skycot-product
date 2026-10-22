@@ -14,7 +14,7 @@ export const buttons = {
   skipQuestion: "Skip — carry on with your best guess",
   saveSecret: "Save it securely",
   declineSecret: "Don't share it",
-  approvePlan: "Looks good — go ahead",
+  approvePlan: "Build it",
   changePlan: "Change the plan",
   askFirst: "Ask me something first",
   keepThisVersion: "Keep this version",
@@ -107,7 +107,8 @@ export const approvals = {
   ifNoAppAccess: "The connected app stays untouched. The assistant will try without it.",
   ifNoQuestion: "The assistant carries on with its best guess.",
   ifNoSecret: "The assistant can't use that service until you provide the key.",
-  ifNoPlan: "Nothing changes. Tell the assistant what you'd like different.",
+  ifNoPlan:
+    "Nothing changes until you press Build it. To change something, say what you'd like different.",
   destructiveWarning:
     "This can't be undone from inside the app. Check the exact command below before allowing it.",
   checkTheCommand: "Check the exact command below before allowing it.",
