@@ -11,7 +11,7 @@
  *   1. apps/desktop/src/boot.ts   -> bundled into dist-electron/boot.cjs, runs before main.cjs.
  *      The desktop then spawns the server with `extendEnv: true`, so the server inherits it.
  *   2. node --import ./nondev/brand/env.cjs scripts/build-desktop-artifact.ts ...
- *      (electron-builder appId / artifact name / protocol schemes / update feed).
+ *      (electron-builder appId / artifact name / protocol schemes / update feed, or none).
  *   3. node --import ./nondev/brand/env.cjs apps/server/dist/bin.mjs   (standalone CLI).
  *
  * Plain CommonJS on purpose: it must run before Effect, before the bundler-defined globals, and
@@ -51,7 +51,12 @@ function resolveBrandEnv(b, host) {
     T3CODE_DESKTOP_CLIENT_ENTRY: b.defaultClientEntry,
     // Path the server puts in printed/opened pairing URLs (seam: brand-client-entry, server side).
     T3CODE_CLIENT_ENTRY: clientEntryPath,
-    // electron-updater feed; never upstream's binaries (already env-driven upstream).
+    // The app's update feed: brand.json `updates.feed`, "none" for none (not "": empty reads as unset). The ONLY feed a SKYCOT build
+    // bakes in or an installed app accepts; T3 Code's releases are refused even if named here
+    // (seams skycot-update-feed*, packages/skycot-brand/src/updateFeed.ts).
+    T3CODE_SKYCOT_UPDATE_FEED: (b.updates && b.updates.feed) || "none",
+    // Source repository for Advanced mode's release links (apps/web vite define). Upstream's build
+    // also reads it as a feed, but a branded build takes T3CODE_SKYCOT_UPDATE_FEED instead.
     T3CODE_DESKTOP_UPDATE_REPOSITORY: b.updateRepository,
     // `skycot update` release feed (seam: brand-cli-update-repo); same repository as the desktop feed.
     T3CODE_CLI_UPDATE_REPOSITORY: b.updateRepository,

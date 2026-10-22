@@ -116,12 +116,31 @@ T3's analytics project even when the brand bootstrap is not loaded. Churn as abo
 
 `L-2a` and `L-2b` are one obligation in two packagers and share the marker text `nondev-seam: L-2`.
 
+## Update seams (23 October 2026)
+
+SKYCOT must never update from T3 Code's releases: a feed pointing at `pingdotgg/t3code` would
+silently turn SKYCOT back into T3 Code and drop the Family rules. The feed has one source,
+`nondev/brand.json` → `updates.feed` → `env.cjs` → `T3CODE_SKYCOT_UPDATE_FEED` (`"none"` today),
+and the rules live in the fork-owned `packages/skycot-brand/src/updateFeed.ts` and
+`updateRestart.ts`, `apps/desktop/src/skycot/updates.ts` and `apps/server/src/skycot/updates/`.
+`nondev/scripts/update-feed-guard.ts` (run by `apply-brand` and the fork tests) fails if any row
+below loses its wiring. Every seam is inert for upstream: without the brand variable the build
+takes upstream's path, and the app-side checks only ever narrow what is accepted.
+
+| id                            | file                                         | lines                                    | change                                                                                                                                                                                                                                                        | reason                                                                                                                                                                      |
+| ----------------------------- | -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| skycot-update-feed-build      | `scripts/build-desktop-artifact.ts`          | 46-50, 2886-2893 (1 import, 1 rewritten) | when `T3CODE_SKYCOT_UPDATE_FEED` is set, `publish` is `skycotPublishConfig(...)` (the brand's feed or null) instead of `resolveGitHubPublishConfig` (which falls back to `GITHUB_REPOSITORY`)                                                                 | the build bakes the feed into `app-update.yml`; upstream CI's `GITHUB_REPOSITORY` is `pingdotgg/t3code`, and the fork's would bake a private repo that cannot serve updates |
+| skycot-update-feed-build-test | `scripts/build-desktop-artifact.test.ts`     | 526-548 (1 test appended)                | with `GITHUB_REPOSITORY` and `T3CODE_DESKTOP_UPDATE_REPOSITORY` both `pingdotgg/t3code`, a branded build bakes no feed (`"none"`), refuses a T3 feed, and bakes the brand's when there is one                                                                 | pins the rule in upstream's own build tests, so a merge that restores the old publish line fails here, not only in `apply-brand`                                            |
+| skycot-update-feed            | `apps/desktop/src/updates/DesktopUpdates.ts` | 36, 1040 (1 import, 1 call wrapped)      | the baked `app-update.yml` goes through `SkycotUpdates.vetBakedFeed`: only the brand's exact feed passes; T3 Code's never, and none while the brand has none                                                                                                  | defence in depth for an installed app: a mis-built or tampered bundle still cannot update onto T3 Code; a refused feed reads as "no feed", so the updater stays off         |
+| skycot-update-family-gate     | `apps/desktop/src/ipc/methods/updates.ts`    | 10, 51 (1 import, 1 call wrapped)        | the renderer's install call runs `SkycotUpdates.installWithFamilyRule`: with the Family profile on, it needs the engine's two-minute "restart allowed" note for the downloaded version (written by `/api/skycot/updates/allow-restart` after the parent code) | restarting into an update is a grown-up's step; the remote path (`server.commitDesktopUpdate`) is already behind the engine's Family gate                                   |
+
 ## Not touched (by design)
 
 - `apps/mobile/**`, `packages/contracts/**`, `packages/client-runtime/**`:
   zero changes. `apps/web/**` carries only the B-7 footer item above. `apps/desktop/**` and `packages/shared/**` carry only the brand seams
   in the second table (each a `process.env.X ?? upstreamDefault` line, except `brand-dock-icon`, two
-  appended lines that call the fork-owned `apps/desktop/src/skycot/dockIcon.ts`).
+  appended lines that call the fork-owned `apps/desktop/src/skycot/dockIcon.ts`), and the two
+  update seams above, which call the fork-owned `apps/desktop/src/skycot/updates.ts`.
   Reuse happens through a Vite/TypeScript alias (`~` → `apps/web/src`, with
   `~/lib/utils` shimmed locally) and `@t3tools/client-runtime` subpath imports.
 - `apps/server/src/**`: only the brand, safety and Family seams listed above. Routing under `/simple/` is hash-based so

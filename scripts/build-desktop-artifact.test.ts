@@ -523,6 +523,31 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  // nondev-seam: skycot-update-feed-build-test
+  // SKYCOT must never bake T3 Code's release feed, whatever GITHUB_REPOSITORY or the old
+  // repository variable say: only the brand's feed (T3CODE_SKYCOT_UPDATE_FEED), or none.
+  it.effect("bakes only SKYCOT's own update feed, or none", () =>
+    Effect.gen(function* () {
+      const t3 = {
+        GITHUB_REPOSITORY: "pingdotgg/t3code",
+        T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code",
+      };
+      const build = (env: Record<string, string>) =>
+        createBuildConfig("mac", "dmg", "0.0.33", false, false, undefined, undefined).pipe(
+          Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+        );
+      assert.isNull((yield* build({ ...t3, T3CODE_SKYCOT_UPDATE_FEED: "none" })).publish);
+      assert.isNull(
+        (yield* build({ ...t3, T3CODE_SKYCOT_UPDATE_FEED: "github:pingdotgg/t3code" })).publish,
+      );
+      assert.deepStrictEqual(
+        (yield* build({ ...t3, T3CODE_SKYCOT_UPDATE_FEED: "https://skycot.com/downloads/mac/" }))
+          .publish,
+        [{ provider: "generic", url: "https://skycot.com/downloads/mac/" }],
+      );
+    }),
+  );
+
   // pnpm writes "set this to true or false" placeholders into allowBuilds when a
   // tarball changes. pnpm ignores them, but the release build decode rejects them.
   it.effect("decodes the repo allowBuilds and every file: tarball it names exists", () =>

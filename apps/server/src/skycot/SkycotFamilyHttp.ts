@@ -25,6 +25,7 @@ import { RECAP_RANGES, type RecapRange } from "./family-recap/recap.ts";
 import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
+import * as SkycotUpdatesHttp from "./updates/SkycotUpdatesHttp.ts";
 
 export const FAMILY_ROUTE = "/api/skycot/family";
 
@@ -543,9 +544,14 @@ export const layerCore = Layer.mergeAll(
   lockRoute,
 );
 
-/** Every Family route; the recap and the fridge read the engine's projections. */
+/**
+ * Every Family route; the recap and the fridge read the engine's projections. SKYCOT's own
+ * update routes ride along (`/api/skycot/updates`, with the Family door for restarting), so the
+ * engine needs no further wiring line.
+ */
 export const layer = Layer.mergeAll(
   layerCore,
+  SkycotUpdatesHttp.layer,
   layerMadeRoutes.pipe(
     Layer.provide(
       Layer.mergeAll(SkycotFamilyRecap.layer, SkycotFridge.layer).pipe(

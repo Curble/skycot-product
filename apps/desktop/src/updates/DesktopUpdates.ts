@@ -33,6 +33,7 @@ import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
+import * as SkycotUpdates from "../skycot/updates.ts"; // nondev-seam: skycot-update-feed
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 import { resolveDefaultDesktopUpdateChannel } from "./updateChannels.ts";
 import {
@@ -1036,7 +1037,7 @@ export const make = Effect.gen(function* () {
         void Effect.runPromiseWith(context)(effect);
       };
 
-      const appUpdateYmlConfig = yield* readAppUpdateYml;
+      const appUpdateYmlConfig = yield* SkycotUpdates.vetBakedFeed(yield* readAppUpdateYml); // nondev-seam: skycot-update-feed
       yield* Ref.set(appUpdateYmlConfigRef, appUpdateYmlConfig);
 
       const notAppliedVersion = yield* readNotAppliedInstallVersion;

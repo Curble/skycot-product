@@ -76,6 +76,8 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "SKYCOT is asleep for this child, so a grown-up switches to someone else.";
     case "seeRecap":
       return "The recap shows what a child made, asked for and needed help with, so it's for grown-ups. The code opens it on this device for 10 minutes.";
+    case "restartToUpdate":
+      return `Restarting puts a new version of ${PRODUCT_NAME} in place, so a grown-up says when.`;
     case "changeTheme":
       return "";
   }

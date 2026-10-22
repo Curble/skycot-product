@@ -25,7 +25,8 @@ export type FamilyAction =
   | "voiceSettings"
   | "manageChildren"
   | "switchChild"
-  | "seeRecap";
+  | "seeRecap"
+  | "restartToUpdate";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -52,6 +53,7 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "manageChildren",
   "switchChild",
   "seeRecap",
+  "restartToUpdate",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -62,7 +64,8 @@ export type FamilyPurpose =
   | "openFolder"
   | "settings"
   | "advanced"
-  | "recap";
+  | "recap"
+  | "update";
 
 /**
  * The engine grant an action asks for. Turning the profile off and changing the code are not
@@ -82,6 +85,8 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
       return "approve";
     case "seeRecap":
       return "recap";
+    case "restartToUpdate":
+      return "update";
     case "aiSettings":
     case "rerunOnboarding":
     case "changeAutonomy":

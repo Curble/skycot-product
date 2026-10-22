@@ -18,6 +18,7 @@ import { NotificationCoordinator } from "../features/notifications/NotificationC
 import { PreviewPanel } from "../features/preview/PreviewPanel";
 import { usePreviewOpen } from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
+import { UpdatePill } from "../features/updates/UpdatePill";
 import { UsageBanner } from "../features/usage/UsageBanner";
 import { UsageIndicator } from "../features/usage/UsagePopover";
 import { UsageSheetHost } from "../features/usage/UsageSheet";
@@ -114,7 +115,12 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
       <TitleBar
         columns={columns}
         detail={detail}
-        trailing={<ProviderPill />}
+        trailing={
+          <>
+            <UpdatePill />
+            <ProviderPill />
+          </>
+        }
         showSearch={conversationRoute}
       />
       {/* One grid row for the notices, however many show. */}
