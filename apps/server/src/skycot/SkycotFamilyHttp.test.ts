@@ -31,6 +31,7 @@ import {
   HttpClientRequest,
   HttpRouter,
   HttpServer,
+  HttpServerRequest,
   HttpServerResponse,
 } from "effect/http";
 import { Rpc, RpcClient, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
@@ -364,7 +365,16 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
     "/api/auth/pairing-token",
     HttpServerResponse.jsonUnsafe({ credential: "pairing-link" }),
   );
-  const layerApp = Layer.mergeAll(SkycotFamilyHttp.layer, layerWs, layerPairing).pipe(
+  // Echoes its body: the gate reads it first, and the route must still get it whole.
+  const layerMutate = HttpRouter.add(
+    "POST",
+    "/api/projects/mutate",
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      return HttpServerResponse.jsonUnsafe(yield* request.json);
+    }),
+  );
+  const layerApp = Layer.mergeAll(SkycotFamilyHttp.layer, layerWs, layerPairing, layerMutate).pipe(
     Layer.provide(SkycotFamilyHttp.layerApiGate),
     Layer.provideMerge(NodeHttpPlatform.layer),
   );
@@ -467,6 +477,12 @@ it.layer(layerEngineEnvironment)("Family profile at the engine's doors", (it) =>
       const body = (yield* held.json) as { error: string; requiredPermission: string };
       assert.equal(body.error, "family");
       assert.equal(body.requiredPermission, SkycotFamilyGate.FAMILY_PERMISSION);
+      // A rename stays open, and the route still reads the body the gate already read.
+      const rename = { type: "project.update", projectId: "project:1", title: "Rocket club" };
+      const renamed = yield* post("/api/projects/mutate", rename);
+      assert.equal(renamed.status, 200);
+      assert.deepEqual(yield* renamed.json, rename);
+      assert.equal((yield* post("/api/projects/mutate", { type: "project.create" })).status, 403);
       yield* post("/api/skycot/family/verify", { code: CODE, purpose: "advanced" });
       const minted = yield* post("/api/auth/pairing-token", {});
       assert.equal(minted.status, 200);
