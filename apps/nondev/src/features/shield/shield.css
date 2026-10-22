@@ -1,0 +1,83 @@
+/* The personal-details shield card. Sits above the reply field; theme tokens only. */
+.fm-shield {
+  margin-bottom: 10px;
+}
+.fm-shield .fm-crew-kicker {
+  margin-left: 4px;
+}
+.fm-shield__line {
+  display: grid;
+  grid-template-columns: 5.5em 1fr;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  line-height: 1.7;
+}
+.fm-shield__label {
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label-2);
+  padding-top: 2px;
+}
+.fm-shield__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fm-shield__caught,
+.fm-shield__nickname {
+  color: inherit;
+  border-radius: 6px;
+  padding: 1px 5px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.fm-shield__caught {
+  background: var(--fm-red-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--fm-red);
+  text-decoration-thickness: 2px;
+}
+.fm-shield__nickname {
+  background: var(--fm-green-soft);
+  font-weight: 600;
+}
+.fm-shield__tag {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--fm-red);
+  color: var(--fm-on-status);
+  font-size: calc(10.5px * var(--fm-text-scale));
+  font-weight: 700;
+  line-height: 1.6;
+  text-decoration: none;
+  vertical-align: 1px;
+}
+.fm-shield__why {
+  margin: 4px 0 0;
+  color: var(--fm-label-2);
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-shield__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.fm-shield__grow {
+  flex: 1;
+}
+html[data-flavour-borders="sketch"] .fm-shield__caught,
+html[data-flavour-borders="sketch"] .fm-shield__nickname {
+  border: 1.5px solid var(--fm-ink);
+}
+@media (max-width: 520px) {
+  .fm-shield__line {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .fm-shield__grow {
+    display: none;
+  }
+}

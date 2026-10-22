@@ -12,7 +12,6 @@ import { AsyncResult } from "effect/reactivity";
 import { ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ProjectAvatar } from "../../app/ProjectAvatar";
@@ -43,6 +42,8 @@ import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCar
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
+import { useFamily } from "../family/FamilyProvider";
+import { useShield } from "../shield";
 import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
@@ -426,6 +427,8 @@ function ReplyComposer({
   const [typedWhileActive, setTypedWhileActive] = useState(false);
   const [confirmNewTurn, setConfirmNewTurn] = useState(false);
   const pictures = usePictures();
+  const family = useFamily();
+  const shield = useShield();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
   if (seed !== appliedSeed) {
@@ -459,6 +462,12 @@ function ReplyComposer({
       setConfirmNewTurn(true);
       return;
     }
+    // Family profile: a full name, school or address waits for the child's pick on the card.
+    const cleared = await shield.clear(trimmed, pictures.pictures.length);
+    if (cleared.kind === "edit") {
+      if (cleared.dropPictures) pictures.clear();
+      return;
+    }
     setSending(true);
     setProblem(null);
     const outcome = await startTurn({
@@ -466,9 +475,9 @@ function ReplyComposer({
       input: {
         threadId,
         message: {
-          messageId: newMessageId(),
+          messageId: cleared.messageId,
           role: "user",
-          text: trimmed,
+          text: cleared.text,
           attachments: pictures.uploads(),
         },
         modelSelection: shell.modelSelection,
@@ -538,6 +547,7 @@ function ReplyComposer({
             <Banner tone="warning">{pictures.problem}</Banner>
           </div>
         ) : null}
+        {shield.card}
         <MessageField
           inputRef={inputRef}
           value={text}

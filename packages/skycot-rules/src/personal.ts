@@ -569,6 +569,12 @@ export function hiddenPlaceholder(category: PersonalCategory): string {
   return `[hidden by SKYCOT: ${NOUN.get(category) ?? "a private detail"}]`;
 }
 
+/**
+ * The approval id a grown-up's parent code is recorded against when they let one message go
+ * as typed. The client mints the message id before asking, so the "yes" names that message.
+ */
+export const shieldApprovalId = (messageId: string) => `shield:${messageId}`;
+
 export interface Redaction {
   readonly text: string;
   /** Only the kinds of detail, never the values: safe to log. */

@@ -37,6 +37,7 @@ import {
 import {
   describePersonalCategories,
   redactPersonalDetails,
+  shieldApprovalId,
   type PersonalCategory,
 } from "@t3tools/skycot-rules/personal";
 import * as Clock from "effect/Clock";
@@ -115,8 +116,8 @@ export function wrapWithFamilyRules(text: string): string {
 const PASS_TTL_MS = 10 * 60_000;
 const shieldPasses = new Map<string, number>();
 
-/** The approval id a grown-up's code is checked against for one message. */
-export const shieldApprovalId = (messageId: string) => `shield:${messageId}`;
+/** The approval id the gate checks a grown-up's code against for one message. */
+export { shieldApprovalId };
 
 export const allowPersonalDetailsOnce = (messageId: string): Effect.Effect<void> =>
   Effect.map(Clock.currentTimeMillis, (now) => {
