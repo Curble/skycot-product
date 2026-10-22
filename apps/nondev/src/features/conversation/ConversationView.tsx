@@ -38,6 +38,8 @@ import { Mascot } from "../brand/Mascot";
 import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
+import { requestMode, usePlanFirst } from "../compose/planFirst";
+import { useEnsureInteractionMode } from "../compose/turnMode";
 import { firstBlank } from "../starters/starters";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
@@ -425,6 +427,8 @@ function ReplyComposer({
 }) {
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+  const ensureMode = useEnsureInteractionMode();
+  const planFirst = usePlanFirst();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -477,24 +481,35 @@ function ReplyComposer({
     }
     setSending(true);
     setProblem(null);
-    const outcome = await startTurn({
+    // Plan first decides how a new request runs; a note typed while it works joins that turn.
+    const interactionMode = active ? shell.interactionMode : requestMode(planFirst);
+    const modeProblem = await ensureMode({
       environmentId,
-      input: {
-        threadId,
-        message: {
-          messageId: cleared.messageId,
-          role: "user",
-          text: withExplainMarker(cleared.text, explainOn, family.enabled),
-          attachments: pictures.uploads(),
-        },
-        modelSelection: shell.modelSelection,
-        runtimeMode: shell.runtimeMode,
-        interactionMode: shell.interactionMode,
-      },
+      threadId,
+      current: shell.interactionMode,
+      wanted: interactionMode,
     });
+    const outcome =
+      modeProblem !== null
+        ? null
+        : await startTurn({
+            environmentId,
+            input: {
+              threadId,
+              message: {
+                messageId: cleared.messageId,
+                role: "user",
+                text: withExplainMarker(cleared.text, explainOn, family.enabled),
+                attachments: pictures.uploads(),
+              },
+              modelSelection: shell.modelSelection,
+              runtimeMode: shell.runtimeMode,
+              interactionMode,
+            },
+          });
     setSending(false);
-    if (outcome._tag === "Failure") {
-      const cause = squashAtomCommandFailure(outcome);
+    if (outcome === null || outcome._tag === "Failure") {
+      const cause = outcome === null ? modeProblem : squashAtomCommandFailure(outcome);
       setProblem(
         cause instanceof Error && /scope|permission|unauthori/i.test(cause.message)
           ? "This connection isn't allowed to send messages."

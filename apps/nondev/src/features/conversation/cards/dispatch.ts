@@ -2,7 +2,10 @@
 // layer decides *what* the buttons say and carry; this module only adds
 // transport details (thread, mode) and turns failures into one calm sentence.
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import {
+  threadRuntimeIsActive,
+  type EnvironmentThreadShell,
+} from "@t3tools/client-runtime/state/shell";
 import type {
   EnvironmentId,
   PlanId,
@@ -18,6 +21,8 @@ import { newMessageId } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import type { ApprovalDecisionPayload } from "../../../plain/approvals";
+import { requestMode, usePlanFirst } from "../../compose/planFirst";
+import { useEnsureInteractionMode } from "../../compose/turnMode";
 import { useExplainMode } from "../../explain/explainMode";
 import { isFamilyRefusal } from "../../family/cards";
 import { useFamily } from "../../family/FamilyProvider";
@@ -32,7 +37,10 @@ export interface DispatchExtras {
   readonly secret?: string;
   /** For "send-message": the text the user typed (or the chip's canned line). */
   readonly text?: string;
-  /** For "send-message" that approves a plan: start the real work from it. */
+  /**
+   * For "send-message" that approves a plan ("Build it"): start the real work from it, in
+   * `interactionMode` ("default" builds). Other messages follow plan first.
+   */
   readonly plan?: { readonly planId: PlanId; readonly interactionMode: ProviderInteractionMode };
   /** For "run.interrupt". */
   readonly runId?: RunId | null;
@@ -80,6 +88,8 @@ export function useDecisionDispatcher({
   });
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+  const ensureMode = useEnsureInteractionMode();
+  const planFirst = usePlanFirst();
   // The failure cause can echo the request; keep it out of the console.
   const family = useFamily();
   const answerSecret = useAtomCommand(serverEnvironment.answerSecretRequest, {
@@ -141,6 +151,18 @@ export function useDecisionDispatcher({
             readExplainMarker(typed).choice === null
               ? withExplainMarker(typed, explainOn, family.enabled)
               : typed;
+          // The engine runs a follow-up in the conversation's stored mode, so set it first:
+          // "Build it" builds; any other new request plans while plan first is on.
+          const interactionMode =
+            extras.plan?.interactionMode ??
+            (threadRuntimeIsActive(shell.runtime) ? shell.interactionMode : requestMode(planFirst));
+          const modeProblem = await ensureMode({
+            environmentId,
+            threadId,
+            current: shell.interactionMode,
+            wanted: interactionMode,
+          });
+          if (modeProblem !== null) return calmFailure(modeProblem);
           return startTurn({
             environmentId,
             input: {
@@ -148,7 +170,7 @@ export function useDecisionDispatcher({
               message: { messageId: newMessageId(), role: "user", text, attachments: [] },
               modelSelection: shell.modelSelection,
               runtimeMode: shell.runtimeMode,
-              interactionMode: extras.plan?.interactionMode ?? shell.interactionMode,
+              interactionMode,
               ...(extras.plan && extras.plan.interactionMode === "default"
                 ? { sourceProposedPlan: { threadId, planId: extras.plan.planId } }
                 : {}),
@@ -158,6 +180,8 @@ export function useDecisionDispatcher({
       }
     })();
     if (outcome === null || outcome === undefined) return null;
+    // Already one plain sentence (the mode switch before a message failed).
+    if (typeof outcome === "string") return outcome;
     return outcome._tag === "Failure" ? calmFailure(squashAtomCommandFailure(outcome)) : null;
   };
 }

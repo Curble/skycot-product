@@ -66,6 +66,7 @@ import {
   vcsActionManager,
   vcsEnvironment,
 } from "./state";
+import { useEnsureInteractionMode } from "../compose/turnMode";
 import { familyCopy } from "../family/copy";
 import { attemptFor, useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
@@ -183,6 +184,7 @@ function PublishSheetBody({
   const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, { reportFailure: false });
   const runAction = useAtomCommand(runPullRequestAction, { reportFailure: false });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+  const ensureMode = useEnsureInteractionMode();
   const actionState = useAtomValue(vcsActionManager.stateAtom(scope));
 
   // Remotes and branches can change outside the app (a developer adds GitHub
@@ -317,7 +319,19 @@ function PublishSheetBody({
       if (live.kind === "script" && shell) {
         // Going live always asks: the turn runs in "Ask me first" whatever the
         // conversation's mode, and the message names the script, not its
-        // command, so the assistant runs what Settings configured.
+        // command, so the assistant runs what Settings configured. It is a
+        // grown-up's own step, so it runs rather than plans (a Family profile's
+        // engine still plans it first: see docs/nondev/FAMILY.md, Plan first).
+        const modeProblem = await ensureMode({
+          environmentId,
+          threadId,
+          current: shell.interactionMode,
+          wanted: "default",
+        });
+        if (modeProblem !== null) {
+          fail(modeProblem);
+          return;
+        }
         const result = await startTurn({
           environmentId,
           input: {
@@ -330,7 +344,7 @@ function PublishSheetBody({
             },
             modelSelection: shell.modelSelection,
             runtimeMode: "approval-required",
-            interactionMode: shell.interactionMode,
+            interactionMode: "default",
           },
         });
         if (result._tag === "Failure") {

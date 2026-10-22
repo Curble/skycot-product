@@ -14,6 +14,7 @@ import { documentTitle } from "../brand";
 import "../features/review";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
+import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { UsageBanner } from "../features/usage/UsageBanner";
 import { UsageIndicator } from "../features/usage/UsagePopover";
@@ -110,6 +111,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <FamilyHeadsUp />
         <UsageBanner />
       </div>
+      <NotificationCoordinator />
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
         {columns === 3 ? <AppSidebar route={route} /> : null}
         {showList ? (

@@ -27,8 +27,17 @@
 //   - "How did you do that?" explain mode (`@t3tools/skycot-rules/explain`): on by default in
 //     the Family profile, off otherwise, and switched per message by the marker the client
 //     appends, which is stripped here.
+//
+// Plan first rides the same wrapper: while the profile is on, a turn runs in the provider's plan
+// mode (Codex's plan collaboration mode, Claude's "plan" permission mode) with a line in the
+// rules saying so, unless the Family gate left word that this message builds an approved plan
+// (it carries `sourcePlanRef`, which the engine checks is a live plan in the same project) or
+// was sent by a grown-up working in Advanced mode. Changed here, below every caller, for the
+// same reason as the rules: a raw RPC, an old thread left in "default", a queued message and a
+// restart all reach the provider through `startTurn`.
 
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type { ProviderInteractionMode } from "@t3tools/contracts";
+import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import {
   EXPLAIN_INSTRUCTIONS,
   explainDefault,
@@ -63,6 +72,14 @@ export const FAMILY_RULES_TEXT = [
 ].join("\n");
 
 /**
+ * The rules block's extra line on a turn that runs as a plan (plan first). It must not set its
+ * own format: Codex only shows a plan card for a `<proposed_plan>` block (a first live run with a
+ * "numbered steps" line got a plain message and no Build it).
+ */
+export const PLAN_FIRST_NOTE =
+  "- Plan first: for this message, make a plan and do not create, change or run anything yet. Keep it short and in simple words. Present the finished plan the way your plan mode asks (a <proposed_plan> block, or your plan tool): SKYCOT shows it to the child with a Build it button.";
+
+/**
  * The child's text cannot close the request block early or open a rules block of its own:
  * any of the two tags, in any case and spacing, loses its angle brackets.
  */
@@ -85,6 +102,8 @@ export interface TurnInstructions {
   readonly explain: boolean;
   /** Kinds of detail the shield hid from this message; empty when none. */
   readonly hidden?: ReadonlyArray<PersonalCategory>;
+  /** The turn runs as a plan (plan first): the rules say so. Family only. */
+  readonly plan?: boolean;
 }
 
 /** The text a provider receives for one message. Unchanged when no instruction applies. */
@@ -94,7 +113,11 @@ export function wrapTurnText(text: string, instructions: TurnInstructions): stri
   const rules = instructions.family
     ? block(
         FAMILY_RULES_TAG,
-        hidden.length > 0 ? `${FAMILY_RULES_TEXT}\n${shieldNote(hidden)}` : FAMILY_RULES_TEXT,
+        [
+          FAMILY_RULES_TEXT,
+          ...(hidden.length > 0 ? [shieldNote(hidden)] : []),
+          ...(instructions.plan === true ? [PLAN_FIRST_NOTE] : []),
+        ].join("\n"),
       )
     : null;
   const explain = instructions.explain ? block(EXPLAIN_TAG, EXPLAIN_INSTRUCTIONS) : null;
@@ -134,14 +157,62 @@ const takeShieldPass = (messageId: string): Effect.Effect<boolean> =>
   });
 
 /**
+ * Plan first: the messages that may run without a plan, and why. Like the shield's passes the
+ * gate leaves word here, keyed by message id, because only the gate sees the call and only
+ * this layer sees the turn. A pass is not spent by the first turn: a restart or a queued
+ * message reaches `startTurn` again with the same message. Kept in memory, so after an engine
+ * restart a build message that has not started yet runs as a plan (the safe side).
+ */
+export type PlanSkip =
+  /** The message carries `sourcePlanRef`: it builds a plan the child approved with Build it. */
+  | "builds-plan"
+  /** Sent by a grown-up working in Advanced mode (parent code): the thread's own mode stands. */
+  | "grown-up";
+
+const PLAN_PASS_TTL_MS = 12 * 60 * 60_000;
+const PLAN_PASS_LIMIT = 500;
+const planPasses = new Map<string, { readonly reason: PlanSkip; readonly expiresAt: number }>();
+
+export const letRunWithoutPlan = (messageId: string, reason: PlanSkip): Effect.Effect<void> =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    for (const [id, pass] of planPasses) if (pass.expiresAt <= now) planPasses.delete(id);
+    planPasses.delete(messageId);
+    planPasses.set(messageId, { reason, expiresAt: now + PLAN_PASS_TTL_MS });
+    for (const id of planPasses.keys()) {
+      if (planPasses.size <= PLAN_PASS_LIMIT) break;
+      planPasses.delete(id);
+    }
+  });
+
+const planPassFor = (messageId: string): Effect.Effect<PlanSkip | null> =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    const pass = planPasses.get(messageId);
+    return pass !== undefined && pass.expiresAt > now ? pass.reason : null;
+  });
+
+/**
+ * Pure: the mode a turn runs in while the Family profile is on. Building an approved plan
+ * builds; a grown-up's message keeps the thread's mode; everything else plans.
+ */
+export function familyInteractionMode(
+  requested: ProviderInteractionMode,
+  skip: PlanSkip | null,
+): ProviderInteractionMode {
+  if (skip === "builds-plan") return "default";
+  if (skip === "grown-up") return requested;
+  return "plan";
+}
+
+/**
  * The message a provider receives. While the Family profile is on: the rules, the shield
  * and (by default) explain mode; otherwise explain mode only when the message asked for it.
  * The same object when nothing applies. `family` is optional so upstream services that never
- * see the profile (tests, other builds) stay unchanged.
+ * see the profile (tests, other builds) stay unchanged. `plan` adds the plan-first line.
  */
 export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnMessage>(
   family: Option.Option<SkycotFamily.SkycotFamily["Service"]>,
   message: M,
+  options: { readonly plan?: boolean } = {},
 ): Effect.Effect<M> =>
   Option.isNone(family)
     ? Effect.succeed(message)
@@ -174,6 +245,7 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
             family: true,
             explain,
             hidden: redaction.categories,
+            plan: options.plan === true,
           }),
         };
       });
@@ -190,9 +262,43 @@ const inputWithFamilyRules = <
   );
 
 /**
+ * A turn start while the profile may be on: plan first decides the mode, then the message is
+ * wrapped (with the plan line when it plans). The same object when nothing changes.
+ */
+export const familyTurnInput = Effect.fn("SkycotFamilyInstructions.familyTurnInput")(function* (
+  family: SkycotFamily.SkycotFamily["Service"],
+  input: ProviderAdapter.ProviderAdapterV2TurnInput,
+) {
+  const requested = input.runtimePolicy.interactionMode;
+  const interactionMode = (yield* family.isEnabled)
+    ? familyInteractionMode(requested, yield* planPassFor(input.message.messageId))
+    : requested;
+  const message = yield* withFamilyRules(Option.some(family), input.message, {
+    plan: interactionMode === "plan",
+  });
+  if (interactionMode === requested) {
+    return message === input.message ? input : { ...input, message };
+  }
+  yield* Effect.logInfo("skycot-family.plan-first", {
+    messageId: input.message.messageId,
+    from: requested,
+    to: interactionMode,
+  });
+  return {
+    ...input,
+    message,
+    runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+      ...input.runtimePolicy,
+      interactionMode,
+    }),
+  };
+});
+
+/**
  * The provider session with its two message entry points wrapped: `startTurn` (every first
- * message, hand-off and restart) and `steerTurn` (a follow-up typed while it works).
- * Compaction keeps the adapter's own request. The same object when the service is absent.
+ * message, hand-off and restart; plan first applies here) and `steerTurn` (a follow-up typed
+ * while it works, which joins the turn's mode). Compaction keeps the adapter's own request.
+ * The same object when the service is absent.
  */
 export function withFamilyRuntime(
   family: Option.Option<SkycotFamily.SkycotFamily["Service"]>,
@@ -202,7 +308,7 @@ export function withFamilyRuntime(
   return {
     ...runtime,
     startTurn: (input) =>
-      inputWithFamilyRules(family.value, input).pipe(
+      familyTurnInput(family.value, input).pipe(
         Effect.flatMap((wrapped) => runtime.startTurn(wrapped)),
       ),
     steerTurn: (input) =>

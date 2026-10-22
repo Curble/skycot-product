@@ -805,7 +805,7 @@ function describePlan(item: PlanItem, ctx: ApprovalContext): ApprovalCard {
         {
           id: "approve",
           label: buttons.approvePlan,
-          decision: { type: "send-message", text: "Looks good — go ahead with the plan." },
+          decision: { type: "send-message", text: "Build it: go ahead with the plan." },
           tone: "primary",
         },
         {

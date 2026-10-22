@@ -703,6 +703,62 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  it.effect("plan first: only Build it, or a grown-up in Advanced mode, runs without a plan", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const dispatch = (sessionId: string, messageId: string, extra: object = {}) =>
+          gate.check({
+            sessionId,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: {
+              type: "message.dispatch",
+              threadId: THREAD_ID,
+              messageId,
+              text: "Build it",
+              ...extra,
+            },
+          });
+        const modeFor = (messageId: string) =>
+          SkycotFamilyInstructions.familyTurnInput(family, {
+            message: {
+              messageId: MessageId.make(messageId),
+              text: "Build it",
+              attachments: [],
+              createdBy: "user",
+              creationSource: "web",
+            },
+            runtimePolicy: {
+              runtimeMode: "approval-required",
+              interactionMode: "default",
+              cwd: null,
+            },
+          } as unknown as Parameters<typeof SkycotFamilyInstructions.familyTurnInput>[1]).pipe(
+            Effect.map((input) => input.runtimePolicy.interactionMode),
+          );
+
+        assert.isTrue(
+          SkycotFamilyGate.buildsPlan(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
+            type: "message.dispatch",
+            sourcePlanRef: { threadId: THREAD_ID, planId: "plan-1" },
+          }),
+        );
+        yield* dispatch(SESSION, "message:build", {
+          sourcePlanRef: { threadId: THREAD_ID, planId: "plan-1" },
+        });
+        assert.equal(yield* modeFor("message:build"), "default");
+        yield* dispatch(SESSION, "message:ordinary");
+        assert.equal(yield* modeFor("message:ordinary"), "plan");
+        // A request that never went through the gate (another way in) plans too.
+        assert.equal(yield* modeFor("message:unseen"), "plan");
+        // A grown-up working in Advanced mode keeps the conversation's own mode.
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: "session-parent" });
+        yield* dispatch("session-parent", "message:parent");
+        assert.equal(yield* modeFor("message:parent"), "default");
+      }),
+    ),
+  );
+
   it.effect("a shield yes for one message does not reach another session's message", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {

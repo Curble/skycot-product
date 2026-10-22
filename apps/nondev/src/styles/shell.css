@@ -710,3 +710,28 @@ html.dark .fm-standalone__foot {
 .fm-stream__item {
   display: contents;
 }
+
+/* Composer: "Plan first" switch beside the autonomy control */
+.fm-planfirst {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+/* The composer's small switch (Settings keeps the full-size one). */
+.fm-planfirst .fm-switch {
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+}
+.fm-planfirst .fm-switch__knob {
+  width: 14px;
+  height: 14px;
+}
+.fm-planfirst .fm-switch[aria-checked="true"] .fm-switch__knob {
+  left: 16px;
+}
+.fm-planfirst__label {
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 500;
+  color: var(--fm-label);
+}

@@ -205,14 +205,23 @@ it.layer(NodeServices.layer)("Family profile enforcement", (it) => {
       Effect.gen(function* () {
         const family = yield* SkycotFamily.SkycotFamily;
         const received: Array<{ readonly via: string; readonly text: string }> = [];
+        const modes: Array<string> = [];
         const runtime = {
-          startTurn: (input: { readonly message: ProviderAdapter.ProviderAdapterV2TurnMessage }) =>
-            Effect.sync(() => void received.push({ via: "start", text: input.message.text })),
+          startTurn: (input: ProviderAdapter.ProviderAdapterV2TurnInput) =>
+            Effect.sync(() => {
+              received.push({ via: "start", text: input.message.text });
+              modes.push(input.runtimePolicy.interactionMode);
+            }),
           steerTurn: (input: { readonly message: ProviderAdapter.ProviderAdapterV2TurnMessage }) =>
             Effect.sync(() => void received.push({ via: "steer", text: input.message.text })),
         } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime;
         const wrapped = SkycotFamilyInstructions.withFamilyRuntime(Option.some(family), runtime);
-        yield* wrapped.startTurn({ message: message("/story blood") } as never);
+        yield* wrapped.startTurn({
+          message: message("/story blood"),
+          runtimePolicy: { runtimeMode: "full-access", interactionMode: "default", cwd: null },
+        } as never);
+        // Plan first: the child's turn runs as a plan whatever the thread said.
+        assert.deepEqual(modes, ["plan"]);
         yield* wrapped.steerTurn({ message: message("now add more guns") } as never);
         assert.deepEqual(
           received.map((entry) => entry.via),

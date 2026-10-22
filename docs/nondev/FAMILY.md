@@ -14,6 +14,21 @@ When the Family profile is on:
   the conversation, the default setting or the developer interface says. "Just do it,
   carefully" and "Fully hands-off" are not offered, and the engine would run them as "Ask me
   first" anyway. Nothing is approved on the child's behalf.
+- **A plan before anything is made (plan first).** Every request the child sends runs as a
+  plan: the assistant replies with numbered steps and changes nothing. The plan card offers
+  **Build it** (the assistant carries that plan out, still asking first) and **Change the plan**
+  (say what's different; the answer is a new plan). The engine holds every child's turn to this,
+  whatever the conversation, the browser or the developer interface says: the only turns that
+  build are a **Build it** of a plan still waiting in that project, and messages from a grown-up
+  working in Advanced mode. The switch is shown locked in the composer and in Settings ›
+  Autonomy & safety. See [Plan first](#plan-first) for how it works and its limits.
+- **The grown-up hears when they're needed.** Notifications are on by default: a short note
+  when Sam finishes, needs an OK (a step, a plan or a question), **needs a grown-up** (a step
+  only the parent code can allow), or something goes wrong. The words name the crew and the
+  project only, never the child's message, a file or the conversation's title; clicking one
+  opens that conversation. The browser asks once before the first note (Settings ›
+  Notifications › **Allow…**); the desktop app needs no extra step. No code is needed to change
+  them, see [What is still possible](#what-is-still-possible).
 - **Some steps need a grown-up.** The child can allow ordinary work inside the project (edit
   a page, run the game). Anything that uses the internet (downloads, web searches, `git
 push`), installs something (`npm install`, `pip install`, `brew`), deletes files, reaches
@@ -70,6 +85,33 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   instead of typing is **off for every child until a parent turns it on** in that child's
   settings (parent code), because Chrome and Edge send the voice to Google or Microsoft. See
   [VOICE.md](VOICE.md).
+
+## Plan first
+
+How the engine keeps "a plan before making anything" true:
+
+- Each turn's mode is decided where the provider is told to start, below every way in (a first
+  message, a follow-up, a queued message, a restart, a raw call). While the profile is on, a turn
+  runs in the provider's plan mode (Codex's plan mode, Claude's "plan" permission mode) and the
+  rules in front of the message add one line: plan only, change nothing, wait for Build it.
+- Two kinds of message are let through as they are, and the engine's own check decides both:
+  a **Build it** (the message names a plan that the engine confirms is still waiting, in the same
+  project; it runs in the normal mode, so "Ask me first" still asks before each step), and a
+  message sent while a grown-up's Advanced-mode code is open on that device.
+- Building a plan uses it up: the plan is marked carried out, so the same Build it cannot run twice.
+
+Limits, honestly:
+
+- **The plan mode is the AI's own.** Codex and Claude have one; with the other assistants (Cursor,
+  Grok, OpenCode, Antigravity) plan first is the "plan only" line in the rules, which a model can
+  ignore. "Ask me first" still holds every change for an OK either way.
+- **Build it builds what the Build it message asks.** SKYCOT's button sends a fixed "go ahead
+  with the plan". Something that sends its own words with a plan's Build it (another client, a raw
+  call) gets those words built without a second plan.
+- **Automations a grown-up set up plan too**, and so does **Put it live**: in a Family profile both
+  start with a plan that someone has to Build.
+- **An engine restart** between pressing Build it and the build starting turns it back into a
+  plan (the safe side): press Build it again.
 
 ## Several children
 
@@ -255,6 +297,7 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                  | Grown-up: AI assistants                                          | the children are part of the profile                                                     |
 | `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: the recap (or the Family settings' yes)                | a child's words and what needed a grown-up are a parent's to read                        |
 | `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                        | The parent code, with the request                                | wakes SKYCOT for a child; nothing stays open afterwards                                  |
+| A child's turn, whatever starts it (`sourcePlanRef` marks a Build it)                                                                                                                                                                                                                                                                                                                                                                                                                 | Runs as a plan unless it builds a waiting plan                   | a plan before making anything                                                            |
 | A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                 | Refused while SKYCOT is asleep for the child                     | bedtime and the daily limits; Advanced mode is exempt                                    |
 | Everything else: reading and watching (lists, diffs, files, status, searches), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                               | Open                                                             | the child's own work, or it only stops or takes away                                     |
 
@@ -307,6 +350,11 @@ Honestly, so a parent can decide how nearby to stay:
   the code.
 - **Another browser or device** can only reach SKYCOT after it has been paired with the Mac,
   and the engine enforces the same profile for it.
+- **Notifications are kept by this browser**, like the voice-typing switch, and a child can switch
+  them off without the code (or close SKYCOT: they only show while SKYCOT is open in the app or a
+  tab). The browser, or macOS in System Settings › Notifications, can also block them; Settings ›
+  Notifications says so and how to undo it. A note names the project, so a project called after a
+  child shows that name on the Mac's screen.
 - **In an Advanced-mode tab left open** after the 15 minutes run out, refused actions (a
   setting snapping back, a terminal that does not open) are not explained there; reloading
   sends it back to SKYCOT.

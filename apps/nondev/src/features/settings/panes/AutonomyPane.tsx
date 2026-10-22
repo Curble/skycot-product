@@ -1,5 +1,5 @@
 import type { EnvironmentId, RuntimeMode } from "@t3tools/contracts";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { ListChecks, Lock, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../../../brand";
 import { AUTONOMY_LEVELS, describeAutonomyLevel } from "../../../plain/autonomy";
@@ -26,6 +26,10 @@ import {
 import { familyCopy } from "../../family/copy";
 import { FamilyAutonomyLock } from "../../family/FamilyLock";
 import { useFamily } from "../../family/FamilyProvider";
+import { planFirstCopy, usePlanFirst } from "../../compose/planFirst";
+import { useCrew } from "../../../themes/useCrew";
+import { Switch } from "../../../ui/Switch";
+import { writePlanFirstChoice } from "../localPrefs";
 import { SettingsGroup } from "../SettingsGroup";
 
 /**
@@ -41,6 +45,8 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
   const writeServerMode = useWriteServerDefaultRuntimeMode(environmentId);
   const policyEnforced = useSkycotPolicyEnabled(environmentId);
   const family = useFamily();
+  const planFirst = usePlanFirst();
+  const builder = useCrew().builder.name;
 
   const serverAutonomy: Autonomy | null =
     serverMode === null ? null : autonomyForRuntimeMode(serverMode);
@@ -110,6 +116,41 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
             ) : null}
           </div>
         </ListExtra>
+      </SettingsGroup>
+
+      <SettingsGroup
+        title="Plan before building"
+        footer={
+          planFirst.locked
+            ? `In a ${familyCopy.title}, ${PRODUCT_NAME}'s engine plans every request first, whatever is set on this device. Build it carries the plan out, still asking first.`
+            : "Applies to new requests on this device. On the plan card, Build it carries the plan out and Change the plan lets you say what's different."
+        }
+      >
+        <ListRow
+          leading={<StepBadge state={planFirst.on ? "ok" : "todo"} icon={ListChecks} />}
+          title={planFirstCopy.label}
+          subtitle={
+            planFirst.locked
+              ? planFirstCopy.locked(builder)
+              : planFirst.on
+                ? planFirstCopy.on(builder)
+                : planFirstCopy.off(builder)
+          }
+          trailing={
+            planFirst.locked ? (
+              <span className="fm-family-lock__pill">
+                <Lock size={11} strokeWidth={2.2} aria-hidden />
+                On
+              </span>
+            ) : (
+              <Switch
+                checked={planFirst.on}
+                onChange={writePlanFirstChoice}
+                label={planFirstCopy.label}
+              />
+            )
+          }
+        />
       </SettingsGroup>
 
       <SettingsGroup

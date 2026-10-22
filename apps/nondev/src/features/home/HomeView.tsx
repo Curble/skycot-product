@@ -15,6 +15,7 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
+import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { homeTip } from "./tip";
@@ -30,6 +31,7 @@ import { summarySentence } from "./summary";
 export function HomeView({ showBack = false }: { readonly showBack?: boolean }) {
   const shell = useShellState();
   const crew = useCrew();
+  const planFirst = usePlanFirst();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
@@ -122,7 +124,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   icon={Sparkles}
                   tone="grey"
                   title="Tip"
-                  subtitle={homeTip(kids, crew.builder.name)}
+                  subtitle={homeTip(kids, crew.builder.name, planFirst.on)}
                 />
               </Card>
             </div>
