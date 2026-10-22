@@ -1,7 +1,7 @@
 // The SKYCOT mascot at one of its six moments, in the drawing that matches the sky (day or
 // dusk). It is artwork, not chrome: themes never restyle it. The files are copies of
-// nondev/brand/assets/poses (node nondev/scripts/sync-brand-assets.ts) and stay unnamed until the
-// character has a name (MASCOT_NAME in src/brand.ts).
+// nondev/brand/assets/poses (node nondev/scripts/sync-brand-assets.ts); the file names stay
+// "mascot-…" by design. The character is SKYCOT; what it says lives in ./mascotCopy.
 import { useState, type CSSProperties } from "react";
 
 import askDay from "../../assets/brand/mascot-ask-a-grown-up-day.svg";
@@ -16,11 +16,11 @@ import thinkingDay from "../../assets/brand/mascot-thinking-day.svg";
 import thinkingDusk from "../../assets/brand/mascot-thinking-dusk.svg";
 import yayDay from "../../assets/brand/mascot-yay-day.svg";
 import yayDusk from "../../assets/brand/mascot-yay-dusk.svg";
-import { MASCOT_NAME } from "../../brand";
 import type { SkyPhase } from "../../plain/daylight";
+import { mascotAccessibleName, type MascotPose } from "./mascotCopy";
 import { useDaylightPhase } from "./useDaylightPhase";
 
-export type MascotPose = "hello" | "yay" | "ask-a-grown-up" | "thinking" | "oops" | "night-night";
+export type { MascotPose };
 
 const POSES: Record<MascotPose, Record<SkyPhase, string>> = {
   hello: { day: helloDay, dusk: helloDusk },
@@ -38,13 +38,16 @@ export function Mascot({
   pose,
   size = 64,
   label,
+  decorative = false,
   className,
 }: {
   readonly pose: MascotPose;
   /** Rendered width and height in CSS pixels. */
   readonly size?: number;
-  /** Spoken description. Omit when the text beside it already says what the moment is. */
+  /** What the cloud is doing, spoken after its name ("cheering you on"). Defaults to the pose. */
   readonly label?: string;
+  /** Hide it from screen readers when the text beside it already names SKYCOT or the moment. */
+  readonly decorative?: boolean;
   readonly className?: string;
 }) {
   const phase = useDaylightPhase();
@@ -56,7 +59,9 @@ export function Mascot({
     <span
       className={["fm-mascot", `fm-mascot--${phase}`, className].filter(Boolean).join(" ")}
       style={{ width: px, height: px, "--fm-mascot-size": `${px}px` } as CSSProperties}
-      {...(label ? { role: "img", "aria-label": spokenLabel(label) } : { "aria-hidden": true })}
+      {...(decorative
+        ? { "aria-hidden": true }
+        : { role: "img", "aria-label": mascotAccessibleName(pose, label) })}
     >
       <img
         key={phase}
@@ -70,8 +75,4 @@ export function Mascot({
       />
     </span>
   );
-}
-
-function spokenLabel(label: string): string {
-  return MASCOT_NAME ? `${MASCOT_NAME}: ${label}` : label;
 }

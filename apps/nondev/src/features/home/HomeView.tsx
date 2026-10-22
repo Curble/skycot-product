@@ -12,6 +12,7 @@ import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
+import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
 import { summarySentence } from "./summary";
 
@@ -57,8 +58,9 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
             </div>
           ) : null}
           <div className="fm-home__hello">
-            <Mascot pose="hello" size={72} />
+            <Mascot pose="hello" size={72} decorative />
             <div>
+              <p className="fm-home__from">{mascotCopy.homeHello}</p>
               {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
               <h2 className="fm-home__greeting">
                 <span className="fm-marker-underline">

@@ -17,14 +17,15 @@ export const CREW_NAME = "Crew";
 export const ADVANCED_MODE_LABEL = "Advanced mode";
 
 /**
- * The mascot's name, once the brand team picks one. Until then nothing visible names the
- * character: copy says "your SKYCOT helper" or keeps the Crew wording, and `Mascot` labels are
- * plain descriptions.
+ * The mascot shares the product's name (decided 22 Oct 2026): the cloud is SKYCOT too. In copy
+ * the character is simply SKYCOT ("SKYCOT says hello"); `MASCOT_FULL_NAME` is only for places
+ * where it must be clear we mean the character rather than the app (spoken labels, About).
+ * Never a different name. Safety moments stay plain: no mascot voice on approval cards.
  */
-export const MASCOT_NAME: string | null = null;
+export const MASCOT_NAME = "SKYCOT";
 
-/** Where copy needs to refer to the mascot before it has a name. */
-export const MASCOT_REFERENCE = MASCOT_NAME ?? `your ${PRODUCT_NAME} helper`;
+/** "SKYCOT the cloud": the character, unmistakably. */
+export const MASCOT_FULL_NAME = `${MASCOT_NAME} the cloud`;
 
 export function documentTitle(section?: string): string {
   return section ? `${section} — ${PRODUCT_NAME}` : PRODUCT_NAME;

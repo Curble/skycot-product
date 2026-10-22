@@ -296,7 +296,7 @@ export function RequestCard({
       {grownUp !== null && !decided ? (
         // Outside the sober region on purpose: the card below stays plain in every theme.
         <p className="fm-mascot-kicker">
-          <Mascot pose="ask-a-grown-up" size={40} />
+          <Mascot pose="ask-a-grown-up" size={40} decorative />
           {familyCopy.fetchGrownUp}
         </p>
       ) : null}

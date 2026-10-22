@@ -41,6 +41,7 @@ import { Pill } from "../../ui/Pill";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { Sheet } from "../../ui/Sheet";
 import { Mascot } from "../brand/Mascot";
+import { mascotCopy } from "../brand/mascotCopy";
 import { StepBadge } from "../../ui/StepBadge";
 import { TextField } from "../../ui/TextField";
 import { AUTONOMY_LEVELS, describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
@@ -74,7 +75,7 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
   who: {
     icon: Users,
     title: "Who is this for?",
-    description: `${PRODUCT_NAME} can be set up for you, or for a child you look after. The ${familyCopy.title} adds guardrails and a parent code; it can be turned off later in Settings → Family.`,
+    description: `${mascotCopy.introduction} I can be set up for you, or for a child you look after. The ${familyCopy.title} adds guardrails and a parent code; it can be turned off later in Settings → Family.`,
   },
   family: {
     icon: KeyRound,

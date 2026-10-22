@@ -11,6 +11,7 @@ import mitLicenseText from "../../../../../../LICENSE?raw";
 import { ADVANCED_MODE_LABEL, COPYRIGHT_LINE, PRODUCT_NAME } from "../../../brand";
 import { serverEnvironment } from "../../../state/server";
 import { Mascot } from "../../brand/Mascot";
+import { mascotCopy } from "../../brand/mascotCopy";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
 import { Sheet } from "../../../ui/Sheet";
@@ -90,6 +91,7 @@ export function AboutPane({ environmentId }: { readonly environmentId: Environme
           Version {APP_VERSION}
           {config ? ` · engine ${config.environment.serverVersion}` : ""}
         </span>
+        <span className="fm-about-hero__line">{mascotCopy.aboutLine}</span>
       </div>
       <SettingsGroup title="Online" footer={`${COPYRIGHT_LINE}, Melbourne, Australia.`}>
         <ListRow

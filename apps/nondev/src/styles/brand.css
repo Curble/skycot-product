@@ -44,6 +44,13 @@ html.dark .fm-mascot--day {
 .fm-home__hello > div {
   min-width: 0;
 }
+/* "SKYCOT says hello": a quiet line above the greeting, so the wave beside it has a voice. */
+.fm-home__from {
+  margin: 0 0 2px;
+  font-size: calc(12.5px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label-2);
+}
 
 /* Empty states and standalone pages take the mascot in place of the icon tile. */
 .fm-empty__art {

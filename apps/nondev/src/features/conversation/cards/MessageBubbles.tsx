@@ -73,7 +73,7 @@ export function ErrorNote({
   return (
     <Bubble author="crew" full meta={shortTime(item.updatedAt)}>
       <p className="fm-mascot-kicker">
-        <Mascot pose="oops" size={36} />
+        <Mascot pose="oops" size={36} decorative />
         Oops
       </p>
       <div className="fm-approval fm-approval--high" data-sober="">
