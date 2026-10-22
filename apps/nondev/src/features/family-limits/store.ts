@@ -9,6 +9,7 @@ import { familyApi, request } from "../family/api";
 import { applySession, readFamilyView } from "../family/store";
 import type { FamilyResult } from "../family/family";
 import { parseLimitState, type LimitState, type SessionLimits } from "./limits";
+import { withStarter } from "./order";
 
 /** Twice a minute, so every minute of use gets at least one; the engine counts each minute once. */
 export const HEARTBEAT_MS = 30_000;
@@ -131,6 +132,29 @@ export async function refreshToday(): Promise<FamilyToday | null> {
   const result = await request("GET", "/today", undefined, parseToday);
   if (result.ok) set({ today: result.value });
   return result.ok ? result.value : null;
+}
+
+/**
+ * A conversation this device just started is the current child's: the engine records it that
+ * way as it starts, so the list can say so now instead of waiting for the next read.
+ */
+export function noteStartedHere(threadId: string): void {
+  const childId = readFamilyView().currentChildId;
+  if (!readFamilyView().enabled || childId === null) return;
+  const threads = withStarter(snapshot.today.threads, threadId, childId);
+  if (threads !== snapshot.today.threads) set({ today: { ...snapshot.today, threads } });
+}
+
+// Ids already asked about, so a conversation from before anyone was chosen (which the engine
+// never names) costs one read per page load, not one per render.
+const askedAbout = new Set<string>();
+
+/** Reads who started what again when the list shows a conversation this device can't place. */
+export function askWhoStarted(threadIds: ReadonlyArray<string>): void {
+  const fresh = threadIds.filter((threadId) => !askedAbout.has(threadId));
+  if (fresh.length === 0 || !readFamilyView().enabled) return;
+  for (const threadId of fresh) askedAbout.add(threadId);
+  void refreshToday();
 }
 
 export async function chooseChild(childId: string): Promise<FamilyResult<SessionLimits>> {

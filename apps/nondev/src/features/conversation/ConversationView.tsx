@@ -10,7 +10,7 @@ import { withExplainMarker } from "@t3tools/skycot-rules/explain";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
+import { Archive, ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -19,13 +19,10 @@ import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { HOME_HREF } from "../../router";
 import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
+import { useConversationShell } from "../../state/oldConversations";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
-import {
-  environmentThreads,
-  environmentThreadShells,
-  threadEnvironment,
-} from "../../state/threads";
+import { environmentThreads, threadEnvironment } from "../../state/threads";
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { useCrew } from "../../themes/useCrew";
 import { Banner } from "../../ui/Banner";
@@ -47,7 +44,10 @@ import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
-import { describeThreadStatus, type ConversationStatus } from "./status";
+import { ConversationMenuButton } from "../tidy/ConversationMenu";
+import { RenameSheet } from "../tidy/RenameSheet";
+import { useTidy } from "../tidy/useTidy";
+import { conversationTitle, describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
 
@@ -79,7 +79,8 @@ export function ConversationView({
   readonly showBack: boolean;
 }) {
   const result = useAtomValue(environmentThreads.stateAtom(environmentId, threadId));
-  const shell = useAtomValue(environmentThreadShells.threadShellAtom({ environmentId, threadId }));
+  // A put-away conversation is not in the live list; the archive's own query has its shell.
+  const { shell, archived } = useConversationShell(environmentId, threadId);
   const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
@@ -167,7 +168,9 @@ export function ConversationView({
   useBadgeWatcher({ threadId, shell, projection, active });
 
   const [publishOpen, setPublishOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
     environmentId,
     threadId,
@@ -190,18 +193,20 @@ export function ConversationView({
         ) : null}
         <CrewAvatar role="builder" size="lg" />
         <div className="fm-conv-header__who">
-          <span className="fm-conv-header__name">
+          <h1 className="fm-conv-header__name">{title ?? crewName}</h1>
+          <span className="fm-conv-header__presence">
             {crewName}
             {projectName ? ` · ${projectName}` : ""}
-          </span>
-          <span className="fm-conv-header__presence">
+            {" · "}
             {status === null
               ? "Connecting…"
-              : shell?.worktreePath
-                ? // The private copy is the reassurance that matters; keep the
-                  // first clause ("Working", "Waiting for you") and drop the rest.
-                  `${status.presence.split(" · ")[0]} · in a private copy of your project`
-                : status.presence}
+              : archived
+                ? "Put away in Old conversations"
+                : shell?.worktreePath
+                  ? // The private copy is the reassurance that matters; keep the
+                    // first clause ("Working", "Waiting for you") and drop the rest.
+                    `${status.presence.split(" · ")[0]} · in a private copy of your project`
+                  : status.presence}
           </span>
         </div>
         <div className="fm-conv-header__tools">
@@ -212,13 +217,27 @@ export function ConversationView({
               runId={shell?.runtime?.activeRunId ?? null}
             />
           ) : null}
-          <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
+          {archived ? null : (
+            <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
+          )}
+          {shell && canOperate ? (
+            <ConversationMenuButton
+              shell={shell}
+              archived={archived}
+              onRename={() => setRenameOpen(true)}
+            />
+          ) : null}
           {project ? <ProjectAvatar project={project} size="md" /> : null}
         </div>
       </header>
 
       {shell && status ? (
         <div className="fm-strip fm-strip--wrap">
+          {archived ? (
+            <Pill tone="neutral" size="sm" icon={Archive}>
+              Put away
+            </Pill>
+          ) : null}
           <Pill tone={status.tone} size="sm">
             {latestId !== null && status.kind === "ready" ? "Done" : status.headline}
           </Pill>
@@ -312,12 +331,23 @@ export function ConversationView({
         />
       )}
 
-      <ReplyComposer
-        environmentId={environmentId}
-        threadId={threadId}
-        shell={shell}
-        active={active}
-        seed={seed}
+      {archived && shell ? (
+        <PutAwayFooter shell={shell} canOperate={canOperate} />
+      ) : (
+        <ReplyComposer
+          environmentId={environmentId}
+          threadId={threadId}
+          shell={shell}
+          active={active}
+          seed={seed}
+        />
+      )}
+
+      <RenameSheet
+        shell={renameOpen ? shell : null}
+        currentTitle={title ?? ""}
+        archived={archived}
+        onClose={() => setRenameOpen(false)}
       />
 
       <PublishSheet
@@ -330,6 +360,48 @@ export function ConversationView({
         projection={projection}
       />
     </>
+  );
+}
+
+/**
+ * Where the reply field would be, for a put-away conversation: it is read-only until it
+ * comes back, so a reply never lands somewhere the list does not show.
+ */
+function PutAwayFooter({
+  shell,
+  canOperate,
+}: {
+  readonly shell: EnvironmentThreadShell;
+  readonly canOperate: boolean;
+}) {
+  const tidy = useTidy();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fm-composer">
+      <div className="fm-composer__inner">
+        <Banner
+          tone="info"
+          action={
+            canOperate ? (
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await tidy.bringBack(shell);
+                  setBusy(false);
+                }}
+              >
+                {busy ? "Bringing back…" : "Bring back"}
+              </Button>
+            ) : null
+          }
+        >
+          <b>This conversation is put away.</b> Nothing in it was deleted. Bring it back to reply.
+        </Banner>
+      </div>
+    </div>
   );
 }
 

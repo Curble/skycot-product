@@ -37,7 +37,7 @@ import { copy } from "../../plain";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import { orchestrationEnvironment, vcsActionManager, vcsEnvironment } from "../../state/vcs";
-import { environmentThreads, environmentThreadShells } from "../../state/threads";
+import { environmentThreads } from "../../state/threads";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
@@ -51,6 +51,7 @@ import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "..
 import { useLastUpload } from "../publish/uploads";
 import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
 import { reviewTargetFor } from "./turnReview";
+import { useConversationShell } from "../../state/oldConversations";
 
 const CodeChanges = lazy(() => import("./CodeChanges"));
 
@@ -83,7 +84,8 @@ export function ReviewSection({
   readonly checkpointId?: string;
 }) {
   const result = useAtomValue(environmentThreads.stateAtom(environmentId, threadId));
-  const shell = useAtomValue(environmentThreadShells.threadShellAtom({ environmentId, threadId }));
+  // Put-away conversations too: their private copy is still theirs.
+  const { shell } = useConversationShell(environmentId, threadId);
   const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const state = Option.getOrNull(AsyncResult.value(result));

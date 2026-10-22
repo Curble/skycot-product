@@ -205,6 +205,13 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
         ? { type: "projectFolder", cwd: input["worktreePath"] }
         : null;
     }
+    // Putting away, bringing back and renaming are open to the child (each can be undone);
+    // pointing the conversation at another folder through the same command is not.
+    if (input["type"] === "thread.metadata.update") {
+      return typeof input["worktreePath"] === "string"
+        ? { type: "projectFolder", cwd: input["worktreePath"] }
+        : null;
+    }
     if (input["type"] !== "runtime-request.respond") return null;
     const decision = input["decision"];
     if (decision !== "accept" && decision !== "acceptForSession" && decision !== "acceptAlways") {

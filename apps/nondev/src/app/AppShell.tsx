@@ -32,6 +32,7 @@ import { resolveDefaultModelSelection, providerForSelection } from "../state/pro
 import { serverEnvironment } from "../state/server";
 import { environmentThreadShells } from "../state/threads";
 import { Pill } from "../ui/Pill";
+import { ToastHost } from "../ui/Toast";
 import { useModal } from "../ui/useModal";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { ConversationList } from "./ConversationList";
@@ -137,6 +138,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <SidebarDrawer route={route} onClose={() => shell.setDrawerOpen(false)} />
       ) : null}
       <UsageSheetHost />
+      <ToastHost />
     </div>
   );
 }

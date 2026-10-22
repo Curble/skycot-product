@@ -175,6 +175,12 @@ describe("gateNeedFor", () => {
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "message.dispatch" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, respond("decline")],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.create", worktreePath: null }],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.archive" }],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unarchive" }],
+      [
+        ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+        { type: "thread.metadata.update", title: "Mia's game" },
+      ],
       [ORCHESTRATION_V2_WS_METHODS.launchThread, { workspaceStrategy: { type: "root" } }],
       ["secrets.answerRequest", { answer: { type: "decline" } }],
       ["preview.open", { threadId: "t" }],
@@ -640,6 +646,47 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         );
         assert.isTrue(yield* refused(vcs("vcs.removeWorktree", { cwd: ROOT, path: ROOT })));
         assert.isTrue(yield* refused(vcs("vcs.pull", { cwd: ROOT })));
+      }),
+    ),
+  );
+
+  // Put away, bring back and rename: open to a child because each can be undone (the
+  // archive keeps everything). The rename's command cannot carry a move to another folder.
+  it.effect("lets a child put away, bring back and rename a conversation, and nothing more", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: null });
+        const dispatch = (payload: Record<string, unknown>) =>
+          gate.check({
+            sessionId: SESSION,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: { commandId: "cmd-1", threadId: THREAD_ID, ...payload },
+          });
+        assert.isFalse(yield* refused(dispatch({ type: "thread.archive" })));
+        assert.isFalse(yield* refused(dispatch({ type: "thread.unarchive" })));
+        assert.isFalse(
+          yield* refused(
+            dispatch({ type: "thread.metadata.update", title: "Mia's dinosaur game" }),
+          ),
+        );
+        assert.isFalse(
+          yield* refused(dispatch({ type: "thread.metadata.update", worktreePath: ROOT })),
+        );
+        assert.isTrue(
+          yield* refused(
+            dispatch({
+              type: "thread.metadata.update",
+              title: "Mia's dinosaur game",
+              worktreePath: "/Users/kid/Desktop",
+            }),
+          ),
+        );
+        yield* family.verify({ code: CODE, purpose: "openFolder", sessionId: SESSION });
+        assert.isFalse(
+          yield* refused(
+            dispatch({ type: "thread.metadata.update", worktreePath: "/Users/kid/Desktop" }),
+          ),
+        );
       }),
     ),
   );

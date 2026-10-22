@@ -17,3 +17,25 @@ export function childFirst<R>(
   for (const row of rows) (owners[threadIdOf(row)] === childId ? mine : others).push(row);
   return { mine, others };
 }
+
+/**
+ * Conversations the engine has not said who started, among `rows`. A brand-new one is the
+ * usual case: the engine records its child as it starts, but this device's copy of who
+ * started what was read earlier, so it asks again rather than filing it under someone else.
+ */
+export function unknownThreadIds<R>(
+  rows: ReadonlyArray<R>,
+  threadIdOf: (row: R) => string,
+  owners: Readonly<Record<string, string>>,
+): ReadonlyArray<string> {
+  return rows.map(threadIdOf).filter((threadId) => owners[threadId] === undefined);
+}
+
+/** Who started what, with `threadId` as `childId`'s; the engine's first answer stands. */
+export function withStarter(
+  owners: Readonly<Record<string, string>>,
+  threadId: string,
+  childId: string,
+): Readonly<Record<string, string>> {
+  return owners[threadId] === undefined ? { ...owners, [threadId]: childId } : owners;
+}
