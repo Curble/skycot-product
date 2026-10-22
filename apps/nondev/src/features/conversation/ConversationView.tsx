@@ -37,6 +37,9 @@ import { ProgressBar } from "../../ui/ProgressBar";
 import { Mascot } from "../brand/Mascot";
 import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
+import { usePictures } from "../compose/usePictures";
+import { firstBlank } from "../starters/starters";
+import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
@@ -159,6 +162,7 @@ export function ConversationView({
   const startNote = useStartNote(threadId);
 
   const [publishOpen, setPublishOpen] = useState(false);
+  const [seed, setSeed] = useState<ComposerSeed | null>(null);
   const publish = usePublishOverview({
     environmentId,
     threadId,
@@ -269,6 +273,18 @@ export function ConversationView({
           <EmptyState art={<Mascot pose="hello" size={72} />} title="Nothing has been said yet">
             Say what you'd like done and {crewName} will show you a plan first.
           </EmptyState>
+          <div className="fm-stream__starters">
+            <StarterCards
+              compact
+              disabled={!canOperate}
+              onPick={(starter) => {
+                setSeed(seedFor(starter));
+                if (starter.kind === "picture") {
+                  document.querySelector<HTMLInputElement>(".fm-composer__file")?.click();
+                }
+              }}
+            />
+          </div>
         </div>
       ) : (
         <Timeline
@@ -294,6 +310,7 @@ export function ConversationView({
         threadId={threadId}
         shell={shell}
         active={active}
+        seed={seed}
       />
 
       <PublishSheet
@@ -390,11 +407,14 @@ function ReplyComposer({
   threadId,
   shell,
   active,
+  seed,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly shell: EnvironmentThreadShell | null;
   readonly active: boolean;
+  /** A starter card tapped in an empty conversation. */
+  readonly seed: ComposerSeed | null;
 }) {
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
@@ -405,6 +425,20 @@ function ReplyComposer({
   // run ends before Return, the first Return asks instead of sending.
   const [typedWhileActive, setTypedWhileActive] = useState(false);
   const [confirmNewTurn, setConfirmNewTurn] = useState(false);
+  const pictures = usePictures();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
+  if (seed !== appliedSeed) {
+    setAppliedSeed(seed);
+    if (seed !== null) setText(seed.text);
+  }
+  useEffect(() => {
+    const field = inputRef.current;
+    if (appliedSeed === null || field === null) return;
+    field.focus();
+    const blank = firstBlank(field.value);
+    if (blank !== null) field.setSelectionRange(blank.start, blank.end);
+  }, [appliedSeed]);
   const crew = useCrew();
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
@@ -431,7 +465,12 @@ function ReplyComposer({
       environmentId,
       input: {
         threadId,
-        message: { messageId: newMessageId(), role: "user", text: trimmed, attachments: [] },
+        message: {
+          messageId: newMessageId(),
+          role: "user",
+          text: trimmed,
+          attachments: pictures.uploads(),
+        },
         modelSelection: shell.modelSelection,
         runtimeMode: shell.runtimeMode,
         interactionMode: shell.interactionMode,
@@ -448,6 +487,7 @@ function ReplyComposer({
       return;
     }
     setText("");
+    pictures.clear();
     setTypedWhileActive(false);
     setConfirmNewTurn(false);
   };
@@ -493,13 +533,21 @@ function ReplyComposer({
             </Banner>
           </div>
         ) : null}
+        {pictures.problem ? (
+          <div style={{ marginBottom: 10 }}>
+            <Banner tone="warning">{pictures.problem}</Banner>
+          </div>
+        ) : null}
         <MessageField
+          inputRef={inputRef}
           value={text}
           onChange={onChange}
           onSend={() => void send()}
           canSend={ready && trimmed.length > 0 && !sending}
           disabled={!ready || sending}
-          attach
+          pictures={pictures.pictures}
+          onAddPictures={pictures.add}
+          onRemovePicture={pictures.remove}
           placeholder={
             canOperate
               ? active

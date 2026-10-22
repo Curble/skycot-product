@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { ChevronLeft, ListTodo, Sparkles } from "lucide-react";
+import { useState } from "react";
 
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
@@ -14,11 +15,12 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
+import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { summarySentence } from "./summary";
 
 /**
- * Home: a greeting, every live or attention-needing job in one sentence each,
- * a tip, and the compose box. The allowance meter is intentionally absent: the
+ * Home: a greeting, the starter cards, every live or attention-needing job in one sentence
+ * each, a tip, and the compose box. The allowance meter is intentionally absent: the
  * engine's usage summary is a log scan, not a cheap read, and we never show
  * made-up numbers. Mount `AllowanceMeter` in `.fm-home__side` when a cheap
  * source exists.
@@ -29,6 +31,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
+  const [seed, setSeed] = useState<ComposerSeed | null>(null);
 
   const active = rows.filter(
     (row) =>
@@ -76,6 +79,16 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               </p>
             </div>
           </div>
+          <StarterCards
+            onPick={(starter) => {
+              setSeed(seedFor(starter));
+              // The file picker only opens inside the tap itself (browsers require a user
+              // gesture), so "Draw it, then build it" clicks the composer's picture input here.
+              if (starter.kind === "picture") {
+                document.querySelector<HTMLInputElement>(".fm-composer__file")?.click();
+              }
+            }}
+          />
           <div className="fm-home__grid">
             <Card label="Today, across every project">
               <CardHeader
@@ -112,7 +125,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
           </div>
         </div>
       </div>
-      <NewConversationComposer preferredProjectKey={shell.projectKey} />
+      <NewConversationComposer preferredProjectKey={shell.projectKey} seed={seed} />
     </>
   );
 }

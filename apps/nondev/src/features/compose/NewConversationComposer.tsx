@@ -4,7 +4,7 @@ import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { ServerConfig, ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { AlertCircle, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { newMessageId, newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -44,7 +44,10 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "./autonomy";
+import { firstBlank } from "../starters/starters";
+import type { ComposerSeed } from "../starters/StarterCards";
 import { MessageField } from "./MessageField";
+import { usePictures } from "./usePictures";
 import {
   branchNameFor,
   folderReadiness,
@@ -63,9 +66,12 @@ import { TrackingSheet, type TrackingChoice } from "./TrackingSheet";
  */
 export function NewConversationComposer({
   preferredProjectKey,
+  seed = null,
 }: {
   /** `${environmentId}:${projectId}` from the sidebar selection, when any. */
   readonly preferredProjectKey: string | null;
+  /** A starter card's prompt: replaces the box's text each time a card is tapped. */
+  readonly seed?: ComposerSeed | null;
 }) {
   const projects = useAtomValue(environmentProjects.projectsAtom);
   const lastProject = useLastProject();
@@ -92,6 +98,21 @@ export function NewConversationComposer({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
+  if (seed !== appliedSeed) {
+    setAppliedSeed(seed);
+    if (seed !== null) setText(seed.text);
+  }
+  // Once the card's words are in, put the cursor on the first [blank] to type over.
+  useEffect(() => {
+    const field = inputRef.current;
+    if (appliedSeed === null || field === null) return;
+    field.focus();
+    const blank = firstBlank(field.value);
+    if (blank !== null) field.setSelectionRange(blank.start, blank.end);
+    field.scrollIntoView({ block: "nearest" });
+  }, [appliedSeed]);
 
   const keyOf = (project: EnvironmentProject) => `${project.environmentId}:${project.id}`;
   // Nothing chosen, nothing remembered and several projects: ask, rather than
@@ -200,6 +221,8 @@ export function NewConversationComposer({
             sending={sending}
             connected={connected}
             phone={phone}
+            inputRef={inputRef}
+            wantsPicture={appliedSeed?.wantsPicture === true}
             onSend={async (send) => {
               setSending(true);
               setProblem(null);
@@ -211,6 +234,7 @@ export function NewConversationComposer({
           />
         ) : (
           <MessageField
+            inputRef={inputRef}
             value={text}
             onChange={setText}
             onSend={() => {}}
@@ -247,6 +271,8 @@ function ComposerField({
   sending,
   connected,
   phone,
+  inputRef,
+  wantsPicture,
   onSend,
 }: {
   readonly project: EnvironmentProject;
@@ -256,6 +282,9 @@ function ComposerField({
   readonly sending: boolean;
   readonly connected: boolean;
   readonly phone: boolean;
+  readonly inputRef: RefObject<HTMLTextAreaElement | null>;
+  /** "Draw it, then build it": the box hints at the + button until a picture is added. */
+  readonly wantsPicture: boolean;
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
   const environmentId = project.environmentId;
@@ -273,6 +302,7 @@ function ComposerField({
     reportFailure: false,
   });
   const [phase, setPhase] = useState<string | null>(null);
+  const pictures = usePictures();
   const [tracking, setTracking] = useState<{
     readonly resolve: (choice: TrackingChoice) => void;
   } | null>(null);
@@ -354,7 +384,7 @@ function ComposerField({
       messageId: newMessageId(),
       role: "user",
       text: trimmed,
-      attachments: [],
+      attachments: pictures.uploads(),
     } as const;
     const folder = await prepareFolder();
     if ("cancelled" in folder) {
@@ -439,10 +469,29 @@ function ComposerField({
 
   return (
     <>
+      {pictures.problem ? (
+        <div style={{ marginBottom: 10 }}>
+          <Banner tone="warning">{pictures.problem}</Banner>
+        </div>
+      ) : wantsPicture && pictures.pictures.length === 0 ? (
+        <p className="fm-help fm-composer__hint">
+          Add a photo of your drawing with the <b>+</b> button, then press Send.
+        </p>
+      ) : null}
       <MessageField
+        inputRef={inputRef}
         value={text}
         onChange={onText}
-        onSend={() => void onSend(send)}
+        pictures={pictures.pictures}
+        onAddPictures={pictures.add}
+        onRemovePicture={pictures.remove}
+        onSend={() =>
+          void onSend(async () => {
+            const outcome = await send();
+            if (outcome.kind === "started") pictures.clear();
+            return outcome;
+          })
+        }
         canSend={ready && trimmed.length > 0 && !sending}
         disabled={!ready || sending}
         placeholder={placeholder}
