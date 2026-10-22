@@ -179,12 +179,8 @@ const threads: ReadonlyArray<RecapThreadInput> = [
 
 describe("the household's days", () => {
   it("starts today and the week at local midnight", () => {
-    expect(new Date(startOfLocalDay(NOW, MELBOURNE)).toISOString()).toBe(
-      "2026-10-21T13:00:00.000Z",
-    );
-    expect(new Date(rangeStart("week", NOW, MELBOURNE)).toISOString()).toBe(
-      "2026-10-15T13:00:00.000Z",
-    );
+    expect(startOfLocalDay(NOW, MELBOURNE)).toBe(Date.parse("2026-10-21T13:00:00.000Z"));
+    expect(rangeStart("week", NOW, MELBOURNE)).toBe(Date.parse("2026-10-15T13:00:00.000Z"));
   });
 });
 
