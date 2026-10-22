@@ -41,7 +41,7 @@ export function StickerArrives({
       >
         <ConfettiBurst />
         <span className="fm-arrive__sticker">
-          <Sticker id={first} size={168} label={`${copy.title} sticker`} />
+          <Sticker id={first} size={184} label={`${copy.title} sticker`} />
         </span>
         <span className="fm-arrive__mascot">
           <Mascot pose="yay" size={72} decorative />
@@ -56,8 +56,8 @@ export function StickerArrives({
         {more > 0 ? (
           <p className="fm-arrive__more">
             {more === 1
-              ? "And one more is waiting in your book."
-              : `And ${more} more are waiting in your book.`}
+              ? "And one more new sticker is waiting in your book."
+              : `And ${more} more new stickers are waiting in your book.`}
           </p>
         ) : null}
         <div className="fm-arrive__actions">

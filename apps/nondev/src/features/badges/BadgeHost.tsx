@@ -41,7 +41,10 @@ export function BadgeHost() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  const unseen = unseenBadges(book);
+  // Stickers already mentioned by a celebration ("one more is waiting in your book") wait
+  // there, still new, instead of popping up one after another.
+  const [announced, setAnnounced] = useState<ReadonlySet<BadgeId>>(() => new Set());
+  const unseen = unseenBadges(book).filter((id) => !announced.has(id));
   const onBookPage = route.name === "stickers" || route.name === "certificate";
   const asleep = sleep?.asleep === true;
   const [showing, setShowing] = useState<ReadonlyArray<BadgeId> | null>(null);
@@ -65,7 +68,8 @@ export function BadgeHost() {
     <StickerArrives
       ids={showing}
       onDone={() => {
-        void markBadgesSeen(showing);
+        void markBadgesSeen(showing.slice(0, 1));
+        setAnnounced(new Set([...announced, ...showing.slice(1)]));
         setShowing(null);
       }}
     />

@@ -108,6 +108,8 @@ export function CertificateScreen({ kind }: { readonly kind: CertificateKind }) 
       </div>
       {createPortal(
         <div className="fm-cert-print" aria-hidden>
+          {/* Only while this screen is open: every other page keeps the browser's paper. */}
+          <style>{"@page { size: landscape; margin: 0; }"}</style>
           <Certificate facts={facts} />
         </div>,
         document.body,

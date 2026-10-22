@@ -32,7 +32,9 @@ export function useBadgeWatcher({
     }
   }
   const made = projection !== null && !active ? (latestReviewable(projection)?.id ?? null) : null;
-  const key = projection === null ? null : `${threadId}:${messages}:${lastMessage}:${made}`;
+  // Waits for the shell too: a key spent before the shell arrived would report nothing.
+  const key =
+    projection === null || shell === null ? null : `${threadId}:${messages}:${lastMessage}:${made}`;
 
   const report = useEffectEvent(() => {
     if (projection === null || shell === null) return;
