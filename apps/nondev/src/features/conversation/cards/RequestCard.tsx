@@ -32,6 +32,7 @@ import {
   describeRuntimeRequest,
   toolCallInputFor,
 } from "../../../plain/approvals";
+import { enforcedRuntimeMode } from "../../../plain/autonomy";
 import { projectAtomOrEmpty } from "../../../state/projects";
 import { vcsEnvironment } from "../../../state/vcs";
 import { CrewAvatar } from "../../../themes/CrewAvatar";
@@ -201,6 +202,7 @@ export function RequestCard({
     needsBranch ? vcsEnvironment.status({ environmentId, input: { cwd: projectRoot } }) : null,
   ).data;
   const crew = useCrew();
+  const family = useFamily();
   const card = describeRuntimeRequest(item, {
     ...(crew.named ? { assistantName: crew.builder.name } : {}),
     ...(projectName === null ? {} : { projectName }),
@@ -215,11 +217,12 @@ export function RequestCard({
         }
       : {}),
     ...(request ? { responseCapability: request.responseCapability.type } : {}),
-    ...(shell?.runtimeMode === "full-access" ? { handsOff: true } : {}),
+    ...(shell && enforcedRuntimeMode(shell.runtimeMode, family.enabled) === "full-access"
+      ? { handsOff: true }
+      : {}),
     ...(toolCallInput === undefined ? {} : { toolCallInput }),
   });
   // Family profile: the same rules the engine enforces say which cards need a grown-up.
-  const family = useFamily();
   const familyApplies = family.enabled && item.type === "approval_request";
   const grownUp =
     familyApplies && item.type === "approval_request"

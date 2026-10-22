@@ -8,6 +8,7 @@ import {
   autonomyToRuntimeMode,
   describeAutonomyLevel,
   describeSpeedCare,
+  enforcedRuntimeMode,
   hardRuleTitles,
   hardRulesStatement,
   isPlainAutonomyLevel,
@@ -202,5 +203,16 @@ describe("describeSpeedCare", () => {
         decodeOptionDescriptor({ id: "webSearch", label: "Web search", type: "boolean" }),
       ]),
     ).toEqual({});
+  });
+});
+
+describe("enforcedRuntimeMode (M2)", () => {
+  it("shows Ask me first for every conversation while the Family profile is on", () => {
+    for (const mode of ["approval-required", "auto-accept-edits", "auto", "full-access"] as const) {
+      expect(enforcedRuntimeMode(mode, true)).toBe("approval-required");
+      expect(enforcedRuntimeMode(mode, false)).toBe(mode);
+    }
+    // A conversation made "Fully hands-off" before the profile was on reads as asking first.
+    expect(runtimeModeToAutonomy(enforcedRuntimeMode("full-access", true))).toBe("askMeFirst");
   });
 });

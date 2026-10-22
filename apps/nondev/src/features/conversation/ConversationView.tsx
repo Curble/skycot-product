@@ -44,6 +44,7 @@ import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCar
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
+import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
@@ -117,6 +118,10 @@ export function ConversationView({
     (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
   const crew = useCrew();
   const crewName = crew.builder.name;
+  // The mode the engine enforces: always "Ask me first" while the Family profile is on.
+  const family = useFamily();
+  const runtimeMode =
+    shell === null ? null : enforcedRuntimeMode(shell.runtimeMode, family.enabled);
 
   const visit = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -273,7 +278,7 @@ export function ConversationView({
             </span>
           ) : null}
           <span className="fm-strip__dot">·</span>
-          <span>{autonomyLabel(autonomyForRuntimeMode(shell.runtimeMode))}</span>
+          <span>{autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}</span>
           <span className="fm-strip__dot">·</span>
           <ExplainToggle threadId={threadId} />
           {publish.status ? (
@@ -290,7 +295,7 @@ export function ConversationView({
         </div>
       ) : null}
 
-      {shell?.runtimeMode === "full-access" ? (
+      {runtimeMode === "full-access" ? (
         <HandsOffStrip environmentId={environmentId} threadId={threadId} canOperate={canOperate} />
       ) : null}
 

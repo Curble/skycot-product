@@ -119,6 +119,15 @@ export function runtimeModeToAutonomy(mode: RuntimeMode): AutonomyLevel {
 }
 
 /**
+ * The mode the engine really runs a conversation in. With the Family profile on, every turn runs
+ * as "Ask me first" whatever the conversation was created with (the engine enforces it), so a
+ * conversation made "Fully hands-off" before the profile was turned on must not say so.
+ */
+export function enforcedRuntimeMode(mode: RuntimeMode, familyOn: boolean): RuntimeMode {
+  return familyOn ? "approval-required" : mode;
+}
+
+/**
  * Which runtime modes each provider family accepts. Mirrors each provider package's
  * server status file; a provider absent here supports all four. The
  * live `supportedRuntimeModes` from the provider snapshot wins when the caller has it.
