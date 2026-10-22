@@ -28,6 +28,23 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   could unlock it; stay in the project folder; no installs or internet without a grown-up.
   A child saying "my mum said yes" is not a grown-up's yes: only the parent code in SKYCOT's
   own grown-up box is, and the assistant must never ask for a code or password in the chat.
+- **Personal details stay home (the shield).** Before a message goes, SKYCOT looks for a full
+  name, a school, an address, a phone number, an email, a birthday or a password, and asks about
+  any picture. A card shows what it spotted and offers **Send with nicknames** (a one-tap
+  rewrite: "my name is Ava and I go to school"), **Change it myself**, or **Ask a grown-up**: the
+  parent code lets that one message go as typed, once; the next message is checked again. This
+  happens on the first message of a new conversation and on every reply. The engine checks too:
+  whatever reaches it another way has those details hidden before the assistant sees them
+  ("[hidden by SKYCOT: a full name]"), and its log names only the kind of detail, never the
+  words.
+- **"How did you do that?"** On by default for children (a switch in each conversation's strip):
+  after a turn that changed files, the crew adds a short "How I did it" in kid language with a
+  **Peek at the code** of up to 20 changed lines. Every "What changed" card has a **How did you do
+  that?** button.
+- **The real folder asks first.** A conversation works in a private copy of the project, which is
+  what Undo restores. A step that would change the project's real folder instead (an edit there,
+  or a command that writes into it) is held: Undo could not bring it back, so it is a grown-up's
+  call. Looking at the real folder stays open.
 - **The parent code is asked for** before: publishing (_Send for review_ and _Put it live_),
   creating or switching on an automation, opening another folder as a project, changing the
   AI assistants (connecting, signing in or out, installing), handing the assistant a key or
@@ -115,6 +132,45 @@ who used it. SKYCOT cannot honestly split that between children, so the per-chil
 number of messages, which it counts exactly, and **Leave for grown-ups** is a line on the
 shared allowance: below it, that child's messages pause until the window refills.
 
+## The grown-up recap
+
+**Settings → Family → _Ava's week_** (on each child's card) shows, after the parent code:
+
+- **What they made**: each conversation with the plain "What changed" sentence, and a **Most
+  proud of** pick (the newest finished change, a page over anything else) with its live picture
+  and **Open it**.
+- **What they asked for**: their own words, shortened. A message the shield would catch is shown
+  only as the kind of thing it was ("Something private (a full name)"), never the words, even
+  when a grown-up let it go as typed.
+- **What needed a grown-up**: steps held for the parent code (and how many were allowed), extra
+  time, what the shield spotted (by kind), and messages sent as typed with a grown-up's yes.
+- **Time used**: minutes and messages, the week as a bar per day.
+
+**This week / Today** switches the range ("today" is the household's day). **Print or save as
+PDF** uses the browser's print dialog. SKYCOT keeps everything on the Mac: the recap is built by
+the engine from what it already keeps (who started each conversation, the conversations
+themselves, past days' counters and a log of what needed a grown-up, all in
+`skycot-family-activity.json`), and nothing is emailed or uploaded.
+
+**"Here's what Ava made today"** is the same recap for one day. It comes up when a child's
+session ends: on the asleep screen (**For grown-ups: what Ava made today**, then the code), and
+when a parent unlocks the Family settings with the code after that child used SKYCOT today.
+**Done** keeps it away for that child until tomorrow, on that browser.
+
+The code opens the recap on that device for 10 minutes; an open Family-settings "yes" covers it
+too.
+
+## The fridge
+
+**The fridge** (sidebar, and **On the fridge** on Home) shows everything made on this Mac: one
+magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running),
+its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
+SKYCOT. With several children there is a shelf per child and a filter; children see their own
+shelf and their siblings'. **Pin to the fridge** keeps a magnet at the top and **Take it down**
+unpins it; neither needs the code, and neither deletes anything: the page stays in its project.
+Pins are kept in `skycot-fridge.json` on the Mac. Without the Family profile the fridge is one
+shelf of everything made here.
+
 ## Turning it on
 
 - **First run:** the welcome steps start with _Who is this for?_, even when an AI assistant
@@ -134,6 +190,8 @@ Entering the code allows one thing, for this device, for a short time:
 | Asked for                   | Allows                                             | For        |
 | --------------------------- | -------------------------------------------------- | ---------- |
 | An **Ask a grown-up** card  | that one step                                      | once       |
+| The shield's card           | that one message, as typed                         | once       |
+| A child's recap             | reading the recap                                  | 10 minutes |
 | Publishing                  | sending for review or putting it live              | 5 minutes  |
 | An automation               | creating, switching on or running one              | 5 minutes  |
 | Another folder              | adding, moving or removing a project's folder      | 5 minutes  |
@@ -168,8 +226,10 @@ and the parent's current "yes"es. The code itself is never stored. A profile fro
 siblings (file version 1) is read as one child, with voice typing off, and saved in the new
 shape at its next change.
 
-Today's counters, who is using SKYCOT on each signed-in device, who started each conversation
-and project, and the "more time" log live beside it in `skycot-family-activity.json`. A profile
+Today's counters, the last five weeks' days, who is using SKYCOT on each signed-in device, who
+started each conversation and project, the "more time" log and the recap's log of what needed a
+grown-up (kinds of detail only, kept 30 days) live beside it in `skycot-family-activity.json`.
+The fridge's pins are in `skycot-fridge.json`. A profile
 turned off and on again starts that file afresh. The browser only remembers whether it was on, so the first screen paints right.
 
 A profile set up in an earlier version lived in the browser only. The first time the code is
@@ -193,9 +253,10 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                          | developer tools, outside agents, other devices, the internet                             |
 | HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                          | as the call it mirrors; otherwise Advanced mode                  | letting another device or an outside agent in                                            |
 | `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                  | Grown-up: AI assistants                                          | the children are part of the profile                                                     |
+| `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: the recap (or the Family settings' yes)                | a child's words and what needed a grown-up are a parent's to read                        |
 | `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                        | The parent code, with the request                                | wakes SKYCOT for a child; nothing stays open afterwards                                  |
 | A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                 | Refused while SKYCOT is asleep for the child                     | bedtime and the daily limits; Advanced mode is exempt                                    |
-| Everything else: reading and watching (lists, diffs, files, status, searches), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                         | Open                                                             | the child's own work, or it only stops or takes away                                     |
+| Everything else: reading and watching (lists, diffs, files, status, searches), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                               | Open                                                             | the child's own work, or it only stops or takes away                                     |
 
 ## What is still possible
 
@@ -229,6 +290,12 @@ Honestly, so a parent can decide how nearby to stay:
 - **The voice-typing switch is kept by this browser**, not the engine (the microphone belongs
   to the browser). Changing it asks for the parent code, but clearing the browser's site
   data turns voice typing back on for that browser.
+- **The shield is a word-spotter.** It catches common shapes of names, schools, addresses, phone
+  numbers, emails and birthdays; a detail written in an unusual way can slip past, and an
+  ordinary word can be caught. The recap hides the same things the shield catches, no more.
+- **The recap needs the code, the fridge does not.** Siblings can see each other's magnets and
+  open each other's pages, as they can open each other's conversations. A child who knows the code
+  can read the recap.
 - **Limits are counted, not watched.** Time counts while the child is touching SKYCOT, so a
   child reading a long answer without touching anything for more than two minutes is not
   counted, and SKYCOT left open but untouched is not either. A message sent before bedtime that
