@@ -3,19 +3,47 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import { AuthSessionId, AuthStandardClientScopes } from "@t3tools/contracts";
+import {
+  AuthSessionId,
+  AuthStandardClientScopes,
+  CommandId,
+  EnvironmentAuthorizationError,
+  ORCHESTRATION_V2_WS_METHODS,
+  OrchestrationV2RpcSchemas,
+  type OrchestrationV2TurnItem,
+  ProviderDriverKind,
+  RpcScopeAuthorization,
+  RuntimeRequestId,
+  ThreadId,
+} from "@t3tools/contracts";
+import * as NodeSocket from "@effect/platform-node/NodeSocket";
+import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpRouter,
+  HttpServer,
+  HttpServerResponse,
+} from "effect/http";
+import { Rpc, RpcClient, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
+import * as Socket from "effect/socket/Socket";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerHttp from "../http.ts";
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
+import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
 
 const CODE = "482913";
@@ -176,5 +204,236 @@ it.layer(
       });
       assert.equal(response.status, 401);
     }),
+  );
+});
+
+// The engine end of a grown-up card and of the HTTP twins of gated calls: a real server, a real
+// WebSocket RPC client, the real gate and middleware. Only the routes behind them are stubs.
+const RespondRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
+  payload: OrchestrationV2RpcSchemas.dispatchCommand.input,
+  success: OrchestrationV2RpcSchemas.dispatchCommand.output,
+  error: EnvironmentAuthorizationError,
+});
+const RespondGroup = RpcGroup.make(RespondRpc).middleware(RpcScopeAuthorization);
+const THREAD_ID = ThreadId.make("thread:family-http");
+const REQUEST_ID = RuntimeRequestId.make("req-install");
+const ROOT = "/Users/kid/projects/space-game";
+const NOW = DateTime.makeUnsafe("2026-10-22T09:00:00.000Z");
+const nativeItemRef = {
+  driver: ProviderDriverKind.make("codex"),
+  nativeId: "tool-1",
+  strength: "strong" as const,
+};
+const itemBase = {
+  threadId: THREAD_ID,
+  runId: null,
+  nodeId: "node:approval" as never,
+  providerThreadId: null,
+  providerTurnId: null,
+  nativeItemRef,
+  parentItemId: null,
+  title: null,
+  startedAt: null,
+  completedAt: null,
+  updatedAt: NOW,
+};
+/** The card B4c held: an install that also reaches the internet. */
+const heldItems: ReadonlyArray<OrchestrationV2TurnItem> = [
+  {
+    ...itemBase,
+    id: IdAllocator.derive.approvalTurnItem({ requestId: REQUEST_ID }),
+    ordinal: 1,
+    status: "waiting",
+    type: "approval_request",
+    requestId: REQUEST_ID,
+    requestKind: "command",
+    prompt: "npm install phaser",
+  },
+  {
+    ...itemBase,
+    id: IdAllocator.derive.turnItemFromProviderItem({
+      driver: nativeItemRef.driver,
+      nativeItemId: nativeItemRef.nativeId,
+    }),
+    ordinal: 0,
+    status: "running",
+    type: "command_execution",
+    input: "npm install phaser",
+  },
+];
+
+const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
+  const config = yield* ServerConfig.ServerConfig;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-family-engine-" });
+  let dispatched = 0;
+  const layerAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+    authenticateHttpRequest: (request) =>
+      request.headers["authorization"] === BEARER
+        ? Effect.succeed({
+            sessionId: AuthSessionId.make("session-parent"),
+            subject: "parent",
+            method: "bearer" as never,
+            scopes: AuthStandardClientScopes,
+          })
+        : (Effect.fail({ _tag: "NoCredential" }) as never),
+  });
+  const layerFamily = SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME));
+  const layerGate = SkycotFamilyGate.layer.pipe(
+    Layer.provideMerge(layerFamily),
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.mock(ProjectionStore.ProjectionStoreV2)({
+          getThread: () =>
+            Effect.succeed({ projectId: "project:family", worktreePath: ROOT } as never),
+          getTurnItem: ({ itemId }) =>
+            Effect.succeed(heldItems.find((item) => item.id === itemId) ?? null),
+        }),
+        Layer.mock(ProjectStore.ProjectStoreV2)({
+          get: () => Effect.succeed(Option.none()),
+          findActiveByWorkspaceRoot: () => Effect.succeed(Option.none()),
+        }),
+      ),
+    ),
+  );
+  // The socket's session, as ws.ts gives it after authenticating the upgrade.
+  const layerWs = HttpRouter.add(
+    "GET",
+    "/ws",
+    Effect.gen(function* () {
+      const gate = yield* SkycotFamilyGate.SkycotFamilyGate;
+      return yield* RpcServer.toHttpEffectWebsocket(RespondGroup).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            RespondGroup.toLayer({
+              [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: () =>
+                Effect.sync(() => {
+                  dispatched += 1;
+                  return { sequence: dispatched };
+                }),
+            }),
+            SkycotFamilyGate.layerRpcAuthorization(gate, "session-parent").pipe(
+              Layer.provide(Layer.succeed(RpcScopeAuthorization)((effect) => effect)),
+            ),
+            RpcSerialization.layerJson,
+          ),
+        ),
+      );
+    }).pipe(Effect.flatten),
+  );
+  const layerPairing = HttpRouter.add(
+    "POST",
+    "/api/auth/pairing-token",
+    HttpServerResponse.jsonUnsafe({ credential: "pairing-link" }),
+  );
+  const layerApp = Layer.mergeAll(SkycotFamilyHttp.layer, layerWs, layerPairing).pipe(
+    Layer.provide(SkycotFamilyHttp.layerApiGate),
+    Layer.provideMerge(NodeHttpPlatform.layer),
+  );
+  const services = yield* Layer.build(
+    HttpRouter.serve(layerApp, { disableListenLog: true }).pipe(
+      Layer.provideMerge(layerGate),
+      Layer.provideMerge(layerAuth),
+      Layer.provideMerge(
+        Layer.mock(ServerSettings.ServerSettingsService)({
+          updateSettings: () => Effect.succeed({} as never),
+        }),
+      ),
+      Layer.provideMerge(ServerConfig.layer({ ...config, devUrl: undefined })),
+      Layer.provideMerge(Layer.succeed(FileSystem.FileSystem, fs)),
+      Layer.provideMerge(NodeHttpServer.layerTest),
+    ),
+  );
+  const client = Context.get(services, HttpClient.HttpClient);
+  const address = Context.get(services, HttpServer.HttpServer).address;
+  const port = "port" in address ? address.port : 0;
+  const post = (resource: string, body: unknown) =>
+    client.execute(
+      HttpClientRequest.post(resource, { headers: { authorization: BEARER } }).pipe(
+        HttpClientRequest.bodyJsonUnsafe(body),
+      ),
+    );
+  // Built in the test's scope: a protocol provided only to `make` would close with it.
+  const protocol = yield* Layer.build(
+    RpcClient.layerProtocolSocket().pipe(
+      Layer.provide(Socket.layerWebSocket(`ws://127.0.0.1:${port}/ws`)),
+      Layer.provide(NodeSocket.layerWebSocketConstructor),
+      Layer.provide(RpcSerialization.layerJson),
+    ),
+  );
+  const rpc = yield* RpcClient.make(RespondGroup).pipe(Effect.provide(protocol));
+  const allow = rpc[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
+    type: "runtime-request.respond",
+    commandId: CommandId.make("command:allow"),
+    threadId: THREAD_ID,
+    requestId: REQUEST_ID,
+    decision: "accept",
+  });
+  return { post, allow, dispatchedCount: () => dispatched };
+});
+
+const layerEngineEnvironment = ServerConfig.layerTest(process.cwd(), {
+  prefix: "skycot-family-engine-config-",
+}).pipe(Layer.provideMerge(NodeServices.layer));
+
+// Live clock: the WebSocket client's open and ping timers run on it.
+it.live(
+  "refuses a child's Allow on a grown-up card over the socket until the code is entered",
+  () =>
+    Effect.gen(function* () {
+      const { post, allow, dispatchedCount } = yield* makeEngine();
+      // Off: the card is the child's to answer.
+      assert.equal((yield* allow).sequence, 1);
+      assert.equal(
+        (yield* post("/api/skycot/family/enable", { code: CODE, childName: null })).status,
+        200,
+      );
+
+      const refusal = yield* Effect.flip(allow);
+      assert.equal(
+        refusal._tag === "EnvironmentAuthorizationError"
+          ? refusal.requiredPermission
+          : refusal._tag,
+        SkycotFamilyGate.FAMILY_PERMISSION,
+      );
+      assert.equal(dispatchedCount(), 1);
+
+      // A wrong code opens nothing; the right one opens this card once.
+      const wrong = yield* post("/api/skycot/family/verify", {
+        code: "000000",
+        purpose: "approve",
+        requestId: REQUEST_ID,
+      });
+      assert.equal(wrong.status, 403);
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(allow)));
+      const right = yield* post("/api/skycot/family/verify", {
+        code: CODE,
+        purpose: "approve",
+        requestId: REQUEST_ID,
+      });
+      assert.equal(right.status, 200);
+      assert.equal((yield* allow).sequence, 2);
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(allow)));
+      assert.equal(dispatchedCount(), 2);
+    }).pipe(Effect.scoped, Effect.provide(layerEngineEnvironment)),
+);
+
+it.layer(layerEngineEnvironment)("Family profile at the engine's doors", (it) => {
+  it.effect("holds the HTTP twins of gated calls for the code", () =>
+    Effect.gen(function* () {
+      const { post } = yield* makeEngine();
+      assert.equal((yield* post("/api/auth/pairing-token", {})).status, 200);
+      yield* post("/api/skycot/family/enable", { code: CODE, childName: null });
+      const held = yield* post("/api/auth/pairing-token", {});
+      assert.equal(held.status, 403);
+      const body = (yield* held.json) as { error: string; requiredPermission: string };
+      assert.equal(body.error, "family");
+      assert.equal(body.requiredPermission, SkycotFamilyGate.FAMILY_PERMISSION);
+      yield* post("/api/skycot/family/verify", { code: CODE, purpose: "advanced" });
+      const minted = yield* post("/api/auth/pairing-token", {});
+      assert.equal(minted.status, 200);
+      assert.deepEqual(yield* minted.json, { credential: "pairing-link" });
+    }).pipe(Effect.scoped),
   );
 });

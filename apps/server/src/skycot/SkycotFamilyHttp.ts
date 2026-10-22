@@ -16,6 +16,7 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 
 export const FAMILY_ROUTE = "/api/skycot/family";
 
@@ -183,6 +184,51 @@ const lockRoute = route("POST", "/lock", AuthOrchestrationOperateScope, ({ famil
     Effect.andThen(family.status),
     Effect.map((status) => json(status, 200, { "set-cookie": expiredUnlockCookie })),
   ),
+);
+
+/**
+ * The Family check for the HTTP API routes that change things (`SkycotFamilyGate.
+ * isGatedHttpRoute`): a raw POST meets the same rule as the WebSocket call it mirrors. Global
+ * router middleware, so no upstream handler changes. Only gated routes are authenticated or
+ * have their body read here (the body is cached on the request, so the route reads it again);
+ * a request that cannot be authenticated passes through and the route refuses it as before.
+ */
+export const layerApiGate = HttpRouter.middleware(
+  Effect.gen(function* () {
+    const gate = yield* SkycotFamilyGate.SkycotFamilyGate;
+    const auth = yield* EnvironmentAuth.EnvironmentAuth;
+    return (httpEffect) =>
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const url = HttpServerRequest.toURL(request);
+        if (Option.isNone(url)) return yield* httpEffect;
+        const pathname = url.value.pathname;
+        if (!SkycotFamilyGate.isGatedHttpRoute(request.method, pathname)) return yield* httpEffect;
+        const session = yield* auth.authenticateHttpRequest(request).pipe(Effect.option);
+        if (Option.isNone(session)) return yield* httpEffect;
+        const payload = yield* request.json.pipe(Effect.orElseSucceed(() => null));
+        const refusal = yield* gate
+          .checkHttp({
+            sessionId: session.value.sessionId,
+            method: request.method,
+            pathname,
+            payload,
+          })
+          .pipe(Effect.flip, Effect.option);
+        if (Option.isSome(refusal)) {
+          return json(
+            {
+              error: "family",
+              message: refusal.value.message,
+              requiredPermission: SkycotFamilyGate.FAMILY_PERMISSION,
+            },
+            403,
+          );
+        }
+        return yield* httpEffect;
+      });
+  }),
+  { global: true },
 );
 
 export const layer = Layer.mergeAll(

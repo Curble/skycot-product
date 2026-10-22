@@ -743,6 +743,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
   Layer.provide(layerCommandReadiness),
+  Layer.provide(SkycotFamilyHttp.layerApiGate), // nondev-seam: skycot-family
   Layer.provide(SkycotFamilyGate.layer.pipe(Layer.provide(ProjectionStoreV2.layer))), // nondev-seam: skycot-family
   Layer.provide(ServerHttp.layerBrowserApiCors),
   Layer.provide(ServerHttp.layerHttpCompression),
