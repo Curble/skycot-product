@@ -589,6 +589,6 @@ export function costEstimate(totals: TokenTotals): string {
   if (totals.tokens === 0) return "Nothing yet";
   if (totals.costUnknown) return "Cost not known";
   const more = totals.partlyPriced ? " or more" : "";
-  if (totals.costUsd > 0 && totals.costUsd < 0.01) return `Under US$0.01${more} (estimate)`;
-  return `About US$${totals.costUsd.toFixed(2)}${more} (estimate)`;
+  if (totals.costUsd > 0 && totals.costUsd < 0.01) return `Under US$0.01${more} if paid per use`;
+  return `About US$${totals.costUsd.toFixed(2)}${more} if paid per use`;
 }

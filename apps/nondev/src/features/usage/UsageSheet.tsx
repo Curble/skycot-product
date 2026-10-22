@@ -252,8 +252,9 @@ function TokenTables({ report }: { readonly report: ReturnType<typeof tokenRepor
       <TokenTable title="By assistant, last 7 days" rows={report.byProvider} />
       <TokenTable title="Busiest models, last 7 days" rows={report.byModel} />
       <p className="fm-usage-note">
-        Counted from the assistants' own logs on this Mac, including use outside SKYCOT. Costs are
-        estimates from public price lists; a Plus, Pro or Max plan is not charged per token.
+        Counted from the assistants' own logs on this Mac, including use outside SKYCOT. Dollar
+        figures show what this would cost on pay-as-you-go prices. A Plus, Pro or Max subscription
+        is not charged per token, so it is not what you pay.
       </p>
     </>
   );

@@ -430,11 +430,11 @@ describe("tokenReport", () => {
 
   it("labels every dollar figure as an estimate and never invents one", () => {
     const report = tokenReport(summary);
-    expect(costEstimate(report.week)).toBe("About US$1.75 or more (estimate)");
+    expect(costEstimate(report.week)).toBe("About US$1.75 or more if paid per use");
     expect(costEstimate(report.byProvider[1]!)).toBe("Cost not known");
     expect(
       costEstimate({ tokens: 10, costUsd: 0.001, partlyPriced: false, costUnknown: false }),
-    ).toBe("Under US$0.01 (estimate)");
+    ).toBe("Under US$0.01 if paid per use");
     expect(costEstimate({ tokens: 0, costUsd: 0, partlyPriced: false, costUnknown: false })).toBe(
       "Nothing yet",
     );
