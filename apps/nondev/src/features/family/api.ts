@@ -23,8 +23,18 @@ async function call(
   body?: unknown,
   query?: Record<string, string>,
 ): Promise<Response> {
+  return callEngine(method, `${FAMILY_API_PATH}${path}`, body, query);
+}
+
+/** One request to the engine's own HTTP API (`/api/...`), with this client's credentials. */
+export async function callEngine(
+  method: "GET" | "POST",
+  fullPath: string,
+  body?: unknown,
+  query?: Record<string, string>,
+): Promise<Response> {
   // The query goes separately: the path is set as a URL's pathname, which would escape a "?".
-  const url = resolvePrimaryEnvironmentHttpUrl(`${FAMILY_API_PATH}${path}`, query);
+  const url = resolvePrimaryEnvironmentHttpUrl(fullPath, query);
   const sameOrigin =
     typeof window !== "undefined" &&
     window.desktopBridge === undefined &&

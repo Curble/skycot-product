@@ -1,0 +1,576 @@
+// "Preview": the conversation's site, running, beside the conversation (a full-screen sheet on
+// a phone). The engine starts the site and names the address; starting asks like any command
+// in "Ask me first" (in a Family profile, the parent code when the start script installs
+// something or uses the internet). Plain controls only: Reload, Open in browser, Close, and
+// "Point at something", which turns a click in the page into a chip in the message box.
+import type { EnvironmentId, PreviewAnnotationSubmissionResult } from "@t3tools/contracts";
+import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
+import {
+  AppWindow,
+  ExternalLink,
+  KeyRound,
+  MousePointerClick,
+  Play,
+  RotateCw,
+  ShieldAlert,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { createPortal } from "react-dom";
+
+import { randomUUID } from "~/lib/utils";
+
+import { useCrew } from "../../themes/useCrew";
+import { Banner } from "../../ui/Banner";
+import { Button, IconButton } from "../../ui/Button";
+import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
+import { useModal } from "../../ui/useModal";
+import { Mascot } from "../brand/Mascot";
+import { Disclosure } from "../conversation/cards/Disclosure";
+import { useFamily } from "../family/FamilyProvider";
+import { checkPreviewAddress, fetchPreviewStatus, startPreview, type PreviewAnswer } from "./api";
+import { BrowserPreviewFrame } from "./BrowserPreviewFrame";
+import {
+  DesktopPreviewFrame,
+  desktopPreviewBridge,
+  type FrameControls,
+} from "./DesktopPreviewFrame";
+import {
+  fixItMessage,
+  pointerFor,
+  previewSurface,
+  SET_UP_MESSAGE,
+  shortAddress,
+  type PreviewStatusView,
+} from "./model";
+import { addPointer, closePreview, suggestMessage, type PointerDraft } from "./store";
+
+/** Polls while the panel is open: quickly while starting, slowly otherwise (it also keeps the site alive). */
+function usePreviewAnswer(threadId: string) {
+  const [answer, setAnswer] = useState<PreviewAnswer | null>(null);
+  const askNow = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Only the newest question may schedule the next one, so "ask now" never doubles the loop.
+    let latest = 0;
+    const run = async () => {
+      if (timer !== undefined) clearTimeout(timer);
+      const mine = ++latest;
+      const next = await fetchPreviewStatus(threadId);
+      if (!live || mine !== latest) return;
+      setAnswer(next);
+      timer = setTimeout(run, next.ok && next.status.state === "starting" ? 1000 : 8000);
+    };
+    askNow.current = () => void run();
+    void run();
+    return () => {
+      live = false;
+      askNow.current = null;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [threadId]);
+  return { answer, setAnswer, refresh: () => askNow.current?.() };
+}
+
+/** The chips one pick makes: one per element, or "the part I marked" for a drawn box. */
+function draftsFrom(result: PreviewAnnotationSubmissionResult): ReadonlyArray<PointerDraft> {
+  const { annotation } = result;
+  const picture = annotation.screenshot?.dataUrl ?? null;
+  const drafts = annotation.elements.map((target, index) => ({
+    id: randomUUID(),
+    picture: index === 0 ? picture : null,
+    pointer: pointerFor({ ...target.element, rect: target.rect }),
+  }));
+  if (drafts.length > 0) return drafts;
+  if (annotation.regions.length === 0 && annotation.strokes.length === 0) return [];
+  const box = annotation.regions[0]?.rect ?? annotation.strokes[0]!.bounds;
+  return [
+    {
+      id: randomUUID(),
+      picture,
+      pointer: {
+        label: "the part I marked",
+        pageUrl: annotation.pageUrl,
+        tagName: "area",
+        selector: null,
+        html: `the area ${Math.round(box.width)}×${Math.round(box.height)} px, ${Math.round(box.x)} px from the left and ${Math.round(box.y)} px from the top of the page`,
+      },
+    },
+  ];
+}
+
+function openOutside(url: string) {
+  const bridge = window.desktopBridge;
+  if (bridge) void bridge.openExternal(url);
+  else window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export function PreviewPanel({
+  environmentId,
+  threadId,
+  sheet,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: string;
+  /** A phone: the panel fills the window above everything else. */
+  readonly sheet: boolean;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  useModal(ref, { open: sheet, onClose: closePreview, initialFocus: "first" });
+  const content = <PreviewPanelBody environmentId={environmentId} threadId={threadId} ref={ref} />;
+  return sheet
+    ? createPortal(<div className="fm-preview-sheet">{content}</div>, document.body)
+    : content;
+}
+
+function PreviewPanelBody({
+  environmentId,
+  threadId,
+  ref,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: string;
+  readonly ref: Ref<HTMLElement>;
+}) {
+  const crew = useCrew();
+  const builder = crew.builder.name;
+  const family = useFamily();
+  const { answer, setAnswer, refresh } = usePreviewAnswer(threadId);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [controls, setControls] = useState<FrameControls | null>(null);
+  const [pointing, setPointing] = useState<"idle" | "picking">("idle");
+  const [leaving, setLeaving] = useState<{ url: string; requestId?: string } | null>(null);
+  /** Internet addresses a grown-up said yes to while this panel is open. */
+  const allowedOrigins = useRef(new Set<string>());
+  const status = answer?.ok ? answer.status : null;
+  const bridge = desktopPreviewBridge();
+  const surface =
+    status?.state === "running"
+      ? previewSurface({
+          hasDesktopPreview: bridge !== null,
+          page: window.location,
+          url: status.url,
+          frameable: status.frameable,
+        })
+      : null;
+  const runningUrl = status?.state === "running" ? status.url : null;
+
+  const start = async (approved: boolean) => {
+    setBusy(true);
+    setProblem(null);
+    let next = await startPreview(threadId, approved);
+    let cancelled = false;
+    if (!next.ok && next.reason === "needs-grown-up" && next.requestId) {
+      const allowed = await family.requireParentCode("approve", {
+        requestId: next.requestId,
+        reason: "Starting this preview needs a grown-up's yes.",
+      });
+      cancelled = !allowed;
+      if (allowed) next = await startPreview(threadId, true);
+    }
+    setBusy(false);
+    // A grown-up who chose Cancel needs no telling; anything else that stopped it is said plainly.
+    if (!next.ok && !cancelled) setProblem(next.message);
+    if (next.ok) setAnswer(next);
+    refresh();
+  };
+
+  // "Just do it, carefully" (or hands-off) starts without a question, once per panel.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (status?.state !== "ready" || status.decision.kind !== "start" || autoStarted.current)
+      return;
+    autoStarted.current = true;
+    void start(false);
+  });
+
+  const originOf = (url: string) => {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return url;
+    }
+  };
+  const mayLeave = async (
+    url: string,
+  ): Promise<{ readonly allowed: boolean; readonly requestId?: string }> =>
+    isLocalPreviewAddress(url) || allowedOrigins.current.has(originOf(url))
+      ? { allowed: true }
+      : checkPreviewAddress(url);
+
+  // The page went somewhere on its own (a link clicked inside it). The engine says whether the
+  // internet is allowed; in a Family profile it is not without a grown-up, so the page goes back.
+  const onNavigated = async (url: string) => {
+    if (runningUrl === null) return;
+    const answer = await mayLeave(url);
+    if (answer.allowed) return;
+    controls?.navigate(runningUrl);
+    setLeaving({ url, ...(answer.requestId ? { requestId: answer.requestId } : {}) });
+  };
+  const onOpenLink = async (url: string) => {
+    const answer = await mayLeave(url);
+    if (!answer.allowed) {
+      setLeaving({ url, ...(answer.requestId ? { requestId: answer.requestId } : {}) });
+      return;
+    }
+    // A child stays inside SKYCOT; everyone else gets their own browser for the outside world.
+    if (isLocalPreviewAddress(url) || family.enabled) controls?.navigate(url);
+    else openOutside(url);
+  };
+  const askToLeave = async () => {
+    if (leaving === null) return;
+    const target = leaving.url;
+    const allowed = leaving.requestId
+      ? await family.requireParentCode("approve", {
+          requestId: leaving.requestId,
+          reason: "This link goes to the internet.",
+        })
+      : false;
+    if (!allowed) return;
+    const checked = await checkPreviewAddress(target);
+    if (!checked.allowed) return;
+    allowedOrigins.current.add(originOf(target));
+    setLeaving(null);
+    controls?.navigate(target);
+  };
+
+  const point = async () => {
+    if (!controls?.pick) return;
+    if (pointing === "picking") {
+      controls.cancelPick?.();
+      setPointing("idle");
+      return;
+    }
+    setPointing("picking");
+    try {
+      const result = await controls.pick();
+      if (result) {
+        for (const draft of draftsFrom(result)) addPointer(threadId, draft);
+        const comment = result.annotation.comment.trim();
+        if (comment.length > 0) suggestMessage(threadId, comment, "append");
+      }
+    } catch {
+      // The page went away mid-pick; nothing was chosen.
+    } finally {
+      setPointing("idle");
+    }
+  };
+
+  let body: ReactNode;
+  if (answer === null) {
+    body = <Waiting title="Getting your preview…" />;
+  } else if (!answer.ok) {
+    body = (
+      <div className="fm-preview__notice">
+        <Banner
+          tone="warning"
+          action={
+            <Button size="sm" onClick={refresh}>
+              Try again
+            </Button>
+          }
+        >
+          {answer.message}
+        </Banner>
+      </div>
+    );
+  } else {
+    body = (
+      <StatusBody
+        status={answer.status}
+        builder={builder}
+        busy={busy}
+        onStart={start}
+        onAsk={(text) => suggestMessage(threadId, text, "replace")}
+        frame={
+          status?.state === "running" && surface !== null ? (
+            <RunningFrame
+              surface={surface}
+              url={status.url}
+              environmentId={environmentId}
+              onControls={setControls}
+              onNavigated={(url) => void onNavigated(url)}
+              onOpenLink={(url) => void onOpenLink(url)}
+            />
+          ) : null
+        }
+      />
+    );
+  }
+
+  const canOpenOutside = runningUrl !== null && surface !== "elsewhere";
+  // The picker runs inside T3's preview browser, which only the Mac app has.
+  const canPoint = surface === "desktop" && controls?.pick !== undefined;
+  return (
+    <aside className="fm-preview" aria-label="Preview" ref={ref} tabIndex={-1}>
+      <header className="fm-preview__bar">
+        <span className="fm-preview__title">
+          <AppWindow size={15} strokeWidth={1.8} aria-hidden />
+          Preview
+          {runningUrl ? (
+            <span className="fm-preview__address">{shortAddress(runningUrl)}</span>
+          ) : null}
+        </span>
+        <span className="fm-preview__tools">
+          <IconButton
+            icon={RotateCw}
+            label="Reload"
+            size="sm"
+            disabled={controls === null}
+            onClick={() => controls?.reload()}
+          />
+          <IconButton
+            icon={ExternalLink}
+            label="Open in browser"
+            size="sm"
+            disabled={!canOpenOutside}
+            onClick={() => runningUrl && openOutside(runningUrl)}
+          />
+          <IconButton icon={X} label="Close preview" size="sm" onClick={closePreview} />
+        </span>
+      </header>
+      {leaving ? (
+        <div className="fm-preview__notice">
+          <Banner
+            tone="info"
+            action={
+              <span className="fm-preview__notice-actions">
+                {leaving.requestId ? (
+                  <Button size="sm" variant="primary" onClick={() => void askToLeave()}>
+                    Ask a grown-up
+                  </Button>
+                ) : null}
+                <Button size="sm" onClick={() => setLeaving(null)}>
+                  Stay here
+                </Button>
+              </span>
+            }
+          >
+            <b>That link goes to the internet</b> ({shortAddress(leaving.url)}). With the Family
+            profile on, a grown-up says yes first.
+          </Banner>
+        </div>
+      ) : null}
+      {problem ? (
+        <div className="fm-preview__notice">
+          <Banner tone="info">{problem}</Banner>
+        </div>
+      ) : null}
+      <div className="fm-preview__body">{body}</div>
+      {status?.state === "running" && surface !== "elsewhere" ? (
+        <footer className="fm-preview__foot">
+          <Button
+            size="sm"
+            variant={pointing === "picking" ? "primary" : "secondary"}
+            icon={MousePointerClick}
+            aria-pressed={pointing === "picking"}
+            disabled={!canPoint}
+            onClick={() => void point()}
+          >
+            {pointing === "picking" ? "Stop pointing" : "Point at something"}
+          </Button>
+          <span className="fm-preview__hint" role="status">
+            {!canPoint
+              ? "Pointing works in the SKYCOT app for Mac. Here, say it in words: “the big pink title”."
+              : pointing === "picking"
+                ? "Click the part you mean, then press Attach. Esc stops."
+                : `Click a part of your page, then tell ${builder} what to change.`}
+          </span>
+        </footer>
+      ) : null}
+    </aside>
+  );
+}
+
+function Waiting({ title, children }: { readonly title: string; readonly children?: ReactNode }) {
+  return (
+    <div className="fm-preview__state">
+      <Mascot pose="thinking" size={72} decorative />
+      <p className="fm-preview__state-title">{title}</p>
+      {children ? <p className="fm-preview__state-text">{children}</p> : null}
+    </div>
+  );
+}
+
+function StatusBody({
+  status,
+  builder,
+  busy,
+  onStart,
+  onAsk,
+  frame,
+}: {
+  readonly status: PreviewStatusView;
+  readonly builder: string;
+  readonly busy: boolean;
+  readonly onStart: (approved: boolean) => Promise<void>;
+  readonly onAsk: (text: string) => void;
+  readonly frame: ReactNode;
+}) {
+  switch (status.state) {
+    case "no-folder":
+      return (
+        <div className="fm-preview__state">
+          <Mascot pose="hello" size={72} decorative />
+          <p className="fm-preview__state-title">Nothing to preview here</p>
+          <p className="fm-preview__state-text">
+            This conversation isn't working in a project folder.
+          </p>
+        </div>
+      );
+    case "no-site":
+      return (
+        <div className="fm-preview__state">
+          <Mascot pose="hello" size={72} decorative />
+          <p className="fm-preview__state-title">Nothing to run yet</p>
+          <p className="fm-preview__state-text">
+            This project doesn't have a site that starts on your Mac. {builder} can set one up.
+          </p>
+          <Button variant="primary" onClick={() => onAsk(SET_UP_MESSAGE)}>
+            Ask {builder} to set it up
+          </Button>
+        </div>
+      );
+    case "ready":
+      if (status.decision.kind === "start") return <Waiting title="Starting your preview…" />;
+      return <StartCard status={status} busy={busy} onStart={onStart} />;
+    case "starting":
+      return <Waiting title="Starting your preview…">This usually takes a few seconds.</Waiting>;
+    case "failed":
+      return (
+        <div className="fm-preview__state">
+          <Mascot pose="oops" size={72} decorative />
+          <p className="fm-preview__state-title">The preview didn't start.</p>
+          <p className="fm-preview__state-text">
+            Ask {builder} to fix it — the message is written for you.
+          </p>
+          <span className="fm-preview__actions">
+            <Button disabled={busy} onClick={() => void onStart(true)}>
+              Try again
+            </Button>
+            <Button variant="primary" onClick={() => onAsk(fixItMessage(status))}>
+              Ask {builder} to fix it
+            </Button>
+          </span>
+          {status.output.trim().length > 0 ? (
+            <div className="fm-preview__said">
+              <Disclosure summary="What it said">
+                <pre className="fm-preview__output">{status.output}</pre>
+              </Disclosure>
+            </div>
+          ) : null}
+        </div>
+      );
+    case "running":
+      return frame;
+  }
+}
+
+function StartCard({
+  status,
+  busy,
+  onStart,
+}: {
+  readonly status: PreviewStatusView & { readonly state: "ready" };
+  readonly busy: boolean;
+  readonly onStart: (approved: boolean) => Promise<void>;
+}) {
+  const grownUp = status.decision.kind === "grown-up";
+  const reasons = status.decision.kind === "start" ? [] : status.decision.reasons;
+  const risky = reasons.length > 0;
+  return (
+    <div className="fm-preview__card">
+      <Card>
+        <CardHeader
+          icon={grownUp ? KeyRound : risky ? ShieldAlert : Play}
+          tone={grownUp || risky ? "orange" : "blue"}
+          title={grownUp ? "Ask a grown-up" : "Start the preview?"}
+          subtitle={grownUp ? "Family profile" : "Ask me first"}
+        />
+        <CardBody>
+          <p className="fm-preview__card-text">
+            To show your site, SKYCOT starts it on this Mac by running your project's start command.
+            {risky ? ` Heads up: it ${reasons.join(" and ")}.` : ""}
+            {grownUp ? " A grown-up needs to enter the parent code first." : ""}
+          </p>
+          <Disclosure summary="Show details">
+            <pre className="fm-preview__output">
+              {status.command.runner}
+              {status.command.script !== status.command.runner
+                ? `\n→ ${status.command.script}`
+                : ""}
+            </pre>
+          </Disclosure>
+        </CardBody>
+        <CardFooter>
+          <Button onClick={closePreview}>Not now</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void onStart(true)}>
+            {busy
+              ? grownUp
+                ? "Waiting for a grown-up…"
+                : "Starting…"
+              : grownUp
+                ? "Ask a grown-up"
+                : "Start the preview"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
+
+function RunningFrame({
+  surface,
+  url,
+  environmentId,
+  onControls,
+  onNavigated,
+  onOpenLink,
+}: {
+  readonly surface: NonNullable<ReturnType<typeof previewSurface>>;
+  readonly url: string;
+  readonly environmentId: EnvironmentId;
+  readonly onControls: (controls: FrameControls | null) => void;
+  readonly onNavigated: (url: string) => void;
+  readonly onOpenLink: (url: string) => void;
+}) {
+  const bridge = desktopPreviewBridge();
+  if (surface === "desktop" && bridge !== null) {
+    return (
+      <DesktopPreviewFrame
+        bridge={bridge}
+        environmentId={environmentId}
+        url={url}
+        onControls={onControls}
+        onNavigated={onNavigated}
+        onOpenLink={onOpenLink}
+      />
+    );
+  }
+  if (surface === "frame") return <BrowserPreviewFrame url={url} onControls={onControls} />;
+  if (surface === "outside") {
+    return (
+      <div className="fm-preview__state">
+        <Mascot pose="hello" size={72} decorative />
+        <p className="fm-preview__state-title">Your site is running</p>
+        <p className="fm-preview__state-text">
+          It can't be shown inside SKYCOT, so it opens in your browser instead.
+        </p>
+        <Button variant="primary" icon={ExternalLink} onClick={() => openOutside(url)}>
+          Open in browser
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="fm-preview__state">
+      <Mascot pose="hello" size={72} decorative />
+      <p className="fm-preview__state-title">Your site is running on your Mac</p>
+      <p className="fm-preview__state-text">
+        Its address only works on the Mac itself. Open SKYCOT there to see it.
+      </p>
+    </div>
+  );
+}

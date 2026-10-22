@@ -15,6 +15,8 @@ import "../features/review";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
 import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
+import { PreviewPanel } from "../features/preview/PreviewPanel";
+import { usePreviewOpen } from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { UsageBanner } from "../features/usage/UsageBanner";
 import { UsageIndicator } from "../features/usage/UsagePopover";
@@ -72,8 +74,13 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
 
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
-  const showList = conversationRoute && !(columns === 1 && route.name !== "home");
   const showContent = !(columns === 1 && route.name === "home");
+  // The live preview sits beside the conversation where there is room (the list steps aside
+  // so the two share the window), and fills the window on a phone.
+  const previewOpen = usePreviewOpen(route.name === "thread" ? route.threadId : null);
+  const previewMode = !previewOpen || !showContent ? "hidden" : columns === 1 ? "sheet" : "panel";
+  const showList =
+    conversationRoute && !(columns === 1 && route.name !== "home") && previewMode !== "panel";
 
   // One place owns the window title, derived from the route, so no screen can
   // leave a stale title behind when it unmounts.
@@ -94,12 +101,16 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   const railOpen = useVersionsRailOpen();
   const roomForRail = useRoomForRail();
   const railMode =
-    route.name === "thread" && showContent
+    route.name === "thread" && showContent && previewMode !== "panel"
       ? versionsRailMode(columns, railOpen, roomForRail)
       : "hidden";
 
   return (
-    <div className="fm-shell" data-columns={columns} data-inspector={railMode}>
+    <div
+      className="fm-shell"
+      data-columns={columns}
+      data-inspector={previewMode === "panel" ? "preview" : railMode}
+    >
       <TitleBar
         columns={columns}
         detail={detail}
@@ -127,7 +138,14 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
             {children}
           </main>
         ) : null}
-        {route.name === "thread" && showContent ? (
+        {route.name === "thread" && previewMode !== "hidden" ? (
+          <PreviewPanel
+            environmentId={route.environmentId}
+            threadId={route.threadId}
+            sheet={previewMode === "sheet"}
+          />
+        ) : null}
+        {route.name === "thread" && showContent && previewMode !== "panel" ? (
           <VersionsRailSlot
             environmentId={route.environmentId}
             threadId={route.threadId}

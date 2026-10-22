@@ -1,0 +1,242 @@
+/* The live preview (features/preview): a column beside the conversation, or a full-window sheet
+   on a phone, and the "Point at something" chips. Everything reads the tokens in apple.css; the
+   only monospace surface is the start command and what a failed start printed. */
+
+/* Shell: the list steps aside and the conversation and the site share the window. */
+.fm-shell[data-inspector="preview"] .fm-body--no-list {
+  grid-template-columns: var(--fm-sidebar-width) minmax(340px, 1fr) minmax(380px, 1.15fr);
+}
+.fm-shell[data-columns="2"][data-inspector="preview"] .fm-body--no-list {
+  grid-template-columns: minmax(300px, 1fr) minmax(340px, 1fr);
+}
+
+.fm-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--fm-sep);
+  background: var(--fm-bg-window);
+  outline: none;
+}
+.fm-preview__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--fm-sep);
+  background: var(--fm-bg-toolbar);
+}
+.fm-preview__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-preview__address {
+  overflow: hidden;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: var(--fm-radius-sm);
+  background: var(--fm-bg-fill);
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-preview__tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+}
+.fm-preview__body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--fm-bg-content);
+}
+.fm-preview__webview,
+.fm-preview__frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* A site with no background of its own is white in any browser. */
+  background: #ffffff;
+}
+.fm-preview__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+}
+.fm-preview__state-title {
+  margin: 0;
+  font-size: calc(17px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-preview__state-text {
+  margin: 0 0 4px;
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-preview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.fm-preview__said {
+  width: 100%;
+  margin-top: 6px;
+  text-align: left;
+}
+.fm-preview__output {
+  max-height: 220px;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--fm-radius);
+  background: var(--fm-code-bg);
+  color: var(--fm-label);
+  font-family: var(--fm-mono);
+  font-size: calc(11.5px * var(--fm-text-scale));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.fm-preview__card {
+  width: min(440px, calc(100% - 32px));
+  margin: auto;
+  padding: 16px 0;
+}
+.fm-preview__card-text {
+  margin: 0 0 8px;
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-label);
+}
+.fm-preview__notice {
+  padding: 8px 10px 0;
+}
+.fm-preview__notice-actions {
+  display: flex;
+  gap: 6px;
+}
+.fm-preview__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--fm-sep);
+  background: var(--fm-bg-toolbar);
+}
+.fm-preview__foot .fm-btn {
+  flex: none;
+}
+.fm-preview__hint {
+  min-width: 0;
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+
+/* A phone: the preview fills the window, above the conversation and below any sheet. */
+.fm-preview-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 47;
+  display: flex;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--fm-bg-window);
+}
+.fm-preview-sheet .fm-preview {
+  flex: 1;
+  border-left: 0;
+}
+
+/* "Point at something": chips above the message box, and in the sent bubble. */
+.fm-pointer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.fm-pointer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 3px 4px 3px 6px;
+  border-radius: 999px;
+  background: var(--fm-accent-soft);
+  color: var(--fm-label);
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
+.fm-pointer-chip svg {
+  flex: none;
+  color: var(--fm-accent);
+}
+.fm-pointer-chip__picture {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 0 0 0.5px var(--fm-sep);
+}
+.fm-pointer-chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-pointer-chip__remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fm-label-2);
+  cursor: pointer;
+}
+.fm-pointer-chip__remove:hover {
+  background: var(--fm-bg-fill-2);
+}
+.fm-bubble-pointing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.fm-bubble-pointing__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--fm-code-bg-me);
+  font-size: calc(12px * var(--fm-text-scale));
+}
+
+/* The header's Preview button reads as "on" while the preview is showing. */
+.fm-conv-header__tools .fm-btn[aria-pressed="true"] {
+  background: var(--fm-accent-soft);
+  color: var(--fm-accent);
+}
