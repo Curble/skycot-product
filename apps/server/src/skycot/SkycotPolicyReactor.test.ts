@@ -376,7 +376,7 @@ describe("SkycotPolicyReactor", () => {
 
   // The engine names a private copy after the project, spaces and all; an edit inside it, or
   // in the project's own folder, is in the project.
-  it.effect("approves edits in a private copy whose path has spaces, and in the folder", () =>
+  it.effect("approves edits in a private copy whose path has spaces, holds the real folder", () =>
     Effect.gen(function* () {
       const copy = "/home/kid/.t3/worktrees/Little Fern Café website/skycot-menu-eedf";
       const edit = (prompt: string) =>
@@ -389,7 +389,13 @@ describe("SkycotPolicyReactor", () => {
           requestEvent(request("file-change")),
         );
       assert.equal((yield* edit(`add ${copy}/christmas.html`)).outcome.type, "approved");
-      assert.equal((yield* edit("update /projects/site/menu.html")).outcome.type, "approved");
+      // Undo restores the private copy, never the project's own folder: that edit is a question.
+      const real = (yield* edit("update /projects/site/menu.html")).outcome;
+      assert.equal(real.type, "held");
+      assert.deepEqual(
+        real.type === "held" ? real.evaluation.matches.map((match) => match.rule.id) : [],
+        ["changes-real-project"],
+      );
       assert.equal(
         (yield* edit("update /home/kid/.t3/worktrees/Little Fern Café website/other/a.html"))
           .outcome.type,
