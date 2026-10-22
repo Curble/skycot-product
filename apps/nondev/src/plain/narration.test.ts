@@ -666,3 +666,30 @@ describe("askBeforeItsStep — an ask reads before the step it allowed (S-3)", (
     ]);
   });
 });
+
+describe("SKYCOT's own tools are told as what they do (M1)", () => {
+  it("narrates the engine's page tools without its internal server name", () => {
+    const opened = describeTurnItem(
+      turnItem("dynamic_tool", {
+        toolName: "t3-code.preview_open",
+        input: { url: "http://127.0.0.1:4173" },
+      }),
+    );
+    expect(opened.headline).toBe("Opened your page to check it");
+    expect(opened.technical).toBe("SKYCOT.preview_open");
+    const picture = describeTurnItem(
+      turnItem("dynamic_tool", { toolName: "t3-code.preview_snapshot", input: {} }),
+    );
+    expect(picture.headline).toBe("Took a picture of your page");
+    const ask = describeTurnItem(
+      items.approval("mcp-elicitation", {
+        appName: "t3-code",
+        prompt: 'Allow the t3-code MCP server to run tool "preview_open"?',
+      }),
+    );
+    expect(ask.headline).toBe("The assistant wants to open your page to check it");
+    for (const narration of [opened, picture, ask]) {
+      expect(`${narration.headline} ${narration.detail ?? ""}`).not.toMatch(/t3-code|MCP/i);
+    }
+  });
+});

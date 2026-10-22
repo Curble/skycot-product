@@ -105,6 +105,7 @@ export const approvals = {
   ifNoFileChange: "The file stays as it is. The assistant will suggest a different approach.",
   ifNoFileRead: "The assistant won't see that file and may have to guess.",
   ifNoAppAccess: "The connected app stays untouched. The assistant will try without it.",
+  ifNoOwnTool: "Nothing is opened. The assistant carries on without checking this way.",
   ifNoQuestion: "The assistant carries on with its best guess.",
   ifNoSecret: "The assistant can't use that service until you provide the key.",
   ifNoPlan:

@@ -271,6 +271,46 @@ describe("describeRuntimeRequest — files and apps", () => {
     expect(elicitation.title).toBe("Linear is asking you something");
     expect(elicitation.whatItWants).toBe("Which team should own this?");
   });
+
+  it("says what SKYCOT's own page tools do, never the engine's internal server name", () => {
+    const ask = (tool: string, assistantName?: string) =>
+      describeRuntimeRequest(
+        items.approval("mcp-elicitation", {
+          appName: "t3-code",
+          prompt: `Allow the t3-code MCP server to run tool "${tool}"?`,
+        }),
+        assistantName === undefined ? {} : { assistantName },
+      );
+    const open = ask("preview_open", "Sam");
+    expect(open.title).toBe("May I check your page?");
+    expect(open.whatItWants).toBe("Sam wants to open your page to check it.");
+    expect(open.whyItMatters).toContain(
+      "The first time, SKYCOT downloads a small browser to look at pages (about 200 MB).",
+    );
+    expect(open.technical).toBe('Allow SKYCOT to run tool "preview_open"?');
+    expect(ask("preview_snapshot", "Sam").whatItWants).toBe(
+      "Sam wants to take a picture of your page.",
+    );
+    expect(ask("preview_press").whatItWants).toBe(
+      "The assistant wants to try the buttons on your page.",
+    );
+    expect(ask("preview_evaluate").risk).toBe("medium");
+    const helper = ask("delegate_task");
+    expect(helper.title).toBe("May I use one of SKYCOT's tools?");
+    expect(helper.whyItMatters).not.toMatch(/browser/);
+    for (const card of [open, helper, ask("preview_resize"), ask("device_open")]) {
+      const words = [
+        card.title,
+        card.whatItWants,
+        card.whyItMatters,
+        card.scopeExplainer,
+        card.technical,
+      ]
+        .concat(card.options.map((option) => option.label))
+        .join(" ");
+      expect(words).not.toMatch(/t3-code|MCP server/i);
+    }
+  });
 });
 
 describe("describeRuntimeRequest — questions, secrets, plans", () => {

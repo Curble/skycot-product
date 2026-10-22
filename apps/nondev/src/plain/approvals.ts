@@ -28,6 +28,13 @@ import {
 
 import { describeFile, filesFromPrompt, type PromptFile } from "./changes";
 import { approvals as copy, buttons, scopes } from "./copy";
+import {
+  BROWSER_DOWNLOAD_NOTE,
+  describeOwnTool,
+  isOwnToolServer,
+  ownToolName,
+  withSkycotName,
+} from "./ownTools";
 import { classifyCommand, type CommandClassification } from "./narration";
 
 // The destructive-command table lives in the shared rules package (one table for the server
@@ -133,6 +140,8 @@ export interface ApprovalContext {
    * in the prompt when the step must leave its sandbox, so the prompt alone is not the command.
    */
   readonly toolCallInput?: string;
+  /** The crew's name for the assistant ("Sam"), when the look names it. */
+  readonly assistantName?: string;
 }
 
 const RISK_ORDER: Record<ApprovalRisk, number> = { low: 0, medium: 1, high: 2, blocked: 3 };
@@ -691,7 +700,44 @@ function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): App
   );
 }
 
+/** One of SKYCOT's own tools (the engine's tool server), said as what it does. */
+function describeOwnToolApproval(
+  item: ApprovalItem,
+  tool: string,
+  ctx: ApprovalContext,
+): ApprovalCard {
+  const what = describeOwnTool(tool);
+  const who = ctx.assistantName ?? "The assistant";
+  const risk: ApprovalRisk = what.runsScript ? "medium" : "low";
+  return finishCard(
+    {
+      title: what.looksAtPages ? "May I check your page?" : "May I use one of SKYCOT's tools?",
+      whatItWants: `${who} wants to ${what.infinitive}.`,
+      whyItMatters: what.looksAtPages
+        ? `It looks at the page in a hidden browser on this Mac and changes no files. ${BROWSER_DOWNLOAD_NOTE}`
+        : "It is part of SKYCOT, not an outside app. The details say which tool it is.",
+      scope: "your computer",
+      ifYouSayNo: copy.ifNoOwnTool,
+      risk,
+      options: buildApprovalOptions(
+        item.requestId,
+        risk,
+        what.looksAtPages ? "checking your page" : "SKYCOT's tools",
+        item.options,
+        false,
+      ),
+      technical: withSkycotName(item.prompt ?? tool),
+    },
+    ctx,
+    what.looksAtPages ? "Opens a page on this Mac to look at it; changes no files." : undefined,
+  );
+}
+
 function describeAppAccessApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
+  const ownTool = isOwnToolServer(item.appName)
+    ? (ownToolName(item.prompt) ?? "")
+    : ownToolName(item.prompt);
+  if (ownTool !== null) return describeOwnToolApproval(item, ownTool, ctx);
   const app = item.appName ?? "a connected app";
   const detail = firstLine(item.prompt);
   const permission = item.requestKind === "permission";

@@ -19,6 +19,19 @@ import {
 
 import { describeFile, humanizeFileName } from "./changes";
 import { errors, progress } from "./copy";
+import { describeOwnTool, isOwnToolServer, ownToolName, withSkycotName } from "./ownTools";
+
+/** "use Linear", or for one of SKYCOT's own tools what it does ("open your page to check it"). */
+function ownToolAsk(item: {
+  readonly appName?: string | null | undefined;
+  readonly prompt?: string | null | undefined;
+}): string {
+  const tool = isOwnToolServer(item.appName)
+    ? (ownToolName(item.prompt) ?? "")
+    : ownToolName(item.prompt);
+  if (tool !== null) return describeOwnTool(tool).infinitive;
+  return `use ${item.appName ?? "a connected app"}`;
+}
 
 // The shell primitives live in the shared rules package so the server policy and the
 // narrator split a command identically; re-exported for the tests and callers that had them.
@@ -1961,7 +1974,7 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
             : item.requestKind === "file-read"
               ? `read ${item.prompt ? describeFile(firstLine(item.prompt, 400)).noun : "a file"}`
               : item.requestKind === "mcp-elicitation" || item.requestKind === "permission"
-                ? `use ${item.appName ?? "a connected app"}`
+                ? ownToolAsk(item)
                 : "do something";
       const policy = readPolicyDecision(request?.answers);
       const headline =
@@ -2141,6 +2154,16 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
     case "dynamic_tool": {
       const status = narrationStatus(item.status);
       const name = item.toolName ?? "a tool";
+      const ownTool = ownToolName(item.toolName);
+      if (ownTool !== null) {
+        const what = describeOwnTool(ownTool);
+        return {
+          headline: tense(status, what.past, what.present, `About to ${what.infinitive}`),
+          kind: "other",
+          status,
+          technical: withSkycotName(name),
+        };
+      }
       const lower = name.toLowerCase();
       const input = item.input as Record<string, unknown> | undefined;
       const path =

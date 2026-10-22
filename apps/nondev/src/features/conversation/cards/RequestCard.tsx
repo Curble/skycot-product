@@ -200,7 +200,9 @@ export function RequestCard({
   const vcsStatus = useEnvironmentQuery(
     needsBranch ? vcsEnvironment.status({ environmentId, input: { cwd: projectRoot } }) : null,
   ).data;
+  const crew = useCrew();
   const card = describeRuntimeRequest(item, {
+    ...(crew.named ? { assistantName: crew.builder.name } : {}),
     ...(projectName === null ? {} : { projectName }),
     ...(projectRoot === null ? {} : { projectRoot }),
     ...(projectFolder === null ? {} : { projectFolder }),
@@ -232,7 +234,6 @@ export function RequestCard({
   const runEnded = askRunEnded(item, projection, shell);
   const decided = decidedLine(item, request, runEnded);
   const decision = request ? describeDecision(request) : null;
-  const crew = useCrew();
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
