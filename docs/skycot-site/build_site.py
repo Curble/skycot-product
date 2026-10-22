@@ -2,13 +2,28 @@
 # variant A) and whose dark side is the bold look (was variant B), switched automatically by the visitor's
 # light/dark setting; privacy, terms, open-source and 404 pages; and the og.png share image.
 # The output folder is copied as-is into public/ of mark-hallam/skycot-research-site (branch product-site).
-import os, html, json, shutil, subprocess
-OUT = "/Users/me/t3code-nondev/docs/skycot-site/draft/"
-OG_DIR = "/Users/me/t3code-nondev/docs/skycot-site/og/"
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-LICENSE = open("/Users/me/t3code-nondev/LICENSE", encoding="utf-8").read().strip()
+# Brand (22 October 2026): logos, favicons, share image and mascot come from nondev/brand/assets (see
+# docs/brand/SKYCOT-brand-guide.html). The mascot's name is undecided: never name it in copy.
+import os, html, json, shutil
+HERE = os.path.dirname(os.path.abspath(__file__)) + "/"
+OUT = HERE + "draft/"
+BRAND = os.path.normpath(HERE + "../../nondev/brand/assets") + "/"
+LICENSE = open(os.path.normpath(HERE + "../../LICENSE"), encoding="utf-8").read().strip()
+# Day/dusk rule (brand guide section 2), inlined in every page's <head> so it runs before first paint.
+DAYLIGHT = open(HERE + "daylight.js", encoding="utf-8").read().strip()
 
-MARK = '''<svg class="mark" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="15" fill="var(--accent)"/><circle cx="32" cy="32" r="21" fill="none" stroke="#fff" stroke-width="2.2" opacity=".5"/><circle cx="32" cy="32" r="13" fill="none" stroke="#fff" stroke-width="2.2" opacity=".8"/><circle cx="32" cy="32" r="5" fill="#fff"/><path d="M17 32h9M38 32h9M32 17v9M32 38v9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/></svg>'''
+def lockup(grownup=False, h=32):
+    # Horizontal lockup: light mode shows the day lockup, dark mode the dusk lockup (on dark). Legal pages
+    # use the grown-up lockup (minimal mark, plain wordmark), which never changes with the time of day.
+    light, dark, vw, vh = (("lockup-horizontal-minimal-light.svg", "lockup-horizontal-minimal-dark.svg", 473, 116) if grownup
+                           else ("lockup-horizontal-day-light.svg", "lockup-horizontal-dusk-dark.svg", 488, 118))
+    return (f'<picture class="lockup"><source media="(prefers-color-scheme: dark)" srcset="/assets/brand/{dark}">'
+            f'<img src="/assets/brand/{light}" width="{round(h * vw / vh)}" height="{h}" alt="SKYCOT"></picture>')
+
+def mascot(cls):
+    # The hello pose, day and dusk stacked; html[data-sky] (set by DAYLIGHT) cross-fades between them.
+    return (f'<div class="sky {cls}" aria-hidden="true"><img class="d" src="/assets/brand/mascot-hello-day.svg" width="176" height="176" alt="">'
+            f'<img class="n" src="/assets/brand/mascot-hello-dusk.svg" width="176" height="176" alt=""></div>')
 
 CSS = r'''
 :root{
@@ -53,6 +68,9 @@ p{margin:0}
 .nav{position:sticky;top:0;z-index:50;background:var(--nav);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
 .nav .wrap{display:flex;align-items:center;height:52px;gap:28px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--nav-text);font-weight:700;letter-spacing:.14em;font-size:15px}
+.lockup,.lockup img{display:block}
+.nav .lockup img{width:132px;height:32px}
+footer .lockup img{width:116px;height:28px}
 .brand:hover{text-decoration:none}
 .nav ul{list-style:none;margin:0 0 0 auto;padding:0;display:flex;gap:26px;font-size:14px}
 .nav ul a{color:var(--nav-text);opacity:.8}
@@ -82,9 +100,6 @@ p{margin:0}
 @media (prefers-color-scheme:dark){
 .nav{background:rgba(0,0,0,.8);border-bottom-color:rgba(255,255,255,.12)}
 .nav .brand,.nav ul a{color:#f5f5f7}
-.brand .mark rect{fill:#fff}
-.brand .mark circle,.brand .mark path{stroke:#000}
-.brand .mark circle:last-of-type{fill:#000}
 .hero{background:#000;color:#f5f5f7;padding:110px 0 0;overflow:hidden}
 .hero h1{font-size:clamp(44px,7.6vw,96px);font-weight:700;letter-spacing:-.03em;background:linear-gradient(180deg,#fff 40%,#8a8a8f);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:16ch}
 .hero .lede{color:#a1a1a6;max-width:34em}
@@ -204,7 +219,8 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .nw{white-space:nowrap}
 .moment.flip{grid-template-columns:7fr 5fr}
 .crewrow{display:flex;gap:28px;align-items:center;max-width:820px;margin:40px auto 8px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px 26px}
-.crewrow .crew{margin:0;flex:0 0 auto}
+.crewart{display:flex;align-items:flex-end;gap:6px;flex:0 0 auto}
+.crewart .mate{width:56px;height:56px;margin-bottom:22px}
 .crewrow h3{font-size:22px;margin-bottom:6px}
 .crewrow p{color:var(--text2);font-size:16px}
 @media (max-width:600px){.crewrow{flex-direction:column;align-items:flex-start;padding:20px}}
@@ -213,6 +229,23 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .looks.two{grid-template-columns:repeat(2,1fr)}
 .honest.center-note{text-align:center;max-width:44em;margin-left:auto;margin-right:auto}
 @media (max-width:900px){.cards.two,.looks.two,.moment.flip{grid-template-columns:1fr}}
+
+/* time-of-day mascot (brand guide): day pose from local dawn to dusk, dusk pose after dusk. Default day.
+   The sky card appears only where contrast needs it: the day mascot on a dark page gets a soft day sky,
+   the dusk mascot on a light page gets its dusk sky. Sizes are fixed, so nothing shifts when it swaps. */
+.sky{--s:200px;position:relative;flex:0 0 auto;width:var(--s);height:calc(var(--s) * .64);overflow:hidden;border-radius:calc(var(--s) * .14)}
+.sky img{position:absolute;left:0;top:calc(var(--s) * -.25);width:var(--s);max-width:none;height:var(--s);transition:opacity 1s ease}
+.sky .n,:root[data-sky="dusk"] .sky .d{opacity:0}
+:root[data-sky="dusk"] .sky .n{opacity:1}
+:root[data-sky="dusk"] .sky{background:linear-gradient(180deg,#171a45 0%,#3c3486 60%,#8e5aa8 88%,#f4a27a 100%)}
+@media (prefers-color-scheme:dark){
+:root:not([data-sky="dusk"]) .sky{background:linear-gradient(180deg,#bbdfff 0%,#e8f4ff 62%,#fff6e6 100%)}
+:root[data-sky="dusk"] .sky{background:none}
+}
+@media (prefers-reduced-motion:reduce){.sky img{transition:none}}
+.sky-hero{--s:220px;margin:-30px auto 14px}
+.sky-crew{--s:128px}
+@media (max-width:600px){.sky-hero{--s:180px;margin:-44px auto 12px}}
 
 /* faq */
 .faq{max-width:760px;margin:30px auto 0}
@@ -261,7 +294,8 @@ LEDE2 = "Grown-ups use it for their business too: no code, no jargon, nothing li
 TITLE = "SKYCOT · The family-friendly AI developer"
 DESC = ("Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI "
         "developer for families and small businesses, on your own Mac, with the AI you already pay for.")
-OG_ALT = "SKYCOT. The family-friendly AI developer. Kids dream it up, SKYCOT builds it. SKYCOT for Mac, early access, skycot.com."
+OG_ALT = ("SKYCOT. The family-friendly AI developer. Kids dream it up. SKYCOT builds it. Nothing goes online without a "
+          "grown-up's code. SKYCOT for Mac, early access. A smiling cloud waves hello beside Sam and Mo.")
 
 # Identity metadata for search engines. Never add an address here (standing rule: no street, postal
 # or registered address anywhere on skycot.com).
@@ -300,16 +334,23 @@ def head(title, desc, path="/", robots=None):
 <meta property="og:description" content="{attr(desc)}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{url}">
-<meta property="og:image" content="{SITE}/og.png">
+<meta property="og:image" content="{SITE}/assets/brand/og-day.png">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="{attr(OG_ALT)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{attr(title)}">
 <meta name="twitter:description" content="{attr(desc)}">
-<meta name="twitter:image" content="{SITE}/og.png">
+<meta name="twitter:image" content="{SITE}/assets/brand/og-day.png">
+<meta name="twitter:image:alt" content="{attr(OG_ALT)}">
 <script id="skycot-structured-data" type="application/ld+json">{STRUCTURED}</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230071e3'/%3E%3Ccircle cx='32' cy='32' r='21' fill='none' stroke='%23fff' stroke-width='2.2' opacity='.5'/%3E%3Ccircle cx='32' cy='32' r='13' fill='none' stroke='%23fff' stroke-width='2.2' opacity='.8'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" id="favicon-svg" type="image/svg+xml" href="/assets/brand/favicon-day.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="mask-icon" href="/assets/brand/mask-icon.svg" color="#0071e3">
+<link rel="manifest" href="/site.webmanifest">
+<script>{DAYLIGHT}</script>
 <style>{CSS}</style>
 </head>
 <body>
@@ -317,9 +358,9 @@ def head(title, desc, path="/", robots=None):
 
 # Links are root-relative clean URLs (/privacy, /#how) as Cloudflare Pages serves them.
 # To preview the generated folder locally, serve it (e.g. `npx wrangler pages dev draft`), not file://.
-def nav():
+def nav(grownup=False):
     return f'''<header class="nav"><div class="wrap">
-  <a class="brand" href="/" aria-label="SKYCOT home">{MARK}<span>SKYCOT</span></a>
+  <a class="brand" href="/" aria-label="SKYCOT home">{lockup(grownup)}</a>
   <ul>
     <li><a href="/#family">Family</a></li>
     <li><a href="/#ideas">What kids make</a></li>
@@ -332,9 +373,12 @@ def nav():
 </div></header>
 '''
 
+def footer(grownup=False):
+    return FOOTER.replace("<!--lockup-->", lockup(grownup, 28))
+
 FOOTER = '''<footer><div class="wrap">
   <div class="cols">
-    <div class="brand" style="letter-spacing:.14em">SKYCOT</div>
+    <a class="brand" href="/" aria-label="SKYCOT home"><!--lockup--></a>
     <ul>
       <li><a href="/#family">Family</a></li>
       <li><a href="/#ideas">What kids make</a></li>
@@ -378,6 +422,7 @@ HERO_ALT = ("An early build of SKYCOT in the Workshop look, showing Settings, Fa
 
 def home_body():
     hero = f'''<section class="hero"><div class="wrap">
+  {mascot("sky-hero")}
   <span class="eyebrow">SKYCOT for Mac · early access</span>
   <h1>{html.escape(H1, quote=False).replace("family-friendly", '<span class="nw">family-friendly</span>')}</h1>
   <p class="lede">{html.escape(LEDE, quote=False)}</p>
@@ -407,9 +452,11 @@ def home_body():
   <p class="sub">Turn on the Family profile and SKYCOT becomes a place where a child can build real things with a grown-up's hand on the brakes. It runs on your Mac, signed in to your own AI account, and your child uses it with you nearby.</p></div>
 
   <div class="crewrow">
-    <img class="crew" src="assets/crew.jpg" width="204" height="92" alt="Sam, who builds things, and Mo, who checks before anything risky: the crew characters from the Workshop look.">
+    <div class="crewart" role="img" aria-label="The SKYCOT cloud waving hello, with Sam in a yellow hard hat, who builds things, and Mo in round glasses, who checks before anything risky.">
+      {mascot("sky-crew")}<img class="mate" src="/assets/brand/sam.svg" width="56" height="56" alt=""><img class="mate" src="/assets/brand/mo.svg" width="56" height="56" alt="">
+    </div>
     <div><span class="tag">Built and in testing for the first release</span>
-      <h3>Sam builds. Mo checks.</h3>
+      <h3>Meet the crew. Sam builds. Mo checks.</h3>
       <p>The Workshop look comes on with the profile: cream paper, marker pens, sticky-note tips and a named crew. The app says "Sam needs your OK" instead of "the assistant". Your child can pick another look any time; a look never changes what SKYCOT does.</p></div>
   </div>
 
@@ -578,7 +625,7 @@ def write(name, content):
         f.write(content)
     print("wrote", name, len(content))
 
-write("index.html", head(TITLE, DESC, "/") + nav() + home_body() + FOOTER)
+write("index.html", head(TITLE, DESC, "/") + nav() + home_body() + footer())
 # Variant B is now the dark side of index.html; the separate file is retired.
 if os.path.exists(OUT + "index-b.html"):
     os.remove(OUT + "index-b.html")
@@ -587,7 +634,7 @@ if os.path.exists(OUT + "index-b.html"):
 # Internal notes (open questions for a lawyer, and the clause-by-clause comparison with T3 Code's own
 # legal pages) live in docs/legal/WEBSITE-LEGAL-NOTES.md, never on the public pages.
 
-PRIVACY = f'''{nav()}
+PRIVACY = f'''{nav(True)}
 <main class="doc"><div class="narrow">
   <h1>Privacy</h1>
   <p class="meta">Last updated {LAST_UPDATED} · applies to the SKYCOT app and skycot.com</p>
@@ -651,9 +698,9 @@ PRIVACY = f'''{nav()}
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
 </div></main>
 '''
-write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what each job needs goes to the AI you chose, no analytics, no cookies, no SKYCOT account.", "/privacy") + PRIVACY + FOOTER)
+write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what each job needs goes to the AI you chose, no analytics, no cookies, no SKYCOT account.", "/privacy") + PRIVACY + footer(True))
 
-TERMS = f'''{nav()}
+TERMS = f'''{nav(True)}
 <main class="doc"><div class="narrow">
   <h1>Terms of use</h1>
   <p class="meta">Last updated {LAST_UPDATED} · early access</p>
@@ -709,7 +756,7 @@ TERMS = f'''{nav()}
   <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
 </div></main>
 '''
-write("terms.html", head("Terms of use · SKYCOT", "Terms of use for the SKYCOT app and the skycot.com website, made by Curble Pty Ltd, Melbourne, Australia.", "/terms") + TERMS + FOOTER)
+write("terms.html", head("Terms of use · SKYCOT", "Terms of use for the SKYCOT app and the skycot.com website, made by Curble Pty Ltd, Melbourne, Australia.", "/terms") + TERMS + footer(True))
 
 OSS = f'''{nav()}
 <main class="doc"><div class="narrow">
@@ -742,7 +789,7 @@ OSS = f'''{nav()}
   <p>If you believe an attribution is missing or wrong, email <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a> and we will fix it.</p>
 </div></main>
 '''
-write("open-source.html", head("Open source · SKYCOT", "SKYCOT is based on T3 Code, © T3 Tools Inc., MIT licence. Full licence text, non-affiliation statement and third-party licences.", "/open-source") + OSS + FOOTER)
+write("open-source.html", head("Open source · SKYCOT", "SKYCOT is based on T3 Code, © T3 Tools Inc., MIT licence. Full licence text, non-affiliation statement and third-party licences.", "/open-source") + OSS + footer())
 
 # ---------- 404 (Cloudflare Pages serves /404.html for any address it does not know) ----------
 NOTFOUND = f'''{nav()}
@@ -752,35 +799,31 @@ NOTFOUND = f'''{nav()}
   <div class="actions"><a class="btn btn-primary" href="/">Go to the home page</a><a class="btn btn-secondary" href="mailto:markhallam@skycot.com">Email us</a></div>
 </div></main>
 '''
-write("404.html", head("Page not found · SKYCOT", "This page is not on skycot.com.", "/404", robots="noindex") + NOTFOUND + FOOTER)
+write("404.html", head("Page not found · SKYCOT", "This page is not on skycot.com.", "/404", robots="noindex") + NOTFOUND + footer())
 
-# ---------- og.png share image (1200x630), rendered by headless Chrome from a tiny HTML card ----------
-OG_HTML = f'''<!doctype html>
-<html lang="en-AU"><head><meta charset="utf-8"><title>SKYCOT share card</title>
-<style>
-html,body{{margin:0;width:1200px;height:630px;overflow:hidden;background:#fff}}
-body{{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}}
-.card{{box-sizing:border-box;width:1200px;height:630px;padding:76px 88px 64px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(180deg,#ffffff 0%,#f5f5f7 100%)}}
-.brand{{display:flex;align-items:center;gap:18px;font-weight:700;letter-spacing:.16em;font-size:30px}}
-.brand svg{{width:64px;height:64px}}
-h1{{margin:0;font-size:84px;line-height:1.02;letter-spacing:-.035em;font-weight:700;max-width:14ch}}
-.sub{{margin:18px 0 0;font-size:32px;line-height:1.3;color:#6e6e73;font-weight:500}}
-.foot{{display:flex;justify-content:space-between;align-items:center;font-size:26px;color:#6e6e73}}
-.foot b{{color:#0071e3;font-weight:600}}
-</style></head>
-<body><div class="card">
-  <div class="brand">{MARK.replace('width="28" height="28"', 'width="64" height="64"').replace('var(--accent)', '#0071e3')}<span>SKYCOT</span></div>
-  <div><h1>{html.escape(H1, quote=False)}</h1><p class="sub">Kids dream it up. SKYCOT builds it.</p></div>
-  <div class="foot"><b>SKYCOT for Mac · early access</b><span>skycot.com</span></div>
-</div></body></html>
+# ---------- brand files: favicons, manifest, share image, lockups, mascot poses, Sam and Mo ----------
+os.makedirs(OUT + "assets/brand", exist_ok=True)
+for src in ["web/favicon-day.svg", "web/favicon-dusk.svg", "web/mask-icon.svg", "web/og-day.png",
+            "web/icon-192-day.png", "web/icon-512-day.png", "web/icon-maskable-192-day.png", "web/icon-maskable-512-day.png",
+            "svg/lockup-horizontal-day-light.svg", "svg/lockup-horizontal-dusk-dark.svg",
+            "svg/lockup-horizontal-minimal-light.svg", "svg/lockup-horizontal-minimal-dark.svg",
+            "poses/day/mascot-hello-day.svg", "poses/dusk/mascot-hello-dusk.svg"]:
+    shutil.copyfile(BRAND + src, OUT + "assets/brand/" + os.path.basename(src))
+# Browsers ask for these at the site root.
+shutil.copyfile(BRAND + "web/favicon.ico", OUT + "favicon.ico")
+shutil.copyfile(BRAND + "web/apple-touch-icon-day.png", OUT + "apple-touch-icon.png")
+# og.png (and /opengraph-image, which redirects to it) keeps working for old links; pages point at og-day.png.
+shutil.copyfile(BRAND + "web/og-day.png", OUT + "og.png")
+# A manifest cannot change with the time of day, so installed icons stay day (brand guide section 9).
+MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "The family-friendly AI developer.",
+            "start_url": "/", "display": "minimal-ui", "background_color": "#ffffff", "theme_color": "#0071e3",
+            "icons": [{"src": f"/assets/brand/icon-{k}{n}-day.png", "sizes": f"{n}x{n}", "type": "image/png",
+                       "purpose": "maskable" if k else "any"} for k in ("", "maskable-") for n in (192, 512)]}
+write("site.webmanifest", json.dumps(MANIFEST, separators=(",", ":")) + "\n")
+# Sam and Mo, drawn exactly as in the brand guide's crew symbols.
+SAM = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Sam</title><path d="M32 7c13 0 25 9 25 24 0 16-11 27-26 27C17 58 7 46 7 31 7 17 19 7 32 7z" fill="#F26B4E" stroke="#2B2420" stroke-width="3"/><path d="M15 24c3-10 11-15 19-15 8 0 14 5 16 12" fill="#FFD166" stroke="#2B2420" stroke-width="3" stroke-linecap="round"/><rect x="12" y="22" width="40" height="6" rx="3" fill="#FFD166" stroke="#2B2420" stroke-width="3"/><circle cx="24" cy="36" r="2.6" fill="#2B2420"/><circle cx="40" cy="36" r="2.6" fill="#2B2420"/><path d="M25 45c3 3 11 3 14 0" fill="none" stroke="#2B2420" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="42" r="3" fill="#FFB4A2" opacity=".8"/><circle cx="46" cy="42" r="3" fill="#FFB4A2" opacity=".8"/></svg>
 '''
-os.makedirs(OG_DIR, exist_ok=True)
-with open(OG_DIR + "og-card.html", "w", encoding="utf-8") as f:
-    f.write(OG_HTML)
-if os.path.exists(CHROME):
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
-                    "--window-size=1200,630", "--screenshot=" + OUT + "og.png", "file://" + OG_DIR + "og-card.html"],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("wrote og.png")
-else:
-    print("Chrome not found; og.png not regenerated")
+MO = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Mo</title><path d="M31 6c15 0 27 11 27 26 0 15-12 26-27 26S5 47 5 32 16 6 31 6z" fill="#3FA66F" stroke="#2B2420" stroke-width="3"/><circle cx="23" cy="33" r="7" fill="#fff" stroke="#2B2420" stroke-width="3"/><circle cx="41" cy="33" r="7" fill="#fff" stroke="#2B2420" stroke-width="3"/><path d="M30 33h4" stroke="#2B2420" stroke-width="3"/><circle cx="24" cy="34" r="2.4" fill="#2B2420"/><circle cx="42" cy="34" r="2.4" fill="#2B2420"/><path d="M25 46c3 2 11 2 14 0" fill="none" stroke="#2B2420" stroke-width="3" stroke-linecap="round"/><path d="M20 12l-4-6M44 12l4-6" stroke="#2B2420" stroke-width="3" stroke-linecap="round"/></svg>
+'''
+write("assets/brand/sam.svg", SAM)
+write("assets/brand/mo.svg", MO)
