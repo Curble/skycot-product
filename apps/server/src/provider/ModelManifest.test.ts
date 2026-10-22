@@ -12,6 +12,9 @@ import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ModelManifest from "./ModelManifest.ts";
 
+// nondev-seam: skycot-model-manifest-test (SKYCOT fetches no manifest unless brand.json names one; these tests exercise the fetch path with a SKYCOT address, and apps/server/src/skycot/modelManifestSource.test.ts pins the default)
+process.env.T3CODE_SKYCOT_MODEL_MANIFEST_URL = "https://models.skycot.test/model-manifest.json";
+
 describe("resolveProviderCatalog", () => {
   it("rejects invalid catalog references", () => {
     const invalidCatalog = (input: {

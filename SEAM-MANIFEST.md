@@ -134,6 +134,21 @@ takes upstream's path, and the app-side checks only ever narrow what is accepted
 | skycot-update-feed            | `apps/desktop/src/updates/DesktopUpdates.ts` | 36, 1040 (1 import, 1 call wrapped)      | the baked `app-update.yml` goes through `SkycotUpdates.vetBakedFeed`: only the brand's exact feed passes; T3 Code's never, and none while the brand has none                                                                                                  | defence in depth for an installed app: a mis-built or tampered bundle still cannot update onto T3 Code; a refused feed reads as "no feed", so the updater stays off         |
 | skycot-update-family-gate     | `apps/desktop/src/ipc/methods/updates.ts`    | 10, 51 (1 import, 1 call wrapped)        | the renderer's install call runs `SkycotUpdates.installWithFamilyRule`: with the Family profile on, it needs the engine's two-minute "restart allowed" note for the downloaded version (written by `/api/skycot/updates/allow-restart` after the parent code) | restarting into an update is a grown-up's step; the remote path (`server.commitDesktopUpdate`) is already behind the engine's Family gate                                   |
 
+## Outside-connection seams (23 October 2026)
+
+SKYCOT must not fetch anything from T3 Code's repository or sites while it runs (whoever controls
+those files controls what SKYCOT does), and should not contact a service the person does not use.
+Every destination the engine reaches on its own is listed with its trigger in
+`docs/legal/PRIVACY-NOTES.md` ("Outside connections the app makes").
+`nondev/scripts/t3-address-guard.ts` (run by `apply-brand` and the fork tests) fails if the model
+list loses its wiring, if the brand names T3 Code, if T3 Connect could switch on, or if a new T3
+address appears in the engine's runtime code.
+
+| id                         | file                                             | lines                                          | change                                                                                                                                                                                                                                        | reason                                                                                                                                                                              |
+| -------------------------- | ------------------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| skycot-model-manifest      | `apps/server/src/provider/ModelManifest.ts`      | 23, 195-196, 207, 225, 241 (1 import, 5 lines) | the `raw.githubusercontent.com/pingdotgg/t3code` constant is gone; the address is `T3CODE_SKYCOT_MODEL_MANIFEST_URL` (brand.json `modelManifest.url`, none today); with none, the bundled manifest is used and an older disk cache is ignored | a deliberate hard edit like `telemetry-default-off`: T3 Tools would otherwise decide which models SKYCOT offers, and an entry point that forgets `env.cjs` must still fetch nothing |
+| skycot-model-manifest-test | `apps/server/src/provider/ModelManifest.test.ts` | 15-16 (2 lines)                                | upstream's fetch tests run against a SKYCOT test address; `apps/server/src/skycot/modelManifestSource.test.ts` pins the "contacts nothing" default                                                                                            | keeps upstream's cache and freshness tests running against the changed default                                                                                                      |
+
 ## Not touched (by design)
 
 - `apps/mobile/**`, `packages/contracts/**`, `packages/client-runtime/**`:
@@ -143,7 +158,7 @@ takes upstream's path, and the app-side checks only ever narrow what is accepted
   update seams above, which call the fork-owned `apps/desktop/src/skycot/updates.ts`.
   Reuse happens through a Vite/TypeScript alias (`~` → `apps/web/src`, with
   `~/lib/utils` shimmed locally) and `@t3tools/client-runtime` subpath imports.
-- `apps/server/src/**`: only the brand, safety and Family seams listed above. Routing under `/simple/` is hash-based so
+- `apps/server/src/**`: only the brand, safety, Family, update and outside-connection seams listed above. Routing under `/simple/` is hash-based so
   the SPA fallback (which serves the stock `index.html`) never fires for us.
 - Root `vite.config.ts` lint overrides: our path gets none of the web lint
   rules yet (report item C-3); revisit once the client stabilises.

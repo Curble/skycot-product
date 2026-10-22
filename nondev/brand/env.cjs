@@ -55,6 +55,10 @@ function resolveBrandEnv(b, host) {
     // bakes in or an installed app accepts; T3 Code's releases are refused even if named here
     // (seams skycot-update-feed*, packages/skycot-brand/src/updateFeed.ts).
     T3CODE_SKYCOT_UPDATE_FEED: (b.updates && b.updates.feed) || "none",
+    // Where the engine refreshes its AI model list: brand.json `modelManifest.url`, "none" for the
+    // bundled list only. Never T3 Code's repository (seam skycot-model-manifest,
+    // apps/server/src/skycot/modelManifestSource.ts; checked by nondev/scripts/t3-address-guard.ts).
+    T3CODE_SKYCOT_MODEL_MANIFEST_URL: (b.modelManifest && b.modelManifest.url) || "none",
     // Source repository for Advanced mode's release links (apps/web vite define). Upstream's build
     // also reads it as a feed, but a branded build takes T3CODE_SKYCOT_UPDATE_FEED instead.
     T3CODE_DESKTOP_UPDATE_REPOSITORY: b.updateRepository,

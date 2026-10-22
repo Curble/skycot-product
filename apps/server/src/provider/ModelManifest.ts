@@ -20,9 +20,7 @@ import { hasValidClaudeManifestAdapters } from "./ClaudeModelManifest.ts";
 import bundledManifestJson from "./model-manifest.json" with { type: "json" };
 import { ProviderCompatibilityPolicy } from "./providerCompatibility.ts";
 import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
-
-const MODEL_MANIFEST_URL =
-  "https://raw.githubusercontent.com/pingdotgg/t3code/main/apps/server/src/provider/model-manifest.json";
+import * as SkycotModelManifestSource from "../skycot/modelManifestSource.ts"; // nondev-seam: skycot-model-manifest
 
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
 
@@ -194,6 +192,8 @@ export const make = Effect.gen(function* () {
   const serviceScope = yield* Effect.scope;
 
   const cachePath = path.join(config.stateDir, "model-manifest.json");
+  // nondev-seam: skycot-model-manifest (upstream fetched T3 Code's own repository; SKYCOT refreshes only from brand.json's address, and with none uses the bundled manifest, not an older cache)
+  const remoteManifestUrl = SkycotModelManifestSource.configuredModelManifestUrl();
   let manifest = BUNDLED_MODEL_MANIFEST;
   let fetchedAtMs: number | null = null;
   let lastAttemptMs: number | null = null;
@@ -204,6 +204,7 @@ export const make = Effect.gen(function* () {
   // semaphore; `current` must never wait behind an in-flight network refresh.
   const ensureDiskCacheLoaded = yield* Effect.cached(
     Effect.gen(function* () {
+      if (remoteManifestUrl === null) return; // nondev-seam: skycot-model-manifest
       const fromDisk = yield* fileSystem.readFileString(cachePath).pipe(
         Effect.flatMap((raw) => decodeManifestCache(raw)),
         Effect.catchCause(() => Effect.succeed(null)),
@@ -221,6 +222,7 @@ export const make = Effect.gen(function* () {
 
   const refresh = Effect.fn("ModelManifest.refresh")(function* (force = false) {
     yield* ensureDiskCacheLoaded;
+    if (remoteManifestUrl === null) return manifest; // nondev-seam: skycot-model-manifest
     const now = yield* Clock.currentTimeMillis;
     // A timestamp in the future means the wall clock moved backwards (the
     // disk cache crosses restarts, so monotonic time cannot cover it). Treat
@@ -236,7 +238,7 @@ export const make = Effect.gen(function* () {
     if (settings !== null && !settings.enableProviderUpdateChecks) return manifest;
 
     lastAttemptMs = now;
-    const fetched = yield* httpClient.get(MODEL_MANIFEST_URL).pipe(
+    const fetched = yield* httpClient.get(remoteManifestUrl).pipe(
       Effect.flatMap(HttpClientResponse.filterStatusOk),
       Effect.flatMap((response) => response.json),
       Effect.flatMap((json) => decodeManifest(json)),

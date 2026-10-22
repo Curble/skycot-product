@@ -22,6 +22,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 
+import { t3AddressProblems } from "./t3-address-guard.ts";
 import { updateFeedProblems } from "./update-feed-guard.ts";
 
 const require = NodeModule.createRequire(import.meta.url);
@@ -553,6 +554,9 @@ function main(): number {
     ...checkEnv(brand, env),
     // SKYCOT's update feed: the brand's only, never T3 Code's (nondev/scripts/update-feed-guard.ts).
     ...updateFeedProblems(ROOT),
+    // Nothing else of T3 Code's is reachable at runtime either: model list, Connect, analytics
+    // (nondev/scripts/t3-address-guard.ts).
+    ...t3AddressProblems(ROOT),
   ];
 
   if (!quiet) {

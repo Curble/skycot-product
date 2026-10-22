@@ -15,7 +15,9 @@
  *   - the renderer's install call goes through the Family rule;
  *   - no committed updater config (dev-app-update.yml / app-update.yml) names T3 Code.
  *
- * Used by apply-brand.ts and update-feed-guard.test.ts (CI: `node --test nondev/scripts/*.test.ts`).
+ * Used by apply-brand.ts and update-feed-guard.test.ts (CI: `node --test nondev/scripts/*.test.ts`),
+ * and runnable directly: `node nondev/scripts/update-feed-guard.ts`. Its sibling
+ * t3-address-guard.ts covers T3 addresses other than the update feed.
  */
 import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";
@@ -163,4 +165,17 @@ export function updateFeedProblems(root: string = ROOT): string[] {
     }
   }
   return problems;
+}
+
+if (
+  process.argv[1] &&
+  NodePath.resolve(process.argv[1]) === NodeURL.fileURLToPath(import.meta.url)
+) {
+  const problems = updateFeedProblems();
+  if (problems.length > 0) {
+    process.stderr.write(`update-feed-guard: ${problems.length} problem(s)\n`);
+    for (const problem of problems) process.stderr.write(`  - ${problem}\n`);
+    process.exit(1);
+  }
+  process.stdout.write("update-feed-guard: SKYCOT can only update from its own feed\n");
 }
