@@ -218,9 +218,6 @@
 .fm-usage-card__title span {
   color: var(--fm-label-2);
   font-size: calc(12px * var(--fm-text-scale));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .fm-usage-card__figure {
   font-size: calc(13px * var(--fm-text-scale));
@@ -315,6 +312,7 @@
   vertical-align: top;
 }
 .fm-usage-table th {
+  width: 100%;
   text-align: left;
   font-weight: 500;
   overflow-wrap: anywhere;

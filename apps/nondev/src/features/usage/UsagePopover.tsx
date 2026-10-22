@@ -157,12 +157,19 @@ function UsagePopoverBody({ usage, now }: { readonly usage: ProviderUsage; reado
           {usage.windows.map((window) => (
             <li key={window.id} className="fm-usage-pop__window">
               <span className={`fm-usage-dot fm-usage-dot--${window.tone}`} aria-hidden />
-              <span>
-                <b>{window.name}:</b> {window.leftPercent}% left
-                {window.reset ? (
-                  <span className="fm-usage-pop__reset"> · {window.reset}</span>
-                ) : null}
-              </span>
+              {window.expired ? (
+                <span>
+                  <b>{window.name}:</b> {window.reset}
+                  <span className="fm-usage-pop__reset"> · new figure after the next message</span>
+                </span>
+              ) : (
+                <span>
+                  <b>{window.name}:</b> {window.leftPercent}% left
+                  {window.reset ? (
+                    <span className="fm-usage-pop__reset"> · {window.reset}</span>
+                  ) : null}
+                </span>
+              )}
             </li>
           ))}
         </ul>

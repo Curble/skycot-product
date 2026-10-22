@@ -158,6 +158,7 @@ export function clockTime(at: number, timeZone: string): string {
  */
 export function resetPhrase(resetsAt: number, now: number, timeZone: string): string {
   const ahead = resetsAt - now;
+  if (ahead < 0) return refilledPhrase(resetsAt, now, timeZone);
   if (ahead < MINUTE) return "resets in a moment";
   if (ahead < HOUR) {
     const minutes = Math.round(ahead / MINUTE);
@@ -171,6 +172,16 @@ export function resetPhrase(resetsAt: number, now: number, timeZone: string): st
   if (days === 1) return `resets tomorrow ${time}`;
   if (days < 7) return `resets ${at.weekday.slice(0, 3)} ${time}`;
   return `resets ${at.day} ${MONTHS[at.month - 1]}`;
+}
+
+/**
+ * A reset time already behind us: the figure is from before the refill, and the provider sends
+ * a new one with the next message. "refilled 1:12 pm", "refilled yesterday".
+ */
+export function refilledPhrase(resetsAt: number, now: number, timeZone: string): string {
+  const days = zoned(now, timeZone).dayNumber - zoned(resetsAt, timeZone).dayNumber;
+  if (days <= 0) return `refilled ${clockTime(resetsAt, timeZone)}`;
+  return days === 1 ? "refilled yesterday" : `refilled ${days} days ago`;
 }
 
 /** "Updated just now", "Updated 4 minutes ago", "Updated 2:10 pm", "Updated yesterday". */
@@ -195,7 +206,18 @@ export interface PlainUsageWindow {
   readonly resetsAt: number | null;
   /** "resets 3:40 pm"; null when the provider did not say. */
   readonly reset: string | null;
-  /** "5-hour window: 62% left · resets 3:40 pm" */
+  /**
+   * The reset time has passed since the provider reported: the share is from before the
+   * refill, so it is not shown as the share left and never decides the ring.
+   */
+  readonly expired: boolean;
+  /**
+   * Whether this window can decide the ring. Claude's model-only weekly allowance ("This week
+   * (Opus)") stops one model, not the assistant, and its extra-spending cap is not an
+   * allowance; both show in the lists but never colour the ring on their own.
+   */
+  readonly decides: boolean;
+  /** "5-hour window: 62% left · resets 3:40 pm", or "5-hour window: refilled 1:12 pm" */
   readonly line: string;
 }
 
@@ -302,14 +324,22 @@ function plainWindow(
   const resetsAt = Number.isFinite(parsed) ? parsed : null;
   const reset = resetsAt === null ? null : resetPhrase(resetsAt, now, timeZone);
   const name = windowName(window, driver);
+  const expired = resetsAt !== null && resetsAt < now;
   return {
     id: window.id,
     name,
     leftPercent,
-    tone: usageTone(leftPercent),
+    tone: expired ? "unknown" : usageTone(leftPercent),
     resetsAt,
     reset,
-    line: `${name}: ${leftPercent}% left${reset ? ` · ${reset}` : ""}`,
+    expired,
+    decides: !(
+      driver === "claudeAgent" &&
+      (window.id.startsWith("seven_day_") || window.id === "monthly_spend")
+    ),
+    line: expired
+      ? `${name}: ${reset}, new figure after the next message`
+      : `${name}: ${leftPercent}% left${reset ? ` · ${reset}` : ""}`,
   };
 }
 
@@ -318,8 +348,12 @@ function plainWindow(
  * (resets later), since that is the one actually holding the person back.
  */
 export function bindingWindow(windows: ReadonlyArray<PlainUsageWindow>): PlainUsageWindow | null {
+  const live = windows.filter((window) => !window.expired);
+  const deciding = live.some((window) => window.decides)
+    ? live.filter((window) => window.decides)
+    : live;
   let best: PlainUsageWindow | null = null;
-  for (const window of windows) {
+  for (const window of deciding) {
     if (
       best === null ||
       window.leftPercent < best.leftPercent ||

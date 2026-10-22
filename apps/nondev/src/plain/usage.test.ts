@@ -270,6 +270,72 @@ describe("bindingWindow", () => {
   });
 });
 
+describe("Claude's model-only allowance", () => {
+  it("shows in the list but does not empty the ring while the main allowance has room", () => {
+    const usage = describeProviderUsage(
+      provider({
+        instanceId: "claudeAgent",
+        driver: "claudeAgent",
+        usageLimits: {
+          checkedAt: "2026-10-22T02:58:00.000Z",
+          windows: [
+            { id: "seven_day", kind: "weekly", label: "Weekly", usedPercent: 56 },
+            { id: "seven_day_fable", kind: "weekly", label: "Weekly · Fable", usedPercent: 100 },
+          ],
+        },
+      }),
+      NOW,
+      TZ,
+    );
+    expect(usage.windows.map((window) => window.line)).toEqual([
+      "This week: 44% left",
+      "This week (Fable): 0% left",
+    ]);
+    expect(usage).toMatchObject({ leftPercent: 44, tone: "ok" });
+  });
+});
+
+describe("a window whose reset has already passed", () => {
+  it("says it refilled instead of showing a stale share, and never decides the ring", () => {
+    const usage = describeProviderUsage(
+      provider({
+        instanceId: "claudeAgent",
+        driver: "claudeAgent",
+        usageLimits: {
+          checkedAt: "2026-10-21T22:00:00.000Z",
+          windows: [
+            {
+              id: "five_hour",
+              kind: "session",
+              label: "Session",
+              usedPercent: 97,
+              windowDurationMins: 300,
+              resetsAt: "2026-10-22T02:12:00.000Z",
+            },
+            {
+              id: "seven_day",
+              kind: "weekly",
+              label: "Weekly",
+              usedPercent: 56,
+              windowDurationMins: 10080,
+              resetsAt: "2026-10-26T17:59:00.000Z",
+            },
+          ],
+        },
+      }),
+      NOW,
+      TZ,
+    );
+    expect(usage.windows[0]).toMatchObject({
+      expired: true,
+      tone: "unknown",
+      line: "5-hour window: refilled 1:12 pm, new figure after the next message",
+    });
+    expect(usage).toMatchObject({ leftPercent: 44, tone: "ok" });
+    expect(usage.binding?.id).toBe("seven_day");
+  });
+});
+
 describe("usageWarning", () => {
   const at = (primaryUsed: number) => {
     const limits = {

@@ -175,18 +175,24 @@ function ProviderCard({
             <li key={window.id}>
               <div className="fm-usage-card__row">
                 <span>{window.name}</span>
-                <span>
-                  <b>{window.leftPercent}% left</b>
-                  {window.reset ? ` · ${window.reset}` : ""}
-                </span>
+                {window.expired ? (
+                  <span>{window.reset}, new figure after the next message</span>
+                ) : (
+                  <span>
+                    <b>{window.leftPercent}% left</b>
+                    {window.reset ? ` · ${window.reset}` : ""}
+                  </span>
+                )}
               </div>
-              <ProgressBar
-                value={window.leftPercent}
-                max={100}
-                tone={BAR_TONE[window.tone]}
-                thin
-                label={`${usage.brand}, ${window.line}`}
-              />
+              {window.expired ? null : (
+                <ProgressBar
+                  value={window.leftPercent}
+                  max={100}
+                  tone={BAR_TONE[window.tone]}
+                  thin
+                  label={`${usage.brand}, ${window.line}`}
+                />
+              )}
             </li>
           ))}
         </ul>
