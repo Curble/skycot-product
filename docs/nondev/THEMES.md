@@ -5,14 +5,15 @@ headings, whether cards look hand-drawn, and what your crew is called. A theme c
 never change what SKYCOT _does_. Approvals, undo and "put it live" look plain and
 calm in every theme, on purpose.
 
-Themes are small text files you can share. SKYCOT ships with four:
+Themes are small text files you can share. SKYCOT ships with four. **Workshop is the
+default look**; **Classic** is the calm alternative for anyone who prefers it, one click away.
 
-| Theme         | Feel                                                                                    |
-| ------------- | --------------------------------------------------------------------------------------- |
-| **Classic**   | The Apple Messages look. Calm, clean, familiar.                                         |
-| **Workshop**  | Playful, hand-drawn. Cream paper, marker pens, and a named crew: Sam builds, Mo checks. |
-| **Paper**     | Warm paper and ink, serif headings, one vermilion accent.                               |
-| **Night Ops** | Dark navy glass with cyan, mint, amber and coral status lights.                         |
+| Theme                  | Feel                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| **Workshop** (default) | Playful, hand-drawn. Cream paper, marker pens, and a named crew: Sam builds, Mo checks. |
+| **Classic**            | The Apple Messages look. Calm, clean, familiar.                                         |
+| **Paper**              | Warm paper and ink, serif headings, one vermilion accent.                               |
+| **Night Ops**          | Dark navy glass with cyan, mint, amber and coral status lights.                         |
 
 ## Picking a theme
 
@@ -20,7 +21,10 @@ Settings → Appearance → **Theme**. Hover a card to try it on for a moment; c
 to keep it. Light and dark are a separate switch underneath, and every theme has
 both sides.
 
-The first time you open SKYCOT, the welcome steps include **Pick a look**.
+The first time you open SKYCOT, the welcome steps include **Pick a look**, with Workshop
+already ticked. Whatever you pick stays picked, Classic included. A Mac that was already
+using SKYCOT in Classic before Workshop became the default (22 October 2026) stays in Classic
+until you choose otherwise.
 
 ## Sharing a theme
 

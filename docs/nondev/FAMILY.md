@@ -44,8 +44,8 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
 - **The assistant's own SKYCOT tools are trimmed.** It cannot start other conversations,
   schedule automations or open pull requests through SKYCOT while the profile is on. Page
   previews still work.
-- **The look.** Workshop (cream paper, marker pens, Sam builds and Mo checks) and larger
-  text come on. Both are ordinary preferences anyone can change; looks never change what
+- **The look.** Workshop (cream paper, marker pens, Sam builds and Mo checks; SKYCOT's
+  default look) stays on unless a parent picked another look, and larger text comes on. Both are ordinary preferences anyone can change; looks never change what
   SKYCOT does.
 - **The greeting uses the child's name**, if one was given.
 

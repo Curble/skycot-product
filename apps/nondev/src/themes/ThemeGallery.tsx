@@ -15,6 +15,7 @@ import {
   endPreview,
   importTheme,
   previewTheme,
+  readDefaultTheme,
   removeCustomTheme,
   setActiveTheme,
   useActiveTheme,
@@ -90,7 +91,10 @@ export function ThemeGallery({
     const theme = active;
     removeCustomTheme(theme.id);
     setConfirmRemove(false);
-    setNotice({ text: `Removed “${theme.name}”. Back to Classic.`, removed: theme });
+    setNotice({
+      text: `Removed “${theme.name}”. Back to ${readDefaultTheme().name}.`,
+      removed: theme,
+    });
   };
   const undoRemove = (theme: SkycotTheme) => {
     const outcome = importTheme(theme);
@@ -245,7 +249,7 @@ export function ThemeGallery({
             icon={Trash2}
             iconTone="red"
             title={`Remove “${active.name}”?`}
-            description="It leaves My themes and this browser, and the look goes back to Classic. Export it first if you might want it later; Undo in the notice brings it back until you leave this screen."
+            description={`It leaves My themes and this browser, and the look goes back to ${readDefaultTheme().name}. Export it first if you might want it later; Undo in the notice brings it back until you leave this screen.`}
             sober
             dismissOnBackdrop={false}
             actions={

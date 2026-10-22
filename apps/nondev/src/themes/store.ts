@@ -5,13 +5,21 @@ import type { ClientSettings } from "@t3tools/contracts";
 import { useSyncExternalStore } from "react";
 
 import { applyThemeToRoot, paintColors, type Mode } from "./apply";
-import { BUILT_IN_THEMES, CLASSIC_THEME, CLASSIC_THEME_ID, isBuiltInThemeId } from "./library";
+import { DEFAULT_THEME_ID, resolveActiveThemeId, settleBrowserDefault } from "./defaultTheme";
+import { BUILT_IN_THEMES, isBuiltInThemeId } from "./library";
 import { parseTheme, type SkycotTheme } from "./schema";
 
 export const ACTIVE_THEME_KEY = "skycot:theme";
 export const CUSTOM_THEMES_KEY = "skycot:themes:custom";
 /** `{ light: { window, toolbar }, dark: {…} }` for index.html's first paint. */
 export const PAINT_KEY = "skycot:theme:paint";
+/** This browser's look when none was picked: "workshop", or "classic" if it predates that default. */
+export const BROWSER_DEFAULT_KEY = "skycot:theme:default";
+/** Mirrors ONBOARDING_KEY in features/settings/localPrefs.ts (an earlier run answered it). */
+const ONBOARDING_KEY = "skycot:onboarding";
+
+/** The default look, for the server render and anything unreadable. */
+const FALLBACK_THEME: SkycotTheme = BUILT_IN_THEMES.find((theme) => theme.id === DEFAULT_THEME_ID)!;
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -71,8 +79,36 @@ function writeCustomThemes(themes: ReadonlyArray<SkycotTheme>) {
   notify();
 }
 
+let browserDefault: string | null = null;
+
+/**
+ * Settled once per browser, on the first read of a visit (before this visit saves its first
+ * paint colour, which is how an earlier run is recognised), and remembered from then on.
+ */
+function readBrowserDefault(): string {
+  if (browserDefault !== null) return browserDefault;
+  const settled = read(BROWSER_DEFAULT_KEY);
+  browserDefault = settleBrowserDefault({
+    settled,
+    chosen: read(ACTIVE_THEME_KEY),
+    ranBefore: read(PAINT_KEY) !== null || read(ONBOARDING_KEY) !== null,
+  });
+  if (settled !== browserDefault) write(BROWSER_DEFAULT_KEY, browserDefault);
+  return browserDefault;
+}
+
+/** The id in force: the stored choice, else this browser's default (Workshop for anyone new). */
 export function readActiveThemeId(): string {
-  return read(ACTIVE_THEME_KEY) ?? CLASSIC_THEME_ID;
+  return resolveActiveThemeId(read(ACTIVE_THEME_KEY), readBrowserDefault());
+}
+
+/** Whether the person ever picked a look here (Classic included); the default is not a choice. */
+export function hasChosenTheme(): boolean {
+  return read(ACTIVE_THEME_KEY) !== null;
+}
+
+function defaultTheme(): SkycotTheme {
+  return themeById(readBrowserDefault()) ?? FALLBACK_THEME;
 }
 
 export function allThemes(): ReadonlyArray<SkycotTheme> {
@@ -83,15 +119,20 @@ export function themeById(id: string): SkycotTheme | null {
   return allThemes().find((theme) => theme.id === id) ?? null;
 }
 
-/** The theme in force: the stored choice when it still exists, else Classic. */
+/** The theme in force: the stored choice when it still exists, else the default. */
 export function readActiveTheme(): SkycotTheme {
-  return themeById(readActiveThemeId()) ?? CLASSIC_THEME;
+  return themeById(readActiveThemeId()) ?? defaultTheme();
+}
+
+/** The look someone gets when they have not picked one; "Back to Workshop" after a removal. */
+export function readDefaultTheme(): SkycotTheme {
+  return defaultTheme();
 }
 
 let previewing: SkycotTheme | null = null;
 
 export function useActiveTheme(): SkycotTheme {
-  return useSyncExternalStore(subscribe, readActiveTheme, () => CLASSIC_THEME);
+  return useSyncExternalStore(subscribe, readActiveTheme, () => FALLBACK_THEME);
 }
 
 /** The theme on the page right now: a hover/focus/editor preview when there is one, else the stored choice. */
@@ -101,7 +142,7 @@ export function readShownTheme(): SkycotTheme {
 
 /** For copy that should follow a preview too (crew names, "the Paper look"), not only the saved choice. */
 export function useShownTheme(): SkycotTheme {
-  return useSyncExternalStore(subscribe, readShownTheme, () => CLASSIC_THEME);
+  return useSyncExternalStore(subscribe, readShownTheme, () => FALLBACK_THEME);
 }
 
 export function useThemes(): ReadonlyArray<SkycotTheme> {
@@ -134,9 +175,10 @@ export function reapplyActiveTheme(mode: Mode): void {
   write(PAINT_KEY, JSON.stringify(paintColors(readActiveTheme())));
 }
 
+/** Keeps a look as the person's choice. Classic is stored too: picking it is a choice, not "no choice". */
 export function setActiveTheme(id: string): void {
-  const theme = themeById(id) ?? CLASSIC_THEME;
-  write(ACTIVE_THEME_KEY, theme.id === CLASSIC_THEME_ID ? null : theme.id);
+  const theme = themeById(id) ?? defaultTheme();
+  write(ACTIVE_THEME_KEY, theme.id);
   previewing = null;
   reapplyActiveTheme(currentMode());
   notify();
@@ -182,7 +224,14 @@ export function importTheme(input: unknown): ImportOutcome {
 
 export function removeCustomTheme(id: string): void {
   writeCustomThemes(readCustomThemes().filter((theme) => theme.id !== id));
-  if (readActiveThemeId() === id) setActiveTheme(CLASSIC_THEME_ID);
+  // Removing the look in use is not a new choice: back to the default, as if none was picked.
+  if (read(ACTIVE_THEME_KEY) === id) {
+    write(ACTIVE_THEME_KEY, null);
+    previewing = null;
+    reapplyActiveTheme(currentMode());
+    notify();
+    void mirrorToDesktop(defaultTheme().id);
+  }
 }
 
 /**

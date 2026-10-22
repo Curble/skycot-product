@@ -28,12 +28,7 @@ import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/prefe
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
 import { ThemeGallery } from "../../themes/ThemeGallery";
-import {
-  readActiveThemeId,
-  setActiveTheme,
-  useActiveTheme,
-  useShownTheme,
-} from "../../themes/store";
+import { hasChosenTheme, setActiveTheme, useActiveTheme, useShownTheme } from "../../themes/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { List, ListExtra, ListRow } from "../../ui/ListRow";
@@ -547,9 +542,10 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
 function LookStep({ preselectWorkshop }: { readonly preselectWorkshop: boolean }) {
   // Follows a hover/focus preview too, so the sentence names the look on screen.
   const theme = useShownTheme();
-  // The child path arrives with Workshop already ticked; a look chosen earlier stands.
+  // Workshop is everyone's default, so it is already ticked unless a look was picked (that
+  // stands). The child path also pins it, for a browser whose default predates Workshop.
   useEffect(() => {
-    if (preselectWorkshop && readActiveThemeId() === "classic") setActiveTheme(FAMILY_THEME_ID);
+    if (preselectWorkshop && !hasChosenTheme()) setActiveTheme(FAMILY_THEME_ID);
   }, [preselectWorkshop]);
   return (
     <div className="fm-onboarding">

@@ -16,14 +16,17 @@ function load(json: unknown, id: string): SkycotTheme {
 
 export const CLASSIC_THEME_ID = "classic";
 
+// Workshop first: it is the default look (defaultTheme.ts); Classic is the calm alternative.
 export const BUILT_IN_THEMES: ReadonlyArray<SkycotTheme> = [
-  load(classicJson, "classic"),
   load(workshopJson, "workshop"),
+  load(classicJson, "classic"),
   load(paperJson, "paper"),
   load(nightOpsJson, "night-ops"),
 ];
 
-export const CLASSIC_THEME: SkycotTheme = BUILT_IN_THEMES[0]!;
+export const CLASSIC_THEME: SkycotTheme = BUILT_IN_THEMES.find(
+  (theme) => theme.id === CLASSIC_THEME_ID,
+)!;
 
 export function isBuiltInThemeId(id: string): boolean {
   return BUILT_IN_THEMES.some((theme) => theme.id === id);

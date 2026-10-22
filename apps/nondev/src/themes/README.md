@@ -9,28 +9,31 @@ Plain-English authoring guide: [`docs/nondev/THEMES.md`](../../../../docs/nondev
 
 ## Files
 
-| File                                       | Role                                                                                                                                                                                                                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `schema.ts`                                | The format, as an Effect `Schema`. `parseTheme()` validates text or an object and returns plain-English problems. Imports only `effect`, so `scripts/validate-theme.ts` can load it from Node.                                                                     |
-| `library/*.theme.json`                     | Built-ins: `classic` (today's Apple look, every token spelled out), `workshop` (Option C, hand-drawn, Sam and Mo), `paper` (Option B, ink on paper, serif), `night-ops` (Option D, navy glass).                                                                    |
-| `library.ts`                               | Loads and re-validates the built-ins at import time.                                                                                                                                                                                                               |
-| `apply.ts`                                 | `applyThemeToRoot(theme, mode, root)`: inline `--fm-*` properties for the active light/dark mode plus `data-theme` and `data-flavour-*` attributes on `<html>`. Pure over a small `ThemeRoot` for tests.                                                           |
-| `store.ts`                                 | Persistence (`skycot:theme`, `skycot:themes:custom`, `skycot:theme:paint`), `useActiveTheme()`, `useThemes()`, `setActiveTheme()`, `previewTheme()`/`endPreview()`, `importTheme()`, `removeCustomTheme()`, and the mirror into the desktop app's client settings. |
-| `useCrew.ts`                               | `useCrew()` → `{ named, builder, checker, characters, playful }` with neutral fallbacks (`CREW_NAME`).                                                                                                                                                             |
-| `CrewAvatar.tsx`, `CrewName.tsx`           | The faces and names, flavour-aware.                                                                                                                                                                                                                                |
-| `Confetti.tsx`                             | One-shot confetti for "It's live", gated on `motion: playful` and `prefers-reduced-motion`.                                                                                                                                                                        |
-| `ThemeGallery.tsx`, `ThemeEditorSheet.tsx` | Settings → Appearance and onboarding "Pick a look".                                                                                                                                                                                                                |
+| File                                       | Role                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema.ts`                                | The format, as an Effect `Schema`. `parseTheme()` validates text or an object and returns plain-English problems. Imports only `effect`, so `scripts/validate-theme.ts` can load it from Node.                                                                                             |
+| `library/*.theme.json`                     | Built-ins: `workshop` (the default look; Option C, hand-drawn, Sam and Mo), `classic` (the calm Apple look, every token spelled out), `paper` (Option B, ink on paper, serif), `night-ops` (Option D, navy glass).                                                                         |
+| `library.ts`                               | Loads and re-validates the built-ins at import time.                                                                                                                                                                                                                                       |
+| `apply.ts`                                 | `applyThemeToRoot(theme, mode, root)`: inline `--fm-*` properties for the active light/dark mode plus `data-theme` and `data-flavour-*` attributes on `<html>`. Pure over a small `ThemeRoot` for tests.                                                                                   |
+| `defaultTheme.ts`                          | Which look someone sees before they pick one: Workshop, or Classic for a browser that used SKYCOT before Workshop became the default. Pure and tested.                                                                                                                                     |
+| `store.ts`                                 | Persistence (`skycot:theme`, `skycot:theme:default`, `skycot:themes:custom`, `skycot:theme:paint`), `useActiveTheme()`, `useThemes()`, `setActiveTheme()`, `previewTheme()`/`endPreview()`, `importTheme()`, `removeCustomTheme()`, and the mirror into the desktop app's client settings. |
+| `useCrew.ts`                               | `useCrew()` → `{ named, builder, checker, characters, playful }` with neutral fallbacks (`CREW_NAME`).                                                                                                                                                                                     |
+| `CrewAvatar.tsx`, `CrewName.tsx`           | The faces and names, flavour-aware.                                                                                                                                                                                                                                                        |
+| `Confetti.tsx`                             | One-shot confetti for "It's live", gated on `motion: playful` and `prefers-reduced-motion`.                                                                                                                                                                                                |
+| `ThemeGallery.tsx`, `ThemeEditorSheet.tsx` | Settings → Appearance and onboarding "Pick a look".                                                                                                                                                                                                                                        |
 
 ## How a theme reaches the page
 
 1. `app/theme.ts` decides light or dark (same keys as the stock UI) and calls
    `reapplyActiveTheme(mode)`.
-2. `store.ts` resolves the active theme (stored id → built-in or custom → Classic)
-   and calls `applyThemeToRoot`.
+2. `store.ts` resolves the active theme (stored id → built-in or custom → this
+   browser's default, normally Workshop) and calls `applyThemeToRoot`. Picking Classic is
+   stored like any other choice; only "never picked" follows the default.
 3. Tokens the theme does not set are **removed** from `<html>`, so the stylesheet's
    own values (Classic, mode-aware) show through. A theme may therefore be sparse.
 4. `index.html` reads `skycot:theme:paint` before React mounts so the first paint is
-   the theme's window colour, not white or black.
+   the theme's window colour, not white or black. With nothing saved (a new browser) it
+   paints Workshop's colours; `defaultTheme.test.ts` keeps them in step.
 
 ## Invariants worth keeping
 
