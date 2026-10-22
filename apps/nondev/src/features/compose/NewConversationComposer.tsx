@@ -6,7 +6,7 @@ import { Atom } from "effect/reactivity";
 import { AlertCircle, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { newMessageId, newThreadId, randomUUID } from "~/lib/utils";
+import { newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CrewName } from "../../themes/CrewName";
@@ -46,10 +46,11 @@ import {
 } from "./autonomy";
 import { firstBlank } from "../starters/starters";
 import type { ComposerSeed } from "../starters/StarterCards";
+import { useShield, type ShieldOutcome } from "../shield";
+import { firstMessageLabels } from "./firstMessage";
 import { MessageField } from "./MessageField";
 import { usePictures } from "./usePictures";
 import {
-  branchNameFor,
   folderReadiness,
   plainPrivateCopyProblem,
   PRIVATE_COPY_COPY,
@@ -303,6 +304,9 @@ function ComposerField({
   });
   const [phase, setPhase] = useState<string | null>(null);
   const pictures = usePictures();
+  const family = useFamily();
+  // Family profile: a full name, school, address or photo waits for the child's pick first.
+  const shield = useShield();
   const [tracking, setTracking] = useState<{
     readonly resolve: (choice: TrackingChoice) => void;
   } | null>(null);
@@ -376,25 +380,25 @@ function ComposerField({
     return { baseBranch: readiness.baseBranch };
   };
 
-  const send = async (): Promise<SendOutcome> => {
+  const send = async (cleared: Extract<ShieldOutcome, { kind: "send" }>): Promise<SendOutcome> => {
     if (!ready || trimmed.length === 0 || modelSelection === null) return { kind: "cancelled" };
     const runtimeMode = runtimeModeFor(autonomy, provider);
     const createdAt = new Date().toISOString();
+    // The id the shield minted: a grown-up's "as typed" was recorded against this message.
     const message = {
-      messageId: newMessageId(),
+      messageId: cleared.messageId,
       role: "user",
-      text: trimmed,
+      text: cleared.text,
       attachments: pictures.uploads(),
     } as const;
+    const labels = firstMessageLabels(cleared.text, randomUUID(), family.enabled);
     const folder = await prepareFolder();
     if ("cancelled" in folder) {
       setPhase(null);
       return { kind: "cancelled" };
     }
     const privateCopy =
-      "baseBranch" in folder
-        ? { baseBranch: folder.baseBranch, branch: branchNameFor(trimmed, randomUUID()) }
-        : null;
+      "baseBranch" in folder ? { baseBranch: folder.baseBranch, branch: labels.branch } : null;
 
     const start = (threadId: ThreadId, worktree: typeof privateCopy) =>
       startTurn({
@@ -403,7 +407,7 @@ function ComposerField({
           threadId,
           message,
           modelSelection,
-          titleSeed: trimmed,
+          titleSeed: labels.title,
           runtimeMode,
           interactionMode: "default",
           createdAt,
@@ -411,7 +415,7 @@ function ComposerField({
             createThread: {
               projectId: project.id,
               // The engine requires a non-empty title; the server regenerates a better one later.
-              title: titleSeedFrom(trimmed),
+              title: labels.title,
               modelSelection,
               runtimeMode,
               interactionMode: "default",
@@ -459,6 +463,21 @@ function ComposerField({
     return { kind: "started" };
   };
 
+  // The shield first, before "Starting…": the card waits for the child, the field stays theirs.
+  const sendCleared = async () => {
+    if (!ready || trimmed.length === 0) return;
+    const cleared = await shield.clear(trimmed, pictures.pictures.length);
+    if (cleared.kind === "edit") {
+      if (cleared.dropPictures) pictures.clear();
+      return;
+    }
+    await onSend(async () => {
+      const outcome = await send(cleared);
+      if (outcome.kind === "started") pictures.clear();
+      return outcome;
+    });
+  };
+
   const placeholder = !connected
     ? "Waiting for your Mac to reconnect…"
     : !canOperate
@@ -478,6 +497,7 @@ function ComposerField({
           Add a photo of your drawing with the <b>+</b> button, then press Send.
         </p>
       ) : null}
+      {shield.card}
       <MessageField
         inputRef={inputRef}
         value={text}
@@ -485,13 +505,7 @@ function ComposerField({
         pictures={pictures.pictures}
         onAddPictures={pictures.add}
         onRemovePicture={pictures.remove}
-        onSend={() =>
-          void onSend(async () => {
-            const outcome = await send();
-            if (outcome.kind === "started") pictures.clear();
-            return outcome;
-          })
-        }
+        onSend={() => void sendCleared()}
         canSend={ready && trimmed.length > 0 && !sending}
         disabled={!ready || sending}
         placeholder={placeholder}
@@ -515,15 +529,6 @@ function ComposerField({
       {tracking ? <TrackingSheet projectTitle={project.title} onChoose={tracking.resolve} /> : null}
     </>
   );
-}
-
-function titleSeedFrom(text: string): string {
-  const line =
-    text
-      .split(/\r?\n/)
-      .find((part) => part.trim().length > 0)
-      ?.trim() ?? "New conversation";
-  return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
 }
 
 function calm(error: unknown): string {
