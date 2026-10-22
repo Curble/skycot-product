@@ -228,6 +228,23 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .crewrow p{color:var(--text2);font-size:16px}
 @media (max-width:600px){.crewrow{flex-direction:column;align-items:flex-start;padding:20px}}
 .cards.two{grid-template-columns:repeat(2,1fr)}
+/* New for families: two groups of feature cards, each led by one wide card */
+.fgroup{margin-top:52px}
+.fgroup .gh{font-size:clamp(22px,2.4vw,28px);font-weight:700;margin:0}
+.fgroup .gs{color:var(--text2);margin:6px 0 0;font-size:17px}
+.fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:22px}
+.fcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.fcard.wide{grid-column:1/-1;flex-direction:row;align-items:center}
+.fcard img{display:block;width:100%;height:auto;aspect-ratio:1200/707;object-fit:cover;object-position:top center;border-bottom:1px solid var(--line)}
+.fcard .t{padding:20px 22px 24px}
+.fcard h3{font-size:20px;margin:0 0 6px}
+.fcard p{color:var(--text2);font-size:16px;margin:0}
+.fcard.wide img{width:62%;flex:none;border-bottom:0;border-right:1px solid var(--line)}
+.fcard.wide .t{padding:28px 32px}
+.fcard.wide h3{font-size:clamp(22px,2.4vw,30px);margin-bottom:10px}
+.fcard.wide p{font-size:17px}
+@media (max-width:820px){.fcard.wide{flex-direction:column;align-items:stretch}.fcard.wide img{width:100%;border-right:0;border-bottom:1px solid var(--line)}.fcard.wide .t{padding:20px 22px 24px}}
+@media (max-width:600px){.fgrid{grid-template-columns:1fr}}
 .card .ask{color:var(--text);font-style:italic;margin-bottom:10px}
 .looks.two{grid-template-columns:repeat(2,1fr)}
 .honest.center-note{text-align:center;max-width:44em;margin-left:auto;margin-right:auto}
@@ -393,6 +410,7 @@ def nav(grownup=False):
   <a class="brand" href="/" aria-label="SKYCOT home">{lockup(grownup)}</a>
   <ul>
     <li><a href="/#family">Family</a></li>
+    <li><a href="/#new">New</a></li>
     <li><a href="/#ideas">What kids make</a></li>
     <li><a href="/#how">How it works</a></li>
     <li><a href="/#safety">Safety</a></li>
@@ -411,6 +429,7 @@ FOOTER = '''<footer><div class="wrap">
     <a class="brand" href="/" aria-label="SKYCOT home"><!--lockup--></a>
     <ul>
       <li><a href="/#family">Family</a></li>
+      <li><a href="/#new">New</a></li>
       <li><a href="/#ideas">What kids make</a></li>
       <li><a href="/#how">How it works</a></li>
       <li><a href="/#safety">Safety</a></li>
@@ -496,6 +515,80 @@ def tour_html():
 
 WORKSHOP_TOUR = tour_html()
 
+# New for families: the shipped family features (22 Oct 2026). Images come from one demo family
+# (Ava and her brother Leo, both fictional) in the Workshop look. Only shipped features go here.
+FEATURES_KIDS = [
+    ("fam-starters.jpg", "Tap a card to start",
+     "Eight one-tap ideas: a game, a page about a pet, a birthday card, a comic, a quiz and more. A tap fills in the message with blanks to change, and nothing is sent until they press Send.",
+     "starters", True),
+    ("fam-talk.jpg", "Talk to SKYCOT",
+     "Tap the microphone and say it; the words appear in the box. Replies can be read aloud by a voice on the Mac. Voice typing stays off until a grown-up turns it on.",
+     "talk", False),
+    ("fam-draw.jpg", "Draw it, then build it",
+     "Draw on paper, snap a photo and add it to the message. SKYCOT builds from the drawing, and Open it runs the result right inside SKYCOT, with no internet.",
+     "draw", False),
+    ("fam-explain.jpg", "“How did you do that?”",
+     "After a build, SKYCOT explains what it did in kid-sized words, with a peek at the real code for the curious.",
+     "explain", False),
+    ("fam-stickers.jpg", "Stickers and a certificate",
+     "Sixteen stickers for real moments, like a first creation, a first Undo or saying please. Nothing rewards time spent, and nothing is ever taken away. Print a “My first app” certificate for the fridge.",
+     "stickers", False),
+]
+FEATURES_GROWNUPS = [
+    ("fam-recap.jpg", "The grown-up recap",
+     "“Ava made 4 things this week.” Time on SKYCOT, what they made, their proudest thing and anything that needed a grown-up. It opens with the parent code, is built on your Mac, and prints or saves as a PDF.",
+     "recap", True),
+    ("fam-shield.jpg", "Personal details stay home",
+     "Before a message goes, SKYCOT spots a full name, school, address, phone number, email or birthday and suggests leaving it out. It looks for common patterns, so stay nearby.",
+     "shield", False),
+    ("fam-siblings.jpg", "A profile for each child",
+     "Up to eight children under one parent code, each with their own name, picture, look, voice settings and limits. “Who’s using SKYCOT?” asks when it opens.",
+     "siblings", False),
+    ("fam-bedtime.jpg", "Bedtime and daily limits",
+     "Set a bedtime and a daily time or message limit for each child. A calm heads-up comes five minutes before; the step that’s running finishes, then SKYCOT sleeps. Limits apply inside SKYCOT only.",
+     "bedtime", False),
+    ("fam-fridge.jpg", "The family fridge",
+     "Pin the best things to the fridge, where the whole family can open them. Taking one down never deletes it.",
+     "fridge", False),
+]
+FEATURE_ALTS = {
+    "starters": "Home in the Workshop look greeting Ava, with eight colourful starter cards such as Make a game, A page about my pet and Draw it, then build it.",
+    "talk": "SKYCOT listening as Ava asks, Can Bubbles blow bubbles when I click her?, with her words appearing in the message box.",
+    "draw": "Ava's crayon rocket drawing, turned into a working page and opened inside SKYCOT, offline.",
+    "explain": "Sam explains how he drew Bubbles the axolotl in simple words, Mo says what he checked, and the code is shown underneath.",
+    "stickers": "Ava's sticker book: First creation, Game maker, Animal friend, Drew it first, Said it out loud and Kind words, with the rest still to find.",
+    "recap": "The grown-up recap, Ava's week: 40 minutes on SKYCOT, 4 things made, a bar for each day and her rocket page as the thing she is most proud of.",
+    "shield": "Mo spots a full name and a school in Ava's message and suggests sending Ava and school instead.",
+    "siblings": "The Who's using SKYCOT? picker with big buttons for Ava and Leo.",
+    "bedtime": "SKYCOT is asleep: it's bedtime, Leo, SKYCOT wakes up at 7:00 am, with Ask a grown-up for more time.",
+    "fridge": "Ava's fridge with three things she made: a rocket drawing page, a star-catching game and a page about her axolotl.",
+}
+
+def feature_cards(items):
+    out = []
+    for img, title, body, key, wide in items:
+        alt = html.escape(FEATURE_ALTS[key])
+        cls = "fcard wide" if wide else "fcard"
+        out.append(f'<div class="{cls}"><img src="assets/{img}" width="1200" height="707" loading="lazy" alt="{alt}">'
+                   f'<div class="t"><h3>{html.escape(title, quote=False)}</h3><p>{html.escape(body, quote=False)}</p></div></div>')
+    return "\n    ".join(out)
+
+def new_for_families():
+    return f'''<section id="new" class="alt"><div class="wrap">
+  <div class="center"><p class="kicker">New for families</p><h2 class="title">Made for kids. <span class="nw">Run by grown-ups.</span></h2>
+  <p class="sub">Ten things that make SKYCOT a workshop for children, with a grown-up’s control behind every one. All of them are in today’s early-access build.</p></div>
+  <div class="fgroup"><p class="gh">For kids</p><p class="gs">Say it, tap it or draw it, and find out how it was made.</p>
+  <div class="fgrid">
+    {feature_cards(FEATURES_KIDS)}
+  </div></div>
+  <div class="fgroup"><p class="gh">For grown-ups</p><p class="gs">See what they made, keep their details at home, and decide when the workshop closes.</p>
+  <div class="fgrid">
+    {feature_cards(FEATURES_GROWNUPS)}
+  </div></div>
+  <p class="fine center" style="margin:28px auto 0">Screens from SKYCOT’s early-access build, with sample children called Ava and Leo. The Mac download is coming soon.</p>
+</div></section>
+'''
+
 def home_body():
     hero = f'''<section class="hero"><div class="wrap">
   {mascot("sky-hero", "SKYCOT the cloud, waving hello")}
@@ -557,10 +650,11 @@ def home_body():
     <div class="shot"><img src="assets/family-parent-code.jpg" width="1200" height="707" alt="The Publish sheet for a sample café website in the Workshop look, with a Parent code step: Uploading a draft line needs a parent's OK while the Family profile is on."></div>
   </div>
 
-  <p class="honest"><b>An honest note.</b> The Family profile is a set of guardrails inside SKYCOT, not a security or parental-control product. It doesn't filter the web, decide what the AI may talk about, lock the Mac or replace Screen Time, and a determined teenager could get round it. SKYCOT runs on the parent's own Mac and AI account, under the parent's supervision, and each AI service's own age rules still apply (see <a href="#faq">the questions below</a>). It makes the first experience safe and kind. The rest is parenting.</p>
+  <p class="honest"><b>An honest note.</b> The Family profile is a set of guardrails inside SKYCOT, not a security or parental-control product. It doesn't filter the web, lock the Mac or replace Screen Time, its bedtime and limits apply only inside SKYCOT, it can't guarantee what an AI says, and a determined teenager could get round it. SKYCOT runs on the parent's own Mac and AI account, under the parent's supervision, and each AI service's own age rules still apply (see <a href="#faq">the questions below</a>). It makes the first experience safe and kind. The rest is parenting.</p>
 </div></section>
 
-<section id="ideas" class="alt"><div class="wrap">
+{new_for_families()}
+<section id="ideas"><div class="wrap">
   <div class="center"><p class="kicker">What kids make</p><h2 class="title">If they can say it, they can build it.</h2>
   <p class="sub">Real projects, made by talking. Here are a few a child might start with, and what they end up with.</p></div>
   <div class="cards two">
@@ -572,7 +666,7 @@ def home_body():
   <p class="fine center" style="margin:28px auto 0">Examples of what a child might ask for. What the assistant builds depends on the AI service you use, and a grown-up checks it before anything is shared.</p>
 </div></section>
 
-<section id="how"><div class="wrap">
+<section id="how" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">How it works</p><h2 class="title">Three steps. No new vocabulary.</h2></div>
   <div class="steps">
     <div class="step"><div class="n">1</div><h3>A grown-up sets it up</h3><p>Install SKYCOT on your Mac, sign in to the AI you already pay for, and turn on the Family profile with a parent code. Your child doesn't need an account of their own.</p></div>
@@ -581,7 +675,7 @@ def home_body():
   </div>
 </div></section>
 
-<section id="works-with" class="alt"><div class="wrap center">
+<section id="works-with"><div class="wrap center">
   <p class="kicker">Bring your own AI</p>
   <h2 class="title">Works with the AI you already pay for.</h2>
   <p class="sub">SKYCOT doesn't resell AI or sit between you and your account. A grown-up signs in through each assistant's own sign-in, so SKYCOT never sees the password. Use whichever is best for the job, and switch any time.</p>
@@ -595,7 +689,7 @@ def home_body():
   <p class="fine" style="margin-left:auto;margin-right:auto"><b>Each AI service sets its own age rules.</b> Some, including Anthropic's Claude and Cursor, are for adults only; others allow teenagers with a parent's permission. SKYCOT runs on the parent's account under the parent's supervision, and doesn't change those rules, so check your service's terms before a child uses SKYCOT with it. Product names belong to their owners. SKYCOT is independent and not affiliated with or endorsed by Anthropic, OpenAI, Anysphere or Google.</p>
 </div></section>
 
-<section id="safety"><div class="wrap">
+<section id="safety" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">Safety</p><h2 class="title">Careful by default. Kinder with a Family profile.</h2>
   <p class="sub">The serious incidents with AI coding tools share one shape: a tool running on its own, a destructive command, and no backup. SKYCOT is built so that shape can't happen by default, and the Family profile locks the settings a child could stumble into.</p></div>
   <div class="cards">
@@ -613,7 +707,7 @@ def home_body():
   <p class="honest center-note">Guardrails inside SKYCOT, not web filtering and not Screen Time. A grown-up stays in charge.</p>
 </div></section>
 
-<section id="looks" class="alt"><div class="wrap">
+<section id="looks"><div class="wrap">
   <div class="center"><p class="kicker">Choose your look</p><h2 class="title">Pick a look. Keep the same careful app.</h2>
   <p class="sub">SKYCOT ships with a library of themes. Try one on with a hover, keep it with a click, change it any time in Settings. A theme changes how things look, never what they do: asking permission, undoing and going live stay plain in every look.</p></div>
   {WORKSHOP_TOUR}
@@ -634,7 +728,7 @@ def home_body():
   </div>
 </div></section>
 
-<section id="grown-ups"><div class="wrap">
+<section id="grown-ups" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">For grown-ups and small businesses too</p><h2 class="title">The same careful developer, for your business.</h2>
   <p class="sub">{html.escape(LEDE2, quote=False)} Text it what you want, like "Add a Christmas menu page", and SKYCOT builds it on your Mac, shows you what changed, and waits for your yes.</p></div>
   <div class="looks two">
@@ -650,7 +744,7 @@ def home_body():
   <p class="fine center" style="margin:28px auto 0"><b>Already a developer, or have one?</b> Advanced mode is one switch away, at the bottom of the sidebar. It shows the full developer interface SKYCOT is built on (T3 Code's), in the same window, with nothing removed. In a Family profile it's hidden and needs the parent code.</p>
 </div></section>
 
-<section id="download" class="alt"><div class="wrap">
+<section id="download"><div class="wrap">
   <div class="center"><p class="kicker">Get SKYCOT</p><h2 class="title">SKYCOT for Mac.</h2>
   <p class="sub">Free during early access. A grown-up brings their own AI account. A signed, notarised Mac download is being prepared; leave your email and you'll be first to know.</p></div>
   <div class="dl">
@@ -669,13 +763,13 @@ def home_body():
   </div>
 </div></section>
 
-<section id="faq"><div class="wrap">
+<section id="faq" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">Questions</p><h2 class="title">Frequently asked.</h2></div>
   <div class="faq">
     <details><summary>Is it safe for kids?</summary><p>It's designed to be a safe first workshop for a child using it with a grown-up nearby. With the <a href="#family">Family profile</a> on, the assistant shows a plan and asks before every change, the riskier modes and developer tools are hidden, Undo is always there, and nothing goes online without the parent code.</p><p>These are guardrails inside the app, not a security product, and the AI service's own safety settings and age rules still apply. Stay involved: build together, and look at what was made before it's shared.</p></details>
     <details><summary>Does my child need an AI account?</summary><p>No. SKYCOT runs on a parent's own Mac and the parent's own AI account, and the parent sets it up and supervises. Your child doesn't sign up for anything, with us or with an AI service, and SKYCOT has no account of its own.</p><p>What your child types goes to the AI service you chose, under your account and that company's terms, so check its rules on age and on who may use your account.</p></details>
     <details><summary>What can the parent code lock?</summary><p>Putting work online (both "send for review" and "put it live"), creating an automation, opening the developer tools (Advanced mode), running the welcome steps again, changing the code, and turning the Family profile off. Five wrong tries locks every code prompt for five minutes.</p><p>Everything else works as normal: building, drafts and Undo. The assistant still asks before every change.</p></details>
-    <details><summary>What does SKYCOT not do?</summary><p>It isn't a parental-control or security product. It doesn't filter the web, decide what the AI may talk about, lock the Mac, limit screen time or replace Screen Time, and it only works inside SKYCOT. The parent code is kept on your Mac, and a determined teenager could get round it.</p><p>SKYCOT also doesn't create AI accounts for anyone, sell AI time, or send anything to us: no analytics are switched on.</p></details>
+    <details><summary>What does SKYCOT not do?</summary><p>It isn't a parental-control or security product. It doesn't filter the web, lock the Mac or replace Screen Time. Its bedtime and daily limits apply only inside SKYCOT, not to other apps or the rest of the Mac. SKYCOT asks the AI to keep things child-friendly and spots personal details before a message goes, but it can't guarantee what an AI says. The parent code is kept on your Mac, and a determined teenager could get round it.</p><p>SKYCOT also doesn't create AI accounts for anyone, sell AI time, or send anything to us: no analytics are switched on.</p></details>
     <details><summary>Which AI does it use?</summary><p>The one you already pay for. A grown-up signs in to at least one supported assistant: Claude Code (Anthropic), Codex (OpenAI), Cursor, or Gemini via Antigravity (Google). SKYCOT runs on that plan; it doesn't sell AI time or stand between you and your account.</p><p>Each service sets its own age rules. As of October 2026, Anthropic's Claude and Cursor require every user to be 18 or over, and OpenAI's terms allow 13 to 17 year olds with a parent's permission; Google sets its own rules for Gemini and Antigravity. Check your service's current terms for your child's age before they use SKYCOT with it.</p></details>
     <details><summary>Do I need to know how to code?</summary><p>No. You describe what you want in plain English, read what changed in plain English, and decide. If you have a developer, they can flip on Advanced mode and see everything in their language, in the same window.</p></details>
     <details><summary>Can I change how it looks?</summary><p>Yes. SKYCOT ships with a <a href="#looks">library of themes</a>: Workshop, the default, plus Classic for anyone who prefers calm, Paper and Night Ops, each with a light and a dark side. Themes are plain data files you can import, export and share, and you can duplicate one and edit the colours, the flavour and your crew's names. A theme changes how things look, never what they do.</p></details>
@@ -683,6 +777,7 @@ def home_body():
     <details><summary>What does SKYCOT cost?</summary><p>Free during early access. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
     <details><summary>Where do my files go?</summary><p>They stay on your Mac. When you send a message, the assistant you chose receives what it needs for that task, under that company's terms. SKYCOT has no analytics switched on and no account of its own to send things to.</p></details>
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
+    <details><summary>Does voice typing send my child's voice anywhere?</summary><p>Voice typing starts off for every child, and a grown-up turns it on with the parent code. SKYCOT never records or keeps audio; it uses the browser's own speech service. In Safari that is Apple's dictation, which on recent Macs can stay on the Mac. In Chrome it is Google's, and in Edge Microsoft's, so the voice goes to that company under its terms. SKYCOT tells you which applies before you switch it on, and recommends Safari for children. Reading replies aloud uses the Mac's own voices, so nothing leaves the Mac.</p></details>
     <details><summary>Can I get at the developer tools?</summary><p>Yes. Advanced mode is a switch at the bottom of the sidebar. It opens the full developer interface SKYCOT is built on (T3 Code's) in the same window: every panel, terminal and setting, nothing removed. Flip it back and the plain-language view returns. In a Family profile the switch is hidden and opening it needs the parent code.</p></details>
     <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
@@ -716,11 +811,12 @@ PRIVACY = f'''{nav(True)}
   <ul>
     <li>The SKYCOT app has no SKYCOT account, no SKYCOT servers that process your work, and no analytics switched on.</li>
     <li>Your project files stay on your Mac. When you work, the assistant you chose (for example Claude Code or Codex) receives what it needs for that task, under that company's terms and your own account.</li>
+    <li>Voice typing is off until you turn it on. It uses your browser's speech service: Apple's in Safari, Google's in Chrome, Microsoft's in Edge. Reading replies aloud uses the Mac's own voices and sends nothing.</li>
     <li>We never receive your files, your messages or the assistant's replies, so we cannot use them for anything, including training AI.</li>
     <li>skycot.com uses no cookies, no analytics and no third-party scripts, fonts or images.</li>
     <li>We do not sell personal information or use it for advertising.</li>
     <li>If you email us or join our Discord, we hold what you send us, and Discord's own policy applies there.</li>
-    <li>A child can use SKYCOT on a parent's Mac and the parent's own AI account, under the parent's supervision. We do not knowingly collect children's information, and the Family profile sends nothing to us (section 8).</li>
+    <li>A child can use SKYCOT on a parent's Mac and the parent's own AI account, under the parent's supervision. We do not knowingly collect children's information. The Family profile's settings, limits, recap, stickers and fridge are kept on your Mac and send nothing to us (section 8).</li>
   </ul>
 
   <h2>1. Who we are</h2>
@@ -730,18 +826,20 @@ PRIVACY = f'''{nav(True)}
   <h3>What stays on your Mac</h3>
   <p>Your project folders stay where you keep them. The versions SKYCOT keeps so you can undo are stored inside each project's own folder history. Your conversations, settings and technical logs are stored in your home folder under <code>~/.skycot</code> and in the app's own data folder. Signing in to each assistant happens on that company's own sign-in page; the sign-in token that results is kept on your Mac, by SKYCOT or by the assistant's own tool, and SKYCOT never sees your password. You can delete all of this at any time by removing the app and those folders.</p>
   <h3>What is sent to the AI assistant you chose</h3>
-  <p>The assistant works in the project folder you open. When you send a message, the assistant's own tool reads what it needs from that folder for the task and sends it, with your message, to the company that makes it, under your account: Anthropic for Claude Code, OpenAI for Codex, Anysphere for Cursor, Google for Gemini and Antigravity, or the maker of any other assistant you connect. That company's privacy policy and your agreement with them govern what happens to it, including whether it may be used to improve or train their models; you can check and change that in your account with them. SKYCOT does not add a copy for itself. In Ask me first, the assistant stops and asks before doing anything beyond the plan, and the hard rules mean touching customer details is always a question, never an assumption.</p>
+  <p>The assistant works in the project folder you open. When you send a message, the assistant's own tool reads what it needs from that folder for the task and sends it, with your message and any pictures you add to it (such as a child's drawing), to the company that makes it, under your account: Anthropic for Claude Code, OpenAI for Codex, Anysphere for Cursor, Google for Gemini and Antigravity, or the maker of any other assistant you connect. That company's privacy policy and your agreement with them govern what happens to it, including whether it may be used to improve or train their models; you can check and change that in your account with them. SKYCOT does not add a copy for itself. In Ask me first, the assistant stops and asks before doing anything beyond the plan, and the hard rules mean touching customer details is always a question, never an assumption.</p>
+  <h3>Voice typing and reading aloud</h3>
+  <p>Voice typing is off until you turn it on, and in a Family profile each child's starts off and needs the parent code. SKYCOT never records, uploads or keeps audio. It uses the speech service of the browser you use it in: in Safari, Apple's dictation, which on recent Macs can run on the Mac itself and otherwise goes to Apple; in Chrome, Google's speech service; in Edge, Microsoft's. Where the sound goes to one of those companies, their terms and privacy policy apply. SKYCOT says which applies in Settings → Voice before you switch it on, and recommends Safari for children. The words appear in the message box and are sent to your assistant only when you press Send. Reading replies aloud uses the voices installed on your Mac, so nothing is sent anywhere.</p>
   <h3>What is sent to us</h3>
   <p>Nothing. SKYCOT has no usage analytics, crash reporting or diagnostics switched on, and in our builds the parts of the engine that could send them point nowhere. The online account and phone-pairing service that T3 Code offers is switched off in SKYCOT, so the app does not talk to T3 Tools Inc.'s servers either. If a future version offers optional diagnostics, it will be off until you switch it on, this page will be updated first, and it will never include your project files or conversations.</p>
   <h3>Background downloads</h3>
   <p>Like most apps, SKYCOT fetches a few public files on its own: it checks GitHub for new versions of SKYCOT, and it downloads public lists of AI models and their prices, also hosted on GitHub. If you add Gemini through Antigravity, it downloads Google's connector from Google. Like any web request, these reveal your IP address and the app's version to the host. Nothing about you or your projects is included.</p>
   <h3>Permissions your Mac may ask for</h3>
-  <p>macOS may ask you to let SKYCOT open the folders you choose and show notifications. If you turn on sharing so that another of your devices can connect to SKYCOT, that device connects to your Mac directly over your own network, with no SKYCOT or T3 server in between. You can change these at any time in System Settings and in SKYCOT's Settings.</p>
+  <p>macOS may ask you to let SKYCOT open the folders you choose, show notifications and, if you use voice typing, use the microphone. If you turn on sharing so that another of your devices can connect to SKYCOT, that device connects to your Mac directly over your own network, with no SKYCOT or T3 server in between. You can change these at any time in System Settings and in SKYCOT's Settings.</p>
   <h3>Publishing</h3>
   <p>If you connect a code-hosting account (for example GitHub) to send work for review or put it live, SKYCOT talks to that service on your instruction only, using your own account. Their terms and privacy policy apply to what you upload there.</p>
 
   <h2>3. The website, skycot.com</h2>
-  <p>The site is a set of plain pages served by Cloudflare. We set no cookies and run no analytics, advertising or tracking, so there is nothing for a browser's "Do Not Track" setting to switch off. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
+  <p>The site is a set of plain pages served by Cloudflare. The cloud on the site switches between day and dusk using your device's own clock and time zone, worked out in your browser; nothing about that is sent anywhere. We set no cookies and run no analytics, advertising or tracking, so there is nothing for a browser's "Do Not Track" setting to switch off. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
 
   <h2>4. Email, Discord and early access</h2>
   <p>If you email us to be notified when SKYCOT is ready, we keep your email address for that purpose only, email you when it is, and delete the list afterwards unless you ask to stay in touch. Other emails are kept for as long as we need them to help you and to keep ordinary business records, and are then deleted. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
@@ -763,8 +861,10 @@ PRIVACY = f'''{nav(True)}
 
   <h2>8. Children and the Family profile</h2>
   <p>SKYCOT is designed so that a child uses it only on a parent's or guardian's own Mac, signed in to that adult's own AI account, with the Family profile turned on and the adult supervising. The adult installs SKYCOT, accepts our terms and the AI service's terms, and is responsible for the child's use. A child does not need, and should not create, an account with us or with an AI service to use SKYCOT; SKYCOT has no account of its own.</p>
-  <p>We do not knowingly collect personal information from children, and the Family profile does not change what we receive, which is nothing. The child's first name (if you give one) and a scrambled version of the parent code stay in SKYCOT's own storage on your Mac; they are never sent to us or to the AI service. skycot.com collects nothing from anyone, including children. If you believe a child has sent us personal information, for example by email, tell us and we will delete it.</p>
-  <p>What a child types into SKYCOT goes to the AI service the adult chose, under the adult's account and that company's privacy policy, exactly as with any other use. Each AI service sets its own minimum age and its own rules on who may use an account, and some require every user to be 18 or over. Those rules apply, and the adult is responsible for checking them before a child uses SKYCOT. The Family profile is a set of guardrails inside SKYCOT, not a parental-control product: it does not filter the web or decide what the AI may say.</p>
+  <p>We do not knowingly collect personal information from children, and the Family profile does not change what we receive, which is nothing. Everything the Family profile keeps stays in SKYCOT's own storage on your Mac and is never sent to us or to the AI service: for each child, a first name (if you give one), a picture, look, text size, voice settings, bedtime and daily limits; the household's time zone, used for bedtime; and a scrambled version of the parent code, never the code itself. To run the limits and the grown-up recap it also keeps, on the Mac, each child's time and counts for the last five weeks, who started each conversation, any extra time a grown-up gave, and a log of what needed a grown-up, which records only the kind of detail involved and is kept for 30 days. Earned stickers and the pages pinned to the family fridge are kept there too. The recap is built on the Mac and shown only after the parent code; printing it or saving it as a PDF uses your browser's print dialog, and nothing is emailed or uploaded. Turning the Family profile off forgets the children, their limits and the parent code.</p>
+  <p>Before a child's message goes, SKYCOT looks for personal details such as a full name, school, address, phone number, email or birthday, and suggests leaving them out. This check runs on the Mac. It spots common patterns, so it can miss a detail written in an unusual way.</p>
+  <p>skycot.com collects nothing from anyone, including children. If you believe a child has sent us personal information, for example by email, tell us and we will delete it.</p>
+  <p>What a child types into SKYCOT goes to the AI service the adult chose, under the adult's account and that company's privacy policy, exactly as with any other use. Each AI service sets its own minimum age and its own rules on who may use an account, and some require every user to be 18 or over. Those rules apply, and the adult is responsible for checking them before a child uses SKYCOT. The Family profile is a set of guardrails inside SKYCOT, not a parental-control product: it does not filter the web, and it asks the AI to keep things child-friendly but cannot guarantee what the AI says. Its bedtime and daily limits apply only inside SKYCOT.</p>
 
   <h2>9. Changes</h2>
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
@@ -783,7 +883,7 @@ TERMS = f'''{nav(True)}
 
   <h2>2. Who can use SKYCOT</h2>
   <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer, signed in to that adult's own AI account, and under that adult's supervision; we recommend turning on the Family profile first. The adult accepts these terms for the child and is responsible for that use, including what the child asks the assistant to do and anything put online. A child does not need, and should not create, an account with us or with an AI service in order to use SKYCOT.</p>
-  <p>Each AI service sets its own minimum age and its own rules on who may use an account, and you must follow them; some require every user to be 18 or over. The Family profile is a set of guardrails inside SKYCOT, not a parental-control or security product: it does not filter the web, limit screen time, or control what the AI service may say, and it can be got round. <em>Summary: a grown-up sets it up, signs in, and stays in charge; the AI service's own age rules still apply.</em></p>
+  <p>Each AI service sets its own minimum age and its own rules on who may use an account, and you must follow them; some require every user to be 18 or over. The Family profile is a set of guardrails inside SKYCOT, not a parental-control or security product: it does not filter the web, lock the Mac or limit anything outside SKYCOT, it cannot control what the AI service says, and it can be got round. <em>Summary: a grown-up sets it up, signs in, and stays in charge; the AI service's own age rules still apply.</em></p>
 
   <h2>3. Your AI assistant is a separate agreement</h2>
   <p>SKYCOT does not provide AI services. You need your own account with at least one supported assistant (for example Claude Code by Anthropic, Codex by OpenAI, Cursor by Anysphere, or Gemini and Antigravity by Google). Your use of those services, their charges, limits and outputs are governed by your agreement with that company, not by us. They can change, stop working or change their prices without telling us, and we are not responsible for their availability, pricing or behaviour. <em>Summary: your AI plan is between you and them.</em></p>
