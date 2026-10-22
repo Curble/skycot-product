@@ -123,7 +123,12 @@ const withGate = <A, E, R>(
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
       }),
       Layer.mock(ProjectStore.ProjectStoreV2)({
-        get: () => Effect.succeed(Option.none()),
+        get: (projectId) =>
+          Effect.succeed(
+            projectId === thread.projectId
+              ? Option.some({ id: projectId, workspaceRoot: ROOT } as never)
+              : Option.none(),
+          ),
         findActiveByWorkspaceRoot: (root) =>
           Effect.succeed(
             root === ROOT ? Option.some({ workspaceRoot: ROOT } as never) : Option.none(),
@@ -269,7 +274,16 @@ describe("gateNeedFor", () => {
     );
     assert.equal(
       purpose(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+        projectId: "project:family",
         workspaceStrategy: { type: "worktree", baseRef: "main" },
+      }),
+      "projectWorktree",
+    );
+    // Fetching the branch from the internet first is a remote operation.
+    assert.equal(
+      purpose(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+        projectId: "project:family",
+        workspaceStrategy: { type: "worktree", baseRef: "main", startFromOrigin: true },
       }),
       "openFolder",
     );
@@ -560,6 +574,42 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         assert.isFalse(yield* refused(write("/Users/kid")));
         assert.isFalse(yield* refused(http("/api/projects/mutate", { type: "project.create" })));
         assert.isTrue(yield* refused(http("/api/auth/pairing-token", {})));
+      }),
+    ),
+  );
+
+  // A conversation's private copy is what makes Undo work, so the child gets one in a
+  // project SKYCOT has. A worktree anywhere else, or removing one, is still a grown-up's.
+  it.effect("lets a new conversation make its private copy, and nothing more", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: null });
+        const launch = (projectId: string, workspaceStrategy: unknown) =>
+          gate.check({
+            sessionId: SESSION,
+            method: ORCHESTRATION_V2_WS_METHODS.launchThread,
+            payload: { projectId, threadId: THREAD_ID, workspaceStrategy },
+          });
+        const privateCopy = { type: "worktree", baseRef: "main", branch: "skycot/space-1a2b" };
+        assert.isFalse(yield* refused(launch(thread.projectId, privateCopy)));
+        assert.isTrue(yield* refused(launch("project:unknown", privateCopy)));
+        assert.isTrue(
+          yield* refused(launch(thread.projectId, { ...privateCopy, startFromOrigin: true })),
+        );
+        const vcs = (method: string, payload: unknown) =>
+          gate.check({ sessionId: SESSION, method, payload });
+        assert.isTrue(
+          yield* refused(
+            vcs("vcs.createWorktree", {
+              cwd: ROOT,
+              refName: "main",
+              newRefName: "skycot/elsewhere",
+              path: "/Users/kid/Desktop/elsewhere",
+            }),
+          ),
+        );
+        assert.isTrue(yield* refused(vcs("vcs.removeWorktree", { cwd: ROOT, path: ROOT })));
+        assert.isTrue(yield* refused(vcs("vcs.pull", { cwd: ROOT })));
       }),
     ),
   );

@@ -46,6 +46,12 @@ export type GateNeed =
   | { readonly type: "grant"; readonly purpose: Purpose }
   /** Open inside a project SKYCOT already has; anywhere else is opening another folder. */
   | { readonly type: "projectFolder"; readonly cwd: string }
+  /**
+   * A conversation's private copy of a project SKYCOT already has. The engine picks the
+   * place (its own worktrees folder) and copies from this Mac's history, and the copy is
+   * what makes Undo possible, so it is open; an unknown project is opening another folder.
+   */
+  | { readonly type: "projectWorktree"; readonly projectId: ProjectId }
   | {
       readonly type: "respond";
       readonly threadId: ThreadId;
@@ -203,7 +209,12 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
     ) {
       return { type: "projectFolder", cwd: workspace["worktreePath"] };
     }
-    return workspace["type"] === "worktree" ? { type: "grant", purpose: "openFolder" } : null;
+    if (workspace["type"] !== "worktree") return null;
+    // Starting from the internet's copy of the branch fetches first: a remote operation.
+    if (workspace["startFromOrigin"] === true || typeof input["projectId"] !== "string") {
+      return { type: "grant", purpose: "openFolder" };
+    }
+    return { type: "projectWorktree", projectId: input["projectId"] as ProjectId };
   }
   if (method === "git.runStackedAction") {
     return input["action"] === "commit" ? null : { type: "grant", purpose: "publish" };
@@ -386,6 +397,12 @@ const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
 
+  const isKnownProject = (projectId: ProjectId) =>
+    projects.get(projectId).pipe(
+      Effect.map(Option.isSome),
+      Effect.orElseSucceed(() => false),
+    );
+
   const enforce = Effect.fn("SkycotFamilyGate.enforce")(function* (
     sessionId: string,
     method: string,
@@ -393,8 +410,13 @@ const make = Effect.gen(function* () {
   ) {
     if (need === null) return;
     if (!(yield* family.isEnabled)) return;
-    if (need.type === "projectFolder") {
-      if (yield* isProjectFolder(need.cwd)) return;
+    if (need.type === "projectFolder" || need.type === "projectWorktree") {
+      if (
+        need.type === "projectFolder"
+          ? yield* isProjectFolder(need.cwd)
+          : yield* isKnownProject(need.projectId)
+      )
+        return;
       if (yield* family.allows({ sessionId, purpose: "openFolder" })) return;
       yield* Effect.logInfo("skycot-family.refused", { method, purpose: "openFolder" });
       return yield* familyRefusal();
