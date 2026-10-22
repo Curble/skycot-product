@@ -17,6 +17,10 @@ export type Route =
   | { readonly name: "people" }
   /** The family fridge: everything the children made. */
   | { readonly name: "fridge" }
+  /** This child's sticker book. */
+  | { readonly name: "stickers" }
+  /** A printable certificate from the sticker book. */
+  | { readonly name: "certificate"; readonly kind: "first" | "tenth" }
   /** Settings › Family › "<child>'s week". */
   | { readonly name: "recap"; readonly childId: string }
   /** System Settings-style screen; `section` is null for the list on a phone. */
@@ -66,6 +70,8 @@ export function parseRoute(hash: string): Route {
         return { name: "people" };
       case "fridge":
         return { name: "fridge" };
+      case "stickers":
+        return { name: "stickers" };
       case "settings":
         return { name: "settings", section: null };
       case "welcome":
@@ -85,6 +91,14 @@ export function parseRoute(hash: string): Route {
   ) {
     return { name: "recap", childId: decodeURIComponent(segments[3]!) };
   }
+  if (
+    segments[0] === "stickers" &&
+    segments[1] === "certificate" &&
+    segments.length === 3 &&
+    (segments[2] === "first" || segments[2] === "tenth")
+  ) {
+    return { name: "certificate", kind: segments[2] };
+  }
   if (segments[0] === "thread" && segments.length === 3) {
     return {
       name: "thread",
@@ -100,6 +114,7 @@ export const NEW_HREF = "#/new";
 export const AUTOMATIONS_HREF = "#/automations";
 export const PEOPLE_HREF = "#/people";
 export const FRIDGE_HREF = "#/fridge";
+export const STICKERS_HREF = "#/stickers";
 export const SETTINGS_HREF = "#/settings";
 export const WELCOME_HREF = "#/welcome";
 
@@ -109,6 +124,10 @@ export function settingsHref(section: SettingsSection): string {
 
 export function recapHref(childId: string): string {
   return `#/settings/family/week/${encodeURIComponent(childId)}`;
+}
+
+export function certificateHref(kind: "first" | "tenth"): string {
+  return `#/stickers/certificate/${kind}`;
 }
 
 export function threadHref(environmentId: EnvironmentId, threadId: ThreadId): string {

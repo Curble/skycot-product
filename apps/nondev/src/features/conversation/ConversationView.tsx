@@ -46,6 +46,7 @@ import { latestReviewable } from "../review";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
+import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
@@ -163,6 +164,7 @@ export function ConversationView({
     if (firstSighting || readerIsNearBottom()) scrollToCheckpoint(latestId);
   }, [latestId, seenLatest]);
   const startNote = useStartNote(threadId);
+  useBadgeWatcher({ threadId, shell, projection, active });
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);

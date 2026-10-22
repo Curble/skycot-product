@@ -192,6 +192,10 @@ function useTitleDetail(
       return "People";
     case "fridge":
       return "The fridge";
+    case "stickers":
+      return "Sticker book";
+    case "certificate":
+      return "Certificate";
     case "recap":
       return "Family — Settings";
     case "new":

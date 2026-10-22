@@ -4,6 +4,7 @@
 import { Mic, MicOff, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { reportBadgeEvent } from "../badges/store";
 import { createVoiceTyping, speaker, speechService } from "./browser";
 import { problemSentence, voiceCopy, voiceProviderShort } from "./copy";
 import type { VoiceTyping, VoiceTypingState } from "./listening";
@@ -57,7 +58,11 @@ export function useVoiceTypingControl({
       }
       // The speaker would be heard by the microphone.
       speaker().stop();
-      machine.start(value, onChange);
+      machine.start(value, (heard) => {
+        // Words the microphone heard: the "Said it out loud" sticker (sent once).
+        if (heard.trim() !== value.trim()) void reportBadgeEvent({ type: "voice" });
+        onChange(heard);
+      });
     },
     cancel: () => machine.cancel(),
     dismissProblem: () => machine.dismissProblem(),

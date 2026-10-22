@@ -7,6 +7,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import type { VersionEntry } from "../../plain/versions";
 import { threadEnvironment } from "../../state/threads";
+import { reportBadgeEvent } from "../badges/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
@@ -71,6 +72,7 @@ export function RestoreSheet({
       setProblem(plainRestoreProblem(squashAtomCommandFailure(outcome)));
       return;
     }
+    void reportBadgeEvent({ type: "undo", threadId });
     onRequested?.();
     onClose();
   };

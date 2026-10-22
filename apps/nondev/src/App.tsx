@@ -19,6 +19,7 @@ import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { FridgeScreen } from "./features/fridge/FridgeScreen";
+import { BadgeHost, CertificateScreen, StickerBook } from "./features/badges";
 import { PeopleScreen } from "./features/people/PeopleScreen";
 import { useOnboardingState } from "./features/settings/localPrefs";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
@@ -134,6 +135,10 @@ export function App() {
                 return <SettingsScreen section="family" recapChildId={route.childId} />;
               case "fridge":
                 return <FridgeScreen />;
+              case "stickers":
+                return <StickerBook showBack={columns === 1} />;
+              case "certificate":
+                return <CertificateScreen kind={route.kind} />;
               case "thread":
                 return (
                   <ThreadRoute
@@ -168,6 +173,7 @@ export function App() {
           })()}
         </AppShell>
         <FamilyLimitsHost />
+        <BadgeHost />
       </SidebarSheetsHost>
     </FamilyProvider>
   );

@@ -1,0 +1,73 @@
+// Mounted once beside the Family limits host: keeps this device's sticker book fresh (when
+// the child here changes, when SKYCOT goes to sleep or wakes, when the window comes back),
+// and lets a new sticker arrive with one celebration when nothing more important is on screen.
+import type { BadgeId } from "@t3tools/skycot-rules/badges";
+import { useEffect, useEffectEvent, useState } from "react";
+
+import { useRoute } from "../../router";
+import { useFamily } from "../family/FamilyProvider";
+import { useLimits } from "../family-limits/store";
+import { canCelebrateNow } from "./canCelebrate";
+import { StickerArrives } from "./StickerArrives";
+import { markBadgesSeen, refreshBadges, unseenBadges, useBadges } from "./store";
+import "./badges.css";
+
+/** How long a waiting sticker waits before looking again (a card or a sheet was up). */
+const RETRY_MS = 4_000;
+const FIRST_PAUSE_MS = 900;
+
+export function BadgeHost() {
+  const family = useFamily();
+  const limits = useLimits();
+  const route = useRoute();
+  const { book } = useBadges();
+  const childKey = family.enabled ? (family.profile.currentChildId ?? "none") : "solo";
+  const sleep = limits.session?.limits;
+  const sleepKey = sleep ? `${sleep.asleep}:${sleep.reason ?? ""}` : "";
+
+  // Bedtime starting or ending is also when "Good night" is judged (on the engine).
+  useEffect(() => {
+    void refreshBadges();
+  }, [
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Another child here, or SKYCOT falling asleep or waking, means a fresh look at the book.
+    childKey,
+    sleepKey,
+  ]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshBadges();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  const unseen = unseenBadges(book);
+  const onBookPage = route.name === "stickers" || route.name === "certificate";
+  const asleep = sleep?.asleep === true;
+  const [showing, setShowing] = useState<ReadonlyArray<BadgeId> | null>(null);
+  const [tick, setTick] = useState(0);
+  const waiting = showing === null && unseen.length > 0 && !onBookPage && !asleep;
+
+  // A short pause first lets the moment that earned it land (the What-changed card, the
+  // message going out); then again every few seconds while something needs the child.
+  const tryToShow = useEffectEvent(() => {
+    if (canCelebrateNow()) setShowing(unseen);
+    else setTick((value) => value + 1);
+  });
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setTimeout(tryToShow, tick === 0 ? FIRST_PAUSE_MS : RETRY_MS);
+    return () => window.clearTimeout(timer);
+  }, [waiting, tick]);
+
+  if (showing === null || showing.length === 0) return null;
+  return (
+    <StickerArrives
+      ids={showing}
+      onDone={() => {
+        void markBadgesSeen(showing);
+        setShowing(null);
+      }}
+    />
+  );
+}

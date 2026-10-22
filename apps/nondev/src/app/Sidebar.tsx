@@ -14,6 +14,7 @@ import { ADVANCED_MODE_LABEL } from "../brand";
 import {
   AUTOMATIONS_HREF,
   FRIDGE_HREF,
+  STICKERS_HREF,
   HOME_HREF,
   PEOPLE_HREF,
   SETTINGS_HREF,
@@ -33,6 +34,7 @@ import { useShellState } from "./ShellState";
 import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
+import { Sticker } from "../features/badges/stickers/Sticker";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -111,6 +113,12 @@ export function AppSidebar({
             label="The fridge"
             selected={route.name === "fridge"}
             href={FRIDGE_HREF}
+          />
+          <SidebarItem
+            glyph={<Sticker id="first-creation" size={18} tilted={false} />}
+            label="My stickers"
+            selected={route.name === "stickers" || route.name === "certificate"}
+            href={STICKERS_HREF}
           />
         </SidebarSection>
 
