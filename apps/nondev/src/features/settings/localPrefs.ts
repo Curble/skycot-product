@@ -112,3 +112,43 @@ export function writeMascotOverride(override: MascotOverride) {
 export function useMascotOverride(): MascotOverride {
   return parseMascotOverride(useStoredString(MASCOT_OVERRIDE_KEY));
 }
+
+// Voice (features/voice). Read-aloud has three states: unset follows the profile (on for a
+// Family profile, off otherwise), so turning Family on or off moves it unless someone chose.
+export const READ_ALOUD_KEY = "skycot:voice:read-aloud";
+export type ReadAloudChoice = "on" | "off" | null;
+
+function parseReadAloud(raw: string | null): ReadAloudChoice {
+  return raw === "on" || raw === "off" ? raw : null;
+}
+export function readReadAloudChoice(): ReadAloudChoice {
+  return parseReadAloud(read(READ_ALOUD_KEY));
+}
+export function writeReadAloudChoice(choice: ReadAloudChoice) {
+  write(READ_ALOUD_KEY, choice);
+}
+export function useReadAloudChoice(): ReadAloudChoice {
+  return parseReadAloud(useStoredString(READ_ALOUD_KEY));
+}
+export function readAloudOn(choice: ReadAloudChoice, family: boolean): boolean {
+  return choice === null ? family : choice === "on";
+}
+
+// Voice typing: on unless the person switched the microphone button off here, or — for a
+// Family profile — a parent did in Settings › Family. The parent's switch is a separate key so
+// the child's own Voice settings cannot undo it.
+export const VOICE_TYPING_KEY = "skycot:voice:typing";
+export const FAMILY_VOICE_TYPING_KEY = "skycot:voice:family-typing";
+
+export function useVoiceTypingOff(): boolean {
+  return useStoredString(VOICE_TYPING_KEY) === "off";
+}
+export function writeVoiceTypingOff(off: boolean) {
+  write(VOICE_TYPING_KEY, off ? "off" : null);
+}
+export function useFamilyVoiceTypingOff(): boolean {
+  return useStoredString(FAMILY_VOICE_TYPING_KEY) === "off";
+}
+export function writeFamilyVoiceTypingOff(off: boolean) {
+  write(FAMILY_VOICE_TYPING_KEY, off ? "off" : null);
+}

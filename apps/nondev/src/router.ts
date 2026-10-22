@@ -28,6 +28,7 @@ export const SETTINGS_SECTIONS = [
   "sharing",
   "mac",
   "appearance",
+  "voice",
   "privacy",
   "advanced",
   "about",

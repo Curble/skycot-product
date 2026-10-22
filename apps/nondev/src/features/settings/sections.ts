@@ -4,6 +4,7 @@ import {
   Laptop,
   Lock,
   type LucideIcon,
+  Mic,
   Share2,
   ShieldCheck,
   SunMoon,
@@ -66,6 +67,13 @@ export const SECTIONS: ReadonlyArray<SectionMeta> = [
     summary: "Theme, light, dark",
     icon: SunMoon,
     tone: "orange",
+  },
+  {
+    id: "voice",
+    label: "Voice",
+    summary: "Talk and read aloud",
+    icon: Mic,
+    tone: "purple",
   },
   { id: "privacy", label: "Privacy", summary: "What leaves this Mac", icon: Lock, tone: "green" },
   {

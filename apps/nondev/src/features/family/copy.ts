@@ -68,6 +68,8 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return `The child's name is part of the ${FAMILY_LABEL} a parent set up.`;
     case "saveSecret":
       return "The assistant is asking for a key or password. A parent decides whether to hand one over.";
+    case "voiceSettings":
+      return "Voice typing sends the sound of the child's voice to the browser's speech service, so a parent decides whether it's on.";
     case "changeTheme":
       return "";
   }

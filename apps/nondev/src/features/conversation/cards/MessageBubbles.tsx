@@ -10,6 +10,7 @@ import { Bubble, TypingIndicator } from "../../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../../ui/Card";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
+import { ReadAloudButton, useAutoReadAloud } from "../../voice/ReadAloud";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
 
@@ -37,14 +38,20 @@ export function UserBubble({ item }: { readonly item: UserMessage }) {
 
 export function CrewBubble({ item }: { readonly item: AssistantMessage }) {
   const crew = useCrew();
+  useAutoReadAloud(item);
   if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
   return (
     <Bubble
       author="crew"
       meta={
-        item.streaming
-          ? `${crew.builder.name} is typing…`
-          : shortTime(item.completedAt ?? item.updatedAt)
+        item.streaming ? (
+          `${crew.builder.name} is typing…`
+        ) : (
+          <>
+            {shortTime(item.completedAt ?? item.updatedAt)}
+            <ReadAloudButton id={item.id} text={item.text} />
+          </>
+        )
       }
     >
       <Markdown text={item.text} />

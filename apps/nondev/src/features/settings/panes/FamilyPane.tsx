@@ -1,5 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
-import { KeyRound, PencilLine, Power, Users, Wrench } from "lucide-react";
+import { KeyRound, Mic, PencilLine, Power, Users, Wrench } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
 import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
@@ -32,6 +32,10 @@ import {
   moveLegacyProfile,
   renameChild,
 } from "../../family/store";
+import { speechService } from "../../voice/browser";
+import { whereVoiceGoes } from "../../voice/copy";
+import { useFamilyVoiceTypingOff, writeFamilyVoiceTypingOff } from "../localPrefs";
+import { Switch } from "../../../ui/Switch";
 import { SettingsGroup } from "../SettingsGroup";
 
 /**
@@ -176,6 +180,8 @@ function FamilyOnPane() {
         ) : null}
       </SettingsGroup>
 
+      <FamilyVoiceGroup childName={profile.childName} />
+
       <SettingsGroup
         title="Developer tools"
         footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on, and the engine sends its address back here unless a parent has entered the code. A parent can still open it from here.`}
@@ -247,6 +253,44 @@ function FamilyOnPane() {
         }
       />
     </>
+  );
+}
+
+/**
+ * The parent's switch for voice typing. It lives on this device (the microphone is the
+ * browser's, not the engine's), and changing it either way needs the parent code, checked by
+ * the engine, so the child's own Voice settings cannot turn it back on.
+ */
+function FamilyVoiceGroup({ childName }: { readonly childName: string | null }) {
+  const { requireParentCode } = useFamily();
+  const off = useFamilyVoiceTypingOff();
+  const who = childName ?? "the child";
+  return (
+    <SettingsGroup
+      title="Voice"
+      footer={`${whereVoiceGoes(speechService)} SKYCOT never records or keeps the sound. Read-aloud uses a voice on this Mac and stays on; ${who} can switch it in Settings › Voice.`}
+    >
+      <ListRow
+        leading={<StepBadge state={off ? "todo" : "ok"} icon={Mic} />}
+        title="Voice typing (parent code)"
+        subtitle={
+          off
+            ? `Off on this device. ${who.charAt(0).toUpperCase()}${who.slice(1)} types instead.`
+            : `On. ${who.charAt(0).toUpperCase()}${who.slice(1)} can tap the microphone to talk instead of typing; listening stops after a minute, or when SKYCOT is in the background.`
+        }
+        trailing={
+          <Switch
+            checked={!off}
+            onChange={(on) =>
+              void requireParentCode("voiceSettings").then((ok) => {
+                if (ok) writeFamilyVoiceTypingOff(!on);
+              })
+            }
+            label="Voice typing"
+          />
+        }
+      />
+    </SettingsGroup>
   );
 }
 

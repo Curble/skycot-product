@@ -1,12 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { EyeOff, FileText } from "lucide-react";
+import { EyeOff, FileText, Mic } from "lucide-react";
 
 import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../../../brand";
 import { serverEnvironment } from "../../../state/server";
 import { ListRow } from "../../../ui/ListRow";
 import { Pill } from "../../../ui/Pill";
 import { StepBadge } from "../../../ui/StepBadge";
+import { speechService } from "../../voice/browser";
+import { voiceCopy, whereVoiceGoes } from "../../voice/copy";
 import { SettingsGroup } from "../SettingsGroup";
 
 function hostOf(url: string): string {
@@ -81,6 +83,22 @@ export function PrivacyPane({ environmentId }: { readonly environmentId: Environ
             ) : (
               "Connecting…"
             )
+          }
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title="Voice" footer={voiceCopy.readAloudLocal}>
+        <ListRow
+          leading={<StepBadge state={speechService === "none" ? "ok" : "warn"} icon={Mic} />}
+          title={
+            speechService === "none"
+              ? "Voice typing is off in this window"
+              : "Voice typing uses the browser's speech service"
+          }
+          subtitle={
+            speechService === "none"
+              ? whereVoiceGoes(speechService)
+              : `${whereVoiceGoes(speechService)} Only while the microphone button is lit.`
           }
         />
       </SettingsGroup>

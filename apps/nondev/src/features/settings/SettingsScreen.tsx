@@ -24,6 +24,7 @@ import { AutonomyPane } from "./panes/AutonomyPane";
 import { FamilyPane } from "./panes/FamilyPane";
 import { PrivacyPane } from "./panes/PrivacyPane";
 import { SharingPane } from "./panes/SharingPane";
+import { VoicePane } from "./panes/VoicePane";
 import { YourMacPane } from "./panes/YourMacPane";
 import { SECTIONS } from "./sections";
 
@@ -158,6 +159,8 @@ function Pane({
       return <YourMacPane environmentId={environmentId} />;
     case "appearance":
       return <AppearancePane />;
+    case "voice":
+      return <VoicePane />;
     case "privacy":
       return <PrivacyPane environmentId={environmentId} />;
     case "advanced":

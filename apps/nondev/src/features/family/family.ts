@@ -19,7 +19,8 @@ export type FamilyAction =
   | "approve"
   | "aiSettings"
   | "renameChild"
-  | "saveSecret";
+  | "saveSecret"
+  | "voiceSettings";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -42,6 +43,7 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "aiSettings",
   "renameChild",
   "saveSecret",
+  "voiceSettings",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -74,6 +76,7 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
     case "changeAutonomy":
     case "renameChild":
     case "saveSecret":
+    case "voiceSettings":
       return "settings";
     case "disableFamily":
     case "changeCode":
