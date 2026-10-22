@@ -93,6 +93,27 @@ without a code (looks never change what SKYCOT does).
 - **Each child's look and text size** follow them: choosing a child puts their look on in that
   browser.
 
+## Tidying the list
+
+A child can **put a conversation away** (its **…** menu, a right-click, or the **…** at the top
+of the conversation), **bring it back** from **Old conversations** in the sidebar, and
+**rename** it. None of these needs the parent code, because each can be undone: a toast offers
+**Undo** straight away, a put-away conversation waits in Old conversations until it is brought
+back, and a rename can be changed again.
+
+- **Putting away is not deleting.** The engine keeps every message, version and page. A put-away
+  conversation still has its magnet on the fridge, still counts in the grown-up recap and keeps
+  the stickers it earned. Opening it from Old conversations shows it, marked _Put away_; replying
+  waits until it is brought back.
+- **A conversation that is still working** cannot be put away until the crew finishes or is
+  stopped.
+- **A new name** shows in the list, at the top of the conversation, on the fridge, in the recap
+  and on a certificate. An empty name is refused. Renaming is how to fix a title the AI wrote
+  that sounds like an instruction ("Create an Offline Bubbles Pet Page"); SKYCOT does not retitle
+  conversations by itself.
+- **Siblings share the list.** As they can open each other's conversations, they can also put
+  away, bring back or rename them. Nothing is lost either way.
+
 ## Bedtime and daily limits
 
 Per child, all optional, set in the child's card (parent code):
@@ -252,6 +273,7 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | `server.updateSettings` (anything but "Ask me first"), `server.updateProvider`, `provider.install.start`/`remove`, `provider.auth.start`/`complete`/`respond`/`logout`, `provider.chatgpt.reconnect-profile`/`import-profile`, `provider.consumeResetCredit`, `provider.uploadFeedback`, `server.upsertKeybinding`/`removeKeybinding`, `secrets.answerRequest` (save)                                                                                                                 | Grown-up: AI assistants                                          | the parent's accounts, sign-ins, settings and keys; feedback sends conversations away    |
 | `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                          | developer tools, outside agents, other devices, the internet                             |
 | HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                          | as the call it mirrors; otherwise Advanced mode                  | letting another device or an outside agent in                                            |
+| Putting a conversation away or bringing it back (`thread.archive`, `thread.unarchive`); renaming it (`thread.metadata.update` with a title)                                                                                                                                                                                                                                                                                                                                           | Open; with a folder (`worktreePath`), Grown-up: another folder   | each can be undone; a folder is where the assistant works                                |
 | `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                  | Grown-up: AI assistants                                          | the children are part of the profile                                                     |
 | `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: the recap (or the Family settings' yes)                | a child's words and what needed a grown-up are a parent's to read                        |
 | `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                        | The parent code, with the request                                | wakes SKYCOT for a child; nothing stays open afterwards                                  |
