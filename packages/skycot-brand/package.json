@@ -1,0 +1,23 @@
+{
+  "name": "@t3tools/skycot-brand",
+  "private": true,
+  "description": "SKYCOT brand logic shared by the plain client and the desktop shell: day or dusk from the sky over the person's time zone. Pure TypeScript, no runtime dependencies, DOM- and Hermes-safe.",
+  "type": "module",
+  "exports": {
+    "./daylight": {
+      "types": "./src/daylight.ts",
+      "import": "./src/daylight.ts"
+    },
+    "./schedule": {
+      "types": "./src/schedule.ts",
+      "import": "./src/schedule.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc-rs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  }
+}

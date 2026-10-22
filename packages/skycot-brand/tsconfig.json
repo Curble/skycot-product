@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    // Plain TypeScript shared with the browser client and Electron's main process: no Effect, so
+    // its Date/timer diagnostics do not apply here.
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalTimers": "off"
+        }
+      }
+    ]
+  },
+  "include": ["src"]
+}

@@ -37,6 +37,8 @@ Our code lives **only** in paths upstream does not own. Anything there can never
 | `apps/nondev/**`                                                         | our client (the workspace package `@t3tools/nondev`), incl. `themes-community/` |
 | `apps/server/src/skycot/**`                                              | SKYCOT-only server modules (provider policy)                                    |
 | `packages/skycot-rules/**`                                               | SKYCOT-only shared rules package                                                |
+| `packages/skycot-brand/**`                                               | SKYCOT-only brand logic (day/dusk from the sky), shared by client and desktop   |
+| `apps/desktop/src/skycot/**`                                             | SKYCOT-only desktop-shell modules (the day/dusk Dock icon)                      |
 | `nondev/**`                                                              | this folder: tooling, scripts, docs, brand assets, `bin/skycot.cjs`             |
 | `docs/nondev/**`                                                         | design docs for the fork                                                        |
 | `docs/legal/**`, `docs/security/**`, `docs/qa/**`, `docs/skycot-site/**` | legal, security-audit, QA and website documents                                 |

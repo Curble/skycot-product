@@ -9,7 +9,7 @@
  * What it compares: `git diff --name-only <merge-base(upstream/main, HEAD)>..HEAD`, i.e. every
  * file that differs between us and the point where we last matched upstream. Paths the fork owns
  * outright (`OUR_PATH_GLOBS` in lib.ts: apps/nondev/**, nondev/**, docs/{nondev,legal,security,
- * qa,skycot-site}/**, packages/skycot-rules/**, apps/server/src/skycot/**, NOTICE,
+ * qa,skycot-site}/**, packages/skycot-{rules,brand}/**, apps/{server,desktop}/src/skycot/**, NOTICE,
  * .github/workflows/nondev-*.yml, SEAM-MANIFEST.md, …) are subtracted. Whatever is left must be
  * declared.
  *

@@ -24,7 +24,8 @@ Column rules
                   report). Higher = more likely to conflict; keep those edits to one appended line.
 
 Paths that never need a row (the fork owns them outright):
-  apps/nondev/**  apps/server/src/skycot/**  packages/skycot-rules/**  nondev/**
+  apps/nondev/**  apps/server/src/skycot/**  apps/desktop/src/skycot/**
+  packages/skycot-rules/**  packages/skycot-brand/**  nondev/**
   docs/{nondev,legal,security,qa,skycot-site}/**  .github/workflows/nondev-*.yml
   SEAM-MANIFEST.md  NOTICE  CONTRIBUTING-THEMES.md  (authoritative: OUR_PATH_GLOBS in nondev/scripts/lib.ts)
   pnpm-lock.yaml is generated and re-resolved by the sync; it is allowed to differ without a row.

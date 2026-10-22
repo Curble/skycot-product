@@ -51,6 +51,9 @@ NodeTest.describe("glob matching", () => {
     NodeAssert.ok(isOurPath("NOTICE"));
     NodeAssert.ok(isOurPath("CONTRIBUTING-THEMES.md"));
     NodeAssert.ok(isOurPath("packages/skycot-rules/src/index.ts"));
+    NodeAssert.ok(isOurPath("packages/skycot-brand/src/daylight.ts"));
+    NodeAssert.ok(isOurPath("apps/desktop/src/skycot/dockIcon.ts"));
+    NodeAssert.ok(!isOurPath("apps/desktop/src/app/DesktopApp.ts"));
     NodeAssert.ok(isOurPath("apps/server/src/skycot/providerPolicy.ts"));
     NodeAssert.ok(isOurPath("apps/nondev/themes-community/ocean.json"));
     NodeAssert.ok(!isOurPath("apps/server/scripts/cli.ts"));
