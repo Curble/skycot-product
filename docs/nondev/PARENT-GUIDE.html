@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SKYCOT · First session with your child</title>
+    <style>
+      :root {
+        --bg: #f5f5f7;
+        --card: #fff;
+        --ink: #1d1d1f;
+        --mute: #6e6e73;
+        --line: #e5e5ea;
+        --blue: #0071e3;
+        --green: #1f8a3b;
+        --amber: #9a5b00;
+        --amber-bg: #fff7e6;
+        --green-bg: #eef8f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111113;
+          --card: #1c1c1e;
+          --ink: #f5f5f7;
+          --mute: #a1a1a6;
+          --line: #2c2c2e;
+          --blue: #4da3ff;
+          --green: #5fd27b;
+          --amber: #ffc56b;
+          --amber-bg: #2a2214;
+          --green-bg: #16251a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          16px/1.55 -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 20px 64px;
+      }
+      .eyebrow {
+        color: var(--blue);
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font-size: 34px;
+        line-height: 1.15;
+        margin: 6px 0 10px;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        color: var(--mute);
+        font-size: 18px;
+        margin: 0 0 28px;
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 22px 24px;
+        margin: 0 0 16px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 0 0 10px;
+      }
+      ol,
+      ul {
+        margin: 8px 0 0;
+        padding-left: 22px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      .note {
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-top: 12px;
+      }
+      .warn {
+        background: var(--amber-bg);
+        color: var(--ink);
+        border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+      }
+      .ok {
+        background: var(--green-bg);
+        border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+      }
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .tag.amber {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      code {
+        font:
+          14px ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        background: color-mix(in srgb, var(--mute) 14%, transparent);
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .grid div {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .grid b {
+        display: block;
+        margin-bottom: 4px;
+      }
+      footer {
+        color: var(--mute);
+        font-size: 13px;
+        margin-top: 24px;
+      }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        h1 {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">SKYCOT · Parent guide</div>
+      <h1>Your first session with your child</h1>
+      <p class="lede">
+        About ten minutes to set up, then let them dream something up. Sit beside them for the first
+        session.
+      </p>
+
+      <section>
+        <h2>Before you start</h2>
+        <ul>
+          <li>
+            <b>Stay with them.</b> SKYCOT uses <i>your</i> AI account. Each AI company has its own
+            age and account-sharing rules (Anthropic's Claude requires adults; OpenAI allows 13–17
+            with a parent's permission and doesn't allow sharing an account). You chose to
+            supervise; being in the room is what makes this a supervised session.
+          </li>
+          <li>
+            <b>Use the address you were given.</b> It runs on this Mac only, in its own fresh space
+            with no test conversations.
+          </li>
+          <li>
+            <b>Pick a parent code your child doesn't know</b> (4–6 digits). You'll need it for
+            anything that matters.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Set up (about 5 minutes)</h2>
+        <ol>
+          <li>Open the sign-in link Claude gave you. It signs this browser in once.</li>
+          <li>On <b>"Who is this for?"</b> choose <b>A child I look after</b>.</li>
+          <li>
+            Type your child's first name (optional; it stays on this Mac) and your parent code
+            twice.
+          </li>
+          <li>
+            Read the short "What this does / doesn't do" box, then <b>Pick a look</b>: Workshop is
+            already chosen (the playful one with Sam and Mo).
+          </li>
+          <li>
+            When asked <b>where their work lives</b>, choose <b>Open a folder…</b> and pick
+            <code>SKYCOT Projects</code> in your home folder. It's empty and ready. SKYCOT will
+            offer to start tracking changes there so anything can be undone; say yes.
+          </li>
+          <li>
+            Finish. The screen now says the assistant <b>always asks first</b>, and larger text is
+            on.
+          </li>
+        </ol>
+        <div class="note ok">
+          <span class="tag">Tested</span> Every step above was walked through live on this exact
+          build, including a child trying slash commands, typing web addresses and asking for scary
+          content.
+        </div>
+      </section>
+
+      <section>
+        <h2>Good first ideas</h2>
+        <div class="grid">
+          <div>
+            <b>A page about a favourite animal</b>"Make a page about axolotls with a big pink title
+            and three fun facts."
+          </div>
+          <div>
+            <b>A tiny game</b>"Make a game where you click the bubbles before they float away."
+          </div>
+          <div>
+            <b>A birthday card</b>"Make a birthday card for Grandma with balloons that pop when you
+            click them."
+          </div>
+          <div>
+            <b>A school-fair poster</b>"Make a poster for our cake stall with prices and a smiley
+            sun."
+          </div>
+        </div>
+        <p style="color: var(--mute); margin: 12px 0 0">
+          Their work opens in the browser on this Mac. Nothing goes online.
+        </p>
+      </section>
+
+      <section>
+        <h2>What your child will see</h2>
+        <ul>
+          <li>
+            <b>Cards that ask first.</b> Before the assistant changes a file, a card asks "May I
+            change these files?". Your child can answer simple ones.
+          </li>
+          <li>
+            <b>"Ask a grown-up"</b> cards. Anything that installs software, uses the internet,
+            deletes, leaves the project folder or puts something online needs <b>your code</b>. Type
+            it yourself; your child shouldn't learn it.
+          </li>
+          <li>
+            <b>Kind refusals.</b> The assistant keeps things age-appropriate, won't ask for or use
+            personal details (full name, school, address, photos) and won't make violent or scary
+            content, even if asked cleverly.
+          </li>
+          <li><b>"What changed"</b> after each step, with <b>Undo</b> if they don't like it.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What's locked behind your code</h2>
+        <ul>
+          <li>Putting anything online or uploading it, and automations.</li>
+          <li>The developer interface (Advanced mode), AI account settings and signing out.</li>
+          <li>Opening other folders, renaming the child, rerunning the welcome steps.</li>
+          <li>
+            Turning the Family profile off, or changing the code. Five wrong tries locks the code
+            for five minutes.
+          </li>
+        </ul>
+        <p style="margin: 10px 0 0">
+          To end the session: <b>Settings → Family → Turn off</b> (needs the code), or simply close
+          the tab. If you opened Advanced mode, <b>Lock again now</b> in Settings → Family closes it
+          straight away.
+        </p>
+      </section>
+
+      <section>
+        <h2>Honest limits</h2>
+        <div class="note warn">
+          <ul style="margin: 0">
+            <li>
+              SKYCOT is a set of guardrails inside SKYCOT, not a parental-control product. It
+              doesn't filter the web, lock the Mac or replace Screen Time. Anyone using Terminal or
+              Finder on this Mac account could turn it off.
+            </li>
+            <li>
+              The AI's replies are guided, not filtered. In testing they were consistently kind and
+              age-appropriate, but stay nearby.
+            </li>
+            <li>
+              The assistant may decline to even try installs now; if you want one, ask it to "show
+              the grown-up box" and approve it yourself.
+            </li>
+            <li>What your child types is sent to the AI company under your account.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>If something goes wrong</h2>
+        <ul>
+          <li>
+            <b>"You've used up this assistant's allowance"</b>: your AI plan's limit is reached; it
+            says when it resets.
+          </li>
+          <li>
+            <b>"Can't reach your Mac"</b>: SKYCOT's engine stopped. Tell Claude and it will restart
+            it.
+          </li>
+          <li>
+            <b>Something looks wrong on screen</b>: take a screenshot and tell Claude. Nothing your
+            child does in the project folder is permanent; Undo and Versions can step back.
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        SKYCOT · © 2026 Curble Pty Ltd, trading as SKYCOT · Based on T3 Code (MIT). Guide for the
+        supervised family test, 22 October 2026.
+      </footer>
+    </main>
+  </body>
+</html>
