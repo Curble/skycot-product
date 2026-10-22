@@ -401,23 +401,29 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
         HttpClientRequest.bodyJsonUnsafe(body),
       ),
     );
-  // Built in the test's scope: a protocol provided only to `make` would close with it.
-  const protocol = yield* Layer.build(
-    RpcClient.layerProtocolSocket().pipe(
-      Layer.provide(Socket.layerWebSocket(`ws://127.0.0.1:${port}/ws`)),
-      Layer.provide(NodeSocket.layerWebSocketConstructor),
-      Layer.provide(RpcSerialization.layerJson),
-    ),
-  );
-  const rpc = yield* RpcClient.make(RespondGroup).pipe(Effect.provide(protocol));
-  const allow = rpc[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
-    type: "runtime-request.respond",
-    commandId: CommandId.make("command:allow"),
-    threadId: THREAD_ID,
-    requestId: REQUEST_ID,
-    decision: "accept",
+  /**
+   * The child's "Allow" over a real WebSocket. Opened only by the test that needs it, and
+   * before any HTTP request: the socket's handshake shares the fetch client's connections.
+   * Built in the caller's scope; a protocol provided only to `make` would close with it.
+   */
+  const connectAllow = Effect.fn("SkycotFamilyHttpTest.connectAllow")(function* () {
+    const protocol = yield* Layer.build(
+      RpcClient.layerProtocolSocket().pipe(
+        Layer.provide(Socket.layerWebSocket(`ws://127.0.0.1:${port}/ws`)),
+        Layer.provide(NodeSocket.layerWebSocketConstructor),
+        Layer.provide(RpcSerialization.layerJson),
+      ),
+    );
+    const rpc = yield* RpcClient.make(RespondGroup).pipe(Effect.provide(protocol));
+    return rpc[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
+      type: "runtime-request.respond",
+      commandId: CommandId.make("command:allow"),
+      threadId: THREAD_ID,
+      requestId: REQUEST_ID,
+      decision: "accept",
+    });
   });
-  return { post, allow, dispatchedCount: () => dispatched };
+  return { post, connectAllow, dispatchedCount: () => dispatched };
 });
 
 const layerEngineEnvironment = ServerConfig.layerTest(process.cwd(), {
@@ -429,7 +435,8 @@ it.live(
   "refuses a child's Allow on a grown-up card over the socket until the code is entered",
   () =>
     Effect.gen(function* () {
-      const { post, allow, dispatchedCount } = yield* makeEngine();
+      const { post, connectAllow, dispatchedCount } = yield* makeEngine();
+      const allow = yield* connectAllow();
       // Off: the card is the child's to answer.
       assert.equal((yield* allow).sequence, 1);
       assert.equal(
