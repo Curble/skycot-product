@@ -949,18 +949,25 @@ export const make = Effect.gen(function* () {
 
   return BitbucketApi.of({
     request,
-    probeAuth: executeJson(
-      "probeAuth",
-      HttpClientRequest.get(apiUrl("/user")),
-      BitbucketUserSchema,
-    ).pipe(
-      Effect.map((user) => ({
-        status: "authenticated" as const,
-        account: nonEmpty(user.username ?? user.display_name ?? user.account_id),
-        host: Option.some("bitbucket.org"),
-        detail: Option.none<string>(),
-      })),
-      Effect.catch(() => currentCredential.pipe(Effect.map(authFromCredential))),
+    // nondev-seam: skycot-outside-bitbucket (no Bitbucket credential: answer "not signed in" without contacting bitbucket.org; every source-control discovery probed it for everyone)
+    probeAuth: currentCredential.pipe(
+      Effect.flatMap((credential) =>
+        credential === null
+          ? Effect.succeed(authFromCredential(null))
+          : executeJson(
+              "probeAuth",
+              HttpClientRequest.get(apiUrl("/user")),
+              BitbucketUserSchema,
+            ).pipe(
+              Effect.map((user) => ({
+                status: "authenticated" as const,
+                account: nonEmpty(user.username ?? user.display_name ?? user.account_id),
+                host: Option.some("bitbucket.org"),
+                detail: Option.none<string>(),
+              })),
+              Effect.catch(() => currentCredential.pipe(Effect.map(authFromCredential))),
+            ),
+      ),
     ),
     listPullRequests: (input) =>
       resolveRepository(input).pipe(

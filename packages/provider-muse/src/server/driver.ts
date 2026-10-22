@@ -114,12 +114,14 @@ export const MuseDriver: ProviderDriver<MuseSettings, MuseDriverEnv> = {
       const capabilities = yield* resolveInstallation(options);
       // The maintenance runner requests fresh capabilities around an explicit update
       // and needs the native target version to verify that the command actually upgraded.
-      const latestVersion = options?.fresh
-        ? yield* latestMuseVersion(processEnvironment, { fresh: true }).pipe(
-            Effect.provideService(HttpClient.HttpClient, httpClient),
-            Effect.provideService(ProviderLatestVersions.ProviderLatestVersions, latestVersions),
-          )
-        : undefined;
+      // nondev-seam: skycot-outside-muse (Meta's version channel only for a Muse the person switched on; every "refresh providers" asked it for everyone)
+      const latestVersion =
+        options?.fresh && effectiveConfig.enabled
+          ? yield* latestMuseVersion(processEnvironment, { fresh: true }).pipe(
+              Effect.provideService(HttpClient.HttpClient, httpClient),
+              Effect.provideService(ProviderLatestVersions.ProviderLatestVersions, latestVersions),
+            )
+          : undefined;
       return latestVersion !== undefined ? { ...capabilities, latestVersion } : capabilities;
     });
     const snapshot = yield* makeManagedServerProvider<ProviderSnapshotSettings<MuseSettings>>({
