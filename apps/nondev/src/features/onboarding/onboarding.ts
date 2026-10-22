@@ -1,23 +1,36 @@
 import type { ServerProvider } from "@t3tools/contracts";
 
 import type { Route } from "../../router";
-import { anyProviderReady } from "../settings/providerCatalog";
 import type { OnboardingState } from "../settings/localPrefs";
 
 /**
- * The welcome steps show on `#/welcome` always, and otherwise only until one
- * assistant is ready or the person has skipped them. `providers === null`
- * means the engine hasn't answered yet, so nothing is decided.
+ * First run: the welcome steps open until the person finishes or skips them in this browser,
+ * whether or not an assistant is already signed in, because the first step ("Who is this
+ * for?") is where a parent turns the Family profile on (QA FK-08). Nothing is decided until
+ * the engine has answered for both the assistants and the profile (`null`), and a browser
+ * opened on a Mac whose Family profile is already on skips them: the parent set it up, and a
+ * child should not be offered the set-up. `#/welcome` is handled by the caller (it asks for
+ * the parent code while the profile is on).
  */
 export function shouldShowOnboarding(
   route: Route,
   providers: ReadonlyArray<ServerProvider> | null,
   state: OnboardingState,
+  familyEnabled: boolean | null,
 ): boolean {
   if (route.name === "welcome") return true;
   if (state !== null) return false;
-  if (providers === null) return false;
-  return !anyProviderReady(providers);
+  if (providers === null || familyEnabled === null) return false;
+  return !familyEnabled;
+}
+
+/**
+ * What opening `#/welcome` does: wait for the engine's answer, open the steps, or ask for the
+ * parent code first while the Family profile is on (QA FK-09: the typed address skipped it).
+ */
+export function welcomeEntry(familyKnown: boolean, locked: boolean): "wait" | "open" | "ask" {
+  if (!familyKnown) return "wait";
+  return locked ? "ask" : "open";
 }
 
 export type Audience = "me" | "child";

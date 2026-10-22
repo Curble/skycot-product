@@ -132,11 +132,8 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
         <ListRow
           title="Run the welcome steps again"
           subtitle={`The short first-run guide: who it's for, assistant, folder, autonomy, look.${family.enabled ? " Asks for the parent code." : ""}`}
-          onClick={() => {
-            void family.requireParentCode("rerunOnboarding").then((ok) => {
-              if (ok) navigate(WELCOME_HREF);
-            });
-          }}
+          // The welcome route asks for the code itself, so a typed address asks too.
+          onClick={() => navigate(WELCOME_HREF)}
           chevron
         />
       </SettingsGroup>

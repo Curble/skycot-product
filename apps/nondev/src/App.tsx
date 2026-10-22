@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ServerProvider } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { Laptop, SearchX, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   peekPairingTokenFromUrl,
@@ -14,9 +14,9 @@ import { AppShell } from "./app/AppShell";
 import { SidebarSheetsHost } from "./app/SidebarSheets";
 import { PRODUCT_NAME } from "./brand";
 import { AutomationsScreen } from "./features/automations/AutomationsScreen";
-import { FamilyProvider } from "./features/family/FamilyProvider";
+import { FamilyProvider, useFamily } from "./features/family/FamilyProvider";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
-import { shouldShowOnboarding } from "./features/onboarding/onboarding";
+import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { PeopleScreen } from "./features/people/PeopleScreen";
 import { useOnboardingState } from "./features/settings/localPrefs";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
@@ -170,9 +170,11 @@ const EMPTY_PROVIDERS_ATOM = Atom.make<ReadonlyArray<ServerProvider> | null>(nul
 );
 
 /**
- * First-run onboarding, shown over the shell once the engine has reported its
- * providers and none is ready, or whenever the person opens `#/welcome`.
- * Dismissed state lives in this browser; Settings can reopen it.
+ * First-run onboarding, shown over the shell until it is finished or skipped in this browser
+ * (`shouldShowOnboarding`), or whenever the person opens `#/welcome`. While the Family profile
+ * is on, `#/welcome` asks for the parent code first, however it was reached (QA FK-09: typing
+ * the address skipped the code the Settings row asked for). Dismissed state lives in this
+ * browser; Settings can reopen it.
  */
 function OnboardingGate({ route }: { readonly route: Route }) {
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
@@ -183,9 +185,34 @@ function OnboardingGate({ route }: { readonly route: Route }) {
       : serverEnvironment.providersValueAtom(environmentId),
   );
   const state = useOnboardingState();
+  const family = useFamily();
+  const familyKnown = family.profile.source === "engine";
+  const onWelcome = route.name === "welcome";
+  // Judged on the engine's first answer: a parent finishing the Family step mid-sheet must not
+  // close the sheet under them. (State adjusted while rendering, as React suggests for this.)
+  const [familyAtStart, setFamilyAtStart] = useState<boolean | null>(null);
+  if (familyAtStart === null && familyKnown) setFamilyAtStart(family.enabled);
+  // `#/welcome` is decided once per visit, so the profile turning on inside it asks nothing.
+  const [welcome, setWelcome] = useState<"unknown" | "open" | "closed">("unknown");
+  if (!onWelcome && welcome !== "unknown") setWelcome("unknown");
+  const entry = welcomeEntry(familyKnown, family.isLocked("rerunOnboarding"));
+  if (onWelcome && welcome === "unknown" && entry === "open") setWelcome("open");
+  const needsCode = onWelcome && welcome === "unknown" && entry === "ask";
+  const asking = useRef(false);
+  useEffect(() => {
+    if (!needsCode || asking.current) return;
+    asking.current = true;
+    void family.requireParentCode("rerunOnboarding").then((ok) => {
+      asking.current = false;
+      setWelcome(ok ? "open" : "closed");
+      if (!ok) navigate(HOME_HREF);
+    });
+  }, [needsCode, family]);
   // No local "dismissed" flag: closing the sheet writes the stored state and
   // leaves `#/welcome`, and both of those already make `show` false.
-  const show = shouldShowOnboarding(route, providers, state);
+  const show = onWelcome
+    ? welcome === "open"
+    : shouldShowOnboarding(route, providers, state, familyAtStart);
   if (!show || environmentId === null) return null;
   return (
     <OnboardingSheet
