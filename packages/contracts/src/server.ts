@@ -627,7 +627,7 @@ export const ServerConfig = Schema.Struct({
   reasoningMessages: Schema.optionalKey(Schema.Boolean),
   threadFind: Schema.optionalKey(Schema.Boolean),
   threadFindProgressive: Schema.optionalKey(Schema.Boolean),
-  // nondev-seam: skycot-policy-config (SKYCOT clients read it; stock clients ignore it)
+  // nondev-seam: skycot-policy-config-contract (SKYCOT clients read it; stock clients ignore it)
   skycotPolicy: Schema.optionalKey(Schema.Boolean),
   scratchWorkspaceRoot: Schema.optionalKey(TrimmedNonEmptyString),
   newProjectsRoot: Schema.optionalKey(TrimmedNonEmptyString),
