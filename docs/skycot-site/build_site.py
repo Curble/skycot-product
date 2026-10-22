@@ -3,7 +3,8 @@
 # light/dark setting; privacy, terms, open-source and 404 pages; and the og.png share image.
 # The output folder is copied as-is into public/ of mark-hallam/skycot-research-site (branch product-site).
 # Brand (22 October 2026): logos, favicons, share image and mascot come from nondev/brand/assets (see
-# docs/brand/SKYCOT-brand-guide.html). The mascot's name is undecided: never name it in copy.
+# docs/brand/SKYCOT-brand-guide.html). The cloud is SKYCOT, like the product (brand guide section 12): say
+# "SKYCOT the cloud" only where the character must be clear, never another name. Workshop is the default look.
 import os, html, json, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)) + "/"
 OUT = HERE + "draft/"
@@ -20,9 +21,11 @@ def lockup(grownup=False, h=32):
     return (f'<picture class="lockup"><source media="(prefers-color-scheme: dark)" srcset="/assets/brand/{dark}">'
             f'<img src="/assets/brand/{light}" width="{round(h * vw / vh)}" height="{h}" alt="SKYCOT"></picture>')
 
-def mascot(cls):
+def mascot(cls, label=None):
     # The hello pose, day and dusk stacked; html[data-sky] (set by DAYLIGHT) cross-fades between them.
-    return (f'<div class="sky {cls}" aria-hidden="true"><img class="d" src="/assets/brand/mascot-hello-day.svg" width="176" height="176" alt="">'
+    # Only one drawing shows at a time, so the wrapper carries the spoken name, not the two images.
+    a11y = f'role="img" aria-label="{html.escape(label)}"' if label else 'aria-hidden="true"'
+    return (f'<div class="sky {cls}" {a11y}><img class="d" src="/assets/brand/mascot-hello-day.svg" width="176" height="176" alt="">'
             f'<img class="n" src="/assets/brand/mascot-hello-dusk.svg" width="176" height="176" alt=""></div>')
 
 CSS = r'''
@@ -247,6 +250,33 @@ h2.title{font-size:clamp(30px,4.2vw,48px);max-width:20ch}
 .sky-crew{--s:128px}
 @media (max-width:600px){.sky-hero{--s:180px;margin:-44px auto 12px}}
 
+/* What makes Workshop special: numbered pins on a real screenshot, callouts beside it (under it on phones) */
+.tour{margin-top:40px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:30px 32px 32px}
+.tour-head{max-width:46em;margin-bottom:22px}
+.tour-head h3{font-size:clamp(24px,2.6vw,32px);margin-bottom:8px}
+.tour-head p{color:var(--text2);font-size:17px}
+.tour-main{display:grid;grid-template-columns:7fr 4fr;gap:30px;align-items:start}
+.tour-fig{position:relative;margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow)}
+.tour-fig img{width:100%}
+.pin{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:15px;line-height:1;display:grid;place-items:center;box-shadow:0 0 0 3px #fff,0 4px 12px rgba(0,0,0,.28)}
+.notes{list-style:none;margin:0;padding:0;display:grid;gap:18px}
+.notes li,.tile figcaption{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
+.num{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:15px;line-height:1;display:grid;place-items:center}
+.tour h4{font-size:17px;margin:3px 0 4px;letter-spacing:-.01em}
+.tour .notes p,.tile p{color:var(--text2);font-size:15px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:30px}
+.tile{margin:0}
+.tile .pic{aspect-ratio:4/3;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--bg2)}
+.tile .pic>img{width:100%;height:100%;object-fit:cover}
+.tile figcaption{margin-top:14px}
+.duo{display:grid;grid-template-columns:1fr 1fr;height:100%}
+.duo div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:600}
+.duo .day{background:#fff6e6;color:#6b5847}
+.duo .dusk{background:linear-gradient(180deg,#171a45 0%,#3c3486 60%,#8e5aa8 88%,#f4a27a 100%);color:#f5f5f7}
+.duo img{width:78%;max-width:170px;margin-top:-12%}
+@media (max-width:900px){.tour{padding:22px 18px 24px}.tour-main{grid-template-columns:1fr;gap:22px}.tiles{grid-template-columns:1fr;gap:26px}}
+@media (max-width:600px){.pin{width:22px;height:22px;font-size:12px;box-shadow:0 0 0 2px #fff,0 2px 8px rgba(0,0,0,.28)}}
+
 /* faq */
 .faq{max-width:760px;margin:30px auto 0}
 details{border-top:1px solid var(--line2);padding:0}
@@ -415,14 +445,60 @@ IC_QUIZ = ic('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5
 IC_PAW = ic('<circle cx="7" cy="10" r="1.8"/><circle cx="11" cy="6.5" r="1.8"/><circle cx="15.5" cy="7.5" r="1.8"/><circle cx="18" cy="11.5" r="1.8"/><path d="M8.5 17.5c0-2.5 2-5 4.5-5s4 2 4 4-1.5 3-3.5 3-2.5-1-5 0z"/>')
 IC_KEY = ic('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>')
 
-# One alt text for the hero (light: Workshop light; dark: Workshop dark). Both show Settings, Family.
-HERO_ALT = ("An early build of SKYCOT in the Workshop look, showing Settings, Family: the Family profile is on and "
-            "set up for a sample child called Ava, the assistant always asks first, the parent code guards the "
-            "developer tools and turning the profile off, and the crew Sam and Mo sit in the sidebar.")
+# One alt text for the hero (light: Home by day, Family profile on for a sample child; dark: Home at dusk).
+HERO_ALT = ("An early build of SKYCOT's Home in the Workshop look: SKYCOT the cloud waves beside \"SKYCOT says hello\" "
+            "and a good-afternoon greeting, a sticky-note tip sits on the right, and the crew Sam, who builds things, "
+            "and Mo, who checks before anything goes live, sit in the sidebar under a sample café website project.")
+
+# "What makes Workshop special" (22 October 2026): Workshop is SKYCOT's default look. Pins 1-3 point at real
+# parts of one screenshot (left/top are percentages of the 1200x707 image); 4-6 are close-ups. On phones the
+# pins shrink and every callout stacks under its picture.
+TOUR_PINS = [("80.5%", "47%"), ("14.4%", "36%"), ("30.3%", "9.6%")]
+TOUR_NOTES = [
+    ("Hand-drawn borders and sticky notes",
+     "Cards look sketched on cream paper with marker pens, and tips and notes sit on sticky notes, like a workbench."),
+    ("The crew",
+     "SKYCOT says hello, Sam builds, Mo checks. The app says \"Sam needs your OK\" instead of \"the assistant\"."),
+    ("Larger, friendly text",
+     "Handwritten headings, marker underlines and roomy type. Larger text is one switch in Settings, and the Family profile turns it on."),
+]
+TOUR_TILES = [
+    ("SKYCOT the cloud follows your sky",
+     "By day it waves from a cream morning; after sunset where you live it wears its dusk colours, with a star."),
+    ("Risk moments stay calm and plain",
+     "Approval cards, Undo and going live drop the doodles: plain borders, plain words, nothing pre-selected."),
+    ("Prefer calm? Classic is one click away",
+     "Settings, Appearance: hover a look to try it on, click to keep it. A look never changes what SKYCOT does."),
+]
+
+def tour_html():
+    pins = "".join(f'<span class="pin" style="left:{x};top:{y}" aria-hidden="true">{i}</span>' for i, (x, y) in enumerate(TOUR_PINS, 1))
+    notes = "".join(f'<li><span class="num" aria-hidden="true">{i}</span><div><h4>{html.escape(h, quote=False)}</h4><p>{html.escape(t, quote=False)}</p></div></li>'
+                    for i, (h, t) in enumerate(TOUR_NOTES, 1))
+    pics = [
+        '<div class="duo"><div class="day"><img src="/assets/brand/mascot-hello-day.svg" width="176" height="176" alt="SKYCOT the cloud by day, waving">By day</div>'
+        '<div class="dusk"><img src="/assets/brand/mascot-hello-dusk.svg" width="176" height="176" alt="SKYCOT the cloud at dusk, waving, with a star">After sunset</div></div>',
+        '<img src="assets/workshop-calm.jpg" width="800" height="600" alt="Close-up of an approval card in the Workshop look: Sam needs your OK, then a plain May I run this? card with Why it matters, Where it reaches, If you say no, and four plain buttons, none pre-selected.">',
+        '<img src="assets/workshop-classic.jpg" width="800" height="600" alt="Close-up of Settings, Appearance: the Workshop card is ticked as the current look, with Classic, the Apple Messages look, right beside it.">',
+    ]
+    tiles = "".join(f'<figure class="tile"><div class="pic">{pic}</div><figcaption><span class="num" aria-hidden="true">{i}</span><div><h4>{html.escape(h, quote=False)}</h4><p>{html.escape(t, quote=False)}</p></div></figcaption></figure>'
+                    for i, (pic, (h, t)) in enumerate(zip(pics, TOUR_TILES), 4))
+    return f'''<div class="tour" id="workshop">
+    <div class="tour-head"><span class="tag">SKYCOT's default look</span><h3>What makes Workshop special</h3>
+      <p>Playful and hand-drawn, for kids and for grown-ups who like a bit of fun. Every look keeps the same careful app underneath.</p></div>
+    <div class="tour-main">
+      <figure class="tour-fig"><img src="assets/workshop-tour.jpg" width="1200" height="707" alt="A conversation in the Workshop look: the crew Sam and Mo in the sidebar, a handwritten Conversations heading with a marker underline, a sketched What changed card for a new Christmas page, and the Versions panel's restore notes on a pink sticky note.">{pins}</figure>
+      <div><ol class="notes">{notes}</ol>
+        <blockquote class="quote">"It makes me feel like a kid."<cite>Mark Hallam, founder, the first time he saw it</cite></blockquote></div>
+    </div>
+    <div class="tiles">{tiles}</div>
+  </div>'''
+
+WORKSHOP_TOUR = tour_html()
 
 def home_body():
     hero = f'''<section class="hero"><div class="wrap">
-  {mascot("sky-hero")}
+  {mascot("sky-hero", "SKYCOT the cloud, waving hello")}
   <span class="eyebrow">SKYCOT for Mac · early access</span>
   <h1>{html.escape(H1, quote=False).replace("family-friendly", '<span class="nw">family-friendly</span>')}</h1>
   <p class="lede">{html.escape(LEDE, quote=False)}</p>
@@ -433,9 +509,9 @@ def home_body():
   </div>
   <p class="hero-note">Works with Claude Code, Codex, Cursor, Gemini and others, signed in with a grown-up's own account. Your files stay on your Mac; only what each job needs goes to the AI you chose.</p>
   <div class="hero-tail">
-  <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/family-settings-dark.jpg" width="1200" height="707"><img src="assets/family-settings.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
+  <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.jpg" width="1200" height="707"><img src="assets/hero.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
   </div>
-  <p class="caption">Early build: Settings, Family, in the Workshop look, set up for a sample child called Ava.</p>
+  <p class="caption">Early build: Home in the Workshop look, SKYCOT's default. Light mode shows it by day with the Family profile on for a sample child called Ava; dark mode shows it at dusk.</p>
 </div></section>
 '''
     body = f'''
@@ -452,12 +528,12 @@ def home_body():
   <p class="sub">Turn on the Family profile and SKYCOT becomes a place where a child can build real things with a grown-up's hand on the brakes. It runs on your Mac, signed in to your own AI account, and your child uses it with you nearby.</p></div>
 
   <div class="crewrow">
-    <div class="crewart" role="img" aria-label="The SKYCOT cloud waving hello, with Sam in a yellow hard hat, who builds things, and Mo in round glasses, who checks before anything risky.">
+    <div class="crewart" role="img" aria-label="SKYCOT the cloud, waving hello, with Sam in a yellow hard hat, who builds things, and Mo in round glasses, who checks before anything risky.">
       {mascot("sky-crew")}<img class="mate" src="/assets/brand/sam.svg" width="56" height="56" alt=""><img class="mate" src="/assets/brand/mo.svg" width="56" height="56" alt="">
     </div>
     <div><span class="tag">Built and in testing for the first release</span>
-      <h3>Meet the crew. Sam builds. Mo checks.</h3>
-      <p>The Workshop look comes on with the profile: cream paper, marker pens, sticky-note tips and a named crew. The app says "Sam needs your OK" instead of "the assistant". Your child can pick another look any time; a look never changes what SKYCOT does.</p></div>
+      <h3>Meet the crew. SKYCOT says hello, Sam builds, Mo checks.</h3>
+      <p>Workshop is SKYCOT's default look: cream paper, marker pens, sticky-note tips and a named crew. The app says "Sam needs your OK" instead of "the assistant". Classic is there for anyone who prefers calm, and your child can pick another look any time; a look never changes what SKYCOT does.</p></div>
   </div>
 
   <div class="moment">
@@ -478,7 +554,7 @@ def home_body():
     <div class="text"><h3>Nothing goes online without your code.</h3>
       <p>Sending work for review or putting it live gains a Parent code step before Confirm. The same code guards new automations, the developer tools and turning the profile off. Five wrong tries locks every code prompt for five minutes.</p>
       <ul><li>Building, drafts and Undo work as normal.</li><li>You see what will happen, and what won't, before you confirm.</li><li>Change the code any time in Settings → Family.</li></ul></div>
-    <div class="shot"><img src="assets/family-parent-code.jpg" width="1200" height="707" alt="The Publish sheet for a sample café website in the Workshop look, with a Parent code step: Sending for review needs a parent's OK while the Family profile is on."></div>
+    <div class="shot"><img src="assets/family-parent-code.jpg" width="1200" height="707" alt="The Publish sheet for a sample café website in the Workshop look, with a Parent code step: Uploading a draft line needs a parent's OK while the Family profile is on."></div>
   </div>
 
   <p class="honest"><b>An honest note.</b> The Family profile is a set of guardrails inside SKYCOT, not a security or parental-control product. It doesn't filter the web, decide what the AI may talk about, lock the Mac or replace Screen Time, and a determined teenager could get round it. SKYCOT runs on the parent's own Mac and AI account, under the parent's supervision, and each AI service's own age rules still apply (see <a href="#faq">the questions below</a>). It makes the first experience safe and kind. The rest is parenting.</p>
@@ -540,15 +616,10 @@ def home_body():
 <section id="looks" class="alt"><div class="wrap">
   <div class="center"><p class="kicker">Choose your look</p><h2 class="title">Pick a look. Keep the same careful app.</h2>
   <p class="sub">SKYCOT ships with a library of themes. Try one on with a hover, keep it with a click, change it any time in Settings. A theme changes how things look, never what they do: asking permission, undoing and going live stay plain in every look.</p></div>
+  {WORKSHOP_TOUR}
   <div class="looks">
-    <div class="look look-hero">
-      <div class="pic"><img src="assets/look-workshop.jpg" width="1200" height="707" alt="SKYCOT in the Workshop theme: cream paper, hand-drawn borders, a yellow sticky-note tip, and a crew list in the sidebar showing Sam, who builds things, and Mo, who checks before anything risky."></div>
-      <div class="t"><span class="tag">On by default in a Family profile</span><h3>Workshop</h3>
-        <p>Playful and hand-drawn: cream paper, marker pens, sticky-note tips, and a named crew. Sam builds things. Mo checks before anything risky. The app says "Sam needs your OK" instead of "the assistant".</p>
-        <blockquote class="quote">"It makes me feel like a kid."<cite>Mark Hallam, founder, the first time he saw it</cite></blockquote></div>
-    </div>
     <div class="look"><div class="pic"><img src="assets/look-classic.jpg" width="1200" height="707" alt="SKYCOT in the Classic theme: white panels, grey sidebar and one blue accent, in the style of Apple Messages."></div>
-      <div class="t"><h3>Classic</h3><p>The Apple Messages look. Calm, clean and familiar. The default for grown-ups.</p></div></div>
+      <div class="t"><h3>Classic</h3><p>The Apple Messages look. Calm, clean and familiar, for anyone who prefers calm. One click away in Settings.</p></div></div>
     <div class="look"><div class="pic"><img src="assets/look-paper.jpg" width="1200" height="707" alt="SKYCOT in the Paper theme: warm off-white background, serif headings and a single vermilion accent."></div>
       <div class="t"><h3>Paper</h3><p>Warm paper and ink. Serif headings, one vermilion accent, quiet everywhere else.</p></div></div>
     <div class="look"><div class="pic"><img src="assets/look-night-ops.jpg" width="1200" height="707" alt="SKYCOT in the Night Ops theme: dark navy panels with cyan highlights, like a mission-control console."></div>
@@ -567,13 +638,13 @@ def home_body():
   <div class="center"><p class="kicker">For grown-ups and small businesses too</p><h2 class="title">The same careful developer, for your business.</h2>
   <p class="sub">{html.escape(LEDE2, quote=False)} Text it what you want, like "Add a Christmas menu page", and SKYCOT builds it on your Mac, shows you what changed, and waits for your yes.</p></div>
   <div class="looks two">
-    <div class="look"><div class="pic"><img src="assets/approval.jpg" width="1200" height="707" alt="A May I run this? card explaining Why it matters, Where it reaches and If you say no, with Don't allow, Allow once and Always allow buttons."></div>
+    <div class="look"><div class="pic"><img src="assets/approval.jpg" width="1200" height="707" alt="Sam needs your OK: a May I run this? card explaining Why it matters, Where it reaches and If you say no, with Don't allow, Allow once, Allow for the rest of this conversation and Always allow buttons."></div>
       <div class="t"><h3>It asks before it acts.</h3><p>A card like a macOS permission prompt: what it wants, why it matters, and what happens if you say no. Nothing is pre-selected.</p></div></div>
-    <div class="look"><div class="pic"><img src="assets/what-changed.jpg" width="1200" height="707" alt="A What changed card listing the changes in plain words, with buttons to keep or undo them, and the Versions list on the right."></div>
+    <div class="look"><div class="pic"><img src="assets/what-changed.jpg" width="1200" height="707" alt="At dusk in dark mode: a What changed card listing a new Christmas page and two changed pages in plain words, with Keep these changes, Undo all of it and Ask for a tweak, and the Versions list on the right."></div>
       <div class="t"><h3>See what changed, in your words.</h3><p>Which pages, what look-and-feel, what wasn't touched. The code is one click away if you ever want it.</p></div></div>
     <div class="look"><div class="pic"><img src="assets/undo.jpg" width="1200" height="707" alt="An Undo all of it? sheet listing what Restore does and does not do, with Cancel and Undo all of it buttons, over the Versions list."></div>
       <div class="t"><h3>Undo all of it. Really.</h3><p>Every change is a version in a Time Machine-style list. Restore puts every file back; the conversation stays.</p></div></div>
-    <div class="look"><div class="pic"><img src="assets/publish.jpg" width="1200" height="707" alt="The Publish sheet: Quick safety check, How would you like to publish, Upload a draft line with What will happen and What won't, then Not yet and Upload a draft line buttons."></div>
+    <div class="look"><div class="pic"><img src="assets/publish.jpg" width="1200" height="707" alt="The Publish sheet: Mo's quick check (three files changed, nothing deleted, no settings or secret files touched), then How would you like to publish, with Upload a draft line and Put it live."></div>
       <div class="t"><h3>Publishing is one plain question at a time.</h3><p>Upload a draft, send for review, or put it live. The live option is the one that warns you.</p></div></div>
   </div>
   <p class="fine center" style="margin:28px auto 0"><b>Already a developer, or have one?</b> Advanced mode is one switch away, at the bottom of the sidebar. It shows the full developer interface SKYCOT is built on (T3 Code's), in the same window, with nothing removed. In a Family profile it's hidden and needs the parent code.</p>
@@ -607,7 +678,8 @@ def home_body():
     <details><summary>What does SKYCOT not do?</summary><p>It isn't a parental-control or security product. It doesn't filter the web, decide what the AI may talk about, lock the Mac, limit screen time or replace Screen Time, and it only works inside SKYCOT. The parent code is kept on your Mac, and a determined teenager could get round it.</p><p>SKYCOT also doesn't create AI accounts for anyone, sell AI time, or send anything to us: no analytics are switched on.</p></details>
     <details><summary>Which AI does it use?</summary><p>The one you already pay for. A grown-up signs in to at least one supported assistant: Claude Code (Anthropic), Codex (OpenAI), Cursor, or Gemini via Antigravity (Google). SKYCOT runs on that plan; it doesn't sell AI time or stand between you and your account.</p><p>Each service sets its own age rules. As of October 2026, Anthropic's Claude and Cursor require every user to be 18 or over, and OpenAI's terms allow 13 to 17 year olds with a parent's permission; Google sets its own rules for Gemini and Antigravity. Check your service's current terms for your child's age before they use SKYCOT with it.</p></details>
     <details><summary>Do I need to know how to code?</summary><p>No. You describe what you want in plain English, read what changed in plain English, and decide. If you have a developer, they can flip on Advanced mode and see everything in their language, in the same window.</p></details>
-    <details><summary>Can I change how it looks?</summary><p>Yes. SKYCOT ships with a <a href="#looks">library of themes</a> (Classic, Workshop, Paper and Night Ops), each with a light and a dark side. Themes are plain data files you can import, export and share, and you can duplicate one and edit the colours, the flavour and your crew's names. A theme changes how things look, never what they do.</p></details>
+    <details><summary>Can I change how it looks?</summary><p>Yes. SKYCOT ships with a <a href="#looks">library of themes</a>: Workshop, the default, plus Classic for anyone who prefers calm, Paper and Night Ops, each with a light and a dark side. Themes are plain data files you can import, export and share, and you can duplicate one and edit the colours, the flavour and your crew's names. A theme changes how things look, never what they do.</p></details>
+    <details><summary>Who is the little cloud?</summary><p>That's SKYCOT. It greets you by day and wears its dusk colours after sunset where you live.</p></details>
     <details><summary>What does SKYCOT cost?</summary><p>Free during early access. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
     <details><summary>Where do my files go?</summary><p>They stay on your Mac. When you send a message, the assistant you chose receives what it needs for that task, under that company's terms. SKYCOT has no analytics switched on and no account of its own to send things to.</p></details>
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
@@ -778,7 +850,7 @@ OSS = f'''{nav()}
   </ul>
 
   <h2 id="themes">Themes are open</h2>
-  <p>Every SKYCOT theme is a plain data file: a short list of colours, a few "flavour" choices (borders, headings, tip cards, button shape, motion) and optional crew names. A theme contains no code, and you can read one in any text editor. The four themes that ship with SKYCOT (Classic, Workshop, Paper and Night Ops) are published with the app, and the format will be documented alongside the first download.</p>
+  <p>Every SKYCOT theme is a plain data file: a short list of colours, a few "flavour" choices (borders, headings, tip cards, button shape, motion) and optional crew names. A theme contains no code, and you can read one in any text editor. The four themes that ship with SKYCOT (Workshop, the default, plus Classic, Paper and Night Ops) are published with the app, and the format will be documented alongside the first download.</p>
   <p>Community themes are welcome. Duplicate a theme in Settings → Appearance, edit it, export it, and contribute it through the SKYCOT repository (the address will be published here with the first download) or by email to <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. Themes we include are credited to their author. A theme changes how SKYCOT looks, never what it does: the permission, undo and publish moments stay plain in every theme.</p>
 
   <h2>Third-party licences</h2>
