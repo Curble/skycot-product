@@ -5,6 +5,8 @@ import {
   describeDecision,
   describeRuntimeRequest,
   isDestructiveCommand,
+  REAL_PROJECT_TITLE,
+  REAL_PROJECT_WARNING,
   toolCallInputFor,
   type ApprovalCard,
 } from "./approvals";
@@ -220,6 +222,7 @@ describe("describeRuntimeRequest — files and apps", () => {
       ctx,
     );
     expect(folder.scope).toBe("only this project");
+    expect(folder.title).toBe(REAL_PROJECT_TITLE);
     const elsewhere = describeRuntimeRequest(
       items.approval("file-change", { prompt: "update /Users/kid/Documents/diary.txt" }),
       ctx,
@@ -641,5 +644,48 @@ describe("a push is judged with the branch the server judged it with (S-1)", () 
     expect(
       approvalNeedsBranch(items.approval("file-change", { prompt: "git push" }), undefined),
     ).toBe(false);
+  });
+});
+
+describe("describeRuntimeRequest — the real project folder beside a private copy", () => {
+  const copy = "/Users/kid/.skycot/worktrees/foreman demo cafe/skycot-footer-1a2b";
+  const real = "/Users/kid/Sites/foreman demo cafe";
+  const ctx = { projectRoot: copy, projectFolder: real };
+
+  it("asks about an edit to the real folder with the honest Undo sentence", () => {
+    const card = describeRuntimeRequest(
+      items.approval("file-change", { prompt: `update ${real}/index.html` }),
+      ctx,
+    );
+    expect(card.title).toBe(REAL_PROJECT_TITLE);
+    expect(card.risk).toBe("medium");
+    expect(card.warning).toBe(REAL_PROJECT_WARNING);
+    expect(card.warning).toContain("which Undo can't reverse");
+    expect(decisions(card)).not.toContain("acceptAlways");
+  });
+
+  it("asks about a command that writes there, but not one that only looks", () => {
+    const writes = describeRuntimeRequest(
+      items.approval("command", { prompt: `sed -i '' 's/a/b/' "${real}/index.html"` }),
+      ctx,
+    );
+    expect(writes.title).toBe(REAL_PROJECT_TITLE);
+    expect(writes.risk).toBe("medium");
+    expect(writes.whyItMatters).toContain("changes your real project, which Undo can't reverse");
+    const looks = describeRuntimeRequest(
+      items.approval("command", { prompt: `cat "${real}/index.html"` }),
+      ctx,
+    );
+    expect(looks.title).not.toBe(REAL_PROJECT_TITLE);
+    expect(looks.warning).toBeUndefined();
+  });
+
+  it("keeps the ordinary card inside the private copy", () => {
+    const card = describeRuntimeRequest(
+      items.approval("file-change", { prompt: `update ${copy}/index.html` }),
+      ctx,
+    );
+    expect(card.title).toBe("May I change this file?");
+    expect(card.risk).toBe("low");
   });
 });

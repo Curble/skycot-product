@@ -8,6 +8,7 @@
 // can delete work.
 
 import {
+  isInRealProjectFolder,
   isOutsideProject,
   isProviderInstructionPath,
   isSecretPath,
@@ -28,6 +29,7 @@ export type HardRuleId =
   | "destructive-git"
   | "pushes-to-live"
   | "outside-project"
+  | "changes-real-project"
   | "leaves-sandbox"
   | "reads-outside-project"
   | "pipes-to-shell"
@@ -86,6 +88,12 @@ export const HARD_RULES: ReadonlyArray<HardRule> = [
     title: "Changing or running anything outside this project's folder",
     held: "works outside your project folder",
     risk: "high",
+  },
+  {
+    id: "changes-real-project",
+    title: "Changing your real project while a conversation works in a private copy",
+    held: "changes your real project, which Undo can't reverse",
+    risk: "medium",
   },
   {
     id: "leaves-sandbox",
@@ -155,6 +163,12 @@ export interface RuleContext {
 }
 
 const projectRoots = (ctx: RuleContext) => [ctx.projectRoot, ctx.projectFolder];
+
+/** The card's honest sentence for `changes-real-project`. */
+export const REAL_PROJECT_SENTENCE = "This changes your real project, which Undo can't reverse.";
+
+const inRealFolder = (path: string, ctx: RuleContext) =>
+  isInRealProjectFolder(path, ctx.projectRoot, ctx.projectFolder);
 
 export interface RuleMatch {
   readonly rule: HardRule;
@@ -662,8 +676,37 @@ function evaluateSegment(segment: string, ctx: RuleContext, namesOnly = false): 
   if (outside.length > 0) {
     hit(READ_PROGRAMS.has(base) ? "reads-outside-project" : "outside-project", outside[0]!);
   }
+  // Writing into the project's own folder from a private copy: Undo will not bring it back.
+  // `cd` is judged with the rest of the command (see `cdIntoRealFolder`).
+  if (base !== "cd" && !onlyLooks) {
+    const real = pathTokens(args).find((candidate) => inRealFolder(candidate, ctx));
+    if (real !== undefined) hit("changes-real-project", real);
+  }
 
   return matches;
+}
+
+/**
+ * `cd "/Users/me/My Site" && sed -i … index.html`: the change lands in the real folder even
+ * though no path names it. Only when something after the `cd` can write; a look around is fine.
+ */
+function cdIntoRealFolder(segments: ReadonlyArray<string>, ctx: RuleContext): string | null {
+  let target: string | null = null;
+  let writes = false;
+  for (const segment of segments) {
+    const tokens = programTokens(segment, { bins: RUNNABLE_BINS });
+    const program = tokens[0];
+    if (program === undefined) continue;
+    const base = programBaseName(program).toLowerCase();
+    const args = tokens.slice(1);
+    if (base === "cd") {
+      const to = args.find((arg) => !arg.startsWith("-"));
+      if (to !== undefined && inRealFolder(to, ctx)) target = to;
+      continue;
+    }
+    if (target !== null && !looksWithoutWriting(base, args, segment)) writes = true;
+  }
+  return writes ? target : null;
 }
 
 /** Judge one shell command against every hard rule. */
@@ -682,9 +725,12 @@ export function evaluateCommand(command: string, ctx: RuleContext = {}): RuleEva
   }
   // Names printed into another program (`| xargs cat`, `while read`) may be opened after all.
   const namesOnly = !/\bxargs\b|\bwhile\s+read\b|\bparallel\b|\$\(|`/.test(text);
-  for (const segment of splitShellSegments(text)) {
+  const segments = splitShellSegments(text);
+  for (const segment of segments) {
     matches.push(...evaluateSegment(segment, ctx, namesOnly));
   }
+  const realCd = cdIntoRealFolder(segments, ctx);
+  if (realCd !== null) matches.push({ rule: hardRule("changes-real-project"), detail: realCd });
   // `x=$(npx vercel --prod)`, `` echo `wrangler deploy` ``: what runs inside counts too.
   for (const inner of commandSubstitutions(text)) {
     for (const segment of splitShellSegments(inner)) {
@@ -709,6 +755,9 @@ export function evaluateFileChange(
       matches.push({ rule: hardRule("deletes-files"), detail: file.path });
     if (isOutsideProject(file.path, projectRoots(ctx))) {
       matches.push({ rule: hardRule("outside-project"), detail: file.path });
+    }
+    if (inRealFolder(file.path, ctx)) {
+      matches.push({ rule: hardRule("changes-real-project"), detail: file.path });
     }
     if (isSecretPath(file.path)) matches.push({ rule: hardRule("secrets"), detail: file.path });
   }

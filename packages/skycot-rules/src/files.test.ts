@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { filesFromPrompt, isOutsideProject, isSecretPath } from "./files.ts";
+import { filesFromPrompt, isInRealProjectFolder, isOutsideProject, isSecretPath } from "./files.ts";
 
 describe("filesFromPrompt", () => {
   it("reads Codex verb lines, Claude tool prefixes, bare paths and 'N files:' lists", () => {
@@ -88,6 +88,33 @@ describe("isOutsideProject", () => {
     expect(isOutsideProject("/etc/hosts", undefined)).toBe(true);
     expect(isOutsideProject("/tmp/x", undefined)).toBe(false);
     expect(isOutsideProject("/Users/me/site/x", null)).toBe(false);
+  });
+});
+
+describe("isInRealProjectFolder", () => {
+  const copy = "/Users/me/.t3/worktrees/Little Fern Café website/skycot-footer-1a2b";
+  const real = "/Users/me/Sites/Little Fern Café website";
+
+  it("is true only for the real folder while a private copy is in use", () => {
+    expect(isInRealProjectFolder(`${real}/index.html`, copy, real)).toBe(true);
+    expect(isInRealProjectFolder(real, copy, real)).toBe(true);
+    expect(isInRealProjectFolder(`${copy}/index.html`, copy, real)).toBe(false);
+    expect(isInRealProjectFolder("index.html", copy, real)).toBe(false);
+    expect(isInRealProjectFolder("/etc/hosts", copy, real)).toBe(false);
+    expect(isInRealProjectFolder(`${real} old/index.html`, copy, real)).toBe(false);
+  });
+
+  it("is false without a private copy", () => {
+    expect(isInRealProjectFolder(`${real}/index.html`, real, real)).toBe(false);
+    expect(isInRealProjectFolder(`${real}/index.html`, `${real}/`, real)).toBe(false);
+    expect(isInRealProjectFolder(`${real}/index.html`, null, real)).toBe(false);
+    expect(isInRealProjectFolder(`${real}/index.html`, copy, null)).toBe(false);
+  });
+
+  it("counts a private copy kept inside the project folder as the copy", () => {
+    const nested = `${real}/.skycot/copies/footer`;
+    expect(isInRealProjectFolder(`${nested}/index.html`, nested, real)).toBe(false);
+    expect(isInRealProjectFolder(`${real}/index.html`, nested, real)).toBe(true);
   });
 });
 

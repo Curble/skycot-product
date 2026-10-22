@@ -19,6 +19,7 @@ import {
   hardRule,
   isDestructiveCommand,
   readCommandAsk,
+  REAL_PROJECT_SENTENCE,
   type RuleEvaluation,
   type RuleMatch,
   SANDBOX_EXPLAINER,
@@ -324,6 +325,13 @@ function withUndoWarning(lead: string, check: string = copy.checkTheCommand): st
 
 const READS_OUTSIDE_SCOPE = "Reads one file outside the project; changes nothing.";
 
+/** The real-folder card's title and its one honest warning (rule `changes-real-project`). */
+export const REAL_PROJECT_TITLE = "May I change your real project?";
+export const REAL_PROJECT_WARNING = `${REAL_PROJECT_SENTENCE} Undo only puts back the private copy this conversation works in.`;
+
+const changesRealProject = (rules: RuleEvaluation) =>
+  rules.matches.some((match) => match.rule.id === "changes-real-project");
+
 /**
  * The exact command an approval is about: the `command_execution` item that shares its native
  * item. Undefined when that item is not in the list (yet).
@@ -393,6 +401,7 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
     ) || classified.risk === "high";
   const outsideOnly =
     !irreversible && rules.matches.some((match) => match.rule.id === "outside-project");
+  const realProject = !irreversible && !outsideOnly && changesRealProject(rules);
   const destructive = irreversible;
   const risk: ApprovalRisk = maxRisk(classified.risk, rules.risk);
   const readsOutside = rules.matches.find((match) => match.rule.id === "reads-outside-project");
@@ -448,9 +457,11 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
           ? "Careful — this can't be undone"
           : outsideOnly
             ? "May I work outside the project?"
-            : readsOutsideOnly
-              ? "May I read a file outside the project?"
-              : "May I run this?",
+            : realProject
+              ? REAL_PROJECT_TITLE
+              : readsOutsideOnly
+                ? "May I read a file outside the project?"
+                : "May I run this?",
       whatItWants,
       whyItMatters:
         ruleLine ??
@@ -468,7 +479,9 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
           )
         : outsideOnly
           ? withUndoWarning("This touches files outside the project folder.")
-          : undefined,
+          : realProject
+            ? REAL_PROJECT_WARNING
+            : undefined,
       options: buildApprovalOptions(
         item.requestId,
         risk,
@@ -571,6 +584,7 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
   const outside = files.some((file) => file.outside);
   const deletes = files.some((file) => file.operation === "remove");
   const sensitive = files.some((file) => file.isConfigOrSecret);
+  const realProject = !outside && changesRealProject(rules);
   // Any delete is a hard rule (QA2-03): red card, once-only buttons.
   const risk: ApprovalRisk = maxRisk(
     deletes || outside ? "high" : sensitive ? "medium" : "low",
@@ -583,15 +597,19 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
     {
       title: deletes
         ? "Careful — this deletes a file"
-        : files.length > 1
-          ? "May I change these files?"
-          : "May I change this file?",
+        : realProject
+          ? REAL_PROJECT_TITLE
+          : files.length > 1
+            ? "May I change these files?"
+            : "May I change this file?",
       whatItWants: `The assistant wants to ${fileChangePhrase(files)}.`,
       whyItMatters: deletes
         ? "Deleting is a hard rule: it is never done without a fresh question from you."
-        : sensitive
-          ? "This touches a settings or secrets file. Mistakes here can break the project or leak keys."
-          : "Every change gets a restore point, so you can always go back.",
+        : realProject
+          ? "This conversation works in a private copy of your project. This change would go into the real folder instead."
+          : sensitive
+            ? "This touches a settings or secrets file. Mistakes here can break the project or leak keys."
+            : "Every change gets a restore point, so you can always go back.",
       scope: outside ? "your computer" : "only this project",
       ifYouSayNo: copy.ifNoFileChange,
       risk,
@@ -600,7 +618,9 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
         ? withUndoWarning(`${deleteNoun} will be deleted.`, copy.checkTheFiles)
         : outside
           ? withUndoWarning(`${outsideNoun} outside the project folder.`, copy.checkTheFiles)
-          : undefined,
+          : realProject
+            ? REAL_PROJECT_WARNING
+            : undefined,
       options: buildApprovalOptions(
         item.requestId,
         risk,

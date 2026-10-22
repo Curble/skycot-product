@@ -9,6 +9,7 @@ import {
   evaluateRequest,
   isDestructiveCommand,
   readCommandAsk,
+  REAL_PROJECT_SENTENCE,
   RENAMES_AWAY,
   UNKNOWN_BRANCH_PUSH,
 } from "./rules.ts";
@@ -706,5 +707,73 @@ describe("the assistant reading its own plugin and skill instructions (N-7)", ()
     expect(ids("find ~/.codex/skills -name '*.md' -exec cat {} +")).not.toEqual([]);
     expect(ids("cat ~/.codex/skills/../sessions/today.jsonl")).toContain("reads-outside-project");
     expect(ids("cat ~/.codex/history.jsonl")).toContain("reads-outside-project");
+  });
+});
+
+describe("changes-real-project: the real folder while a conversation works in a private copy", () => {
+  const copy = "/Users/me/.t3/worktrees/foreman demo cafe/skycot-footer-1a2b";
+  const real = "/Users/me/Sites/foreman demo cafe";
+  const ctx = { projectRoot: copy, projectFolder: real };
+  const realIds = (command: string) =>
+    evaluateCommand(command, ctx).matches.map((match) => match.rule.id);
+
+  it("holds an edit to the real folder as a medium question, not an outside-the-project one", () => {
+    const result = evaluateFileChange([{ path: `${real}/index.html`, operation: "change" }], ctx);
+    expect(result.decision).toBe("hold");
+    expect(result.risk).toBe("medium");
+    expect(result.matches.map((match) => match.rule.id)).toEqual(["changes-real-project"]);
+    expect(describeMatches(result.matches)).toBe(
+      "changes your real project, which Undo can't reverse",
+    );
+    expect(REAL_PROJECT_SENTENCE).toBe("This changes your real project, which Undo can't reverse.");
+  });
+
+  it("allows the same edit inside the private copy", () => {
+    expect(
+      evaluateFileChange([{ path: `${copy}/index.html`, operation: "change" }], ctx).decision,
+    ).toBe("allow");
+    expect(evaluateFileChange([{ path: "index.html", operation: "change" }], ctx).decision).toBe(
+      "allow",
+    );
+  });
+
+  it("says nothing extra when there is no private copy", () => {
+    const plain = { projectRoot: real, projectFolder: real };
+    expect(
+      evaluateFileChange([{ path: `${real}/index.html`, operation: "change" }], plain).decision,
+    ).toBe("allow");
+    expect(evaluateCommand(`sed -i '' s/a/b/ "${real}/index.html"`, plain).decision).toBe("allow");
+  });
+
+  it("holds commands that write into the real folder", () => {
+    expect(realIds(`sed -i '' 's/Old/New/' "${real}/index.html"`)).toEqual([
+      "changes-real-project",
+    ]);
+    expect(realIds(`cp index.html "${real}/index.html"`)).toEqual(["changes-real-project"]);
+    expect(realIds(`echo hi > "${real}/notes.txt"`)).toEqual(["changes-real-project"]);
+    expect(realIds(`cd "${real}" && sed -i '' s/a/b/ index.html`)).toEqual([
+      "changes-real-project",
+    ]);
+  });
+
+  it("lets the assistant look at the real folder", () => {
+    expect(realIds(`cat "${real}/index.html"`)).toEqual([]);
+    expect(realIds(`ls "${real}"`)).toEqual([]);
+    expect(realIds(`cd "${real}" && ls && cat index.html`)).toEqual([]);
+    expect(realIds(`diff "${real}/index.html" index.html`)).toEqual([]);
+  });
+
+  it("keeps the stronger rules in charge of deleting there", () => {
+    expect(realIds(`rm "${real}/index.html"`)).toEqual(
+      expect.arrayContaining(["deletes-files", "changes-real-project"]),
+    );
+  });
+
+  it("is what the Family profile hands to a grown-up", () => {
+    const request = evaluateRequest(
+      { kind: "file-change", files: [{ path: `${real}/index.html`, operation: "change" }] },
+      ctx,
+    );
+    expect(request.decision).toBe("hold");
   });
 });

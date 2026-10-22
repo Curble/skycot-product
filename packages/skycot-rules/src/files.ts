@@ -127,6 +127,23 @@ export function isOutsideProject(path: string | undefined, projectRoots: Project
   return /(^|[\\/])\.\.([\\/]|$)/.test(path);
 }
 
+/**
+ * True when the thread works in a private copy and `path` lies in the project's own folder
+ * instead. Undo restores the private copy; it never reaches the real folder, so a change
+ * there is not covered. A copy kept inside the project folder still counts as the copy, and a
+ * relative path is the copy's own.
+ */
+export function isInRealProjectFolder(
+  path: string | undefined,
+  privateCopy: string | undefined | null,
+  projectFolder: string | undefined | null,
+): boolean {
+  if (!path || !privateCopy || !projectFolder) return false;
+  if (normalizeRoot(privateCopy) === normalizeRoot(projectFolder)) return false;
+  if (isUnder(path, privateCopy)) return false;
+  return isUnder(path, projectFolder);
+}
+
 const SECRET_PATH_PATTERN =
   /(^|[\\/])(\.env(\.[\w.-]+)?|\.npmrc|\.pypirc|\.netrc|\.git-credentials|credentials(\.json)?|secrets?(\.[\w.-]+)?|id_rsa|id_ed25519|id_ecdsa|known_hosts|authorized_keys|\.ssh|\.aws|\.gnupg|\.docker\/config\.json|keychain)$|\.(pem|key|p12|pfx|jks|keystore)$/i;
 
