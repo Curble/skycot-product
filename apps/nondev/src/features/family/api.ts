@@ -19,7 +19,7 @@ export const FAMILY_API_PATH = "/api/skycot/family";
 
 async function call(
   method: "GET" | "POST",
-  fullPath: string,
+  path: string,
   body?: unknown,
   query?: Record<string, string>,
 ): Promise<Response> {
