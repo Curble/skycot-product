@@ -5,8 +5,7 @@ import { request } from "../family/api";
 import { parseRecap, type RecapRange, type RecapReport } from "./recap";
 
 export function fetchRecap(childId: string, range: RecapRange): Promise<FamilyResult<RecapReport>> {
-  const query = new URLSearchParams({ childId, range });
-  return request("GET", `/recap?${query.toString()}`, undefined, parseRecap);
+  return request("GET", "/recap", undefined, parseRecap, { childId, range });
 }
 
 /** The composer's shield card showed: the kinds of detail only, for the recap. */

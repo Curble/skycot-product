@@ -182,19 +182,19 @@ export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">):
   return lines;
 }
 
-/** The headline: "Ava made 3 things today" / "Ava's week: 2 things made". */
+/** The headline: "Here's what Ava made today" / "Ava made 2 things this week". */
 export function recapHeadline(report: Pick<RecapReport, "range" | "made">, name: string): string {
   const things = report.made.length;
   if (report.range === "session") {
     return things === 0 ? `${name} didn't make anything today` : `Here's what ${name} made today`;
   }
-  return `${name}'s week`;
+  return things === 0
+    ? `A quiet week for ${name}`
+    : `${name} made ${plural(things, "thing")} this week`;
 }
 
 /** The week as bars: each day's share of the busiest day, with a short weekday label. */
-export function weekBars(
-  days: RecapReport["days"],
-): Array<{
+export function weekBars(days: RecapReport["days"]): Array<{
   readonly date: string;
   readonly label: string;
   readonly minutes: number;

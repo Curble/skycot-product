@@ -183,6 +183,15 @@ html[data-flavour-cards="sticky"] .fm-recap__bar-fill {
   text-align: left;
 }
 @media (max-width: 560px) {
+  /* Back, title, then Print and Done on their own row. */
+  .fm-recap-screen .fm-settings__header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .fm-recap-screen .fm-settings__header-spacer {
+    flex-basis: 100%;
+    height: 0;
+  }
   .fm-recap__stats {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }

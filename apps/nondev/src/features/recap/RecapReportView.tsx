@@ -33,8 +33,7 @@ const timeOf = (at: number, timeZone: string, withDay: boolean) =>
     minute: "2-digit",
   })
     .format(at)
-    .replace(/\s+/g, " ")
-    .toLowerCase();
+    .replace(/\s+/g, " ");
 
 export function RecapReportView({
   report,
@@ -42,6 +41,7 @@ export function RecapReportView({
   name,
   environmentId,
   compact = false,
+  hero = true,
 }: {
   readonly report: RecapReport;
   readonly child: FamilyChild;
@@ -49,6 +49,8 @@ export function RecapReportView({
   readonly environmentId: EnvironmentId | null;
   /** The end-of-session card: the highlights only. */
   readonly compact?: boolean;
+  /** Off where a sheet's own title already says who and when. */
+  readonly hero?: boolean;
 }) {
   const [preview, setPreview] = useState<{ cwd: string; page: string } | null>(null);
   const week = report.range === "week";
@@ -60,13 +62,15 @@ export function RecapReportView({
 
   return (
     <div className={`fm-recap${compact ? " fm-recap--compact" : ""}`} data-range={report.range}>
-      <header className="fm-recap__hero">
-        <ChildAvatar child={child} size={compact ? 48 : 64} />
-        <div className="fm-recap__hero-text">
-          <p className="fm-recap__kicker">{rangeLabel(report)}</p>
-          <h2 className="fm-recap__title">{recapHeadline(report, name)}</h2>
-        </div>
-      </header>
+      {hero ? (
+        <header className="fm-recap__hero">
+          <ChildAvatar child={child} size={compact ? 48 : 64} />
+          <div className="fm-recap__hero-text">
+            <p className="fm-recap__kicker">{rangeLabel(report)}</p>
+            <h2 className="fm-recap__title">{recapHeadline(report, name)}</h2>
+          </div>
+        </header>
+      ) : null}
 
       <div className="fm-recap__stats" role="list" aria-label="At a glance">
         <Stat icon={Clock} value={minutesPhrase(report.minutes)} label={`on SKYCOT ${span}`} />
@@ -148,7 +152,11 @@ export function RecapReportView({
                   title={entry.title}
                   subtitle={[
                     entry.projectTitle,
-                    madeSummary(entry) ?? "Talked it through; no files changed.",
+                    // The sentence's own full stop would clash with the separators.
+                    (madeSummary(entry) ?? "Talked it through; no files changed").replace(
+                      /\.$/,
+                      "",
+                    ),
                     `${entry.startedInRange ? "Started" : "Carried on"} ${timeOf(entry.lastAt, report.timeZone, week)}`,
                   ]
                     .filter(Boolean)
@@ -256,12 +264,12 @@ function WeekBars({ report }: { readonly report: RecapReport }) {
         <div key={bar.date} className="fm-recap__bar">
           <span className="fm-recap__bar-value">{bar.minutes > 0 ? `${bar.minutes}m` : ""}</span>
           <span className="fm-recap__bar-track">
-            <span
-              className="fm-recap__bar-fill"
-              style={{
-                height: `${Math.max(bar.minutes > 0 ? 6 : 0, Math.round(bar.share * 100))}%`,
-              }}
-            />
+            {bar.minutes > 0 ? (
+              <span
+                className="fm-recap__bar-fill"
+                style={{ height: `${Math.max(6, Math.round(bar.share * 100))}%` }}
+              />
+            ) : null}
           </span>
           <span className="fm-recap__bar-label">{bar.label}</span>
         </div>

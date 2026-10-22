@@ -81,26 +81,30 @@ export function FridgeScreen() {
           </div>
         </div>
         {children.length > 1 ? (
-          <SegmentedControl
-            label="Whose fridge"
-            size="sm"
-            wrap={columns === 1}
-            value={only}
-            onChange={setOnly}
-            options={[
-              { value: "everyone", label: "Everyone" },
-              ...children.map((child, index) => ({
-                value: child.id,
-                label: childLabel(child, index),
-              })),
-            ]}
-          />
+          <div className="fm-fridge__filter">
+            <SegmentedControl
+              label="Whose fridge"
+              size="sm"
+              wrap={columns === 1}
+              value={only}
+              onChange={setOnly}
+              options={[
+                { value: "everyone", label: "Everyone" },
+                ...children.map((child, index) => ({
+                  value: child.id,
+                  label: childLabel(child, index),
+                })),
+              ]}
+            />
+          </div>
         ) : null}
         {problem ? <Banner tone="warning">{problem}</Banner> : null}
         {fridge.problem && fridge.items.length === 0 ? (
           <Banner tone="warning">{fridge.problem}</Banner>
         ) : null}
-        {fridge.loaded && fridge.items.length === 0 && !fridge.problem ? (
+        {!fridge.loaded ? (
+          <p className="fm-help">Opening the fridge…</p>
+        ) : fridge.items.length === 0 && !fridge.problem ? (
           <EmptyState
             art={<Mascot pose="hello" size={88} decorative />}
             title="Nothing on the fridge yet"

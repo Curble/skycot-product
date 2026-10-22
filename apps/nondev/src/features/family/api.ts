@@ -17,8 +17,14 @@ import {
 
 export const FAMILY_API_PATH = "/api/skycot/family";
 
-async function call(method: "GET" | "POST", path: string, body?: unknown): Promise<Response> {
-  const url = resolvePrimaryEnvironmentHttpUrl(`${FAMILY_API_PATH}${path}`);
+async function call(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+  query?: Record<string, string>,
+): Promise<Response> {
+  // The query goes separately: the path is set as a URL's pathname, which would escape a "?".
+  const url = resolvePrimaryEnvironmentHttpUrl(`${FAMILY_API_PATH}${path}`, query);
   const sameOrigin =
     typeof window !== "undefined" &&
     window.desktopBridge === undefined &&
@@ -42,9 +48,10 @@ export async function request<A>(
   path: string,
   body: unknown,
   decode: (body: unknown) => A | null,
+  query?: Record<string, string>,
 ): Promise<FamilyResult<A>> {
   try {
-    const response = await call(method, path, body);
+    const response = await call(method, path, body, query);
     const parsed: unknown = await response.json().catch(() => null);
     return readFamilyAnswer(response.status, parsed, decode);
   } catch {

@@ -49,11 +49,13 @@ export function SessionRecapBody({
   child,
   name,
   environmentId,
+  hero = true,
 }: {
   readonly report: RecapReport;
   readonly child: FamilyChild;
   readonly name: string;
   readonly environmentId: EnvironmentId | null;
+  readonly hero?: boolean;
 }) {
   return (
     <RecapReportView
@@ -62,6 +64,7 @@ export function SessionRecapBody({
       name={name}
       environmentId={environmentId}
       compact
+      hero={hero}
     />
   );
 }
@@ -173,7 +176,13 @@ export function SessionRecapHost() {
       ) : report === null ? (
         <p className="fm-help">Putting today together…</p>
       ) : (
-        <SessionRecapBody report={report} child={child} name={name} environmentId={environmentId} />
+        <SessionRecapBody
+          report={report}
+          child={child}
+          name={name}
+          environmentId={environmentId}
+          hero={false}
+        />
       )}
     </Sheet>
   );
