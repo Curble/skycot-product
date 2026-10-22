@@ -57,6 +57,14 @@ function resolveBrandEnv(b, host) {
     T3CODE_CLI_UPDATE_REPOSITORY: b.updateRepository,
     // electron-builder artifact file name (seam: brand-artifact-name). `${...}` are electron-builder macros.
     T3CODE_DESKTOP_ARTIFACT_NAME: `${b.artifactPrefix}-\${version}-\${arch}.\${ext}`,
+    // Installed app icon, always the DAY drawing (brand guide: Finder / Start menu never switch;
+    // only the running Dock tile follows the sky). Repo-relative; read by the desktop build only
+    // (seam: brand-desktop-icons). The .icns carries the hand-drawn 16-63 px versions.
+    T3CODE_DESKTOP_ICON_MAC_PNG:
+      "nondev/brand/assets/macos/AppIcon-day.iconset/icon_512x512@2x.png",
+    T3CODE_DESKTOP_ICON_MAC_ICNS: "nondev/brand/assets/macos/AppIcon-day.icns",
+    T3CODE_DESKTOP_ICON_LINUX_PNG: "nondev/brand/assets/linux/app-icon-day-512.png",
+    T3CODE_DESKTOP_ICON_WIN_ICO: "nondev/brand/assets/windows/app-icon-day.ico",
     // Analytics: off by default, and never upstream's PostHog project (already env-driven upstream).
     T3CODE_TELEMETRY_ENABLED: b.telemetryEnabledByDefault ? "true" : "false",
     T3CODE_POSTHOG_KEY: telemetryKey || "",

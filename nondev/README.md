@@ -208,17 +208,19 @@ welcomes forks; if accepted, our code seams drop to zero and only icon files rem
 
 ## 8. Files in this folder
 
-| File                         | Purpose                                                                                 |
-| ---------------------------- | --------------------------------------------------------------------------------------- |
-| `scripts/upstream-sync.ts`   | the nightly merge driver (also runnable locally)                                        |
-| `scripts/check-seams.ts`     | CI gate: every changed upstream file is declared; markers present (`--strict`)          |
-| `scripts/check-workflows.ts` | lists inherited upstream workflows that run here without a repository guard             |
-| `scripts/apply-brand.ts`     | brand checker: seams intact, `brand.json` sane, update feed = git origin, analytics off |
-| `scripts/lib.ts`             | pure helpers: manifest parsing, glob matching, sensitive paths, export diffing          |
-| `scripts/git.ts`             | thin git/shell wrappers                                                                 |
-| `scripts/*.test.ts`          | unit tests — `node --test nondev/scripts/*.test.ts`                                     |
-| `bin/skycot.cjs`             | the only supported CLI entry: loads `brand/env.cjs`, then upstream's `bin.mjs`          |
-| `brand.json`, `brand/`       | the fork's identity and the bootstrap that turns it into `T3CODE_*` defaults            |
-| `legal/`                     | the licence-packaging seams (L-1…L-5) and why each exists                               |
-| `SEAM-MANIFEST.template.md`  | the manifest format and rules                                                           |
-| `sync-report.md`             | written by each sync on its branch (not present on a fresh `main`)                      |
+| File                             | Purpose                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| `scripts/upstream-sync.ts`       | the nightly merge driver (also runnable locally)                                        |
+| `scripts/check-seams.ts`         | CI gate: every changed upstream file is declared; markers present (`--strict`)          |
+| `scripts/check-workflows.ts`     | lists inherited upstream workflows that run here without a repository guard             |
+| `scripts/apply-brand.ts`         | brand checker: seams intact, `brand.json` sane, update feed = git origin, analytics off |
+| `scripts/lib.ts`                 | pure helpers: manifest parsing, glob matching, sensitive paths, export diffing          |
+| `scripts/sync-brand-assets.ts`   | copies the shipped mascot/icon files out of `brand/assets` (`--check` in tests)         |
+| `scripts/generate-zone-table.ts` | regenerates the time-zone → city table behind the day/dusk switch                       |
+| `scripts/git.ts`                 | thin git/shell wrappers                                                                 |
+| `scripts/*.test.ts`              | unit tests — `node --test nondev/scripts/*.test.ts`                                     |
+| `bin/skycot.cjs`                 | the only supported CLI entry: loads `brand/env.cjs`, then upstream's `bin.mjs`          |
+| `brand.json`, `brand/`           | the fork's identity and the bootstrap that turns it into `T3CODE_*` defaults            |
+| `legal/`                         | the licence-packaging seams (L-1…L-5) and why each exists                               |
+| `SEAM-MANIFEST.template.md`      | the manifest format and rules                                                           |
+| `sync-report.md`                 | written by each sync on its branch (not present on a fresh `main`)                      |

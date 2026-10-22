@@ -2575,7 +2575,10 @@ const stageMacIcons = Effect.fn("build-desktop-artifact.stageMacIcons")(function
     verbose,
   });
 
-  yield* generateMacIconSet(sourcePng, iconIcnsPath, tmpRoot, path, verbose);
+  // nondev-seam: brand-desktop-icons — a hand-made .icns keeps its own small-size drawings.
+  const brandIcns = process.env.T3CODE_DESKTOP_ICON_MAC_ICNS;
+  if (brandIcns) yield* fs.copyFile(path.join(yield* RepoRoot, brandIcns), iconIcnsPath);
+  else yield* generateMacIconSet(sourcePng, iconIcnsPath, tmpRoot, path, verbose);
 });
 
 export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(function* (
@@ -2789,10 +2792,13 @@ export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIcon
     };
   }
 
+  // nondev-seam: brand-desktop-icons — repo-relative overrides for the installed app icon.
   return {
-    macIconPng: BRAND_ASSET_PATHS.productionMacIconPng,
-    linuxIconPng: BRAND_ASSET_PATHS.productionLinuxIconPng,
-    windowsIconIco: BRAND_ASSET_PATHS.productionWindowsIconIco,
+    macIconPng: process.env.T3CODE_DESKTOP_ICON_MAC_PNG ?? BRAND_ASSET_PATHS.productionMacIconPng,
+    linuxIconPng:
+      process.env.T3CODE_DESKTOP_ICON_LINUX_PNG ?? BRAND_ASSET_PATHS.productionLinuxIconPng,
+    windowsIconIco:
+      process.env.T3CODE_DESKTOP_ICON_WIN_ICO ?? BRAND_ASSET_PATHS.productionWindowsIconIco,
   };
 }
 

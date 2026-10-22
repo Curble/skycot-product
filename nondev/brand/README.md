@@ -114,7 +114,18 @@ commit the changed binaries under `assets/prod/**`.
 `scripts/build-desktop-artifact.ts` → `resolveDesktopBuildIconAssets(version)` picks the `prod`
 trio (`macIconPng`, `linuxIconPng`, `windowsIconIco`), builds `icon.icns` with `iconutil` from the
 macOS PNG, writes the Linux `icons/` set from the universal PNG, and copies the `.ico` as
-`icon.ico`. Nothing to configure for us.
+`icon.ico`.
+
+**SKYCOT does not replace `assets/prod/**`.** The seam `brand-desktop-icons` reads
+`T3CODE_DESKTOP_ICON_{MAC_PNG,MAC_ICNS,LINUX_PNG,WIN_ICO}` (set by `env.cjs`, repo-relative) and
+points the build at the day drawing in `assets/` here: `macos/AppIcon-day.icns` is copied as-is
+(it carries the hand-drawn 16-63 px versions a resize would lose), `macos/AppIcon-day.iconset/
+icon_512x512@2x.png` becomes `icon.png`, `linux/app-icon-day-512.png` feeds the Linux set and
+`windows/app-icon-day.ico` is the Windows icon. The installed icon is always day; the running Dock
+tile switches at local civil dusk and dawn (`apps/desktop/src/skycot/dockIcon.ts`, seam
+`brand-dock-icon`), using the 512 px icons that `node nondev/scripts/sync-brand-assets.ts` embeds.
+Unpackaged `vp run dev` runs keep upstream's blueprint/prod files for the window icon, but the Dock
+switcher still applies on macOS.
 
 ## 3. Human-only items (cannot be done by an agent)
 

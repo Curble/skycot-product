@@ -256,6 +256,51 @@ function seams(): Seam[] {
       mechanism: "env seam",
     },
     {
+      id: "brand-desktop-icons",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "installed macOS icon (.icns, hand-drawn small sizes)",
+      envName: "T3CODE_DESKTOP_ICON_MAC_ICNS",
+      upstreamDefault: "generateMacIconSet(sourcePng, iconIcnsPath, tmpRoot, path, verbose)",
+      effective: (e) => e.T3CODE_DESKTOP_ICON_MAC_ICNS!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-desktop-icons",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "installed macOS icon PNG (Resources/icon.png, DMG)",
+      envName: "T3CODE_DESKTOP_ICON_MAC_PNG",
+      upstreamDefault: "BRAND_ASSET_PATHS.productionMacIconPng",
+      effective: (e) => e.T3CODE_DESKTOP_ICON_MAC_PNG!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-desktop-icons",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "installed Linux icon set (resized from one PNG)",
+      envName: "T3CODE_DESKTOP_ICON_LINUX_PNG",
+      upstreamDefault: "BRAND_ASSET_PATHS.productionLinuxIconPng",
+      effective: (e) => e.T3CODE_DESKTOP_ICON_LINUX_PNG!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-desktop-icons",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "installed Windows icon (.ico)",
+      envName: "T3CODE_DESKTOP_ICON_WIN_ICO",
+      upstreamDefault: "BRAND_ASSET_PATHS.productionWindowsIconIco",
+      effective: (e) => e.T3CODE_DESKTOP_ICON_WIN_ICO!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-dock-icon",
+      file: "apps/desktop/src/app/DesktopApp.ts",
+      constant: "running Dock icon (day / dusk, follows local civil dusk and dawn)",
+      envName: "../skycot/dockIcon.ts",
+      upstreamDefault: "yield* appIdentity.configure;",
+      effective: () => "apps/desktop/src/skycot/dockIcon.ts (macOS)",
+      mechanism: "hard edit (TS)",
+    },
+    {
       id: "brand-cli-update-repo",
       file: "packages/shared/src/cliRelease.ts",
       constant: "CLI_RELEASE_REPOSITORY (`update` command feed + release download base)",
@@ -343,6 +388,15 @@ function checkEnv(brand: Brand, env: Record<string, string>): string[] {
     errors.push(
       `env.cjs: with no PostHog key of our own, T3CODE_POSTHOG_HOST must be the loopback sink, not "${env.T3CODE_POSTHOG_HOST}"`,
     );
+  for (const name of [
+    "T3CODE_DESKTOP_ICON_MAC_PNG",
+    "T3CODE_DESKTOP_ICON_MAC_ICNS",
+    "T3CODE_DESKTOP_ICON_LINUX_PNG",
+    "T3CODE_DESKTOP_ICON_WIN_ICO",
+  ]) {
+    if (!env[name] || read(env[name]) === undefined)
+      errors.push(`env.cjs: ${name} names "${env[name] ?? ""}", which is not a file in the repo`);
+  }
   for (const file of ["LICENSE", "NOTICE", "nondev/bin/skycot.cjs"]) {
     if (read(file) === undefined)
       errors.push(`${file}: missing (shipped in every bundle / the only supported CLI entry)`);

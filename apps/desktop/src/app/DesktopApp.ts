@@ -36,6 +36,7 @@ import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
 import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as SkycotDockIcon from "../skycot/dockIcon.ts"; // nondev-seam: brand-dock-icon
 
 const DEFAULT_DESKTOP_BACKEND_PORT = 3773;
 const MAX_TCP_PORT = 65_535;
@@ -321,6 +322,7 @@ const startup = Effect.gen(function* () {
     });
   }
   yield* appIdentity.configure;
+  yield* SkycotDockIcon.followTheSky; // nondev-seam: brand-dock-icon
   yield* previewPasskeys.configure;
   yield* applicationMenu.configure;
   yield* updates.configure;
