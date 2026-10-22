@@ -1,0 +1,377 @@
+/* Usage: the title-bar ring, its popover, the Usage sheet and the early-warning banner.
+   Colours are tone tokens only (green > 30% left, orange 10–30%, red < 10%, neutral when
+   nothing is reported), so every theme, light and dark, follows. Nothing here animates. */
+
+.fm-usage-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fm-usage__button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  min-width: 26px;
+  justify-content: center;
+  padding: 0 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fm-label);
+  font: inherit;
+  cursor: pointer;
+}
+.fm-usage__button:hover {
+  background: var(--fm-sidebar-hover);
+}
+.fm-usage__button:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+.fm-usage__figure {
+  font-size: calc(11.5px * var(--fm-text-scale));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fm-usage__figure--low {
+  color: var(--fm-orange-ink);
+}
+.fm-usage__figure--critical {
+  color: var(--fm-red-ink);
+}
+
+/* The ring */
+.fm-usage-ring {
+  display: block;
+  flex: none;
+}
+.fm-usage-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.fm-usage-ring__track {
+  stroke: var(--fm-bg-fill-2);
+}
+.fm-usage-ring--unknown .fm-usage-ring__track {
+  stroke: var(--fm-label-3);
+  stroke-width: 1.5;
+}
+.fm-usage-ring--critical .fm-usage-ring__track {
+  stroke: var(--fm-red-soft);
+}
+.fm-usage-ring__fill {
+  stroke-linecap: round;
+}
+.fm-usage-ring--ok .fm-usage-ring__fill {
+  stroke: var(--fm-green);
+}
+.fm-usage-ring--low .fm-usage-ring__fill {
+  stroke: var(--fm-orange);
+}
+.fm-usage-ring--critical .fm-usage-ring__fill {
+  stroke: var(--fm-red);
+}
+
+/* Small tone dots in lists */
+.fm-usage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  margin-top: 0.45em;
+  background: var(--fm-label-3);
+}
+.fm-usage-dot--ok {
+  background: var(--fm-green);
+}
+.fm-usage-dot--low {
+  background: var(--fm-orange);
+}
+.fm-usage-dot--critical {
+  background: var(--fm-red);
+}
+
+/* The hover popover */
+.fm-usage-pop {
+  width: max-content;
+  min-width: 250px;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: 12px 6px 6px;
+  color: var(--fm-label);
+  font-size: calc(12.5px * var(--fm-text-scale));
+  line-height: 1.45;
+  user-select: text;
+}
+.fm-usage-pop__body {
+  padding: 0 8px 8px;
+}
+.fm-usage-pop__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-usage-pop__plan {
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+}
+.fm-usage-pop__windows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fm-usage-pop__window {
+  display: flex;
+  gap: 8px;
+}
+.fm-usage-pop__window b {
+  font-weight: 600;
+}
+.fm-usage-pop__reset {
+  color: var(--fm-label-2);
+}
+.fm-usage-pop__reason {
+  margin: 0;
+  color: var(--fm-label-2);
+}
+.fm-usage-pop__updated {
+  margin: 6px 0 0;
+  color: var(--fm-label-3);
+  font-size: calc(11.5px * var(--fm-text-scale));
+}
+.fm-usage-pop__more {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-top: 1px solid var(--fm-sep-2);
+  border-radius: 0 0 var(--fm-radius-sm) var(--fm-radius-sm);
+  background: transparent;
+  color: var(--fm-accent);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fm-usage-pop__more:hover {
+  background: var(--fm-accent-soft);
+}
+.fm-usage-pop__more:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: -2px;
+}
+
+/* The sheet (and Settings) */
+.fm-usage-details {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.fm-usage-heading {
+  margin: 0 0 10px;
+  font-family: var(--fm-font-label);
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-usage-muted {
+  margin: 0;
+  color: var(--fm-label-2);
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-usage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+}
+.fm-usage-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-bg-fill);
+  min-width: 0;
+}
+.fm-usage-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.fm-usage-card__title {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: calc(13.5px * var(--fm-text-scale));
+}
+.fm-usage-card__title span {
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-usage-card__figure {
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fm-usage-card__figure--unknown {
+  color: var(--fm-label-2);
+  font-weight: 500;
+}
+.fm-usage-card__figure--low {
+  color: var(--fm-orange-ink);
+}
+.fm-usage-card__figure--critical {
+  color: var(--fm-red-ink);
+}
+.fm-usage-card__windows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fm-usage-card__row {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-bottom: 4px;
+  font-size: calc(12.5px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-usage-card__row b {
+  color: var(--fm-label);
+  font-weight: 600;
+}
+.fm-usage-card__reason,
+.fm-usage-card__updated {
+  margin: 0;
+  color: var(--fm-label-2);
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
+.fm-usage-card__updated {
+  color: var(--fm-label-3);
+  font-size: calc(11.5px * var(--fm-text-scale));
+}
+
+.fm-usage-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.fm-usage-totals > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-bg-fill);
+}
+.fm-usage-totals span {
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+}
+.fm-usage-totals b {
+  font-size: calc(17px * var(--fm-text-scale));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fm-usage-totals small {
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+}
+.fm-usage-table {
+  width: 100%;
+  margin-bottom: 14px;
+  border-collapse: collapse;
+  font-size: calc(12.5px * var(--fm-text-scale));
+}
+.fm-usage-table caption {
+  padding-bottom: 6px;
+  text-align: left;
+  color: var(--fm-label-2);
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+}
+.fm-usage-table th,
+.fm-usage-table td {
+  padding: 6px 0;
+  border-top: 1px solid var(--fm-sep-2);
+  vertical-align: top;
+}
+.fm-usage-table th {
+  text-align: left;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.fm-usage-table th small {
+  display: block;
+  color: var(--fm-label-3);
+  font-size: calc(11.5px * var(--fm-text-scale));
+  font-weight: 400;
+}
+.fm-usage-table td {
+  padding-left: 12px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--fm-label-2);
+}
+.fm-usage-note {
+  margin: 0;
+  color: var(--fm-label-3);
+  font-size: calc(11.5px * var(--fm-text-scale));
+  line-height: 1.45;
+}
+.fm-usage-advanced {
+  display: flex;
+  justify-content: flex-start;
+}
+.fm-usage-settings {
+  padding: 14px;
+  border-radius: var(--fm-radius-lg);
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-card);
+}
+.fm-usage-settings .fm-usage-card,
+.fm-usage-settings .fm-usage-totals > div {
+  background: var(--fm-bg-fill);
+}
+
+.fm-usage-banner__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+@media (max-width: 520px) {
+  .fm-usage-table td:last-child {
+    white-space: normal;
+  }
+}
+
+/* Workshop: the sketch outline on cards, never at a risk moment (an empty allowance). */
+html[data-flavour-borders="sketch"] .fm-usage-card:not([data-sober]),
+html[data-flavour-borders="sketch"] .fm-usage-totals > div {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-sm);
+}
+html[data-flavour-borders="sketch"] .fm-usage-pop[data-sober] {
+  border: 0;
+}

@@ -12,7 +12,11 @@ import { createPortal } from "react-dom";
 import { documentTitle } from "../brand";
 // Side effect: registers the "What changed" card for checkpoint turn items.
 import "../features/review";
+import { useFamily } from "../features/family/FamilyProvider";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
+import { UsageBanner } from "../features/usage/UsageBanner";
+import { UsageIndicator } from "../features/usage/UsagePopover";
+import { UsageSheetHost } from "../features/usage/UsageSheet";
 import { sectionLabel } from "../features/settings/sections";
 import {
   useRoomForRail,
@@ -99,7 +103,11 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         trailing={<ProviderPill />}
         showSearch={conversationRoute}
       />
-      <ConnectionBanner />
+      {/* One grid row for the notices, however many show. */}
+      <div className="fm-shell__notices">
+        <ConnectionBanner />
+        <UsageBanner />
+      </div>
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
         {columns === 3 ? <AppSidebar route={route} /> : null}
         {showList ? (
@@ -126,6 +134,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
       {columns < 3 && shell.drawerOpen ? (
         <SidebarDrawer route={route} onClose={() => shell.setDrawerOpen(false)} />
       ) : null}
+      <UsageSheetHost />
     </div>
   );
 }
@@ -195,8 +204,13 @@ function useTitleDetail(
   }
 }
 
-/** "Using ChatGPT", from the provider a new conversation would start with, named the way Settings names it. */
+/**
+ * "Using ChatGPT", from the provider a new conversation would start with, named the way
+ * Settings names it, and beside it the ring showing how much of its allowance is left. The
+ * Family profile keeps usage out of the child's view (the parent finds it in Settings).
+ */
 function ProviderPill() {
+  const family = useFamily();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
   const providers = useAtomValue(
@@ -207,7 +221,12 @@ function ProviderPill() {
   if (environmentId === null || providers === null) return null;
   const provider = providerForSelection(providers, resolveDefaultModelSelection(providers, null));
   if (provider === null) return null;
-  return <Pill tone="provider">Using {catalogEntryFor(String(provider.driver)).brand}</Pill>;
+  return (
+    <span className="fm-usage-status">
+      <Pill tone="provider">Using {catalogEntryFor(String(provider.driver)).brand}</Pill>
+      {family.enabled ? null : <UsageIndicator />}
+    </span>
+  );
 }
 
 const EMPTY_THREAD_INDEX_ATOM = Atom.make<ReadonlyMap<ThreadId, OrchestrationV2ThreadShell>>(

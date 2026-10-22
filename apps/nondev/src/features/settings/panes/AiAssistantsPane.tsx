@@ -8,6 +8,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { WELCOME_HREF, navigate } from "../../../router";
 import { useFamily } from "../../family/FamilyProvider";
+import { UsageSettingsGroup } from "../../usage/UsageSettings";
 import { providerForSelection, resolveDefaultModelSelection } from "../../../state/providers";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
@@ -88,6 +89,8 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
           <ListRow title="No assistant is ready yet" subtitle="Connect one above to get started." />
         )}
       </SettingsGroup>
+
+      <UsageSettingsGroup environmentId={environmentId} />
 
       <SettingsGroup title="More">
         <ListRow
