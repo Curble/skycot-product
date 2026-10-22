@@ -149,14 +149,14 @@ jobs:
       # Only the commits the branch adds on top of origin/main go into the bundle; the publish job
       # has origin/main, so the prerequisites resolve there.
       - name: Bundle the sync branch
-        if: steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human'
+        if: inputs.dry_run != true && (steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human')
         run: |
           branch="${{ steps.sync.outputs.branch }}"
           git bundle create "$RUNNER_TEMP/sync.bundle" "origin/main..refs/heads/$branch"
           git bundle verify "$RUNNER_TEMP/sync.bundle"
 
       - name: Upload sync branch bundle
-        if: steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human'
+        if: inputs.dry_run != true && (steps.sync.outputs.status == 'clean' || steps.sync.outputs.status == 'needs-human')
         uses: actions/upload-artifact@v7
         with:
           name: sync-bundle
