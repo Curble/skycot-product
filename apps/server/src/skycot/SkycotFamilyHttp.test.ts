@@ -164,7 +164,8 @@ it.layer(
         const wrong = yield* send("POST", "/api/skycot/family/verify", {
           body: { code: "000000", purpose: "advanced" },
         });
-        assert.equal(wrong.status, 403);
+        // QA FK-14: an expected answer, not a failed request.
+        assert.equal(wrong.status, 200);
         const body = (yield* wrong.json) as {
           error: string;
           message: string;
@@ -192,6 +193,28 @@ it.layer(
       const page = yield* send("GET", "/", { headers: { cookie: pair } });
       assert.equal(page.status, 200);
       assert.include(yield* page.text, "developer interface");
+    }),
+  );
+
+  // QA FK-10: the child could rename themselves without the code.
+  it.effect("renames the child only after a grown-up's yes", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: "Ava" } });
+      const refused = yield* send("POST", "/api/skycot/family/rename", {
+        body: { childName: "Boss" },
+      });
+      assert.equal(refused.status, 403);
+      const status = yield* send("GET", "/api/skycot/family");
+      assert.equal(((yield* status.json) as { childName: string }).childName, "Ava");
+      yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "settings" },
+      });
+      const renamed = yield* send("POST", "/api/skycot/family/rename", {
+        body: { childName: "Ava B" },
+      });
+      assert.equal(renamed.status, 200);
+      assert.equal(((yield* renamed.json) as { childName: string }).childName, "Ava B");
     }),
   );
 
@@ -405,7 +428,7 @@ it.live(
         purpose: "approve",
         requestId: REQUEST_ID,
       });
-      assert.equal(wrong.status, 403);
+      assert.equal(((yield* wrong.json) as { error: string }).error, "wrong-code");
       assert.isTrue(Exit.isFailure(yield* Effect.exit(allow)));
       const right = yield* post("/api/skycot/family/verify", {
         code: CODE,

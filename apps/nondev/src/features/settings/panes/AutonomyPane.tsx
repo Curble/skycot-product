@@ -114,7 +114,7 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
 
       <SettingsGroup
         title={`What ${PRODUCT_NAME} ${policyEnforced ? "always asks about" : "warns you about"}`}
-        footer={hardRulesStatement(policyEnforced, PRODUCT_NAME)}
+        footer={hardRulesStatement(policyEnforced, PRODUCT_NAME, family.enabled)}
       >
         {HARD_RULE_TITLES.map((rule) => (
           <ListRow

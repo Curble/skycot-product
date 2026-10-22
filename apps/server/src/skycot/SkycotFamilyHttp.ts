@@ -30,8 +30,10 @@ const STATUS_BY_REASON: Readonly<Record<SkycotFamily.FamilyFailureReason, number
   "already-enabled": 409,
   "invalid-code": 400,
   "invalid-request": 400,
-  "wrong-code": 403,
-  locked: 429,
+  // A wrong code is an answer to the question, not a failed request: 200 with `error`, so a
+  // child's guesses do not print "Failed to load resource" in the console (QA FK-14).
+  "wrong-code": 200,
+  locked: 200,
   storage: 500,
 };
 
@@ -88,6 +90,10 @@ const route = (
           message: "Could not pin the Family default runtime mode.",
         }),
       );
+      // Read the body before any early answer: replying while the client is still sending
+      // makes Node drop the connection, which the client sees as "other side closed".
+      const body =
+        method === "POST" ? record(yield* request.json.pipe(Effect.orElseSucceed(() => ({})))) : {};
       const session = yield* auth
         .authenticateHttpRequest(request)
         .pipe(Effect.orElseSucceed(() => null));
@@ -103,8 +109,6 @@ const route = (
           403,
         );
       }
-      const body =
-        method === "POST" ? record(yield* request.json.pipe(Effect.orElseSucceed(() => ({})))) : {};
       return yield* handler({ sessionId: session.sessionId, body, family, pinSafeDefault }).pipe(
         Effect.catchTags({
           SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
@@ -173,10 +177,29 @@ const changeCodeRoute = route("POST", "/change-code", AuthSettingsWriteScope, ({
     .pipe(Effect.map((status) => json(status, 200, { "set-cookie": expiredUnlockCookie }))),
 );
 
-const renameRoute = route("POST", "/rename", AuthOrchestrationOperateScope, ({ family, body }) =>
-  family
-    .rename({ childName: nullableText(body["childName"]) })
-    .pipe(Effect.map((status) => json(status))),
+/** The child's name is part of the profile: a grown-up's "yes" first, as for the AI settings. */
+const renameRoute = route(
+  "POST",
+  "/rename",
+  AuthOrchestrationOperateScope,
+  ({ family, body, sessionId }) =>
+    Effect.gen(function* () {
+      if (
+        (yield* family.isEnabled) &&
+        !(yield* family.allows({ sessionId, purpose: "settings" }))
+      ) {
+        return json(
+          {
+            error: "forbidden",
+            message: SkycotFamilyGate.FAMILY_REFUSAL_MESSAGE,
+            requiredPermission: SkycotFamilyGate.FAMILY_PERMISSION,
+          },
+          403,
+        );
+      }
+      const status = yield* family.rename({ childName: nullableText(body["childName"]) });
+      return json(status);
+    }),
 );
 
 const lockRoute = route("POST", "/lock", AuthOrchestrationOperateScope, ({ family, sessionId }) =>

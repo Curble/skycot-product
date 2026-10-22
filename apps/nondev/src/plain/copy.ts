@@ -62,7 +62,15 @@ export const autonomy = {
  * server reports the SKYCOT policy is on (ServerConfig.skycotPolicy); until then the client
  * must not claim rules are enforced, because in "Just do it, carefully" the provider decides.
  */
-export function hardRulesStatement(enforced: boolean, productName = "SKYCOT"): string {
+export function hardRulesStatement(
+  enforced: boolean,
+  productName = "SKYCOT",
+  familyOn = false,
+): string {
+  // A child's composer names no mode it cannot have (QA FK-12).
+  if (familyOn) {
+    return `${productName} checks every step against these rules on this computer and stops to ask when one matches. Some steps also need a grown-up's parent code.`;
+  }
   return enforced
     ? `${productName} checks every step against these rules on this computer and stops to ask when one matches — including any step that needs to reach outside the assistant's safe area — in Ask me first and Just do it, carefully. Fully hands-off (Advanced mode) asks nothing.`
     : `In Ask me first, ${productName} shows you a question before every step. In Just do it, carefully, the assistant itself decides when to ask, so these rules shape the warnings on cards but are not enforced. Fully hands-off (Advanced mode) asks nothing.`;

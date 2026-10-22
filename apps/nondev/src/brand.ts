@@ -3,6 +3,9 @@
 // `productName` in nondev/brand.json (the desktop/build side of the brand).
 export const PRODUCT_NAME = "SKYCOT";
 
+/** The command people type in Terminal; mirrors `cliName` in nondev/brand.json. */
+export const CLI_NAME = "skycot";
+
 /** The registered company behind SKYCOT; SKYCOT is its registered business name. */
 export const COMPANY_NAME = "Curble Pty Ltd";
 

@@ -148,7 +148,16 @@ function FamilyOnPane() {
               : "Not set. Used in the greeting only."
           }
           expanded={openRow === "name"}
-          onClick={() => setOpenRow(openRow === "name" ? null : "name")}
+          // The engine refuses a rename without the parent's "yes" (QA FK-10).
+          onClick={() => {
+            if (openRow === "name") {
+              setOpenRow(null);
+              return;
+            }
+            void requireParentCode("renameChild").then((ok) => {
+              if (ok) setOpenRow("name");
+            });
+          }}
         />
         {openRow === "name" ? (
           <ListExtra>

@@ -12,7 +12,7 @@ import {
   submitServerAuthCredential,
 } from "~/environments/primary/auth";
 
-import { PRODUCT_NAME } from "../brand";
+import { CLI_NAME, PRODUCT_NAME } from "../brand";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -115,7 +115,7 @@ export function PairRoute({
       </form>
       <div className="fm-standalone__foot">
         {acceptsTokens
-          ? `On the Mac that runs ${PRODUCT_NAME}, open Terminal (the Mac's built-in text window) and type “t3 pair”. It prints a link you can open on this device, or a code to paste above.`
+          ? `On the Mac that runs ${PRODUCT_NAME}, open Terminal (the Mac's built-in text window) and type “${CLI_NAME} pair”. It prints a link you can open on this device, or a code to paste above.`
           : "This Mac expects a trusted connection code before the app can connect. Ask whoever set it up."}
       </div>
     </StandalonePage>

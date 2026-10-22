@@ -24,6 +24,8 @@ import {
 export interface ParentCodeOptions {
   /** For "approve": the one card the grown-up is allowing. */
   readonly requestId?: string;
+  /** For "approve": the card's own reason, shown on the code sheet. */
+  readonly reason?: string | null;
 }
 
 export interface FamilyApi {
@@ -145,7 +147,7 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
       icon={KeyRound}
       iconTone="grey"
       title={pending.action === "approve" ? "Ask a grown-up" : "Parent code"}
-      description={actionReason(pending.action)}
+      description={actionReason(pending.action, pending.options.reason)}
       sober
       initialFocus="first"
       actions={

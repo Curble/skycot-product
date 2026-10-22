@@ -17,7 +17,9 @@ export type FamilyAction =
   | "rerunOnboarding"
   | "openFolder"
   | "approve"
-  | "aiSettings";
+  | "aiSettings"
+  | "renameChild"
+  | "saveSecret";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -38,6 +40,8 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "openFolder",
   "approve",
   "aiSettings",
+  "renameChild",
+  "saveSecret",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -68,6 +72,8 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
     case "aiSettings":
     case "rerunOnboarding":
     case "changeAutonomy":
+    case "renameChild":
+    case "saveSecret":
       return "settings";
     case "disableFamily":
     case "changeCode":
@@ -128,14 +134,17 @@ export type FamilyResult<A> =
 export const ENGINE_UNREACHABLE =
   "SKYCOT's engine isn't answering, so the Family profile can't be checked. Check the Mac is awake and try again.";
 
-/** Reads one answer: a value on 2xx, the engine's own sentence otherwise. */
+/**
+ * Reads one answer: a value on 2xx, the engine's own sentence otherwise. A wrong or locked
+ * code comes back as 200 with `error` (an expected answer, not a failed request).
+ */
 export function readFamilyAnswer<A>(
   status: number,
   body: unknown,
   decode: (body: unknown) => A | null,
 ): FamilyResult<A> {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
-  if (status >= 200 && status < 300) {
+  if (status >= 200 && status < 300 && typeof record["error"] !== "string") {
     const value = decode(body);
     return value === null
       ? {

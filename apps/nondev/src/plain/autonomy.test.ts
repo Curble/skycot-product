@@ -66,6 +66,12 @@ describe("autonomy levels", () => {
     expect(hardRulesStatement(false)).not.toMatch(/every mode/);
     expect(hardRulesStatement(true)).toMatch(/stops to ask when one matches/);
     expect(hardRulesStatement(true)).toMatch(/outside the assistant's safe area/);
+    // QA FK-12: with the Family profile on, the child's composer names no other mode.
+    for (const enforced of [true, false]) {
+      const family = hardRulesStatement(enforced, "SKYCOT", true);
+      expect(family).not.toMatch(/hands-off|Just do it|Advanced mode/);
+      expect(family).toMatch(/parent code/);
+    }
     expect(hardRuleTitles()).toContain("Stepping outside the assistant's safe area");
     expect(hardRuleTitles()).toContain("Deleting files or folders");
     expect(hardRuleTitles().length).toBe(HARD_RULES.length);

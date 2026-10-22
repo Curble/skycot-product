@@ -33,8 +33,14 @@ export const familyCopy = {
     "This profile was set up in this browser only, so it could be cleared from the browser. Enter the parent code once and SKYCOT's engine will keep it and enforce it everywhere.",
 } as const;
 
-/** What the code sheet says it is for. */
-export function actionReason(action: FamilyAction): string {
+/**
+ * What the code sheet says it is for. A grown-up card passes its own reason ("It uses the
+ * internet and installs something."), so the sheet says what this step does (QA FK-13).
+ */
+export function actionReason(action: FamilyAction, cardReason?: string | null): string {
+  if (action === "approve" && cardReason) {
+    return `${cardReason} A grown-up allows this one step with the parent code.`;
+  }
   switch (action) {
     case "publish":
       return "Publishing puts work where other people can see it, so a parent confirms first.";
@@ -56,6 +62,10 @@ export function actionReason(action: FamilyAction): string {
       return "This step uses the internet, installs something, deletes or reaches outside the project, so a grown-up allows it.";
     case "aiSettings":
       return "The AI assistants use a parent's accounts and settings, so a parent changes them.";
+    case "renameChild":
+      return `The child's name is part of the ${FAMILY_LABEL} a parent set up.`;
+    case "saveSecret":
+      return "The assistant is asking for a key or password. A parent decides whether to hand one over.";
     case "changeTheme":
       return "";
   }

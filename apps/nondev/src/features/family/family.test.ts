@@ -284,6 +284,14 @@ describe("the engine's answers", () => {
       remainingMs: 1_000,
     });
     expect(readFamilyAnswer(200, "nonsense", parseServerStatus)).toMatchObject({ ok: false });
+    // QA FK-14: the engine answers a wrong code with 200 so the console stays quiet.
+    expect(
+      readFamilyAnswer(
+        200,
+        { error: "wrong-code", message: "That's not the parent code.", attemptsLeft: 3 },
+        parseServerStatus,
+      ),
+    ).toMatchObject({ ok: false, reason: "wrong-code", attemptsLeft: 3 });
   });
 });
 

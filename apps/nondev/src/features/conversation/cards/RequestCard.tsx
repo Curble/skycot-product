@@ -255,7 +255,7 @@ export function RequestCard({
     if (askRunEnded(item, projection, shell)) return;
     const askParent = () =>
       item.type === "approval_request"
-        ? family.requireParentCode("approve", { requestId: item.requestId })
+        ? family.requireParentCode("approve", { requestId: item.requestId, reason: grownUp })
         : Promise.resolve(false);
     const needsParent = familyApplies && approves(option);
     if (needsParent && grownUp !== null && !(await askParent())) return;

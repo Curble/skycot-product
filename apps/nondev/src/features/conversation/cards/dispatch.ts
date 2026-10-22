@@ -17,6 +17,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import type { ApprovalDecisionPayload } from "../../../plain/approvals";
 import { isFamilyRefusal } from "../../family/cards";
+import { useFamily } from "../../family/FamilyProvider";
 import { serverEnvironment } from "../../../state/server";
 import { threadEnvironment } from "../../../state/threads";
 
@@ -76,6 +77,7 @@ export function useDecisionDispatcher({
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   // The failure cause can echo the request; keep it out of the console.
+  const family = useFamily();
   const answerSecret = useAtomCommand(serverEnvironment.answerSecretRequest, {
     reportFailure: false,
     reportDefect: false,
@@ -106,6 +108,10 @@ export function useDecisionDispatcher({
               ? ({ type: "save", secret: (extras.secret ?? "").trim() } as const)
               : ({ type: "decline" } as const);
           if (answer.type === "save" && answer.secret.length === 0) return null;
+          // The engine refuses a child's save; ask first so the parent can say yes here.
+          if (answer.type === "save" && !(await family.requireParentCode("saveSecret"))) {
+            return null;
+          }
           return answerSecret({
             environmentId,
             input: { threadId, turnItemId: payload.turnItemId, answer },

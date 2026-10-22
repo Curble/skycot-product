@@ -183,7 +183,7 @@ export function NewConversationComposer({
             <span className="fm-rule__icon">
               <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
             </span>
-            <span>{hardRulesStatement(policyEnforced)}</span>
+            <span>{hardRulesStatement(policyEnforced, undefined, family.enabled)}</span>
           </p>
         ) : null}
         {problem ? (
