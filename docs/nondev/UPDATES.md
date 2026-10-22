@@ -69,20 +69,21 @@ private, so neither works for the public until releases are published somewhere 
 
 ## Switching the Mac feed on (later)
 
-Do this only when a **signed and notarised** Mac build exists. Recommended: a generic feed on
-SKYCOT's own site, so the download page and the updater serve the same files.
+Do this only when a **signed and notarised** Mac build exists. Chosen for the beta (23 October
+2026): a generic feed at `https://downloads.skycot.com/mac/` (Cloudflare R2), so the download page
+and the updater serve the same files. The full release steps are in [RELEASE.md](RELEASE.md).
 
 1. **Build** with the brand loaded and the feed set:
    ```
    # nondev/brand.json
-   "updates": { "feed": "https://skycot.com/downloads/mac/" }
+   "updates": { "feed": "https://downloads.skycot.com/mac/" }
    node nondev/scripts/apply-brand.ts          # must pass
-   node --import ./nondev/brand/env.cjs scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64
+   node --import ./nondev/brand/env.cjs scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64 --signed
    ```
    electron-builder writes `latest-mac.yml` next to the `.zip` and `.dmg` (both are needed: the
    updater installs from the zip).
 2. **Publish** `latest-mac.yml`, `SKYCOT-<version>-arm64.zip` (and its `.blockmap`) and the
-   `.dmg` to `https://skycot.com/downloads/mac/` over https. Upload `latest-mac.yml` last, so an
+   `.dmg` to `https://downloads.skycot.com/mac/` over https. Upload `latest-mac.yml` last, so an
    app never sees a version whose files are not there yet.
 3. **Check** with a copy of the previous version: About should go _Looking…_ → _Downloading…_ →
    _A new version is ready_, and the pill should appear. Try it once with the Family profile on.

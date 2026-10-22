@@ -10,7 +10,7 @@
   "defaultClientEntry": "simple/index.html",
   "updateRepository": "mark-hallam/skycot-product",
   "updates": {
-    "$comment": "Where the Mac app looks for new SKYCOT versions. The ONLY source: env.cjs hands it on as T3CODE_SKYCOT_UPDATE_FEED; the desktop build bakes it into the app, the app refuses any other feed, and T3 Code's releases are refused everywhere (packages/skycot-brand/src/updateFeed.ts). null = no updates (today: there is no public, signed Mac download yet; the private repo above cannot serve one). To switch on, see docs/nondev/UPDATES.md: e.g. \"https://skycot.com/downloads/mac/\" (a folder serving latest-mac.yml + the signed zip/dmg) or \"github:<owner>/<public-repo>\". updateRepository above is the source repo (the CLI `update` command and Advanced mode's release links), not the app's feed.",
+    "$comment": "Where the Mac app looks for new SKYCOT versions. The ONLY source: env.cjs hands it on as T3CODE_SKYCOT_UPDATE_FEED; the desktop build bakes it into the app, the app refuses any other feed, and T3 Code's releases are refused everywhere (packages/skycot-brand/src/updateFeed.ts). null = no updates (today: there is no public, signed Mac download yet; the private repo above cannot serve one). To switch on, see docs/nondev/UPDATES.md: \"https://downloads.skycot.com/mac/\" for the beta (Cloudflare R2; a folder serving latest-mac.yml + the signed zip/dmg; see docs/nondev/RELEASE.md) or \"github:<owner>/<public-repo>\". updateRepository above is the source repo (the CLI `update` command and Advanced mode's release links), not the app's feed.",
     "feed": null
   },
   "telemetryEnabledByDefault": false,
