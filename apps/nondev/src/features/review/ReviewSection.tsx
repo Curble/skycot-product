@@ -11,6 +11,7 @@ import {
   Image,
   MessageSquarePlus,
   Palette,
+  Play,
   Receipt,
   Settings2,
   ShieldCheck,
@@ -43,6 +44,8 @@ import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { StepBadge } from "../../ui/StepBadge";
+import { previewablePage } from "../starters/preview";
+import { PreviewSheet } from "../starters/PreviewSheet";
 import { RestoreSheet, plainRestoreProblem } from "../versions/RestoreSheet";
 import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "../versions/timeline";
 import { useLastUpload } from "../publish/uploads";
@@ -113,6 +116,7 @@ export function ReviewSection({
   const [keepNote, setKeepNote] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [undoRequested, setUndoRequested] = useState(false);
   const undoNoteId = useId();
 
@@ -162,6 +166,8 @@ export function ReviewSection({
   }
 
   const filePaths = what.groups.flatMap((group) => group.files.map((file) => file.path));
+  // A page this turn made or changed can be opened right here (starters make one file).
+  const page = cwd === null ? null : previewablePage(what.groups.flatMap((group) => group.files));
   // The commit reads like the request that caused it ("Make the button bigger…"),
   // with the plain summary underneath; git shows the first line in every log.
   const request = projection.messages.find(
@@ -374,8 +380,13 @@ export function ReviewSection({
           ) : null}
         </CardBody>
         <CardFooter note={footerNote}>
+          {page !== null ? (
+            <Button variant="primary" icon={Play} onClick={() => setPreviewOpen(true)}>
+              Open it
+            </Button>
+          ) : null}
           <Button
-            variant="primary"
+            variant={page !== null ? "secondary" : "primary"}
             disabled={keepBlocked || keeping || nothingToKeep}
             onClick={() => void keep()}
           >
@@ -402,6 +413,15 @@ export function ReviewSection({
           </p>
         ) : null}
       </Card>
+      {page !== null && cwd !== null ? (
+        <PreviewSheet
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          environmentId={environmentId}
+          cwd={cwd}
+          relativePath={page}
+        />
+      ) : null}
       <RestoreSheet
         open={undoOpen}
         onClose={() => setUndoOpen(false)}
