@@ -33,7 +33,11 @@ import * as Option from "effect/Option";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
-import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
+import {
+  findPersonalDetails,
+  personalCategories,
+  shieldApprovalId,
+} from "@t3tools/skycot-rules/personal";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
@@ -322,19 +326,25 @@ export function startedBy(
   return null;
 }
 
-/** Pure: the id of the child's message a call sends, if it sends one. Exported for tests. */
-export function sentMessageId(method: string, payload: unknown): string | null {
+/** Pure: the child's message a call sends, if it sends one. Exported for tests. */
+export function sentMessage(
+  method: string,
+  payload: unknown,
+): { readonly messageId: string; readonly text: string; readonly threadId?: string } | null {
   const input = record(payload);
-  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand) {
-    return input["type"] === "message.dispatch" && typeof input["messageId"] === "string"
-      ? input["messageId"]
-      : null;
-  }
-  if (method === ORCHESTRATION_V2_WS_METHODS.launchThread) {
-    const messageId = record(input["initialMessage"])["messageId"];
-    return typeof messageId === "string" ? messageId : null;
-  }
-  return null;
+  const threadId = typeof input["threadId"] === "string" ? input["threadId"] : undefined;
+  const message =
+    method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input["type"] === "message.dispatch"
+      ? input
+      : method === ORCHESTRATION_V2_WS_METHODS.launchThread
+        ? record(input["initialMessage"])
+        : null;
+  if (message === null || typeof message["messageId"] !== "string") return null;
+  return {
+    messageId: message["messageId"],
+    text: typeof message["text"] === "string" ? message["text"] : "",
+    ...(threadId ? { threadId } : {}),
+  };
 }
 
 /**
@@ -536,7 +546,12 @@ const make = Effect.gen(function* () {
       requestId: need.requestId,
       consume: true,
     });
-    if (allowed) return;
+    if (allowed) {
+      if (Option.isSome(limits)) {
+        yield* limits.value.recordEvent({ sessionId, kind: "approved", threadId: need.threadId });
+      }
+      return;
+    }
     yield* Effect.logInfo("skycot-family.refused", { method, requestId: need.requestId });
     return yield* familyRefusal();
   });
@@ -575,22 +590,31 @@ const make = Effect.gen(function* () {
    * A grown-up who allowed this one message as typed (the shield card's parent code, an
    * `approve` grant for `shield:<messageId>`): the provider layer only sees the message, not
    * the session, so the pass is left there. Spent here, after the limits let the call through,
-   * so a message refused at bedtime does not use up the parent's yes.
+   * so a message refused at bedtime does not use up the parent's yes. What the shield does
+   * with a message is noted for the recap by kind only, never the words.
    */
   const passShield = Effect.fn("SkycotFamilyGate.passShield")(function* (
     sessionId: string,
     method: string,
     payload: unknown,
   ) {
-    const messageId = sentMessageId(method, payload);
-    if (messageId === null || !(yield* family.isEnabled)) return;
+    const message = sentMessage(method, payload);
+    if (message === null || !(yield* family.isEnabled)) return;
+    const categories = personalCategories(findPersonalDetails(message.text));
     const allowed = yield* family.allows({
       sessionId,
       purpose: "approve",
-      requestId: shieldApprovalId(messageId),
+      requestId: shieldApprovalId(message.messageId),
       consume: true,
     });
-    if (allowed) yield* SkycotFamilyInstructions.allowPersonalDetailsOnce(messageId);
+    if (allowed) yield* SkycotFamilyInstructions.allowPersonalDetailsOnce(message.messageId);
+    if (categories.length === 0 || Option.isNone(limits)) return;
+    yield* limits.value.recordEvent({
+      sessionId,
+      kind: allowed ? "shield-allowed" : "shield",
+      categories,
+      threadId: message.threadId,
+    });
   });
 
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>

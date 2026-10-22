@@ -656,7 +656,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
   );
 
   it.effect("a parent's yes on the shield card sends that one message as typed, once", () =>
-    withGate([], ({ gate, family }) =>
+    withGate([], ({ gate, family, limits }) =>
       Effect.gen(function* () {
         yield* family.enable({ code: CODE, childName: "Ava" });
         const typed = "my name is Ava Smith and I go to St Kilda Primary";
@@ -688,6 +688,17 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         // The next message, with nobody's yes, is shielded as always.
         yield* gate.check(send("message:next"));
         assert.notInclude(yield* providerSees("message:next"), "St Kilda");
+        // The recap hears what happened by kind of detail only.
+        const events = (yield* limits.snapshot)?.activity.events ?? [];
+        assert.deepEqual(
+          events.map((event) => [event.kind, event.categories, event.threadId]),
+          [
+            ["shield-allowed", ["full-name", "school"], THREAD_ID],
+            ["shield", ["full-name", "school"], THREAD_ID],
+            ["shield", ["full-name", "school"], THREAD_ID],
+          ],
+        );
+        assert.notInclude(JSON.stringify(events), "Smith");
       }),
     ),
   );

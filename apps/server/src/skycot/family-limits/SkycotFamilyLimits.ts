@@ -47,6 +47,9 @@ import {
 export const ACTIVITY_FILE_NAME = "skycot-family-activity.json";
 const LOG_KEEP = 200;
 const LOG_DAYS = 30;
+/** Past days kept per child, for the weekly recap (a little over a month). */
+const HISTORY_KEEP = 35;
+const EVENTS_KEEP = 500;
 
 const Day = Schema.Struct({
   date: Schema.String,
@@ -67,6 +70,30 @@ const LogEntry = Schema.Struct({
 });
 export type MoreTimeLogEntry = typeof LogEntry.Type;
 
+/** A finished day's counters, kept for the recap after "today" starts again. */
+const PastDay = Schema.Struct({
+  date: Schema.String,
+  minutes: Schema.Number,
+  turns: Schema.Number,
+});
+export type PastDay = typeof PastDay.Type;
+
+/**
+ * What needed a grown-up, for the parent's recap: a held step a grown-up allowed, a personal
+ * detail the shield caught (kinds only, never the words), and a message a grown-up let go as
+ * typed.
+ */
+export const FAMILY_EVENT_KINDS = ["approved", "shield", "shield-allowed"] as const;
+const FamilyEvent = Schema.Struct({
+  at: Schema.Number,
+  childId: Schema.String,
+  kind: Schema.Literals(FAMILY_EVENT_KINDS),
+  categories: Schema.optionalKey(Schema.Array(Schema.String)),
+  threadId: Schema.optionalKey(Schema.String),
+});
+export type FamilyEvent = typeof FamilyEvent.Type;
+export type FamilyEventKind = FamilyEvent["kind"];
+
 const ActivityFile = Schema.Struct({
   version: Schema.Literal(1),
   profileCreatedAt: Schema.String,
@@ -77,8 +104,41 @@ const ActivityFile = Schema.Struct({
   /** The assistant each child last used, for the allowance reading between turns. */
   providers: Schema.Record(Schema.String, Schema.String),
   log: Schema.Array(LogEntry),
+  /** Optional so a file from before the recap reads as it was. */
+  history: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(PastDay))),
+  events: Schema.optionalKey(Schema.Array(FamilyEvent)),
 });
 type ActivityFile = typeof ActivityFile.Type;
+
+/**
+ * The child's day replaced; a finished day that counted something moves into the history
+ * first, so the weekly recap still has it after midnight.
+ */
+function withDay(activity: ActivityFile, childId: string, day: ChildDay): ActivityFile {
+  const before = activity.days[childId];
+  const history = { ...activity.history };
+  if (
+    before !== undefined &&
+    before.date !== day.date &&
+    (before.minutes > 0 || before.turns > 0)
+  ) {
+    history[childId] = [
+      ...(history[childId] ?? []).filter((past) => past.date !== before.date),
+      { date: before.date, minutes: before.minutes, turns: before.turns },
+    ].slice(-HISTORY_KEEP);
+  }
+  return { ...activity, days: { ...activity.days, [childId]: day }, history };
+}
+
+/** Everything the recap reads, as the engine keeps it. */
+export interface ActivitySnapshot {
+  readonly threads: Readonly<Record<string, string>>;
+  readonly projects: Readonly<Record<string, string>>;
+  readonly days: Readonly<Record<string, ChildDay>>;
+  readonly history: Readonly<Record<string, ReadonlyArray<PastDay>>>;
+  readonly log: ReadonlyArray<MoreTimeLogEntry>;
+  readonly events: ReadonlyArray<FamilyEvent>;
+}
 
 const decodeActivity = Schema.decodeUnknownOption(Schema.fromJsonString(ActivityFile));
 const encodeActivity = Schema.encodeEffect(Schema.fromJsonString(ActivityFile));
@@ -204,6 +264,18 @@ export class SkycotFamilyLimits extends Context.Service<
       readonly code: string;
       readonly more: MoreTime;
     }) => Effect.Effect<SessionLimits, SkycotFamily.FamilyError>;
+    /** Notes something that needed a grown-up for the session's child (the recap reads it). */
+    readonly recordEvent: (input: {
+      readonly sessionId: string;
+      readonly kind: FamilyEventKind;
+      readonly categories?: ReadonlyArray<string> | undefined;
+      readonly threadId?: string | undefined;
+    }) => Effect.Effect<void>;
+    /** The profile and its activity as kept, for the recap; null while the profile is off. */
+    readonly snapshot: Effect.Effect<{
+      readonly profile: SkycotFamily.FamilyStatus;
+      readonly activity: ActivitySnapshot;
+    } | null>;
     /** Every child's day, for Settings › Family, and who started what. */
     readonly today: Effect.Effect<{
       readonly children: ReadonlyArray<ChildToday>;
@@ -381,7 +453,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
       const before = activity.days[child.id];
       const after = countMinute(before, at, loaded.profile.timeZone);
       if (after !== before) {
-        activity = { ...activity, days: { ...activity.days, [child.id]: after } };
+        activity = withDay(activity, child.id, after);
         yield* save(activity);
       }
     }
@@ -448,11 +520,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
       return yield* refuse(profile, child, state);
     }
     yield* save({
-      ...activity,
-      days: {
-        ...activity.days,
-        [child.id]: countTurn(activity.days[child.id], at, profile.timeZone),
-      },
+      ...withDay(activity, child.id, countTurn(activity.days[child.id], at, profile.timeZone)),
       providers:
         input.instanceId === undefined
           ? activity.providers
@@ -522,8 +590,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
       reason: before.reason,
     };
     const next: ActivityFile = {
-      ...activity,
-      days: { ...activity.days, [child.id]: day },
+      ...withDay(activity, child.id, day),
       log: [...activity.log, entry]
         .filter((logged) => logged.at > at - LOG_DAYS * 24 * 60 * 60_000)
         .slice(-LOG_KEEP),
@@ -532,6 +599,49 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     yield* Effect.logInfo("skycot-family.more-time", { childId: child.id, kind: entry.kind });
     return yield* sessionView(profile, next, input.sessionId, at);
   }, lock.withPermits(1));
+
+  const recordEvent: SkycotFamilyLimits["Service"]["recordEvent"] = Effect.fn(
+    "SkycotFamilyLimits.recordEvent",
+  )(function* (input) {
+    const loaded = yield* current;
+    if (loaded === null) return;
+    const { activity } = loaded;
+    const child = childFor(loaded.profile, activity, input.sessionId);
+    if (child === null) return;
+    const at = yield* now;
+    const event: FamilyEvent = {
+      at,
+      childId: child.id,
+      kind: input.kind,
+      ...(input.categories && input.categories.length > 0
+        ? { categories: [...input.categories] }
+        : {}),
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+    };
+    yield* save({
+      ...activity,
+      events: [...(activity.events ?? []), event]
+        .filter((logged) => logged.at > at - LOG_DAYS * 24 * 60 * 60_000)
+        .slice(-EVENTS_KEEP),
+    });
+  }, lock.withPermits(1));
+
+  const snapshot: SkycotFamilyLimits["Service"]["snapshot"] = Effect.gen(function* () {
+    const loaded = yield* current;
+    if (loaded === null) return null;
+    const { activity } = loaded;
+    return {
+      profile: loaded.profile,
+      activity: {
+        threads: activity.threads,
+        projects: activity.projects,
+        days: activity.days,
+        history: activity.history ?? {},
+        log: activity.log,
+        events: activity.events ?? [],
+      },
+    };
+  }).pipe(Effect.withSpan("SkycotFamilyLimits.snapshot"));
 
   const today: SkycotFamilyLimits["Service"]["today"] = Effect.gen(function* () {
     const loaded = yield* current;
@@ -563,6 +673,8 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     admitStep,
     recordStart,
     moreTime,
+    recordEvent,
+    snapshot,
     today,
   });
 });

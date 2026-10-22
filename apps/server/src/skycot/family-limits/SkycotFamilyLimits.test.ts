@@ -70,6 +70,37 @@ it.layer(NodeServices.layer)("SkycotFamilyLimits", (it) => {
     ),
   );
 
+  it.effect(
+    "keeps yesterday's minutes for the recap after midnight, and what needed a grown-up",
+    () =>
+      withLimits(({ family, limits }) =>
+        Effect.gen(function* () {
+          const status = yield* family.enable({
+            code: CODE,
+            childName: "Ava",
+            timeZone: MELBOURNE,
+          });
+          const ava = status.children[0]!.id;
+          yield* at("2026-10-21T16:00:00+11:00");
+          yield* limits.admitTurn({ sessionId: SESSION });
+          yield* TestClock.adjust("1 minute");
+          yield* limits.heartbeat({ sessionId: SESSION, active: true });
+          yield* limits.recordEvent({ sessionId: SESSION, kind: "shield", categories: ["school"] });
+          yield* at("2026-10-22T09:00:00+11:00");
+          yield* limits.heartbeat({ sessionId: SESSION, active: true });
+          const snapshot = yield* limits.snapshot;
+          assert.deepEqual(snapshot?.activity.history[ava], [
+            { date: "2026-10-21", minutes: 2, turns: 1 },
+          ]);
+          assert.equal(snapshot?.activity.days[ava]?.date, "2026-10-22");
+          assert.deepEqual(
+            snapshot?.activity.events.map((event) => [event.childId, event.kind, event.categories]),
+            [[ava, "shield", ["school"]]],
+          );
+        }),
+      ),
+  );
+
   it.effect("a heartbeat that is not active counts nothing", () =>
     withLimits(({ family, limits }) =>
       Effect.gen(function* () {
