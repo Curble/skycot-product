@@ -3,6 +3,7 @@ import { assert, describe, it } from "@effect/vitest";
 import {
   type OrchestrationV2AppThread,
   type OrchestrationV2TurnItem,
+  MessageId,
   ORCHESTRATION_V2_WS_METHODS,
   WS_METHODS,
   RpcScopeAuthorization,
@@ -26,8 +27,11 @@ import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
+
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
+import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 
 const CODE = "482913";
 const SESSION = "session-1";
@@ -647,6 +651,74 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         assert.isTrue(
           yield* gate.requestNeedsGrownUp({ threadId: THREAD_ID, requestId: REQUEST_ID }),
         );
+      }),
+    ),
+  );
+
+  it.effect("a parent's yes on the shield card sends that one message as typed, once", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const typed = "my name is Ava Smith and I go to St Kilda Primary";
+        const send = (messageId: string) => ({
+          sessionId: SESSION,
+          method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+          payload: { type: "message.dispatch", threadId: THREAD_ID, messageId, text: typed },
+        });
+        const providerSees = (messageId: string) =>
+          SkycotFamilyInstructions.withFamilyRules(Option.some(family), {
+            messageId: MessageId.make(messageId),
+            text: typed,
+            attachments: [],
+            createdBy: "user",
+            creationSource: "web",
+          }).pipe(Effect.map((message) => message.text));
+
+        yield* family.verify({
+          code: CODE,
+          purpose: "approve",
+          sessionId: SESSION,
+          requestId: shieldApprovalId("message:allowed"),
+        });
+        yield* gate.check(send("message:allowed"));
+        assert.include(yield* providerSees("message:allowed"), "Ava Smith");
+        // The pass and the grant are both spent: the same id again is shielded.
+        yield* gate.check(send("message:allowed"));
+        assert.notInclude(yield* providerSees("message:allowed"), "Ava Smith");
+        // The next message, with nobody's yes, is shielded as always.
+        yield* gate.check(send("message:next"));
+        assert.notInclude(yield* providerSees("message:next"), "St Kilda");
+      }),
+    ),
+  );
+
+  it.effect("a shield yes for one message does not reach another session's message", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        yield* family.verify({
+          code: CODE,
+          purpose: "approve",
+          sessionId: "session-2",
+          requestId: shieldApprovalId("message:elsewhere"),
+        });
+        yield* gate.check({
+          sessionId: SESSION,
+          method: ORCHESTRATION_V2_WS_METHODS.launchThread,
+          payload: {
+            threadId: "thread:new",
+            projectId: "project:family",
+            initialMessage: { messageId: "message:elsewhere", text: "my name is Ava Smith" },
+          },
+        });
+        const wrapped = yield* SkycotFamilyInstructions.withFamilyRules(Option.some(family), {
+          messageId: MessageId.make("message:elsewhere"),
+          text: "my name is Ava Smith",
+          attachments: [],
+          createdBy: "user",
+          creationSource: "web",
+        });
+        assert.notInclude(wrapped.text, "Ava Smith");
       }),
     ),
   );

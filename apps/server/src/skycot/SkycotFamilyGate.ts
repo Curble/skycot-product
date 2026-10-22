@@ -33,11 +33,13 @@ import * as Option from "effect/Option";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
+import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 
 /** `requiredPermission` on the refusal, so a client can tell "ask a grown-up" from a scope error. */
@@ -320,6 +322,21 @@ export function startedBy(
   return null;
 }
 
+/** Pure: the id of the child's message a call sends, if it sends one. Exported for tests. */
+export function sentMessageId(method: string, payload: unknown): string | null {
+  const input = record(payload);
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand) {
+    return input["type"] === "message.dispatch" && typeof input["messageId"] === "string"
+      ? input["messageId"]
+      : null;
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.launchThread) {
+    const messageId = record(input["initialMessage"])["messageId"];
+    return typeof messageId === "string" ? messageId : null;
+  }
+  return null;
+}
+
 /**
  * The same rule for the HTTP API routes that change things (`/api/projects/mutate` is the
  * HTTP twin of `projects.mutate`). Revoking access stays open: it only ever takes away.
@@ -554,10 +571,33 @@ const make = Effect.gen(function* () {
     if (started !== null) yield* limits.value.recordStart({ sessionId, ...started });
   });
 
+  /**
+   * A grown-up who allowed this one message as typed (the shield card's parent code, an
+   * `approve` grant for `shield:<messageId>`): the provider layer only sees the message, not
+   * the session, so the pass is left there. Spent here, after the limits let the call through,
+   * so a message refused at bedtime does not use up the parent's yes.
+   */
+  const passShield = Effect.fn("SkycotFamilyGate.passShield")(function* (
+    sessionId: string,
+    method: string,
+    payload: unknown,
+  ) {
+    const messageId = sentMessageId(method, payload);
+    if (messageId === null || !(yield* family.isEnabled)) return;
+    const allowed = yield* family.allows({
+      sessionId,
+      purpose: "approve",
+      requestId: shieldApprovalId(messageId),
+      consume: true,
+    });
+    if (allowed) yield* SkycotFamilyInstructions.allowPersonalDetailsOnce(messageId);
+  });
+
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
     Effect.suspend(() =>
       enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)).pipe(
         Effect.andThen(admit(input.sessionId, input.method, input.payload)),
+        Effect.andThen(passShield(input.sessionId, input.method, input.payload)),
       ),
     );
 
