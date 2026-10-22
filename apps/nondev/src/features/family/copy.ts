@@ -70,6 +70,10 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "The assistant is asking for a key or password. A parent decides whether to hand one over.";
     case "voiceSettings":
       return "Voice typing sends the sound of the child's voice to the browser's speech service, so a parent decides whether it's on.";
+    case "manageChildren":
+      return "Names, pictures, bedtimes and limits are a parent's to set.";
+    case "switchChild":
+      return "SKYCOT is asleep for this child, so a grown-up switches to someone else.";
     case "changeTheme":
       return "";
   }

@@ -1,6 +1,7 @@
 import type { EnvironmentId } from "@t3tools/contracts";
-import { KeyRound, Mic, PencilLine, Power, Users, Wrench } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { deviceTimeZone } from "../../../plain/daylight";
+import { ArrowLeftRight, KeyRound, Mic, Plus, Power, Users, Wrench } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
 import { ADVANCED_MODE_LABEL } from "../../../brand";
@@ -11,7 +12,13 @@ import { ListExtra, ListRow } from "../../../ui/ListRow";
 import { Pill } from "../../../ui/Pill";
 import { StepBadge } from "../../../ui/StepBadge";
 import { TextField } from "../../../ui/TextField";
+import { ChildAvatar } from "../../family/ChildAvatar";
+import { ChildEditorSheet } from "../../family/ChildEditorSheet";
+import { childLabel, MAX_CHILDREN, namesList, type FamilyChild } from "../../family/children";
 import { familyCopy } from "../../family/copy";
+import { openChildPicker } from "../../family-limits/FamilyLimitsHost";
+import { clockPhrase, limitsSummary, todaySummary } from "../../family-limits/limits";
+import { refreshToday, useLimits, type ChildToday } from "../../family-limits/store";
 import {
   CODE_MAX,
   codeStrength,
@@ -26,12 +33,7 @@ import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
 import { useFamily } from "../../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../../family/ParentCodeEntry";
-import {
-  changeParentCode,
-  lockFamilyGrants,
-  moveLegacyProfile,
-  renameChild,
-} from "../../family/store";
+import { changeParentCode, lockFamilyGrants, moveLegacyProfile } from "../../family/store";
 import { speechService } from "../../voice/browser";
 import { whereVoiceGoes } from "../../voice/copy";
 import { useFamilyVoiceTypingOff, writeFamilyVoiceTypingOff } from "../localPrefs";
@@ -87,7 +89,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
   return <FamilyOnPane />;
 }
 
-type Row = "code" | "name" | "off" | null;
+type Row = "code" | "off" | null;
 
 // "14 more minutes" only changes once a minute: a coarse clock, read every 30 seconds.
 const CLOCK_STEP_MS = 30_000;
@@ -103,6 +105,7 @@ function FamilyOnPane() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmOff, setConfirmOff] = useState(false);
   const since = profile.createdAt ? formatSince(profile.createdAt) : null;
+  const names = profile.children.map((child, index) => childLabel(child, index));
   const openLine = openGrantsSentence(profile, useSyncExternalStore(subscribeClock, readClock));
 
   // Confirm first; the code sheet then turns it off on the engine in the same step.
@@ -122,7 +125,11 @@ function FamilyOnPane() {
             <span className="fm-family-status__text">
               <b>{familyCopy.title} is on</b>
               <small>
-                {profile.childName ? `Set up for ${profile.childName}` : "No name given"}
+                {names.length > 1
+                  ? `For ${namesList(names)}`
+                  : profile.childName
+                    ? `Set up for ${profile.childName}`
+                    : "No name given"}
                 {since ? ` · since ${since}` : ""}
               </small>
             </span>
@@ -140,42 +147,19 @@ function FamilyOnPane() {
         />
       </SettingsGroup>
 
-      <SettingsGroup title="Parent code and name" footer={familyCopy.storage}>
+      <ChildrenGroup />
+
+      <SettingsGroup title="Parent code" footer={familyCopy.storage}>
         <ListRow
           leading={<StepBadge state="todo" icon={KeyRound} />}
           title="Change parent code"
-          subtitle="Enter the current code, then a new one."
+          subtitle="Enter the current code, then a new one. One code for every child."
           expanded={openRow === "code"}
           onClick={() => setOpenRow(openRow === "code" ? null : "code")}
         />
         {openRow === "code" ? (
           <ListExtra>
             <ChangeCodeForm onDone={() => setOpenRow(null)} />
-          </ListExtra>
-        ) : null}
-        <ListRow
-          leading={<StepBadge state="todo" icon={PencilLine} />}
-          title="Child's name"
-          subtitle={
-            profile.childName
-              ? `“${profile.childName}” — used in the greeting only.`
-              : "Not set. Used in the greeting only."
-          }
-          expanded={openRow === "name"}
-          // The engine refuses a rename without the parent's "yes" (QA FK-10).
-          onClick={() => {
-            if (openRow === "name") {
-              setOpenRow(null);
-              return;
-            }
-            void requireParentCode("renameChild").then((ok) => {
-              if (ok) setOpenRow("name");
-            });
-          }}
-        />
-        {openRow === "name" ? (
-          <ListExtra>
-            <RenameForm initial={profile.childName ?? ""} onDone={() => setOpenRow(null)} />
           </ListExtra>
         ) : null}
       </SettingsGroup>
@@ -268,11 +252,11 @@ function FamilyVoiceGroup({ childName }: { readonly childName: string | null }) 
   return (
     <SettingsGroup
       title="Voice"
-      footer={`${whereVoiceGoes(speechService)} SKYCOT never records or keeps the sound. Read-aloud uses a voice on this Mac and stays on; ${who} can switch it in Settings › Voice.`}
+      footer={`${whereVoiceGoes(speechService)} SKYCOT never records or keeps the sound. Each child's voice typing is off until a parent turns it on in their settings above; this switch can keep it off on this device for everyone.`}
     >
       <ListRow
         leading={<StepBadge state={off ? "todo" : "ok"} icon={Mic} />}
-        title="Voice typing (parent code)"
+        title="Voice typing on this device (parent code)"
         subtitle={
           off
             ? `Off on this device. ${who.charAt(0).toUpperCase()}${who.slice(1)} types instead.`
@@ -460,52 +444,167 @@ function MoveLegacyPane() {
   );
 }
 
-function RenameForm({
-  initial,
-  onDone,
-}: {
-  readonly initial: string;
-  readonly onDone: () => void;
-}) {
-  const [name, setName] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const save = async () => {
-    setBusy(true);
-    const result = await renameChild(name);
-    setBusy(false);
-    if (result.ok) onDone();
-    else setFailure(result.message);
-  };
-  return (
-    <div className="fm-family-inline">
-      <TextField
-        label="Child's first name"
-        placeholder="Ava"
-        autoComplete="off"
-        autoFocus
-        value={name}
-        onChange={(event) => setName(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") void save();
-        }}
-      />
-      <p className="fm-help">Leave it empty for a greeting without a name.</p>
-      {failure ? <Banner tone="warning">{failure}</Banner> : null}
-      <div className="fm-family-inline__actions">
-        <Button size="sm" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()}>
-          {busy ? "Saving…" : "Save"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function formatSince(iso: string): string | null {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+// "Today" changes once a minute at most: re-read the engine's numbers while the pane is open.
+const TODAY_REFRESH_MS = 60_000;
+
+/** One card per child, "Add another child", and who is using SKYCOT on this device. */
+function ChildrenGroup() {
+  const { profile, requireParentCode } = useFamily();
+  const { today } = useLimits();
+  const [editing, setEditing] = useState<{ readonly child: FamilyChild | null } | null>(null);
+  useEffect(() => {
+    void refreshToday();
+    const timer = window.setInterval(() => void refreshToday(), TODAY_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+  const children = profile.children;
+  const several = children.length > 1;
+  const current = children.find((child) => child.id === profile.currentChildId) ?? null;
+  const open = (child: FamilyChild | null) =>
+    void requireParentCode("manageChildren").then((ok) => {
+      if (ok) setEditing({ child });
+    });
+  const timeZone = profile.timeZone ?? deviceTimeZone();
+  return (
+    <>
+      <SettingsGroup
+        title={several ? "Children" : "Child"}
+        footer="Names, pictures, looks, voice and limits need the parent code. Choosing who's using SKYCOT doesn't, except to move away from a child it's asleep for."
+      >
+        <ListExtra>
+          <div>
+            {children.map((child, index) => (
+              <ChildCard
+                key={child.id}
+                child={child}
+                label={childLabel(child, index)}
+                here={several && child.id === profile.currentChildId}
+                today={today.children.find((entry) => entry.childId === child.id) ?? null}
+                timeZone={timeZone}
+                onEdit={() => open(child)}
+              />
+            ))}
+          </div>
+        </ListExtra>
+        {children.length < MAX_CHILDREN ? (
+          <ListRow
+            leading={<StepBadge state="todo" icon={Plus} />}
+            title="Add another child"
+            subtitle="Their own picture, look, bedtime and limits, under the same parent code."
+            trailing={
+              <Button size="sm" onClick={() => open(null)}>
+                Add…
+              </Button>
+            }
+          />
+        ) : null}
+        {several ? (
+          <ListRow
+            leading={<StepBadge state="todo" icon={ArrowLeftRight} />}
+            title="Who's using SKYCOT on this device"
+            subtitle={current ? `${current.name ?? "A child"} right now.` : "Nobody chosen yet."}
+            trailing={
+              <Button size="sm" onClick={openChildPicker}>
+                Switch…
+              </Button>
+            }
+          />
+        ) : null}
+      </SettingsGroup>
+      {editing ? (
+        <ChildEditorSheet
+          child={editing.child}
+          siblings={children.length}
+          canRemove={several}
+          onClose={() => {
+            setEditing(null);
+            void refreshToday();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ChildCard({
+  child,
+  label,
+  here,
+  today,
+  timeZone,
+  onEdit,
+}: {
+  readonly child: FamilyChild;
+  readonly label: string;
+  readonly here: boolean;
+  readonly today: ChildToday | null;
+  readonly timeZone: string;
+  readonly onEdit: () => void;
+}) {
+  const state = today?.limits ?? null;
+  const share =
+    state !== null && child.limits.dailyMinutes !== null
+      ? Math.min(1, state.usedMinutes / child.limits.dailyMinutes)
+      : null;
+  const extras = today?.moreTime ?? [];
+  return (
+    <div className="fm-child-card">
+      <ChildAvatar child={child} size={52} />
+      <div className="fm-child-card__text">
+        <span className="fm-child-card__name">
+          {label}
+          {here ? (
+            <Pill tone="ok" size="sm">
+              On this device
+            </Pill>
+          ) : null}
+          {state?.asleep ? (
+            <Pill tone="neutral" size="sm">
+              Asleep
+            </Pill>
+          ) : null}
+        </span>
+        <span className="fm-child-card__line">{limitsSummary(child.limits)}</span>
+        <span className="fm-child-card__line">
+          Voice typing {child.voice.typing ? "on" : "off"} · read aloud{" "}
+          {child.voice.readAloud ? "on" : "off"}
+          {child.largerText ? " · larger text" : ""}
+        </span>
+        {state !== null ? (
+          <span className="fm-child-card__today">{todaySummary(state, child.limits)}</span>
+        ) : null}
+        {share !== null ? (
+          <span
+            className={`fm-child-card__meter${state?.asleep ? " fm-child-card__meter--asleep" : ""}`}
+            role="img"
+            aria-label={`${Math.round(share * 100)}% of today's time used`}
+          >
+            <span style={{ width: `${Math.round(share * 100)}%` }} />
+          </span>
+        ) : null}
+        {extras.length > 0 ? (
+          <span className="fm-child-card__line">
+            {extras
+              .map((entry) =>
+                entry.kind === "extra"
+                  ? `A grown-up added ${entry.minutes ?? 15} minutes at ${clockPhrase(entry.at, timeZone)}`
+                  : `A grown-up ended bedtime at ${clockPhrase(entry.at, timeZone)}`,
+              )
+              .join(" · ")}
+          </span>
+        ) : null}
+      </div>
+      <div className="fm-child-card__actions">
+        <Button size="sm" onClick={onEdit}>
+          Edit…
+        </Button>
+      </div>
+    </div>
+  );
 }

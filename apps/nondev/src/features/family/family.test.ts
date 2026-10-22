@@ -225,12 +225,22 @@ describe("the engine's answers", () => {
       createdAt: "2026-10-22T09:00:00.000Z",
       attemptsLeft: 3,
       lockedForMs: 0,
+      children: [],
+      timeZone: null,
     });
   });
 
   it("turns a lock into a local deadline and retires a moved browser profile", () => {
     const view = viewFromStatus(
-      { enabled: true, childName: null, createdAt: null, attemptsLeft: 0, lockedForMs: 60_000 },
+      {
+        enabled: true,
+        childName: null,
+        createdAt: null,
+        attemptsLeft: 0,
+        lockedForMs: 60_000,
+        children: [],
+        timeZone: null,
+      },
       T0,
       true,
     );
@@ -239,7 +249,15 @@ describe("the engine's answers", () => {
     expect(view.source).toBe("engine");
     expect(viewLockRemainingMs(view, T0 + 59_000)).toBe(1_000);
     const off = viewFromStatus(
-      { enabled: false, childName: null, createdAt: null, attemptsLeft: 5, lockedForMs: 0 },
+      {
+        enabled: false,
+        childName: null,
+        createdAt: null,
+        attemptsLeft: 5,
+        lockedForMs: 0,
+        children: [],
+        timeZone: null,
+      },
       T0,
       true,
     );
@@ -355,7 +373,80 @@ describe("open grants", () => {
         now,
       ),
     ).toBe(
-      "Open on this device: the AI assistants for 9 more minutes and publishing for 1 more minute.",
+      "Open on this device: Family and AI settings for 9 more minutes and publishing for 1 more minute.",
     );
+  });
+});
+
+describe("several children", () => {
+  const child = (id: string, name: string | null) => ({
+    id,
+    name,
+    avatar: { kind: "initial", color: "sky" },
+    look: "workshop",
+    largerText: true,
+    voice: { typing: false, readAloud: true },
+    limits: { bedtime: null, dailyMinutes: null, dailyTurns: null, keepAllowancePercent: null },
+  });
+  const status = (session?: unknown) =>
+    parseServerStatus({
+      enabled: true,
+      childName: "Ava",
+      createdAt: "2026-10-22T09:00:00.000Z",
+      attemptsLeft: 5,
+      lockedForMs: 0,
+      children: [child("a", "Ava"), child("l", "Leo"), { id: 3 }],
+      timeZone: "Australia/Melbourne",
+      ...(session === undefined ? {} : { session }),
+    })!;
+
+  it("reads the children, dropping one it cannot read", () => {
+    const read = status();
+    expect(read.children.map((entry) => entry.id)).toEqual(["a", "l"]);
+    expect(read.children[1]!.voice).toEqual({ typing: false, readAloud: true });
+    expect(read.timeZone).toBe("Australia/Melbourne");
+  });
+
+  it("greets the child using this device, and asks who it is when nobody is chosen", () => {
+    const chosen = viewFromStatus(
+      status({ childId: "l", needsChoice: false, limits: null, sentence: null }),
+      T0,
+      false,
+    );
+    expect(chosen.currentChildId).toBe("l");
+    expect(chosen.childName).toBe("Leo");
+    expect(chosen.needsChoice).toBe(false);
+    const unknown = viewFromStatus(
+      status({ childId: null, needsChoice: true, limits: null, sentence: null }),
+      T0,
+      false,
+    );
+    expect(unknown.currentChildId).toBeNull();
+    expect(unknown.needsChoice).toBe(true);
+    expect(unknown.childName).toBeNull();
+  });
+
+  it("keeps the last choice when an answer carries no session", () => {
+    const view = viewFromStatus(status(), T0, false, { openUntil: {}, currentChildId: "a" });
+    expect(view.currentChildId).toBe("a");
+    expect(
+      viewFromStatus(status(), T0, false, { openUntil: {}, currentChildId: "gone" }).needsChoice,
+    ).toBe(true);
+  });
+
+  it("caches the children for first paint", () => {
+    const view = viewFromStatus(
+      status({ childId: "a", needsChoice: false, limits: null, sentence: null }),
+      T0,
+      false,
+    );
+    const cached = parseCachedView(serializeCachedView(view), false);
+    expect(cached.children.map((entry) => entry.name)).toEqual(["Ava", "Leo"]);
+    expect(cached.currentChildId).toBe("a");
+  });
+
+  it("guards managing children with the settings grant", () => {
+    expect(purposeFor("manageChildren")).toBe("settings");
+    expect(purposeFor("switchChild")).toBe("settings");
   });
 });

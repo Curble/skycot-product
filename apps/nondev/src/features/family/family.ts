@@ -5,6 +5,8 @@
 // guards, and the code-format helpers. The older browser-only record (`FamilyProfile`,
 // `skycot:family`) stays readable so a profile set up before the move can be carried over.
 // Nothing here touches the DOM or the network; store.ts and api.ts do.
+import { parseChildren, type FamilyChild } from "./children";
+import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
 
 export type FamilyAction =
   | "publish"
@@ -20,7 +22,9 @@ export type FamilyAction =
   | "aiSettings"
   | "renameChild"
   | "saveSecret"
-  | "voiceSettings";
+  | "voiceSettings"
+  | "manageChildren"
+  | "switchChild";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -44,6 +48,8 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "renameChild",
   "saveSecret",
   "voiceSettings",
+  "manageChildren",
+  "switchChild",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -77,6 +83,8 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
     case "renameChild":
     case "saveSecret":
     case "voiceSettings":
+    case "manageChildren":
+    case "switchChild":
       return "settings";
     case "disableFamily":
     case "changeCode":
@@ -100,6 +108,11 @@ export interface ServerFamilyStatus {
   readonly lockedForMs: number;
   /** Only the status read carries these; other answers leave them out. */
   readonly grants?: ReadonlyArray<OpenGrant>;
+  readonly children: ReadonlyArray<FamilyChild>;
+  /** The zone bedtimes are read in. */
+  readonly timeZone: string | null;
+  /** Who is using SKYCOT on this device; only the status read carries it. */
+  readonly session?: SessionLimits;
 }
 
 const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
@@ -145,6 +158,11 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     ...(parseGrants(record["grants"]) === undefined
       ? {}
       : { grants: parseGrants(record["grants"])! }),
+    children: parseChildren(record["children"]),
+    timeZone: text("timeZone"),
+    ...(parseSessionLimits(record["session"]) === null
+      ? {}
+      : { session: parseSessionLimits(record["session"])! }),
   };
 }
 
@@ -158,6 +176,7 @@ export type FamilyFailure =
   | "storage"
   | "unauthenticated"
   | "forbidden"
+  | "asleep"
   | "unreachable";
 
 export type FamilyResult<A> =
@@ -212,7 +231,14 @@ export function readFamilyAnswer<A>(
 /** What the UI renders. */
 export interface FamilyView {
   readonly enabled: boolean;
+  /** The name of the child using SKYCOT on this device (the greeting's). */
   readonly childName: string | null;
+  readonly children: ReadonlyArray<FamilyChild>;
+  /** The child using SKYCOT on this device; null while one has to be chosen. */
+  readonly currentChildId: string | null;
+  /** More than one child and none chosen on this device yet. */
+  readonly needsChoice: boolean;
+  readonly timeZone: string | null;
   readonly createdAt: string | null;
   readonly attemptsLeft: number;
   /** Epoch ms (this browser's clock) until code prompts open again; null when not locked. */
@@ -228,6 +254,10 @@ export interface FamilyView {
 export const EMPTY_VIEW: FamilyView = {
   enabled: false,
   childName: null,
+  children: [],
+  currentChildId: null,
+  needsChoice: false,
+  timeZone: null,
   createdAt: null,
   attemptsLeft: MAX_ATTEMPTS,
   lockedUntil: null,
@@ -236,13 +266,43 @@ export const EMPTY_VIEW: FamilyView = {
   legacy: false,
 };
 
+/**
+ * Which child this device is using: the engine's answer when the status carries one, else the
+ * one remembered from before (a status from a change carries none), else the only child.
+ */
+export function currentChildOf(
+  children: ReadonlyArray<FamilyChild>,
+  session: Pick<SessionLimits, "childId" | "needsChoice"> | undefined,
+  previous: string | null,
+): { readonly currentChildId: string | null; readonly needsChoice: boolean } {
+  const known = (id: string | null) =>
+    id !== null && children.some((child) => child.id === id) ? id : null;
+  if (session !== undefined) {
+    const id = known(session.childId);
+    return { currentChildId: id, needsChoice: id === null && children.length > 1 };
+  }
+  const kept = known(previous) ?? (children.length === 1 ? children[0]!.id : null);
+  return { currentChildId: kept, needsChoice: kept === null && children.length > 1 };
+}
+
+export function currentChild(
+  view: Pick<FamilyView, "children" | "currentChildId">,
+): FamilyChild | null {
+  return view.children.find((child) => child.id === view.currentChildId) ?? null;
+}
+
 export function viewFromStatus(
   status: ServerFamilyStatus,
   now: number,
   legacy: boolean,
-  previous: Pick<FamilyView, "openUntil"> = EMPTY_VIEW,
+  previous: Pick<FamilyView, "openUntil" | "currentChildId"> = EMPTY_VIEW,
 ): FamilyView {
+  const choice = currentChildOf(status.children, status.session, previous.currentChildId);
+  const child = status.children.find((candidate) => candidate.id === choice.currentChildId);
   return {
+    ...choice,
+    children: status.children,
+    timeZone: status.timeZone,
     // Answers other than the status read carry no grants: keep what was known.
     openUntil:
       status.grants === undefined
@@ -251,7 +311,8 @@ export function viewFromStatus(
             status.grants.map((grant) => [grant.purpose, now + grant.remainingMs]),
           ),
     enabled: status.enabled,
-    childName: status.childName,
+    // An older engine sends one name and no children.
+    childName: status.children.length === 0 ? status.childName : (child?.name ?? null),
     createdAt: status.createdAt,
     attemptsLeft: status.attemptsLeft,
     lockedUntil: status.lockedForMs > 0 ? now + status.lockedForMs : null,
@@ -271,11 +332,20 @@ export function parseCachedView(raw: string | null, legacy: boolean): FamilyView
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return base;
     const record = parsed as Record<string, unknown>;
+    const children = parseChildren(record["children"]);
+    const currentChildId =
+      typeof record["currentChildId"] === "string" &&
+      children.some((child) => child.id === record["currentChildId"])
+        ? record["currentChildId"]
+        : null;
     return {
       ...base,
       enabled: record["enabled"] === true,
       childName: typeof record["childName"] === "string" ? record["childName"] : null,
       createdAt: typeof record["createdAt"] === "string" ? record["createdAt"] : null,
+      children,
+      currentChildId,
+      timeZone: typeof record["timeZone"] === "string" ? record["timeZone"] : null,
     };
   } catch {
     return base;
@@ -287,6 +357,9 @@ export function serializeCachedView(view: FamilyView): string {
     enabled: view.enabled,
     childName: view.childName,
     createdAt: view.createdAt,
+    children: view.children,
+    currentChildId: view.currentChildId,
+    timeZone: view.timeZone,
   });
 }
 
@@ -312,7 +385,7 @@ export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: 
 
 const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
   ["advanced", "Advanced mode"],
-  ["settings", "the AI assistants"],
+  ["settings", "Family and AI settings"],
   ["publish", "publishing"],
   ["automation", "automations"],
   ["openFolder", "other folders"],

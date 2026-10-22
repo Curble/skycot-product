@@ -3,7 +3,7 @@
 // change, and carries a profile set up before the move over to the engine.
 import { useSyncExternalStore } from "react";
 
-import { familyApi, type FamilyResult, type UnlockToken } from "./api";
+import { familyApi, type ChildPatch, type FamilyResult, type UnlockToken } from "./api";
 import {
   EMPTY_VIEW,
   FAMILY_CACHE_KEY,
@@ -128,6 +128,42 @@ export function changeParentCode(
 
 export function renameChild(childName: string | null): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.rename({ childName }), applyStatus);
+}
+
+export function addChild(child: ChildPatch) {
+  return settle(familyApi.addChild(child), ({ status }) => applyStatus(status));
+}
+
+export function updateChild(childId: string, patch: ChildPatch) {
+  return settle(familyApi.updateChild({ childId, patch }), applyStatus);
+}
+
+export function removeChild(childId: string) {
+  return settle(familyApi.removeChild({ childId }), applyStatus);
+}
+
+/** The child's own look and text size (no code: picking a look is open to children). */
+export function saveOwnLook(input: { readonly look?: string; readonly largerText?: boolean }) {
+  return settle(familyApi.look(input), applyStatus);
+}
+
+/** The engine's answer about who is using this device, from a choice or a heartbeat. */
+export function applySession(session: {
+  readonly childId: string | null;
+  readonly needsChoice: boolean;
+}) {
+  const known =
+    session.childId !== null && view.children.some((child) => child.id === session.childId)
+      ? session.childId
+      : null;
+  if (known === view.currentChildId && session.needsChoice === view.needsChoice) return;
+  const child = view.children.find((candidate) => candidate.id === known);
+  setView({
+    ...view,
+    currentChildId: known,
+    needsChoice: session.needsChoice,
+    childName: child?.name ?? (view.children.length === 0 ? view.childName : null),
+  });
 }
 
 /** One code try for a grown-up's "yes"; the engine records the grant for this device. */

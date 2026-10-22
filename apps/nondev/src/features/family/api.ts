@@ -4,6 +4,8 @@
 import { readDesktopPrimaryBearerToken } from "~/environments/primary/desktopAuth";
 import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target";
 
+import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
+import type { ChildAvatar, ChildLimits, ChildVoice } from "./children";
 import {
   ENGINE_UNREACHABLE,
   parseServerStatus,
@@ -35,7 +37,7 @@ async function call(method: "GET" | "POST", path: string, body?: unknown): Promi
   });
 }
 
-async function request<A>(
+export async function request<A>(
   method: "GET" | "POST",
   path: string,
   body: unknown,
@@ -69,10 +71,53 @@ function parseUnlock(body: unknown): UnlockToken | null {
     : null;
 }
 
+/** What a parent sets for a child; fields left out keep their value. */
+export interface ChildPatch {
+  readonly name?: string | null;
+  readonly avatar?: ChildAvatar;
+  readonly look?: string;
+  readonly largerText?: boolean;
+  readonly voice?: Partial<ChildVoice>;
+  readonly limits?: Partial<ChildLimits>;
+}
+
+function parseAdded(body: unknown) {
+  const status = parseServerStatus(body);
+  const childId =
+    typeof body === "object" && body !== null ? (body as Record<string, unknown>)["childId"] : null;
+  return status === null || typeof childId !== "string" ? null : { status, childId };
+}
+
+/** The household's zone travels with every change a parent makes, so bedtimes read right. */
+function browserZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 export const familyApi = {
   status: () => request("GET", "", undefined, parseServerStatus),
   enable: (input: { readonly code: string; readonly childName: string | null }) =>
-    request("POST", "/enable", input, parseServerStatus),
+    request("POST", "/enable", { ...input, timeZone: browserZone() }, parseServerStatus),
+  addChild: (child: ChildPatch) =>
+    request("POST", "/children/add", { child, timeZone: browserZone() }, parseAdded),
+  updateChild: (input: { readonly childId: string; readonly patch: ChildPatch }) =>
+    request("POST", "/children/update", { ...input, timeZone: browserZone() }, parseServerStatus),
+  removeChild: (input: { readonly childId: string }) =>
+    request("POST", "/children/remove", input, parseServerStatus),
+  look: (input: { readonly look?: string; readonly largerText?: boolean }) =>
+    request("POST", "/look", input, parseServerStatus),
+  choose: (input: { readonly childId: string }) =>
+    request("POST", "/choose", input, parseSessionLimits),
+  heartbeat: (input: { readonly active: boolean }) =>
+    request("POST", "/heartbeat", input, parseSessionLimits),
+  moreTime: (input: {
+    readonly childId: string;
+    readonly kind: "extra15" | "extra30" | "endBedtime";
+    readonly code: string;
+  }) => request("POST", "/more-time", input, parseSessionLimits),
   verify: (input: {
     readonly code: string;
     readonly purpose: FamilyPurpose;
@@ -87,4 +132,4 @@ export const familyApi = {
   lock: () => request("POST", "/lock", {}, parseServerStatus),
 } satisfies Record<string, (...args: never[]) => Promise<FamilyResult<unknown>>>;
 
-export type { FamilyResult, ServerFamilyStatus };
+export type { FamilyResult, ServerFamilyStatus, SessionLimits };

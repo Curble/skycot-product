@@ -609,7 +609,7 @@ function DoneStep({
           <ListRow
             leading={<StepBadge state="done" />}
             title={familyFor ? `${familyCopy.title} for ${familyFor}` : `${familyCopy.title} on`}
-            subtitle="Parent code set. Change it or turn the profile off in Settings → Family."
+            subtitle="Parent code set. Add another child, bedtimes and daily limits in Settings → Family."
           />
         ) : null}
         <ListRow

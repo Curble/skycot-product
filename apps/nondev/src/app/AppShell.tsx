@@ -13,6 +13,7 @@ import { documentTitle } from "../brand";
 // Side effect: registers the "What changed" card for checkpoint turn items.
 import "../features/review";
 import { useFamily } from "../features/family/FamilyProvider";
+import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { UsageBanner } from "../features/usage/UsageBanner";
 import { UsageIndicator } from "../features/usage/UsagePopover";
@@ -106,6 +107,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
       {/* One grid row for the notices, however many show. */}
       <div className="fm-shell__notices">
         <ConnectionBanner />
+        <FamilyHeadsUp />
         <UsageBanner />
       </div>
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>

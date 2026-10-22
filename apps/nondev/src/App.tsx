@@ -15,6 +15,7 @@ import { SidebarSheetsHost } from "./app/SidebarSheets";
 import { PRODUCT_NAME } from "./brand";
 import { AutomationsScreen } from "./features/automations/AutomationsScreen";
 import { FamilyProvider, useFamily } from "./features/family/FamilyProvider";
+import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { PeopleScreen } from "./features/people/PeopleScreen";
@@ -161,6 +162,7 @@ export function App() {
             }
           })()}
         </AppShell>
+        <FamilyLimitsHost />
       </SidebarSheetsHost>
     </FamilyProvider>
   );
