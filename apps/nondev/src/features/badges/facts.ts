@@ -6,6 +6,7 @@
 // itself, not from words in its template ("keep score" in the quiz card is not a game).
 import type { BadgeEvent, CreationTopics } from "@t3tools/skycot-rules/badges";
 import { parseExplanation, readExplainMarker } from "@t3tools/skycot-rules/explain";
+import { readPointing } from "@t3tools/skycot-rules/preview";
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
@@ -41,7 +42,8 @@ const STORY = /\b(story|stories|comics?|tales?|fairy ?tales?|once upon|adventure
 /** What a creation is about, from its first message (the card, or the child's words). */
 export function creationTopics(text: string, starter: string | null): CreationTopics {
   if (starter !== null) return { game: false, animal: false, story: false };
-  const words = readExplainMarker(text).text;
+  // The child's own words: the pointing block is the page's HTML, not something they said.
+  const words = readPointing(readExplainMarker(text).text).text;
   return { game: GAME.test(words), animal: ANIMAL.test(words), story: STORY.test(words) };
 }
 
@@ -54,7 +56,7 @@ export interface MessageFacts {
 }
 
 export function messageFacts(text: string, pictures: number): MessageFacts {
-  const words = readExplainMarker(text).text;
+  const words = readPointing(readExplainMarker(text).text).text;
   const starter = starterIdFromText(words);
   return {
     starter,

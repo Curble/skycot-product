@@ -7,15 +7,17 @@ import {
 } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import { withExplainMarker } from "@t3tools/skycot-rules/explain";
+import { withPointing } from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
+import { AppWindow, ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ProjectAvatar } from "../../app/ProjectAvatar";
+import { useColumns } from "../../app/useColumns";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { HOME_HREF } from "../../router";
 import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
@@ -47,6 +49,15 @@ import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
+import { PointerChips } from "../preview/PointerChips";
+import {
+  clearPointers,
+  closePreview,
+  openPreview,
+  usePointers,
+  usePreviewOpen,
+  useSuggestedMessage,
+} from "../preview/store";
 import { describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
@@ -212,6 +223,7 @@ export function ConversationView({
               runId={shell?.runtime?.activeRunId ?? null}
             />
           ) : null}
+          {project ? <PreviewButton threadId={threadId} /> : null}
           <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           {project ? <ProjectAvatar project={project} size="md" /> : null}
         </div>
@@ -362,6 +374,22 @@ function StopButton({
   );
 }
 
+/** Opens the conversation's live preview beside it (a sheet on a phone), or closes it. */
+function PreviewButton({ threadId }: { readonly threadId: ThreadId }) {
+  const open = usePreviewOpen(threadId);
+  const phone = useColumns() === 1;
+  const toggle = () => (open ? closePreview() : openPreview(threadId));
+  // A phone's header has room for the name or a word-button, not both.
+  if (phone) {
+    return <IconButton icon={AppWindow} label="Preview" aria-pressed={open} onClick={toggle} />;
+  }
+  return (
+    <Button size="sm" icon={AppWindow} aria-pressed={open} onClick={toggle}>
+      Preview
+    </Button>
+  );
+}
+
 /**
  * Fully hands-off means no question is ever asked. The warning stays on screen
  * for the whole conversation, with the one-tap way back to "Ask me first".
@@ -433,6 +461,7 @@ function ReplyComposer({
   const [typedWhileActive, setTypedWhileActive] = useState(false);
   const [confirmNewTurn, setConfirmNewTurn] = useState(false);
   const pictures = usePictures();
+  const pointers = usePointers(threadId);
   const family = useFamily();
   const shield = useShield();
   const [explainOn] = useExplainMode(threadId, family.enabled);
@@ -449,9 +478,31 @@ function ReplyComposer({
     const blank = firstBlank(field.value);
     if (blank !== null) field.setSelectionRange(blank.start, blank.end);
   }, [appliedSeed]);
+  // "Ask Sam to fix it" and the picker's own note arrive from the preview panel.
+  const suggested = useSuggestedMessage(threadId);
+  const [appliedSuggestion, setAppliedSuggestion] = useState<number | null>(null);
+  if (suggested !== null && suggested.nonce !== appliedSuggestion) {
+    setAppliedSuggestion(suggested.nonce);
+    setText((current) =>
+      suggested.mode === "append" && current.trim().length > 0
+        ? `${current.trimEnd()} ${suggested.text}`
+        : suggested.text,
+    );
+  }
+  const suggestedMode = suggested?.mode ?? "replace";
+  useEffect(() => {
+    const field = inputRef.current;
+    if (appliedSuggestion === null || field === null) return;
+    field.focus();
+    // A written-for-you message is read from its first line; a picker note is typed after.
+    const at = suggestedMode === "replace" ? 0 : field.value.length;
+    field.setSelectionRange(at, at);
+    if (suggestedMode === "replace") field.scrollTop = 0;
+  }, [appliedSuggestion, suggestedMode]);
   const crew = useCrew();
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
+  const hasContent = trimmed.length > 0 || pointers.length > 0;
 
   const onChange = (value: string) => {
     setText(value);
@@ -464,13 +515,18 @@ function ReplyComposer({
   };
 
   const send = async (asNewRequest = false) => {
-    if (!ready || trimmed.length === 0 || shell === null) return;
+    if (!ready || !hasContent || shell === null) return;
     if (!active && typedWhileActive && !asNewRequest) {
       setConfirmNewTurn(true);
       return;
     }
-    // Family profile: a full name, school or address waits for the child's pick on the card.
-    const cleared = await shield.clear(trimmed, pictures.pictures.length);
+    // What was pointed at in the preview travels as words in the message, so the shield reads
+    // it too. Family profile: a full name, school or address waits for the child's pick.
+    const outgoing = withPointing(
+      trimmed,
+      pointers.map((draft) => draft.pointer),
+    );
+    const cleared = await shield.clear(outgoing, pictures.pictures.length);
     if (cleared.kind === "edit") {
       if (cleared.dropPictures) pictures.clear();
       return;
@@ -504,6 +560,7 @@ function ReplyComposer({
     }
     setText("");
     pictures.clear();
+    clearPointers(threadId);
     setTypedWhileActive(false);
     setConfirmNewTurn(false);
   };
@@ -555,12 +612,13 @@ function ReplyComposer({
           </div>
         ) : null}
         {shield.card}
+        <PointerChips threadId={threadId} pointers={pointers} disabled={sending} />
         <MessageField
           inputRef={inputRef}
           value={text}
           onChange={onChange}
           onSend={() => void send()}
-          canSend={ready && trimmed.length > 0 && !sending}
+          canSend={ready && hasContent && !sending}
           disabled={!ready || sending}
           pictures={pictures.pictures}
           onAddPictures={pictures.add}

@@ -11,6 +11,7 @@
 // @effect-diagnostics globalDate:off
 import { localDay, nextLocalMidnight } from "@t3tools/skycot-brand/bedtime";
 import { readExplainMarker } from "@t3tools/skycot-rules/explain";
+import { readPointing } from "@t3tools/skycot-rules/preview";
 import { findPersonalDetails, personalCategories } from "@t3tools/skycot-rules/personal";
 
 import type { ActivitySnapshot, MoreTimeLogEntry } from "../family-limits/SkycotFamilyLimits.ts";
@@ -152,7 +153,13 @@ export function pageOf(files: ReadonlyArray<RecapFile>): string | null {
 
 /** The child's words for the recap, or only the kinds of detail when the shield would catch any. */
 export function askFor(text: string): { readonly text: string | null; readonly hidden: string[] } {
-  const words = readExplainMarker(text).text.trim();
+  // What they pointed at in the preview reads as "Pointed at the big pink title", not markup.
+  const pointing = readPointing(readExplainMarker(text).text);
+  const words = (
+    pointing.text.trim().length > 0 || pointing.labels.length === 0
+      ? pointing.text
+      : `Pointed at ${pointing.labels.join(", ")}`
+  ).trim();
   const hidden = personalCategories(findPersonalDetails(words));
   if (hidden.length > 0) return { text: null, hidden };
   const line =

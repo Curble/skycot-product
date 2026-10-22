@@ -1,7 +1,7 @@
 // What the two parties say: your blue bubbles, the Crew's grey bubbles with
 // light Markdown, and the red-tinted "something went wrong" note.
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, MousePointerClick } from "lucide-react";
 
 import { describeTurnItem } from "../../../plain/narration";
 import { Mascot } from "../../brand/Mascot";
@@ -18,7 +18,16 @@ type UserMessage = Extract<OrchestrationV2TurnItem, { type: "user_message" }>;
 type AssistantMessage = Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>;
 type ErrorItem = Extract<OrchestrationV2TurnItem, { type: "error" }>;
 
-export function UserBubble({ item }: { readonly item: UserMessage }) {
+const NO_POINTING: ReadonlyArray<string> = [];
+
+export function UserBubble({
+  item,
+  pointing = NO_POINTING,
+}: {
+  readonly item: UserMessage;
+  /** What the person pointed at in the preview, lifted out of the message's words. */
+  readonly pointing?: ReadonlyArray<string>;
+}) {
   const steered = item.inputIntent === "steer" || item.inputIntent === "promoted_queued_to_steer";
   const queued = item.inputIntent === "queued_turn";
   const attachments = item.attachments.length;
@@ -32,6 +41,16 @@ export function UserBubble({ item }: { readonly item: UserMessage }) {
   return (
     <Bubble author="me" meta={meta || undefined}>
       {item.text}
+      {pointing.length > 0 ? (
+        <span className="fm-bubble-pointing">
+          {[...new Set(pointing)].map((label) => (
+            <span key={label} className="fm-bubble-pointing__chip">
+              <MousePointerClick size={12} strokeWidth={2} aria-hidden />
+              Pointing at {label}
+            </span>
+          ))}
+        </span>
+      ) : null}
     </Bubble>
   );
 }

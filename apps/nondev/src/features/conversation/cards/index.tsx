@@ -2,6 +2,7 @@
 // Timeline does it) is enough; tool-ish items never reach the registry because
 // the stream folds them into WorkingCard first (see grouping.ts).
 import { parseExplanation, readExplainMarker } from "@t3tools/skycot-rules/explain";
+import { readPointing } from "@t3tools/skycot-rules/preview";
 
 import { ExplainCard } from "../../explain/ExplainCard";
 import { CrewBubble, ErrorNote, UserBubble } from "./MessageBubbles";
@@ -10,11 +11,12 @@ import { registerTimelineRenderer } from "./registry";
 import { RequestCard } from "./RequestCard";
 
 // The explain-mode marker is for the engine; the person sees what they typed.
-registerTimelineRenderer("user_message", ({ item }) =>
-  item.type === "user_message" ? (
-    <UserBubble item={{ ...item, text: readExplainMarker(item.text).text }} />
-  ) : null,
-);
+// So is the "Point at something" block: the person sees chips, the assistant the element.
+registerTimelineRenderer("user_message", ({ item }) => {
+  if (item.type !== "user_message") return null;
+  const pointing = readPointing(readExplainMarker(item.text).text);
+  return <UserBubble item={{ ...item, text: pointing.text }} pointing={pointing.labels} />;
+});
 // A "How I did it" section becomes its own Explain card under the message.
 registerTimelineRenderer("assistant_message", (context) => {
   const { item } = context;

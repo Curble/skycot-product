@@ -33,6 +33,7 @@ import * as Option from "effect/Option";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
+import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import {
   findPersonalDetails,
   personalCategories,
@@ -158,25 +159,15 @@ const ADVANCED_METHODS = new Set([
   "git.preparePullRequestThread",
 ]);
 
-/** A preview of the child's own work runs on this Mac; anything else is the internet. */
+/**
+ * A preview of the child's own work runs on this Mac; anything else is the internet. Shared with
+ * the live preview (`skycot/preview`), so a typed address and the preview panel agree.
+ */
 function isLocalPreviewUrl(value: unknown): boolean {
   if (value === undefined) return true;
   if (typeof value !== "string") return false;
-  try {
-    const url = new URL(value);
-    if (url.protocol === "file:" || url.protocol === "about:") return true;
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    return (
-      host === "localhost" ||
-      host.endsWith(".localhost") ||
-      host === "127.0.0.1" ||
-      host === "[::1]" ||
-      host === "0.0.0.0"
-    );
-  } catch {
-    return false;
-  }
+  if (value.startsWith("about:") || value.startsWith("file:")) return true;
+  return isLocalPreviewAddress(value);
 }
 
 const record = (value: unknown): Record<string, unknown> =>

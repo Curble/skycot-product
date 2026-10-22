@@ -35,6 +35,10 @@
     "./badges": {
       "types": "./src/badges.ts",
       "import": "./src/badges.ts"
+    },
+    "./preview": {
+      "types": "./src/preview.ts",
+      "import": "./src/preview.ts"
     }
   },
   "scripts": {

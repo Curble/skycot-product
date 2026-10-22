@@ -2,6 +2,7 @@
 // would catch, which must reach the parent as a kind of detail only.
 import { describe, expect, it } from "@effect/vitest";
 import { EXPLAIN_ON_MARKER } from "@t3tools/skycot-rules/explain";
+import { withPointing } from "@t3tools/skycot-rules/preview";
 
 import type { ActivitySnapshot } from "../family-limits/SkycotFamilyLimits.ts";
 import { askFor, buildRecap, rangeStart, startOfLocalDay, type RecapThreadInput } from "./recap.ts";
@@ -198,6 +199,24 @@ describe("askFor", () => {
       hidden: [],
     });
     expect(askFor("x".repeat(140)).text).toHaveLength(100);
+  });
+
+  it("shows what was pointed at in the preview as words, not markup", () => {
+    const pointer = {
+      label: "the big pink title",
+      pageUrl: "http://localhost:5173/",
+      tagName: "h1",
+      selector: "h1",
+      html: "<h1>Welcome</h1>",
+    };
+    expect(askFor(withPointing("make this bigger", [pointer]))).toEqual({
+      text: "make this bigger",
+      hidden: [],
+    });
+    expect(askFor(`${withPointing("", [pointer])}${EXPLAIN_ON_MARKER}`)).toEqual({
+      text: "Pointed at the big pink title",
+      hidden: [],
+    });
   });
 });
 

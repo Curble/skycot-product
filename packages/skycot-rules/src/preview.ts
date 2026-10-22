@@ -1,0 +1,146 @@
+// nondev-seam: skycot-rules-package
+// The live preview's shared rules. The engine decides which address the preview may show and
+// the plain client draws it; both read "is this address on this Mac?" from here, so the screen
+// can never offer what the engine would refuse. Also the "Point at something" block: the words
+// a message carries so the assistant knows which part of the page the person means, and the
+// reader that lets the plain client show them as a chip instead.
+
+const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/;
+/**
+ * scheme, sign-in part, host, port and the rest. Parsed by hand: this package also runs where
+ * there is no `URL` (Hermes). Anything unusual (escapes, backslashes, odd hosts) fails to match
+ * and is treated as not this Mac.
+ */
+const WEB_ADDRESS =
+  /^(https?):\/\/(?:([^@/?#\\]*)@)?(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::(\d{1,5}))?([/?#][^\s]*)?$/i;
+
+interface WebAddress {
+  readonly scheme: string;
+  readonly host: string;
+  readonly port: number | null;
+  readonly rest: string;
+}
+
+function parseWebAddress(value: string): WebAddress | null {
+  const match = WEB_ADDRESS.exec(value.trim());
+  if (match === null || match[2] !== undefined) return null;
+  const port = match[4] === undefined ? null : Number(match[4]);
+  if (port !== null && (port < 1 || port > 65_535)) return null;
+  return {
+    scheme: match[1]!.toLowerCase(),
+    host: match[3]!.toLowerCase(),
+    port,
+    rest: match[5] ?? "",
+  };
+}
+
+const isLoopbackHost = (host: string) =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  LOOPBACK_V4.test(host) ||
+  host === "[::1]" ||
+  host === "0.0.0.0";
+
+/** True for an address served by this Mac itself (loopback), the only kind the preview shows on its own. */
+export function isLocalPreviewAddress(value: string): boolean {
+  const address = parseWebAddress(value);
+  return address !== null && isLoopbackHost(address.host);
+}
+
+// Colour and cursor codes a dev server prints into its terminal.
+// oxlint-disable-next-line no-control-regex -- terminal escape sequences are control characters
+const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+
+/** The terminal's text without colour codes, for reading and for showing a grown-up. */
+export function plainTerminalText(text: string): string {
+  return text.replace(ANSI, "").replace(/\r\n?/g, "\n");
+}
+
+const URL_IN_TEXT = /https?:\/\/[^\s'"<>`)\]]+/g;
+const PORT_IN_TEXT =
+  /\b(?:listening|running|started|serving|ready|available)\b[^\n]{0,60}?(?:\bport\b\s*:?\s*|:)(\d{2,5})\b/i;
+
+/**
+ * The first address on this Mac a dev server says it is serving ("Local: http://localhost:5173/").
+ * A server bound to every network card (0.0.0.0, ::) is opened as localhost; addresses on other
+ * computers are ignored.
+ */
+export function localAddressFromOutput(output: string): string | null {
+  const text = plainTerminalText(output);
+  for (const match of text.matchAll(URL_IN_TEXT)) {
+    const address = parseWebAddress(match[0].replace(/[.,;:]+$/, ""));
+    if (address === null) continue;
+    const host = address.host === "0.0.0.0" || address.host === "[::]" ? "localhost" : address.host;
+    if (!isLoopbackHost(host)) continue;
+    const rest = address.rest.length === 0 ? "/" : address.rest;
+    return `${address.scheme}://${host}${address.port === null ? "" : `:${address.port}`}${rest}`;
+  }
+  const port = PORT_IN_TEXT.exec(text)?.[1];
+  if (port !== undefined) {
+    const value = Number(port);
+    if (value > 0 && value < 65536) return `http://localhost:${value}/`;
+  }
+  return null;
+}
+
+/** One thing the person pointed at in the preview. */
+export interface Pointer {
+  /** "the big pink title": what the chip says. */
+  readonly label: string;
+  readonly pageUrl: string;
+  readonly tagName: string;
+  readonly selector: string | null;
+  /** A short piece of the element's HTML, so the assistant can find it in the files. */
+  readonly html: string;
+}
+
+export const MAX_POINTERS = 3;
+const POINTER_LINE = /^\[SKYCOT pointing at: (.+)\]$/;
+const HTML_MAX = 300;
+const LABEL_MAX = 80;
+
+const oneLine = (text: string, max: number) => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+};
+// A label must not close its own bracket, or the reader would cut it short.
+const cleanLabel = (label: string) => oneLine(label.replace(/[[\]]/g, ""), LABEL_MAX) || "this";
+
+/**
+ * The message the assistant receives: what the person typed, then one block per thing they
+ * pointed at. The block reads as plain words where it is shown raw (Advanced mode), and the
+ * plain client lifts it out into chips (`readPointing`).
+ */
+export function withPointing(text: string, pointers: ReadonlyArray<Pointer>): string {
+  if (pointers.length === 0) return text;
+  const blocks = pointers
+    .slice(0, MAX_POINTERS)
+    .map((pointer) =>
+      [
+        `[SKYCOT pointing at: ${cleanLabel(pointer.label)}]`,
+        `- Page: ${oneLine(pointer.pageUrl, 300)}`,
+        `- Element: <${oneLine(pointer.tagName, 40)}>${
+          pointer.selector ? `, selector \`${oneLine(pointer.selector, 200)}\`` : ""
+        }`,
+        `- Looks like: ${oneLine(pointer.html, HTML_MAX)}`,
+      ].join("\n"),
+    );
+  const intro = "(The person pointed at this part of the preview; it is what they mean.)";
+  const typed = text.trimEnd();
+  return `${typed}${typed.length > 0 ? "\n\n" : ""}${blocks.join("\n\n")}\n${intro}`;
+}
+
+/** The typed words without the pointing blocks, and the chips' labels. */
+export function readPointing(text: string): {
+  readonly text: string;
+  readonly labels: ReadonlyArray<string>;
+} {
+  const lines = text.split("\n");
+  const first = lines.findIndex((line) => POINTER_LINE.test(line));
+  if (first === -1) return { text, labels: [] };
+  const labels = lines.flatMap((line) => {
+    const match = POINTER_LINE.exec(line);
+    return match ? [match[1]!] : [];
+  });
+  return { text: lines.slice(0, first).join("\n").trimEnd(), labels };
+}
