@@ -117,8 +117,13 @@ const route = (
     }).pipe(Effect.withSpan(`skycot.family.http ${method} ${path || "/"}`)),
   );
 
-const statusRoute = route("GET", "", AuthOrchestrationOperateScope, ({ family }) =>
-  family.status.pipe(Effect.map((status) => json(status))),
+/** The profile, plus what a grown-up has opened on this device and for how long. */
+const statusRoute = route("GET", "", AuthOrchestrationOperateScope, ({ family, sessionId }) =>
+  Effect.gen(function* () {
+    const status = yield* family.status;
+    const grants = yield* family.openGrants({ sessionId });
+    return json({ ...status, grants });
+  }),
 );
 
 const enableRoute = route(

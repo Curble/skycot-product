@@ -193,6 +193,20 @@ it.layer(
       const page = yield* send("GET", "/", { headers: { cookie: pair } });
       assert.equal(page.status, 200);
       assert.include(yield* page.text, "developer interface");
+      // QA FK-16: Settings can say Advanced mode is open, and for how long.
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        grants: ReadonlyArray<{ purpose: string; remainingMs: number }>;
+      };
+      assert.deepEqual(
+        status.grants.map((grant) => grant.purpose),
+        ["advanced"],
+      );
+      assert.isAbove(status.grants[0]!.remainingMs, 14 * 60_000);
+      yield* send("POST", "/api/skycot/family/lock", { body: {} });
+      const locked = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        grants: ReadonlyArray<unknown>;
+      };
+      assert.deepEqual(locked.grants, []);
     }),
   );
 

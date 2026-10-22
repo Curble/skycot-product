@@ -214,6 +214,15 @@ export class SkycotFamily extends Context.Service<
       readonly consume?: boolean;
     }) => Effect.Effect<boolean>;
     /** Checks a signed token (the Advanced-mode cookie). Always true while the profile is off. */
+    /**
+     * This session's live "yes"es, for Settings to show (Advanced mode open for 14 more
+     * minutes). Single-step approvals are left out: they are spent by the card they open.
+     */
+    readonly openGrants: (input: {
+      readonly sessionId: string;
+    }) => Effect.Effect<
+      ReadonlyArray<{ readonly purpose: FamilyPurpose; readonly remainingMs: number }>
+    >;
     readonly tokenAllows: (
       token: string | undefined,
       purpose: FamilyPurpose,
@@ -556,6 +565,17 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return true;
   }, lock.withPermits(1));
 
+  const openGrants: SkycotFamily["Service"]["openGrants"] = Effect.fn("SkycotFamily.openGrants")(
+    function* (input) {
+      const file = yield* load;
+      if (file === null || !file.enabled) return [];
+      const at = yield* now;
+      return liveGrants(file.grants, at)
+        .filter((grant) => grant.sessionId === input.sessionId && grant.purpose !== "approve")
+        .map((grant) => ({ purpose: grant.purpose, remainingMs: grant.expiresAt - at }));
+    },
+  );
+
   const tokenAllows: SkycotFamily["Service"]["tokenAllows"] = Effect.fn("SkycotFamily.tokenAllows")(
     function* (token, purpose) {
       const file = yield* load;
@@ -571,6 +591,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
 
   return SkycotFamily.of({
     status,
+    openGrants,
     isEnabled,
     enable,
     verify,

@@ -1,6 +1,6 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { KeyRound, PencilLine, Power, Users, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
 import { ADVANCED_MODE_LABEL } from "../../../brand";
@@ -17,6 +17,7 @@ import {
   codeStrength,
   digitsOnly,
   isValidCode,
+  openGrantsSentence,
   setupProblem,
   strengthHint,
   type FamilySetupDraft,
@@ -84,12 +85,21 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
 
 type Row = "code" | "name" | "off" | null;
 
+// "14 more minutes" only changes once a minute: a coarse clock, read every 30 seconds.
+const CLOCK_STEP_MS = 30_000;
+const readClock = () => Math.floor(Date.now() / CLOCK_STEP_MS) * CLOCK_STEP_MS;
+const subscribeClock = (onChange: () => void) => {
+  const timer = window.setInterval(onChange, CLOCK_STEP_MS);
+  return () => window.clearInterval(timer);
+};
+
 function FamilyOnPane() {
   const { profile, requireParentCode } = useFamily();
   const [openRow, setOpenRow] = useState<Row>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmOff, setConfirmOff] = useState(false);
   const since = profile.createdAt ? formatSince(profile.createdAt) : null;
+  const openLine = openGrantsSentence(profile, useSyncExternalStore(subscribeClock, readClock));
 
   // Confirm first; the code sheet then turns it off on the engine in the same step.
   const turnOff = async () => {
@@ -183,7 +193,11 @@ function FamilyOnPane() {
         <ListRow
           leading={<StepBadge state="todo" icon={KeyRound} />}
           title="Lock again now"
-          subtitle="Ends every “yes” the parent code gave on this device (Advanced mode, publishing, automations) before it runs out."
+          subtitle={
+            openLine === null
+              ? "Nothing is open on this device. Every “yes” the parent code gives ends on its own, or here."
+              : `${openLine} Ends every “yes” the parent code gave on this device before it runs out.`
+          }
           trailing={
             <Button size="sm" onClick={() => void lockFamilyGrants()}>
               Lock

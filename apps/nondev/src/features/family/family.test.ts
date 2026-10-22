@@ -18,6 +18,7 @@ import {
   parseProfile,
   parseServerStatus,
   purposeFor,
+  openGrantsSentence,
   readFamilyAnswer,
   serializeCachedView,
   viewFromStatus,
@@ -316,5 +317,45 @@ describe("setup draft", () => {
       "The two codes don't match yet.",
     );
     expect(setupReady({ childName: "Ava", code: "2580", confirm: "2580" })).toBe(true);
+  });
+});
+
+// QA FK-16: Settings → Family looked the same with Advanced mode open as locked.
+describe("open grants", () => {
+  const now = 1_000_000;
+  it("reads this device's open grants from the engine's status", () => {
+    const status = parseServerStatus({
+      enabled: true,
+      childName: "Ava",
+      createdAt: null,
+      attemptsLeft: 5,
+      lockedForMs: 0,
+      grants: [
+        { purpose: "advanced", remainingMs: 14 * 60_000 },
+        { purpose: "nonsense", remainingMs: 1 },
+        { purpose: "publish", remainingMs: -5 },
+      ],
+    });
+    expect(status?.grants).toEqual([{ purpose: "advanced", remainingMs: 14 * 60_000 }]);
+    const view = viewFromStatus(status!, now, false);
+    expect(view.openUntil).toEqual({ advanced: now + 14 * 60_000 });
+    // An answer without grants keeps what the last status said.
+    const { grants: _grants, ...rest } = status!;
+    expect(viewFromStatus(rest, now, false, view).openUntil).toEqual(view.openUntil);
+  });
+
+  it("says what is open and for how long, or nothing", () => {
+    expect(openGrantsSentence({ openUntil: {} }, now)).toBeNull();
+    expect(openGrantsSentence({ openUntil: { advanced: now + 14 * 60_000 - 1 } }, now)).toBe(
+      "Open on this device: Advanced mode for 14 more minutes.",
+    );
+    expect(
+      openGrantsSentence(
+        { openUntil: { publish: now + 60_000, settings: now + 9 * 60_000, advanced: now - 1 } },
+        now,
+      ),
+    ).toBe(
+      "Open on this device: the AI assistants for 9 more minutes and publishing for 1 more minute.",
+    );
   });
 });

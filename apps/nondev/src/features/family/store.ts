@@ -68,7 +68,7 @@ export function useFamilyView(): FamilyView {
 }
 
 function applyStatus(status: ServerFamilyStatus): void {
-  setView(viewFromStatus(status, Date.now(), legacyPresent()));
+  setView(viewFromStatus(status, Date.now(), legacyPresent(), view));
 }
 
 /** A failed code try tells us the counter: keep the prompt's sentence and lock in step. */
@@ -138,7 +138,11 @@ export function tryParentCode(
 ): Promise<FamilyResult<UnlockToken>> {
   return settle(
     familyApi.verify({ code, purpose, ...(requestId === undefined ? {} : { requestId }) }),
-    () => setView({ ...view, attemptsLeft: 5, lockedUntil: null }),
+    () => {
+      setView({ ...view, attemptsLeft: 5, lockedUntil: null });
+      // The engine says how long the new "yes" lasts.
+      void refreshFamily();
+    },
   );
 }
 

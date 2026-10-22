@@ -82,6 +82,12 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
   }
 }
 
+/** A grown-up's "yes" still open on this device. */
+export interface OpenGrant {
+  readonly purpose: FamilyPurpose;
+  readonly remainingMs: number;
+}
+
 /** `GET /api/skycot/family`, as the engine sends it. Never the hash. */
 export interface ServerFamilyStatus {
   readonly enabled: boolean;
@@ -89,6 +95,33 @@ export interface ServerFamilyStatus {
   readonly createdAt: string | null;
   readonly attemptsLeft: number;
   readonly lockedForMs: number;
+  /** Only the status read carries these; other answers leave them out. */
+  readonly grants?: ReadonlyArray<OpenGrant>;
+}
+
+const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
+  "approve",
+  "publish",
+  "automation",
+  "openFolder",
+  "settings",
+  "advanced",
+]);
+
+function parseGrants(value: unknown): ReadonlyArray<OpenGrant> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry: unknown) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const record = entry as Record<string, unknown>;
+    const purpose = record["purpose"];
+    const remainingMs = record["remainingMs"];
+    return typeof purpose === "string" &&
+      PURPOSES.has(purpose) &&
+      typeof remainingMs === "number" &&
+      remainingMs > 0
+      ? [{ purpose: purpose as FamilyPurpose, remainingMs }]
+      : [];
+  });
 }
 
 export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
@@ -106,6 +139,9 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     createdAt: text("createdAt"),
     attemptsLeft: Math.max(0, Math.floor(number("attemptsLeft", MAX_ATTEMPTS))),
     lockedForMs: Math.max(0, number("lockedForMs", 0)),
+    ...(parseGrants(record["grants"]) === undefined
+      ? {}
+      : { grants: parseGrants(record["grants"])! }),
   };
 }
 
@@ -178,6 +214,8 @@ export interface FamilyView {
   readonly attemptsLeft: number;
   /** Epoch ms (this browser's clock) until code prompts open again; null when not locked. */
   readonly lockedUntil: number | null;
+  /** What a grown-up has opened on this device, until when (this browser's clock). */
+  readonly openUntil: Partial<Readonly<Record<FamilyPurpose, number>>>;
   /** "engine" once the engine has answered; "cache" while only the first-paint cache is known. */
   readonly source: "engine" | "cache";
   /** A profile set up before the engine kept it, still only in this browser. */
@@ -190,6 +228,7 @@ export const EMPTY_VIEW: FamilyView = {
   createdAt: null,
   attemptsLeft: MAX_ATTEMPTS,
   lockedUntil: null,
+  openUntil: {},
   source: "cache",
   legacy: false,
 };
@@ -198,8 +237,16 @@ export function viewFromStatus(
   status: ServerFamilyStatus,
   now: number,
   legacy: boolean,
+  previous: Pick<FamilyView, "openUntil"> = EMPTY_VIEW,
 ): FamilyView {
   return {
+    // Answers other than the status read carry no grants: keep what was known.
+    openUntil:
+      status.grants === undefined
+        ? previous.openUntil
+        : Object.fromEntries(
+            status.grants.map((grant) => [grant.purpose, now + grant.remainingMs]),
+          ),
     enabled: status.enabled,
     childName: status.childName,
     createdAt: status.createdAt,
@@ -258,6 +305,40 @@ export function isFamilyLocked(
 
 export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: number): number {
   return view.lockedUntil === null ? 0 : Math.max(0, view.lockedUntil - now);
+}
+
+const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
+  ["advanced", "Advanced mode"],
+  ["settings", "the AI assistants"],
+  ["publish", "publishing"],
+  ["automation", "automations"],
+  ["openFolder", "other folders"],
+];
+
+/**
+ * "Open on this device: Advanced mode for 14 more minutes." or null when nothing is open
+ * (QA FK-16: the pane looked the same locked and unlocked). Advanced mode covers the rest.
+ */
+export function openGrantsSentence(
+  view: Pick<FamilyView, "openUntil">,
+  now: number,
+): string | null {
+  const minutes = (until: number | undefined) =>
+    until === undefined || until <= now ? 0 : Math.ceil((until - now) / 60_000);
+  const advanced = minutes(view.openUntil.advanced);
+  const open =
+    advanced > 0
+      ? [[OPEN_LABELS[0]![1], advanced] as const]
+      : OPEN_LABELS.slice(1)
+          .map(([purpose, label]) => [label, minutes(view.openUntil[purpose])] as const)
+          .filter(([, left]) => left > 0);
+  if (open.length === 0) return null;
+  const parts = open.map(
+    ([label, left]) => `${label} for ${left === 1 ? "1 more minute" : `${left} more minutes`}`,
+  );
+  const joined =
+    parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return `Open on this device: ${joined}.`;
 }
 
 export interface FamilyProfile {
