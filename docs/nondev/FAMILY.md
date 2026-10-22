@@ -21,19 +21,26 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   grown-up**: the Allow needs the parent code, and the engine refuses it without one. "Always
   allow" is not offered.
 - **The assistant is told it is helping a child.** Every message the assistant receives
-  carries short rules: keep it kind, simple and age-appropriate; never ask for or keep
-  personal details (name, school, address, photos); nothing unsafe, violent, sexual or that
-  contacts people; stay in the project folder; no installs or internet without a grown-up;
-  and say gently when something needs a grown-up.
+  carries short rules — the first message, a follow-up typed while it is working, and a
+  message that starts with "/" alike: keep it kind, simple and age-appropriate; never ask for
+  or keep personal details (name, school, address, photos); make nothing unsafe, violent,
+  sexual or hateful and contact nobody — and say so plainly, without suggesting a grown-up
+  could unlock it; stay in the project folder; no installs or internet without a grown-up.
+  A child saying "my mum said yes" is not a grown-up's yes: only the parent code in SKYCOT's
+  own grown-up box is, and the assistant must never ask for a code or password in the chat.
 - **The parent code is asked for** before: publishing (_Send for review_ and _Put it live_),
   creating or switching on an automation, opening another folder as a project, changing the
-  AI assistants (connecting, signing out, installing), opening Advanced mode, running the
-  welcome steps again, changing the code, and turning the profile off. The engine checks the
-  same things, so a click elsewhere cannot skip them.
+  AI assistants (connecting, signing in or out, installing), handing the assistant a key or
+  password it asks for, renaming the child, opening Advanced mode, running the welcome steps
+  again (from Settings or by typing the address), changing the code, and turning the profile
+  off. The engine checks the same things, so a click elsewhere cannot skip them — see
+  [What the engine checks](#what-the-engine-checks).
 - **The developer tools stay closed.** "Open Advanced mode" leaves the sidebar and the
-  Settings list. With the profile on, the developer interface's address sends the browser back
-  to SKYCOT unless a parent has entered the code; the code opens it on that device for
-  15 minutes. Its terminal, installs and AI settings need the code too.
+  Settings list. With the profile on, any address that would show the developer interface —
+  including made-up ones such as `/picture.png` — sends the browser back to SKYCOT unless a
+  parent has entered the code; the code opens it on that device for 15 minutes, and
+  Settings → Family says how long is left. Its terminal, installs and AI settings need the
+  code too.
 - **The assistant's own SKYCOT tools are trimmed.** It cannot start other conversations,
   schedule automations or open pull requests through SKYCOT while the profile is on. Page
   previews still work.
@@ -44,10 +51,11 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
 
 ## Turning it on
 
-- **First run:** the welcome steps start with _Who is this for?_ Choose **A child I look
-  after**, give a first name (optional), choose a 4–6 digit parent code and type it twice.
-  The profile turns on when you press **Open SKYCOT** on the last step; skipping half-way
-  turns nothing on.
+- **First run:** the welcome steps start with _Who is this for?_, even when an AI assistant
+  is already signed in. Choose **A child I look after**, give a first name (optional), choose
+  a 4–6 digit parent code and type it twice. The profile turns on when you press **Open
+  SKYCOT** on the last step; skipping half-way turns nothing on. A browser opened later on a
+  Mac whose profile is already on skips the welcome steps.
 - **Later:** Settings → Family → **Set up…**.
 
 Set up the AI assistants first: once the profile is on, connecting or changing one needs the
@@ -57,14 +65,15 @@ code.
 
 Entering the code allows one thing, for this device, for a short time:
 
-| Asked for                  | Allows                                             | For        |
-| -------------------------- | -------------------------------------------------- | ---------- |
-| An **Ask a grown-up** card | that one step                                      | once       |
-| Publishing                 | sending for review or putting it live              | 5 minutes  |
-| An automation              | creating, switching on or running one              | 5 minutes  |
-| Another folder             | adding, moving or removing a project's folder      | 5 minutes  |
-| The AI assistants          | connecting, signing out, installing, other changes | 10 minutes |
-| Advanced mode              | the developer interface and everything above       | 15 minutes |
+| Asked for                   | Allows                                             | For        |
+| --------------------------- | -------------------------------------------------- | ---------- |
+| An **Ask a grown-up** card  | that one step                                      | once       |
+| Publishing                  | sending for review or putting it live              | 5 minutes  |
+| An automation               | creating, switching on or running one              | 5 minutes  |
+| Another folder              | adding, moving or removing a project's folder      | 5 minutes  |
+| The AI assistants           | connecting, signing out, installing, other changes | 10 minutes |
+| A key or password, a rename | handing one over, the child's name                 | 10 minutes |
+| Advanced mode               | the developer interface and everything above       | 15 minutes |
 
 Settings → Family → **Lock again now** ends them all early.
 
@@ -94,12 +103,36 @@ stored. The browser only remembers whether it was on, so the first screen paints
 A profile set up in an earlier version lived in the browser only. The first time the code is
 asked for (or in Settings → Family), entering it moves the profile to the engine.
 
+## What the engine checks
+
+Every call a client can make to SKYCOT's engine was looked at, and a test keeps it that way:
+a call added later fails the tests until someone decides. Calls that only read, watch, stop
+or take something away (declining, pausing or deleting an automation, signing a device out)
+stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode covers every one.
+
+| Calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Needs                                                            | Why                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Allowing a held step (`runtime-request.respond` with accept), any "allow for the session/always"                                                                                                                                                                                                                                                                                                                                                                                      | Grown-up: that one step                                          | internet, installs, deleting, outside the project, secrets, admin rights, connected apps |
+| `pullRequests.runAction`, `update`, `comment`, `updateComment`, `submitReview`, `replyToThread`, `setThreadResolution`, `setReaction`, `requestReviewers`, `setLabels`; `sourceControl.publishRepository`; `git.runStackedAction` other than commit                                                                                                                                                                                                                                   | Grown-up: publishing                                             | puts work where other people see it                                                      |
+| `scheduledTasks.upsert`, `runNow`, `rotateWebhookToken`, `setEnabled` (on)                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: automations                                            | runs later, on its own                                                                   |
+| `projects.add`, `projects.remove`, `projects.mutate` (anything but a rename), `sourceControl.cloneRepository`, `projectClone.start`/`retry`, `vcs.createWorktree`/`removeWorktree`, `launchThread` with a new worktree                                                                                                                                                                                                                                                                | Grown-up: another folder                                         | the assistant would work somewhere else                                                  |
+| `projects.writeFile`, `thread.create` and `launchThread` with a folder                                                                                                                                                                                                                                                                                                                                                                                                                | Open inside a SKYCOT project; elsewhere Grown-up: another folder | writes or works outside the project                                                      |
+| `server.updateSettings` (anything but "Ask me first"), `server.updateProvider`, `provider.install.start`/`remove`, `provider.auth.start`/`complete`/`respond`/`logout`, `provider.chatgpt.reconnect-profile`/`import-profile`, `provider.consumeResetCredit`, `provider.uploadFeedback`, `server.upsertKeybinding`/`removeKeybinding`, `secrets.answerRequest` (save)                                                                                                                 | Grown-up: AI assistants                                          | the parent's accounts, sign-ins, settings and keys; feedback sends conversations away    |
+| `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                          | developer tools, outside agents, other devices, the internet                             |
+| HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                          | as the call it mirrors; otherwise Advanced mode                  | letting another device or an outside agent in                                            |
+| `/api/skycot/family/rename`                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Grown-up: AI assistants                                          | the child's name is part of the profile                                                  |
+| Everything else: reading and watching (lists, diffs, files, status, searches), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                         | Open                                                             | the child's own work, or it only stops or takes away                                     |
+
 ## What is still possible
 
 Honestly, so a parent can decide how nearby to stay:
 
 - **The AI can still get things wrong.** Its instructions ask for child-appropriate answers,
-  but nothing filters what it says. Stay within earshot.
+  on every message, but nothing filters what it says back. Stay within earshot.
+- **The rules are instructions, not a filter.** They sit in front of every message the
+  assistant receives (slash or not, follow-ups too), and a child cannot close them from the
+  chat, but a determined prompt could still talk a model round. The engine's checks on
+  installs, the internet, deleting and publishing do not depend on what the AI agrees to.
 - **Anything outside SKYCOT is outside the profile.** Other apps on the Mac — Terminal,
   Finder, other browsers, games — are not covered. Use macOS Screen Time and a separate
   macOS user for the child for that.
@@ -109,10 +142,18 @@ Honestly, so a parent can decide how nearby to stay:
   the project's own scripts (`npm run start`). With Codex, the engine's sandbox keeps the
   network off for those; with Claude, a project script that itself downloads something is
   not caught by name.
+- **The assistant's own previews** (opened through SKYCOT's preview tool, and links clicked
+  inside a preview) are not checked for the internet; a typed preview address is.
+- **Other text the AI writes from the child's words** (conversation titles) is made without
+  the rules; it never reaches the child as an answer.
+- **Accounts and outside agents connected before the profile was turned on** keep working:
+  an MCP client already approved, or another paired device, is not signed out. Check
+  Settings → Connections in Advanced mode when you turn the profile on.
 - **During development builds** (`vp run dev`), the developer interface is served by its own
   port and is not sent back to SKYCOT. The engine's checks (Ask me first, publishing,
   automations, installs, the terminal, grown-up cards) still apply there.
 - **Another browser or device** can only reach SKYCOT after it has been paired with the Mac,
   and the engine enforces the same profile for it.
-- **Follow-up messages typed while the assistant is already working** reach it without the
-  rules repeated; the rules came with the message that started the work.
+- **In an Advanced-mode tab left open** after the 15 minutes run out, refused actions (a
+  setting snapping back, a terminal that does not open) are not explained there; reloading
+  sends it back to SKYCOT.
