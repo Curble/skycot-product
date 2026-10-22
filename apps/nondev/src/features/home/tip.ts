@@ -21,3 +21,10 @@ export function startOneHint(kids: boolean): string {
     ? "Start one below: say what you'd like to make, like telling a friend."
     : "Start one below: say what you'd like done, like you'd text a staff member.";
 }
+
+/** An empty conversation's hint: the same plan promise as the Home tip, made only when true. */
+export function emptyConversationHint(builderName: string, planFirst: boolean): string {
+  return planFirst
+    ? `Say what you'd like done and ${builderName} will show you a plan first.`
+    : `Say what you'd like done and ${builderName} will get started.`;
+}

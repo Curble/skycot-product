@@ -45,6 +45,7 @@ import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
 import { enforcedRuntimeMode } from "../../plain/autonomy";
+import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
@@ -120,6 +121,7 @@ export function ConversationView({
   const crewName = crew.builder.name;
   // The mode the engine enforces: always "Ask me first" while the Family profile is on.
   const family = useFamily();
+  const planFirst = usePlanFirst();
   const runtimeMode =
     shell === null ? null : enforcedRuntimeMode(shell.runtimeMode, family.enabled);
 
@@ -316,7 +318,7 @@ export function ConversationView({
       ) : projection.turnItems.length === 0 ? (
         <div className="fm-stream">
           <EmptyState art={<Mascot pose="hello" size={72} />} title="Nothing has been said yet">
-            Say what you'd like done and {crewName} will show you a plan first.
+            {emptyConversationHint(crewName, planFirst.on)}
           </EmptyState>
           <div className="fm-stream__starters">
             <StarterCards
