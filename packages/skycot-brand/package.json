@@ -1,7 +1,7 @@
 {
   "name": "@t3tools/skycot-brand",
   "private": true,
-  "description": "SKYCOT brand logic shared by the plain client and the desktop shell: day or dusk from the sky over the person's time zone. Pure TypeScript, no runtime dependencies, DOM- and Hermes-safe.",
+  "description": "SKYCOT brand logic shared by the plain client, the desktop shell and the engine: day or dusk from the sky over the person's time zone, and the Family profile's bedtime windows. Pure TypeScript, no runtime dependencies, DOM- and Hermes-safe.",
   "type": "module",
   "exports": {
     "./daylight": {
@@ -11,6 +11,10 @@
     "./schedule": {
       "types": "./src/schedule.ts",
       "import": "./src/schedule.ts"
+    },
+    "./bedtime": {
+      "types": "./src/bedtime.ts",
+      "import": "./src/bedtime.ts"
     }
   },
   "scripts": {
