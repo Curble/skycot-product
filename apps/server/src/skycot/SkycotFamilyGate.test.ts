@@ -23,6 +23,9 @@ import * as Path from "effect/Path";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as TestClock from "effect/testing/TestClock";
+
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 
@@ -109,6 +112,7 @@ const withGate = <A, E, R>(
   use: (input: {
     readonly gate: SkycotFamilyGate.SkycotFamilyGate["Service"];
     readonly family: SkycotFamily.SkycotFamily["Service"];
+    readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
   }) => Effect.Effect<A, E, R>,
   threadWorktreePath: string | null = ROOT,
 ) =>
@@ -139,10 +143,16 @@ const withGate = <A, E, R>(
     return yield* Effect.gen(function* () {
       const gate = yield* SkycotFamilyGate.SkycotFamilyGate;
       const family = yield* SkycotFamily.SkycotFamily;
-      return yield* use({ gate, family });
+      const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
+      return yield* use({ gate, family, limits });
     }).pipe(
       Effect.provide(
-        SkycotFamilyGate.layer.pipe(Layer.provideMerge(Layer.merge(layerFamily, layerProjections))),
+        SkycotFamilyGate.layerCore.pipe(
+          Layer.provideMerge(
+            SkycotFamilyLimits.layerAt(path.join(dir, SkycotFamilyLimits.ACTIVITY_FILE_NAME)),
+          ),
+          Layer.provideMerge(Layer.merge(layerFamily, layerProjections)),
+        ),
       ),
     );
   }).pipe(Effect.scoped);
@@ -668,6 +678,236 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         assert.equal(scopeChecks, 0);
         assert.isTrue(Exit.isSuccess(yield* call("projects.readFile")));
         assert.equal(scopeChecks, 1);
+      }),
+    ),
+  );
+});
+
+describe("turnStartFor and startedBy", () => {
+  it("names the calls that start a turn", () => {
+    const dispatch = ORCHESTRATION_V2_WS_METHODS.dispatchCommand;
+    assert.deepEqual(
+      SkycotFamilyGate.turnStartFor(dispatch, { type: "message.dispatch", threadId: "t1" }),
+      { threadId: "t1", instanceId: undefined },
+    );
+    assert.isNotNull(
+      SkycotFamilyGate.turnStartFor(dispatch, { type: "queue.resume", threadId: "t1" }),
+    );
+    assert.isNull(
+      SkycotFamilyGate.turnStartFor(dispatch, { type: "run.interrupt", threadId: "t1" }),
+    );
+    assert.isNull(SkycotFamilyGate.turnStartFor(dispatch, respond("accept")));
+    assert.deepEqual(
+      SkycotFamilyGate.turnStartFor(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+        threadId: "t2",
+        modelSelection: { instanceId: "codex" },
+        initialMessage: { text: "hi" },
+      }),
+      { threadId: "t2", instanceId: "codex" },
+    );
+    assert.isNull(
+      SkycotFamilyGate.turnStartFor(ORCHESTRATION_V2_WS_METHODS.launchThread, { threadId: "t2" }),
+    );
+  });
+
+  it("names the conversation or project a call starts", () => {
+    assert.deepEqual(
+      SkycotFamilyGate.startedBy(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+        threadId: "t2",
+        projectId: "p1",
+      }),
+      { threadId: "t2", projectId: "p1" },
+    );
+    assert.isNull(
+      SkycotFamilyGate.startedBy(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+        threadId: "t2",
+        reuseExistingThread: true,
+      }),
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.startedBy("projects.mutate", { type: "project.create", projectId: "p9" }),
+      { projectId: "p9" },
+    );
+  });
+});
+
+it.layer(NodeServices.layer)("SkycotFamilyGate limits", (it) => {
+  const MELBOURNE = "Australia/Melbourne";
+  const at = (iso: string) => TestClock.setTime(Date.parse(iso));
+  const message = (threadId = THREAD_ID) => ({
+    method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+    payload: { type: "message.dispatch", threadId, text: "make it blue" },
+  });
+
+  /** One child with a 19:30–07:00 bedtime and three messages a day, on Melbourne's clock. */
+  const setUp = (family: SkycotFamily.SkycotFamily["Service"]) =>
+    Effect.gen(function* () {
+      const status = yield* family.enable({ code: CODE, childName: "Ava", timeZone: MELBOURNE });
+      const childId = status.children[0]!.id;
+      yield* family.updateChild({
+        childId,
+        patch: { limits: { bedtime: { start: "19:30", end: "07:00" }, dailyTurns: 3 } },
+      });
+      return childId;
+    });
+
+  it.effect(
+    "refuses a turn at bedtime with the asleep permission, and lets it through by day",
+    () =>
+      withGate([], ({ gate, family }) =>
+        Effect.gen(function* () {
+          yield* setUp(family);
+          yield* at("2026-10-22T16:00:00+11:00");
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          yield* at("2026-10-22T19:31:00+11:00");
+          const error = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.equal(error.requiredPermission, SkycotFamilyGate.FAMILY_ASLEEP_PERMISSION);
+          assert.include(error.message, "bedtime");
+          assert.include(error.message, "7:00 am");
+          yield* at("2026-10-23T07:00:00+11:00");
+          yield* gate.check({ sessionId: SESSION, ...message() });
+        }),
+      ),
+  );
+
+  it.effect("counts messages and stops at the day's cap until tomorrow", () =>
+    withGate([], ({ gate, family, limits }) =>
+      Effect.gen(function* () {
+        yield* setUp(family);
+        yield* at("2026-10-22T09:00:00+11:00");
+        for (let index = 0; index < 3; index += 1) {
+          yield* gate.check({ sessionId: SESSION, ...message() });
+        }
+        const error = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+        assert.include(error.message, "today's 3 messages");
+        const session = yield* limits.forSession({ sessionId: SESSION });
+        assert.equal(session.limits?.turns, 3);
+        assert.equal(session.limits?.reason, "turns");
+        yield* at("2026-10-23T08:00:00+11:00");
+        yield* gate.check({ sessionId: SESSION, ...message() });
+      }),
+    ),
+  );
+
+  it.effect(
+    "finishes the current step, then pauses: a child's yes to the next step is refused",
+    () =>
+      withGate([approval("file-change", "Edit index.html")], ({ gate, family }) =>
+        Effect.gen(function* () {
+          yield* setUp(family);
+          yield* at("2026-10-22T15:00:00+11:00");
+          const respondCall = {
+            sessionId: SESSION,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: respond("accept"),
+          };
+          yield* gate.check(respondCall);
+          yield* at("2026-10-22T20:00:00+11:00");
+          const error = yield* Effect.flip(gate.check(respondCall));
+          assert.equal(error.requiredPermission, SkycotFamilyGate.FAMILY_ASLEEP_PERMISSION);
+          // Saying no, or stopping, is always fine.
+          yield* gate.check({ ...respondCall, payload: respond("decline") });
+          yield* gate.check({
+            ...respondCall,
+            payload: { type: "run.interrupt", threadId: THREAD_ID, runId: "run-1" },
+          });
+        }),
+      ),
+  );
+
+  it.effect("a grown-up's extra time lets turns through until it runs out", () =>
+    withGate([], ({ gate, family, limits }) =>
+      Effect.gen(function* () {
+        const childId = yield* setUp(family);
+        yield* at("2026-10-22T20:00:00+11:00");
+        assert.isTrue(yield* refused(gate.check({ sessionId: SESSION, ...message() })));
+        assert.equal(
+          (yield* Effect.flip(
+            limits.moreTime({
+              sessionId: SESSION,
+              childId,
+              code: "000000",
+              more: { type: "extra", minutes: 15 },
+            }),
+          )).reason,
+          "wrong-code",
+        );
+        const after = yield* limits.moreTime({
+          sessionId: SESSION,
+          childId,
+          code: CODE,
+          more: { type: "extra", minutes: 15 },
+        });
+        assert.isFalse(after.limits?.asleep);
+        assert.equal(after.limits?.minutesLeft, 15);
+        yield* gate.check({ sessionId: SESSION, ...message() });
+        yield* at("2026-10-22T20:16:00+11:00");
+        assert.isTrue(yield* refused(gate.check({ sessionId: SESSION, ...message() })));
+        const today = yield* limits.today;
+        assert.deepEqual(
+          today.children[0]!.moreTime.map((entry) => [entry.kind, entry.minutes, entry.reason]),
+          [["extra", 15, "bedtime"]],
+        );
+      }),
+    ),
+  );
+
+  it.effect("a parent in Advanced mode is not held to a child's bedtime", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* setUp(family);
+        yield* at("2026-10-22T21:00:00+11:00");
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        yield* gate.check({ sessionId: SESSION, ...message() });
+      }),
+    ),
+  );
+
+  it.effect(
+    "with two children a device must choose first, and each child keeps their own day",
+    () =>
+      withGate([], ({ gate, family, limits }) =>
+        Effect.gen(function* () {
+          const ava = yield* setUp(family);
+          const { childId: leo } = yield* family.addChild({ name: "Leo" });
+          yield* at("2026-10-22T09:00:00+11:00");
+          const error = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.include(error.message, "Choose who's using SKYCOT");
+          assert.isTrue((yield* limits.forSession({ sessionId: SESSION })).needsChoice);
+          yield* limits.choose({ sessionId: SESSION, childId: ava, grownUp: false });
+          for (let index = 0; index < 3; index += 1) {
+            yield* gate.check({ sessionId: SESSION, ...message() });
+          }
+          assert.isTrue(yield* refused(gate.check({ sessionId: SESSION, ...message() })));
+          // Ava is out of messages: switching to Leo needs a grown-up, not just a tap.
+          const blocked = yield* Effect.flip(
+            limits.choose({ sessionId: SESSION, childId: leo, grownUp: false }),
+          );
+          assert.equal(blocked._tag, "SkycotFamilyLimitRefusal");
+          yield* limits.choose({ sessionId: SESSION, childId: leo, grownUp: true });
+          yield* gate.check({ sessionId: SESSION, ...message() });
+        }),
+      ),
+  );
+
+  it.effect("remembers which child started a conversation; the first answer stands", () =>
+    withGate([], ({ gate, family, limits }) =>
+      Effect.gen(function* () {
+        const ava = yield* setUp(family);
+        const { childId: leo } = yield* family.addChild({ name: "Leo" });
+        yield* at("2026-10-22T09:00:00+11:00");
+        const launch = (threadId: string) => ({
+          sessionId: SESSION,
+          method: ORCHESTRATION_V2_WS_METHODS.launchThread,
+          payload: { threadId, projectId: "project:family", initialMessage: { text: "hi" } },
+        });
+        yield* limits.choose({ sessionId: SESSION, childId: ava, grownUp: false });
+        yield* gate.check(launch("thread:ava"));
+        yield* limits.choose({ sessionId: SESSION, childId: leo, grownUp: false });
+        yield* gate.check(launch("thread:leo"));
+        const today = yield* limits.today;
+        assert.deepEqual(today.threads, { "thread:ava": ava, "thread:leo": leo });
+        assert.deepEqual(today.projects, { "project:family": ava });
       }),
     ),
   );

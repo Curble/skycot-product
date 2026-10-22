@@ -8,6 +8,12 @@
 // The file is the source of truth and is re-read whenever it changes on disk (one stat per
 // read), so several service instances, or a parent editing it by hand, never disagree.
 //
+// Version 2 keeps several children under one parent code; each child has a look, voice
+// settings and limits (bedtime, daily time, messages per day, a share of the AI allowance to
+// leave for grown-ups). A version 1 file (one child) is read as version 2 and written back as
+// such on the next change. Daily counters and who-is-using-which-device live beside it in the
+// activity file (family-limits/SkycotFamilyLimits.ts), which changes every minute.
+//
 // Honesty: the file sits in the user's own data directory. Anyone who can use a terminal or
 // Finder on this Mac account can delete it, which turns the profile off. That is outside the
 // threat model (a curious child, not a determined one) and the docs say so.
@@ -27,6 +33,8 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
+import { formatClockTime, knownTimeZone, parseClockTime } from "@t3tools/skycot-brand/bedtime";
+
 import * as ServerConfig from "../config.ts";
 
 export const FAMILY_FILE_NAME = "skycot-family.json";
@@ -34,6 +42,27 @@ export const MAX_ATTEMPTS = 5;
 export const LOCKOUT_MS = 5 * 60_000;
 export const CODE_PATTERN = /^\d{4,6}$/;
 export const CHILD_NAME_MAX = 40;
+export const MAX_CHILDREN = 8;
+export const DEFAULT_LOOK = "workshop";
+
+/** The mascot's poses a child can pick as their picture (apps/nondev features/brand/Mascot). */
+export const AVATAR_POSES = [
+  "hello",
+  "yay",
+  "thinking",
+  "oops",
+  "ask-a-grown-up",
+  "night-night",
+] as const;
+/** Colours for a letter picture; the client maps each to a swatch that reads in light and dark. */
+export const AVATAR_COLORS = ["sky", "sun", "leaf", "berry", "grape", "coral"] as const;
+
+/** Bounds a parent can pick from; anything outside is clamped, so a hand-edited file stays sane. */
+export const LIMIT_BOUNDS = {
+  dailyMinutes: { min: 5, max: 12 * 60 },
+  dailyTurns: { min: 1, max: 500 },
+  keepAllowancePercent: { min: 5, max: 90 },
+} as const;
 
 /**
  * What a grown-up can say yes to. `advanced` (the developer interface) is the master grant:
@@ -68,7 +97,46 @@ const Grant = Schema.Struct({
 });
 type Grant = typeof Grant.Type;
 
-const FamilyFile = Schema.Struct({
+const ChildAvatar = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("mascot"), pose: Schema.Literals(AVATAR_POSES) }),
+  Schema.Struct({ kind: Schema.Literal("initial"), color: Schema.Literals(AVATAR_COLORS) }),
+]);
+export type ChildAvatar = typeof ChildAvatar.Type;
+
+const ChildLimits = Schema.Struct({
+  /** Local wall-clock times ("19:30" to "07:00") in the profile's time zone; null is no bedtime. */
+  bedtime: Schema.NullOr(Schema.Struct({ start: Schema.String, end: Schema.String })),
+  /** Minutes of active use a day (see family-limits/limits.ts for how they are counted). */
+  dailyMinutes: Schema.NullOr(Schema.Number),
+  /** Messages the child may send a day. */
+  dailyTurns: Schema.NullOr(Schema.Number),
+  /** The child's messages pause once the AI allowance has this many percent left or fewer. */
+  keepAllowancePercent: Schema.NullOr(Schema.Number),
+});
+export type ChildLimits = typeof ChildLimits.Type;
+
+const ChildVoice = Schema.Struct({
+  /** Talking instead of typing (the browser's speech service). The voice feature reads this. */
+  typing: Schema.Boolean,
+  /** Answers read aloud by default. */
+  readAloud: Schema.Boolean,
+});
+export type ChildVoice = typeof ChildVoice.Type;
+
+const Child = Schema.Struct({
+  id: Schema.String,
+  name: Schema.NullOr(Schema.String),
+  avatar: ChildAvatar,
+  /** A theme id from the client's library ("workshop"); unknown ids fall back there. */
+  look: Schema.String,
+  largerText: Schema.Boolean,
+  voice: ChildVoice,
+  limits: ChildLimits,
+  createdAt: Schema.String,
+});
+export type FamilyChild = typeof Child.Type;
+
+const FamilyFileV1 = Schema.Struct({
   version: Schema.Literal(1),
   enabled: Schema.Boolean,
   childName: Schema.NullOr(Schema.String),
@@ -80,19 +148,106 @@ const FamilyFile = Schema.Struct({
   tokenSecret: Schema.String,
   grants: Schema.Array(Grant),
 });
+type FamilyFileV1 = typeof FamilyFileV1.Type;
+
+export const FAMILY_FILE_VERSION = 2;
+
+const FamilyFile = Schema.Struct({
+  version: Schema.Literal(FAMILY_FILE_VERSION),
+  enabled: Schema.Boolean,
+  codeHash: Schema.String,
+  salt: Schema.String,
+  createdAt: Schema.String,
+  failedAttempts: Schema.Number,
+  lockedUntil: Schema.NullOr(Schema.Number),
+  tokenSecret: Schema.String,
+  grants: Schema.Array(Grant),
+  /** The household's IANA zone for bedtimes and "today"; null means the engine's own. */
+  timeZone: Schema.NullOr(Schema.String),
+  children: Schema.Array(Child),
+});
 type FamilyFile = typeof FamilyFile.Type;
 
-const decodeFamilyFile = Schema.decodeUnknownOption(Schema.fromJsonString(FamilyFile));
+const decodeFamilyFileV2 = Schema.decodeUnknownOption(Schema.fromJsonString(FamilyFile));
+const decodeFamilyFileV1 = Schema.decodeUnknownOption(Schema.fromJsonString(FamilyFileV1));
 const encodeFamilyFile = Schema.encodeEffect(Schema.fromJsonString(FamilyFile));
+
+export const NO_LIMITS: ChildLimits = {
+  bedtime: null,
+  dailyMinutes: null,
+  dailyTurns: null,
+  keepAllowancePercent: null,
+};
+
+/**
+ * Voice typing starts off for every child, migrated ones included: in Chrome and Edge the
+ * browser sends the child's voice to Google or Microsoft, so a parent turns it on knowingly
+ * (Settings › Family). Read-aloud uses the Mac's own voices and starts on.
+ */
+export const DEFAULT_VOICE: ChildVoice = { typing: false, readAloud: true };
+
+/**
+ * The single child of a version 1 file. Its id comes from the file's own salt, so every read
+ * before the first write names the same child (thread owners recorded meanwhile stay right).
+ */
+export function migrateFamilyFileV1(file: FamilyFileV1): FamilyFile {
+  const id = `c${NodeCrypto.createHash("sha256").update(`child:${file.salt}`).digest("hex").slice(0, 10)}`;
+  return {
+    version: FAMILY_FILE_VERSION,
+    enabled: file.enabled,
+    codeHash: file.codeHash,
+    salt: file.salt,
+    createdAt: file.createdAt,
+    failedAttempts: file.failedAttempts,
+    lockedUntil: file.lockedUntil,
+    tokenSecret: file.tokenSecret,
+    grants: file.grants,
+    timeZone: null,
+    children: [
+      {
+        id,
+        name: file.childName,
+        avatar: { kind: "initial", color: AVATAR_COLORS[0] },
+        look: DEFAULT_LOOK,
+        largerText: true,
+        voice: DEFAULT_VOICE,
+        limits: NO_LIMITS,
+        createdAt: file.createdAt,
+      },
+    ],
+  };
+}
+
+/** Either version on disk, as version 2; null when it is neither (treated as "off"). */
+export function decodeFamilyFile(raw: string): FamilyFile | null {
+  const current = decodeFamilyFileV2(raw);
+  if (current._tag === "Some") return current.value;
+  const legacy = decodeFamilyFileV1(raw);
+  return legacy._tag === "Some" ? migrateFamilyFileV1(legacy.value) : null;
+}
 
 /** What any signed-in client may read. Never the hash, salt or secret. */
 export interface FamilyStatus {
   readonly enabled: boolean;
+  /** The first child's name, for clients from before siblings. */
   readonly childName: string | null;
   readonly createdAt: string | null;
   readonly attemptsLeft: number;
   /** Milliseconds until code prompts open again; 0 when not locked. */
   readonly lockedForMs: number;
+  readonly children: ReadonlyArray<FamilyChild>;
+  /** The zone bedtimes are read in (the profile's, else the engine's). */
+  readonly timeZone: string;
+}
+
+/** What a parent sets for a child; anything left out keeps its value (or the default). */
+export interface ChildInput {
+  readonly name?: string | null | undefined;
+  readonly avatar?: unknown;
+  readonly look?: unknown;
+  readonly largerText?: unknown;
+  readonly voice?: unknown;
+  readonly limits?: unknown;
 }
 
 export type FamilyFailureReason =
@@ -188,6 +343,8 @@ export class SkycotFamily extends Context.Service<
     readonly enable: (input: {
       readonly code: string;
       readonly childName: string | null;
+      /** The parent's browser zone, for bedtimes; the engine's own when left out. */
+      readonly timeZone?: string | null | undefined;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** One code attempt; on success records a grant for this session and returns its token. */
     readonly verify: (input: VerifyInput) => Effect.Effect<UnlockToken, FamilyError>;
@@ -198,9 +355,27 @@ export class SkycotFamily extends Context.Service<
       readonly oldCode: string;
       readonly newCode: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Renames the first child (clients from before siblings). */
     readonly rename: (input: {
       readonly childName: string | null;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
+    readonly addChild: (
+      input: ChildInput,
+    ) => Effect.Effect<{ readonly status: FamilyStatus; readonly childId: string }, FamilyError>;
+    readonly updateChild: (input: {
+      readonly childId: string;
+      readonly patch: ChildInput;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** The last child cannot be removed: turning the profile off is the way out. */
+    readonly removeChild: (input: {
+      readonly childId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    readonly setTimeZone: (timeZone: string) => Effect.Effect<FamilyStatus, FamilyError>;
+    /**
+     * One code attempt for a one-off parent action (more time tonight) that leaves no grant
+     * behind. Counts towards the same five tries.
+     */
+    readonly checkCode: (input: { readonly code: string }) => Effect.Effect<void, FamilyError>;
     /** Ends every grant this session holds (a parent leaving Advanced mode). */
     readonly lock: (input: { readonly sessionId: string }) => Effect.Effect<void, FamilyError>;
     /**
@@ -308,6 +483,19 @@ export function lockRemainingMs(file: Pick<FamilyFile, "lockedUntil">, now: numb
   return Math.min(LOCKOUT_MS, Math.max(0, file.lockedUntil - now));
 }
 
+/** The engine's own zone: a Mac's clock settings, which is where the family lives. */
+export function engineTimeZone(): string {
+  try {
+    return knownTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return "UTC";
+  }
+}
+
+export function familyTimeZone(file: Pick<FamilyFile, "timeZone"> | null): string {
+  return file?.timeZone ? knownTimeZone(file.timeZone) : engineTimeZone();
+}
+
 function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
   if (file === null || !file.enabled) {
     return {
@@ -316,22 +504,125 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       createdAt: null,
       attemptsLeft: MAX_ATTEMPTS,
       lockedForMs: 0,
+      children: [],
+      timeZone: familyTimeZone(null),
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
   const failed = file.lockedUntil !== null && lockedForMs === 0 ? 0 : file.failedAttempts;
   return {
     enabled: true,
-    childName: file.childName,
+    childName: file.children[0]?.name ?? null,
     createdAt: file.createdAt,
     attemptsLeft: lockedForMs > 0 ? 0 : Math.max(0, MAX_ATTEMPTS - failed),
     lockedForMs,
+    children: file.children,
+    timeZone: familyTimeZone(file),
   };
 }
 
 function cleanChildName(name: string | null): string | null {
   const trimmed = name?.replace(/\s+/g, " ").trim() ?? "";
   return trimmed.length === 0 ? null : trimmed.slice(0, CHILD_NAME_MAX);
+}
+
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+
+function cleanAvatar(value: unknown, fallback: ChildAvatar): ChildAvatar {
+  const input = record(value);
+  if (
+    input["kind"] === "mascot" &&
+    (AVATAR_POSES as ReadonlyArray<unknown>).includes(input["pose"])
+  ) {
+    return { kind: "mascot", pose: input["pose"] as (typeof AVATAR_POSES)[number] };
+  }
+  if (
+    input["kind"] === "initial" &&
+    (AVATAR_COLORS as ReadonlyArray<unknown>).includes(input["color"])
+  ) {
+    return { kind: "initial", color: input["color"] as (typeof AVATAR_COLORS)[number] };
+  }
+  return fallback;
+}
+
+function cleanLook(value: unknown, fallback: string): string {
+  return typeof value === "string" && /^[A-Za-z0-9_.:-]{1,64}$/.test(value) ? value : fallback;
+}
+
+function boundedOrNull(value: unknown, bounds: { readonly min: number; readonly max: number }) {
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(bounds.max, Math.max(bounds.min, Math.round(value)));
+}
+
+/** A parent's limits, normalised: "7:30" → "07:30", numbers clamped, nonsense left unchanged. */
+export function cleanLimits(value: unknown, previous: ChildLimits): ChildLimits {
+  const input = record(value);
+  const pick = <K extends keyof ChildLimits>(key: K, next: ChildLimits[K] | undefined) =>
+    key in input && next !== undefined ? next : previous[key];
+  const bedtimeInput = input["bedtime"];
+  let bedtime: ChildLimits["bedtime"] | undefined;
+  if (bedtimeInput === null) bedtime = null;
+  else {
+    const window = record(bedtimeInput);
+    const start = typeof window["start"] === "string" ? parseClockTime(window["start"]) : null;
+    const end = typeof window["end"] === "string" ? parseClockTime(window["end"]) : null;
+    bedtime =
+      start !== null && end !== null && start !== end
+        ? { start: formatClockTime(start), end: formatClockTime(end) }
+        : undefined;
+  }
+  return {
+    bedtime: pick("bedtime", bedtime),
+    dailyMinutes: pick(
+      "dailyMinutes",
+      boundedOrNull(input["dailyMinutes"], LIMIT_BOUNDS.dailyMinutes),
+    ),
+    dailyTurns: pick("dailyTurns", boundedOrNull(input["dailyTurns"], LIMIT_BOUNDS.dailyTurns)),
+    keepAllowancePercent: pick(
+      "keepAllowancePercent",
+      boundedOrNull(input["keepAllowancePercent"], LIMIT_BOUNDS.keepAllowancePercent),
+    ),
+  };
+}
+
+function cleanVoice(value: unknown, previous: ChildVoice): ChildVoice {
+  const input = record(value);
+  return {
+    typing: typeof input["typing"] === "boolean" ? input["typing"] : previous.typing,
+    readAloud: typeof input["readAloud"] === "boolean" ? input["readAloud"] : previous.readAloud,
+  };
+}
+
+/** One child with a parent's changes applied; every field is checked, nothing is trusted. */
+export function applyChildInput(child: FamilyChild, input: ChildInput): FamilyChild {
+  return {
+    ...child,
+    name: input.name === undefined ? child.name : cleanChildName(input.name),
+    avatar: input.avatar === undefined ? child.avatar : cleanAvatar(input.avatar, child.avatar),
+    look: input.look === undefined ? child.look : cleanLook(input.look, child.look),
+    largerText: typeof input.largerText === "boolean" ? input.largerText : child.largerText,
+    voice: input.voice === undefined ? child.voice : cleanVoice(input.voice, child.voice),
+    limits: input.limits === undefined ? child.limits : cleanLimits(input.limits, child.limits),
+  };
+}
+
+function newChild(input: ChildInput, siblings: number, createdAt: string): FamilyChild {
+  return applyChildInput(
+    {
+      id: `c${hex(NodeCrypto.randomBytes(5))}`,
+      name: null,
+      // Each new sibling gets the next colour, so two letter pictures never look alike.
+      avatar: { kind: "initial", color: AVATAR_COLORS[siblings % AVATAR_COLORS.length]! },
+      look: DEFAULT_LOOK,
+      largerText: true,
+      voice: DEFAULT_VOICE,
+      limits: NO_LIMITS,
+      createdAt,
+    },
+    input,
+  );
 }
 
 const liveGrants = (grants: ReadonlyArray<Grant>, now: number) =>
@@ -359,8 +650,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const cached = yield* Ref.get(cache);
     if (cached.stamp === stamp) return cached.file;
     const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
-    const decoded = decodeFamilyFile(raw);
-    const file = decoded._tag === "Some" ? decoded.value : null;
+    const file = decodeFamilyFile(raw);
     yield* Ref.set(cache, { stamp, file });
     return file;
   });
@@ -440,17 +730,19 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     }
     const at = yield* now;
     const salt = hex(NodeCrypto.randomBytes(16));
+    const createdAt = DateTime.formatIso(DateTime.makeUnsafe(at));
     const file: FamilyFile = {
-      version: 1,
+      version: FAMILY_FILE_VERSION,
       enabled: true,
-      childName: cleanChildName(input.childName),
       codeHash: yield* hashCode(input.code, salt),
       salt,
-      createdAt: DateTime.formatIso(DateTime.makeUnsafe(at)),
+      createdAt,
       failedAttempts: 0,
       lockedUntil: null,
       tokenSecret: hex(NodeCrypto.randomBytes(32)),
       grants: [],
+      timeZone: input.timeZone ? knownTimeZone(input.timeZone) : null,
+      children: [newChild({ name: input.childName }, 0, createdAt)],
     };
     yield* save(file);
     return toStatus(file, at);
@@ -525,10 +817,96 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     input,
   ) {
     const file = yield* requireEnabled(yield* load);
-    const next = { ...file, childName: cleanChildName(input.childName) };
+    const next: FamilyFile = {
+      ...file,
+      children: file.children.map((child, index) =>
+        index === 0 ? applyChildInput(child, { name: input.childName }) : child,
+      ),
+    };
     yield* save(next);
     return toStatus(next, yield* now);
   }, lock.withPermits(1));
+
+  const addChild: SkycotFamily["Service"]["addChild"] = Effect.fn("SkycotFamily.addChild")(
+    function* (input) {
+      const file = yield* requireEnabled(yield* load);
+      if (file.children.length >= MAX_CHILDREN) {
+        return yield* new FamilyError({ reason: "invalid-request" });
+      }
+      const at = yield* now;
+      const child = newChild(
+        input,
+        file.children.length,
+        DateTime.formatIso(DateTime.makeUnsafe(at)),
+      );
+      const next: FamilyFile = { ...file, children: [...file.children, child] };
+      yield* save(next);
+      return { status: toStatus(next, at), childId: child.id };
+    },
+    lock.withPermits(1),
+  );
+
+  const updateChild: SkycotFamily["Service"]["updateChild"] = Effect.fn("SkycotFamily.updateChild")(
+    function* (input) {
+      const file = yield* requireEnabled(yield* load);
+      if (!file.children.some((child) => child.id === input.childId)) {
+        return yield* new FamilyError({ reason: "invalid-request" });
+      }
+      const next: FamilyFile = {
+        ...file,
+        children: file.children.map((child) =>
+          child.id === input.childId ? applyChildInput(child, input.patch) : child,
+        ),
+      };
+      yield* save(next);
+      return toStatus(next, yield* now);
+    },
+    lock.withPermits(1),
+  );
+
+  const removeChild: SkycotFamily["Service"]["removeChild"] = Effect.fn("SkycotFamily.removeChild")(
+    function* (input) {
+      const file = yield* requireEnabled(yield* load);
+      if (file.children.length <= 1 || !file.children.some((child) => child.id === input.childId)) {
+        return yield* new FamilyError({ reason: "invalid-request" });
+      }
+      const next: FamilyFile = {
+        ...file,
+        children: file.children.filter((child) => child.id !== input.childId),
+      };
+      yield* save(next);
+      return toStatus(next, yield* now);
+    },
+    lock.withPermits(1),
+  );
+
+  const setTimeZone: SkycotFamily["Service"]["setTimeZone"] = Effect.fn("SkycotFamily.setTimeZone")(
+    function* (timeZone) {
+      const file = yield* requireEnabled(yield* load);
+      const zone = knownTimeZone(timeZone);
+      if (file.timeZone === zone) return toStatus(file, yield* now);
+      const next: FamilyFile = { ...file, timeZone: zone };
+      yield* save(next);
+      return toStatus(next, yield* now);
+    },
+    lock.withPermits(1),
+  );
+
+  const checkCode: SkycotFamily["Service"]["checkCode"] = Effect.fn("SkycotFamily.checkCode")(
+    function* (input) {
+      const file = yield* requireEnabled(yield* load);
+      const at = yield* now;
+      const cleared = yield* attempt(file, input.code, at);
+      // Only a success after earlier misses changes the file (the counter goes back to zero).
+      if (
+        cleared.failedAttempts !== file.failedAttempts ||
+        cleared.lockedUntil !== file.lockedUntil
+      ) {
+        yield* save(cleared);
+      }
+    },
+    lock.withPermits(1),
+  );
 
   const lockSession: SkycotFamily["Service"]["lock"] = Effect.fn("SkycotFamily.lock")(function* (
     input,
@@ -598,6 +976,11 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     disable,
     changeCode,
     rename,
+    addChild,
+    updateChild,
+    removeChild,
+    setTimeZone,
+    checkCode,
     lock: lockSession,
     allows,
     tokenAllows,

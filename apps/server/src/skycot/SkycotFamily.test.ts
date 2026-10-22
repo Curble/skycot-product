@@ -30,13 +30,19 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
     it.effect("starts off, turns on with a name and never exposes the hash", () =>
       withFamily((family, filePath) =>
         Effect.gen(function* () {
-          assert.deepEqual(yield* family.status, {
-            enabled: false,
-            childName: null,
-            createdAt: null,
-            attemptsLeft: SkycotFamily.MAX_ATTEMPTS,
-            lockedForMs: 0,
-          });
+          const off = yield* family.status;
+          assert.deepEqual(
+            { ...off, timeZone: "engine" },
+            {
+              enabled: false,
+              childName: null,
+              createdAt: null,
+              attemptsLeft: SkycotFamily.MAX_ATTEMPTS,
+              lockedForMs: 0,
+              children: [],
+              timeZone: "engine",
+            },
+          );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });
           assert.isTrue(status.enabled);
           assert.equal(status.childName, "Ava");
@@ -260,6 +266,140 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
         ),
       ],
       ["preview"],
+    );
+  });
+
+  describe("several children (file version 2)", () => {
+    const V1 = {
+      version: 1,
+      enabled: true,
+      childName: "Ava",
+      codeHash: "",
+      salt: "0123456789abcdef0123456789abcdef",
+      createdAt: "2026-10-01T00:00:00.000Z",
+      failedAttempts: 2,
+      lockedUntil: null,
+      tokenSecret: "secret",
+      grants: [],
+    };
+
+    it.effect("reads a version 1 file as one child, keeps the code, and writes version 2", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          // A real profile first, so the hash matches CODE; then rewritten in the old shape.
+          yield* family.enable({ code: CODE, childName: null });
+          const real = JSON.parse(yield* fs.readFileString(filePath)) as Record<string, unknown>;
+          yield* fs.writeFileString(
+            filePath,
+            JSON.stringify({ ...V1, codeHash: real["codeHash"], salt: real["salt"] }),
+          );
+          const status = yield* family.status;
+          assert.equal(status.childName, "Ava");
+          assert.lengthOf(status.children, 1);
+          const [ava] = status.children;
+          assert.equal(ava!.name, "Ava");
+          assert.equal(ava!.look, SkycotFamily.DEFAULT_LOOK);
+          assert.isTrue(ava!.largerText);
+          // Voice typing goes to the browser's speech service: off until a parent turns it on.
+          assert.deepEqual(ava!.voice, { typing: false, readAloud: true });
+          assert.deepEqual(ava!.limits, SkycotFamily.NO_LIMITS);
+          assert.equal(status.attemptsLeft, SkycotFamily.MAX_ATTEMPTS - 2);
+          // The same id on every read before the first write.
+          assert.equal((yield* family.status).children[0]!.id, ava!.id);
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          const saved = JSON.parse(yield* fs.readFileString(filePath)) as Record<string, unknown>;
+          assert.equal(saved["version"], SkycotFamily.FAMILY_FILE_VERSION);
+          assert.notProperty(saved, "childName");
+          assert.equal((saved["children"] as Array<{ id: string }>)[0]!.id, ava!.id);
+        }),
+      ),
+    );
+
+    it.effect("adds, updates and removes children; the last one stays", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          const first = yield* family.enable({ code: CODE, childName: "Ava" });
+          const avaId = first.children[0]!.id;
+          const { status, childId } = yield* family.addChild({
+            name: "  Leo ",
+            avatar: { kind: "mascot", pose: "yay" },
+            look: "classic",
+            largerText: false,
+          });
+          assert.lengthOf(status.children, 2);
+          const leo = status.children.find((child) => child.id === childId)!;
+          assert.equal(leo.name, "Leo");
+          assert.deepEqual(leo.avatar, { kind: "mascot", pose: "yay" });
+          assert.equal(leo.look, "classic");
+          assert.isFalse(leo.largerText);
+          // A second letter picture never shares the first one's colour.
+          assert.notDeepEqual(status.children[0]!.avatar, leo.avatar);
+
+          const updated = yield* family.updateChild({
+            childId,
+            patch: {
+              voice: { typing: true },
+              limits: {
+                bedtime: { start: "7:30", end: "7:00" },
+                dailyMinutes: 9999,
+                dailyTurns: null,
+              },
+              avatar: { kind: "mascot", pose: "not-a-pose" },
+            },
+          });
+          const changed = updated.children.find((child) => child.id === childId)!;
+          assert.deepEqual(changed.voice, { typing: true, readAloud: true });
+          assert.deepEqual(changed.limits, {
+            bedtime: { start: "07:30", end: "07:00" },
+            dailyMinutes: SkycotFamily.LIMIT_BOUNDS.dailyMinutes.max,
+            dailyTurns: null,
+            keepAllowancePercent: null,
+          });
+          assert.deepEqual(changed.avatar, leo.avatar);
+
+          const removed = yield* family.removeChild({ childId });
+          assert.deepEqual(
+            removed.children.map((child) => child.id),
+            [avaId],
+          );
+          assert.equal(
+            (yield* failureOf(family.removeChild({ childId: avaId }))).reason,
+            "invalid-request",
+          );
+        }),
+      ),
+    );
+
+    it.effect("checks a code for a one-off action and counts a wrong one", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          assert.equal(
+            (yield* failureOf(family.checkCode({ code: "000000" }))).reason,
+            "wrong-code",
+          );
+          assert.equal((yield* family.status).attemptsLeft, SkycotFamily.MAX_ATTEMPTS - 1);
+          yield* family.checkCode({ code: CODE });
+          assert.equal((yield* family.status).attemptsLeft, SkycotFamily.MAX_ATTEMPTS);
+        }),
+      ),
+    );
+
+    it.effect(
+      "keeps the household's zone for bedtimes, ignoring one this engine does not know",
+      () =>
+        withFamily((family) =>
+          Effect.gen(function* () {
+            const on = yield* family.enable({
+              code: CODE,
+              childName: null,
+              timeZone: "Australia/Melbourne",
+            });
+            assert.equal(on.timeZone, "Australia/Melbourne");
+            assert.equal((yield* family.setTimeZone("Mars/Base")).timeZone, "UTC");
+          }),
+        ),
     );
   });
 });

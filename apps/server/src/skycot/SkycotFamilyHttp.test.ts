@@ -43,6 +43,7 @@ import * as ServerHttp from "../http.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
@@ -64,7 +65,9 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
   const pinned: Array<unknown> = [];
 
   const layerDependencies = Layer.mergeAll(
-    SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME)),
+    SkycotFamilyLimits.layerAt(path.join(dir, SkycotFamilyLimits.ACTIVITY_FILE_NAME)).pipe(
+      Layer.provideMerge(SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME))),
+    ),
     Layer.mock(EnvironmentAuth.EnvironmentAuth)({
       authenticateHttpRequest: (request) =>
         request.headers["authorization"] === BEARER
@@ -230,6 +233,64 @@ it.layer(
       });
       assert.equal(renamed.status, 200);
       assert.equal(((yield* renamed.json) as { childName: string }).childName, "Ava B");
+    }),
+  );
+
+  it.effect("keeps several children: changes need a grown-up's yes, choosing does not", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const post = (resource: string, body: unknown) =>
+        send("POST", `/api/skycot/family${resource}`, { body }).pipe(
+          Effect.flatMap((response) =>
+            response.json.pipe(
+              Effect.map((json) => ({
+                status: response.status,
+                json: json as Record<string, any>,
+              })),
+            ),
+          ),
+        );
+      yield* post("/enable", { code: CODE, childName: "Ava", timeZone: "Australia/Melbourne" });
+      const refused = yield* post("/children/add", { child: { name: "Leo" } });
+      assert.equal(refused.status, 403);
+      assert.equal(refused.json["requiredPermission"], SkycotFamilyGate.FAMILY_PERMISSION);
+
+      yield* post("/verify", { code: CODE, purpose: "settings" });
+      const added = yield* post("/children/add", { child: { name: "Leo" } });
+      assert.equal(added.status, 200);
+      assert.lengthOf(added.json["children"], 2);
+      const leo = added.json["childId"] as string;
+      const limited = yield* post("/children/update", {
+        childId: leo,
+        patch: { limits: { dailyTurns: 20 } },
+      });
+      assert.equal(limited.json["children"][1].limits.dailyTurns, 20);
+
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as Record<
+        string,
+        any
+      >;
+      assert.isTrue(status["session"].needsChoice);
+      const chosen = yield* post("/choose", { childId: leo });
+      assert.equal(chosen.json["childId"], leo);
+      assert.equal(chosen.json["limits"].turns, 0);
+      const beat = yield* post("/heartbeat", { active: true });
+      assert.equal(beat.json["limits"].usedMinutes, 1);
+
+      // The child's own look needs no code, and only touches the child using this device.
+      const look = yield* post("/look", { look: "classic", largerText: false });
+      assert.equal(look.json["children"][1].look, "classic");
+      assert.equal(look.json["children"][0].look, SkycotFamily.DEFAULT_LOOK);
+
+      const wrong = yield* post("/more-time", { childId: leo, kind: "extra15", code: "000000" });
+      assert.equal(wrong.json["error"], "wrong-code");
+      const more = yield* post("/more-time", { childId: leo, kind: "extra30", code: CODE });
+      assert.equal(more.json["limits"].passUntil > 0, true);
+      const today = (yield* (yield* send("GET", "/api/skycot/family/today")).json) as Record<
+        string,
+        any
+      >;
+      assert.equal(today["children"][1].moreTime[0].minutes, 30);
     }),
   );
 

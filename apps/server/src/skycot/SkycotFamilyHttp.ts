@@ -15,6 +15,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 
@@ -61,6 +62,7 @@ type Handler = (input: {
   readonly sessionId: string;
   readonly body: Record<string, unknown>;
   readonly family: SkycotFamily.SkycotFamily["Service"];
+  readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
   /**
    * Pins the engine default to "Ask me first". The runtime policy downgrades every turn
    * anyway; this keeps Settings and new threads honest about it.
@@ -74,56 +76,79 @@ const route = (
   scope: AuthEnvironmentScope,
   handler: Handler,
 ) =>
-  HttpRouter.add(
-    method,
-    `${FAMILY_ROUTE}${path}`,
+  // The limits are taken when the routes are built (they come with the Family gate's layer),
+  // not per request: route handlers only see the server's top-level services.
+  Layer.unwrap(
     Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const auth = yield* EnvironmentAuth.EnvironmentAuth;
-      const family = yield* SkycotFamily.SkycotFamily;
-      const settings = yield* ServerSettings.ServerSettingsService;
-      const pinSafeDefault = Effect.suspend(() =>
-        settings.updateSettings({ defaultRuntimeMode: "approval-required" }),
-      ).pipe(
-        Effect.ignoreCause({
-          log: true,
-          message: "Could not pin the Family default runtime mode.",
-        }),
+      const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
+      return HttpRouter.add(
+        method,
+        `${FAMILY_ROUTE}${path}`,
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const auth = yield* EnvironmentAuth.EnvironmentAuth;
+          const family = yield* SkycotFamily.SkycotFamily;
+          const settings = yield* ServerSettings.ServerSettingsService;
+          const pinSafeDefault = Effect.suspend(() =>
+            settings.updateSettings({ defaultRuntimeMode: "approval-required" }),
+          ).pipe(
+            Effect.ignoreCause({
+              log: true,
+              message: "Could not pin the Family default runtime mode.",
+            }),
+          );
+          // Read the body before any early answer: replying while the client is still sending
+          // makes Node drop the connection, which the client sees as "other side closed".
+          const body =
+            method === "POST"
+              ? record(yield* request.json.pipe(Effect.orElseSucceed(() => ({}))))
+              : {};
+          const session = yield* auth
+            .authenticateHttpRequest(request)
+            .pipe(Effect.orElseSucceed(() => null));
+          if (session === null) {
+            return json({ error: "unauthenticated", message: "Sign in to SKYCOT again." }, 401);
+          }
+          if (!session.scopes.includes(scope)) {
+            return json(
+              {
+                error: "forbidden",
+                message: "This device is not allowed to change the Family profile.",
+              },
+              403,
+            );
+          }
+          return yield* handler({
+            sessionId: session.sessionId,
+            body,
+            family,
+            limits,
+            pinSafeDefault,
+          }).pipe(
+            Effect.catchTags({
+              SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
+            }),
+          );
+        }).pipe(Effect.withSpan(`skycot.family.http ${method} ${path || "/"}`)),
       );
-      // Read the body before any early answer: replying while the client is still sending
-      // makes Node drop the connection, which the client sees as "other side closed".
-      const body =
-        method === "POST" ? record(yield* request.json.pipe(Effect.orElseSucceed(() => ({})))) : {};
-      const session = yield* auth
-        .authenticateHttpRequest(request)
-        .pipe(Effect.orElseSucceed(() => null));
-      if (session === null) {
-        return json({ error: "unauthenticated", message: "Sign in to SKYCOT again." }, 401);
-      }
-      if (!session.scopes.includes(scope)) {
-        return json(
-          {
-            error: "forbidden",
-            message: "This device is not allowed to change the Family profile.",
-          },
-          403,
-        );
-      }
-      return yield* handler({ sessionId: session.sessionId, body, family, pinSafeDefault }).pipe(
-        Effect.catchTags({
-          SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
-        }),
-      );
-    }).pipe(Effect.withSpan(`skycot.family.http ${method} ${path || "/"}`)),
+    }),
   );
 
-/** The profile, plus what a grown-up has opened on this device and for how long. */
-const statusRoute = route("GET", "", AuthOrchestrationOperateScope, ({ family, sessionId }) =>
-  Effect.gen(function* () {
-    const status = yield* family.status;
-    const grants = yield* family.openGrants({ sessionId });
-    return json({ ...status, grants });
-  }),
+/**
+ * The profile, plus what a grown-up has opened on this device and for how long, and who is
+ * using SKYCOT here (with whether it is awake for them).
+ */
+const statusRoute = route(
+  "GET",
+  "",
+  AuthOrchestrationOperateScope,
+  ({ family, limits, sessionId }) =>
+    Effect.gen(function* () {
+      const status = yield* family.status;
+      const grants = yield* family.openGrants({ sessionId });
+      const session = yield* limits.forSession({ sessionId });
+      return json({ ...status, grants, session });
+    }),
 );
 
 const enableRoute = route(
@@ -135,6 +160,7 @@ const enableRoute = route(
       const status = yield* family.enable({
         code: text(body["code"]),
         childName: nullableText(body["childName"]),
+        timeZone: nullableText(body["timeZone"]),
       });
       yield* pinSafeDefault;
       return json(status);
@@ -182,28 +208,163 @@ const changeCodeRoute = route("POST", "/change-code", AuthSettingsWriteScope, ({
     .pipe(Effect.map((status) => json(status, 200, { "set-cookie": expiredUnlockCookie }))),
 );
 
-/** The child's name is part of the profile: a grown-up's "yes" first, as for the AI settings. */
-const renameRoute = route(
-  "POST",
-  "/rename",
-  AuthOrchestrationOperateScope,
-  ({ family, body, sessionId }) =>
+const grownUpFirst = json(
+  {
+    error: "forbidden",
+    message: SkycotFamilyGate.FAMILY_REFUSAL_MESSAGE,
+    requiredPermission: SkycotFamilyGate.FAMILY_PERMISSION,
+  },
+  403,
+);
+
+/** Whether a grown-up's "yes" for settings is open on this device (always while the profile is off). */
+const settingsOpen = Effect.fn("SkycotFamilyHttp.settingsOpen")(function* (
+  family: SkycotFamily.SkycotFamily["Service"],
+  sessionId: string,
+) {
+  return !(yield* family.isEnabled) || (yield* family.allows({ sessionId, purpose: "settings" }));
+});
+
+/**
+ * The children are part of the profile: names, pictures, looks and limits need a grown-up's
+ * "yes" first, as for the AI settings. The parent's browser zone comes along, so bedtimes are
+ * read on the household's clock.
+ */
+const parentRoute = (
+  path: string,
+  run: (input: {
+    readonly family: SkycotFamily.SkycotFamily["Service"];
+    readonly body: Record<string, unknown>;
+  }) => Effect.Effect<unknown, SkycotFamily.FamilyError>,
+) =>
+  route("POST", path, AuthOrchestrationOperateScope, ({ family, body, sessionId }) =>
     Effect.gen(function* () {
-      if (
-        (yield* family.isEnabled) &&
-        !(yield* family.allows({ sessionId, purpose: "settings" }))
-      ) {
-        return json(
-          {
-            error: "forbidden",
-            message: SkycotFamilyGate.FAMILY_REFUSAL_MESSAGE,
-            requiredPermission: SkycotFamilyGate.FAMILY_PERMISSION,
-          },
-          403,
-        );
+      if (!(yield* settingsOpen(family, sessionId))) return grownUpFirst;
+      const timeZone = nullableText(body["timeZone"]);
+      if (timeZone !== null) yield* family.setTimeZone(timeZone);
+      return json(yield* run({ family, body }));
+    }),
+  );
+
+const childInput = (value: unknown): SkycotFamily.ChildInput => {
+  const input = record(value);
+  return {
+    ...("name" in input ? { name: nullableText(input["name"]) } : {}),
+    ...("avatar" in input ? { avatar: input["avatar"] } : {}),
+    ...("look" in input ? { look: input["look"] } : {}),
+    ...("largerText" in input ? { largerText: input["largerText"] } : {}),
+    ...("voice" in input ? { voice: input["voice"] } : {}),
+    ...("limits" in input ? { limits: input["limits"] } : {}),
+  };
+};
+
+const renameRoute = parentRoute("/rename", ({ family, body }) =>
+  family.rename({ childName: nullableText(body["childName"]) }),
+);
+
+const addChildRoute = parentRoute("/children/add", ({ family, body }) =>
+  family
+    .addChild(childInput(body["child"]))
+    .pipe(Effect.map(({ status, childId }) => ({ ...status, childId }))),
+);
+
+const updateChildRoute = parentRoute("/children/update", ({ family, body }) =>
+  family.updateChild({ childId: text(body["childId"]), patch: childInput(body["patch"]) }),
+);
+
+const removeChildRoute = parentRoute("/children/remove", ({ family, body }) =>
+  family.removeChild({ childId: text(body["childId"]) }),
+);
+
+/**
+ * The child's own look and text size, from Settings › Appearance: picking a look stays open to
+ * children (it never changes what SKYCOT does), so this needs no code, and only ever touches the
+ * child using SKYCOT on this device.
+ */
+const lookRoute = route(
+  "POST",
+  "/look",
+  AuthOrchestrationOperateScope,
+  ({ family, limits, body, sessionId }) =>
+    Effect.gen(function* () {
+      const session = yield* limits.forSession({ sessionId });
+      if (session.childId === null)
+        return json({ error: "invalid-request", message: "Choose who's using SKYCOT first." }, 409);
+      const patch: SkycotFamily.ChildInput = {
+        ...(typeof body["look"] === "string" ? { look: body["look"] } : {}),
+        ...(typeof body["largerText"] === "boolean" ? { largerText: body["largerText"] } : {}),
+      };
+      return json(yield* family.updateChild({ childId: session.childId, patch }));
+    }),
+);
+
+const limitRefusal = (refusal: SkycotFamilyLimits.FamilyLimitRefusal) =>
+  json(
+    {
+      error: "asleep",
+      message: refusal.sentence,
+      requiredPermission: SkycotFamilyGate.FAMILY_ASLEEP_PERMISSION,
+    },
+    403,
+  );
+
+/** "Who's using SKYCOT?" on this device. */
+const chooseRoute = route(
+  "POST",
+  "/choose",
+  AuthOrchestrationOperateScope,
+  ({ family, limits, body, sessionId }) =>
+    Effect.gen(function* () {
+      const grownUp = yield* family.allows({ sessionId, purpose: "settings" });
+      return yield* limits.choose({ sessionId, childId: text(body["childId"]), grownUp }).pipe(
+        Effect.map((session) => json(session)),
+        Effect.catchTags({
+          SkycotFamilyLimitRefusal: (refusal) => Effect.succeed(limitRefusal(refusal)),
+        }),
+      );
+    }),
+);
+
+/** Twice a minute while SKYCOT is open: counts an active minute, answers with today's state. */
+const heartbeatRoute = route(
+  "POST",
+  "/heartbeat",
+  AuthOrchestrationOperateScope,
+  ({ limits, body, sessionId }) =>
+    limits
+      .heartbeat({ sessionId, active: body["active"] === true })
+      .pipe(Effect.map((session) => json(session))),
+);
+
+/** Every child's day (Settings › Family) and who started which conversation. */
+const todayRoute = route("GET", "/today", AuthOrchestrationOperateScope, ({ limits }) =>
+  limits.today.pipe(Effect.map((today) => json(today))),
+);
+
+const MORE_TIME: Readonly<Record<string, SkycotFamilyLimits.MoreTime>> = {
+  extra15: { type: "extra", minutes: 15 },
+  extra30: { type: "extra", minutes: 30 },
+  endBedtime: { type: "endBedtime" },
+};
+
+/** "Ask a grown-up for more time": the code goes with the one request; nothing stays open. */
+const moreTimeRoute = route(
+  "POST",
+  "/more-time",
+  AuthOrchestrationOperateScope,
+  ({ limits, body, sessionId }) =>
+    Effect.gen(function* () {
+      const more = MORE_TIME[text(body["kind"])];
+      if (more === undefined) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
       }
-      const status = yield* family.rename({ childName: nullableText(body["childName"]) });
-      return json(status);
+      const session = yield* limits.moreTime({
+        sessionId,
+        childId: text(body["childId"]),
+        code: text(body["code"]),
+        more,
+      });
+      return json(session);
     }),
 );
 
@@ -266,6 +427,14 @@ export const layer = Layer.mergeAll(
   disableRoute,
   changeCodeRoute,
   renameRoute,
+  addChildRoute,
+  updateChildRoute,
+  removeChildRoute,
+  lookRoute,
+  chooseRoute,
+  heartbeatRoute,
+  todayRoute,
+  moreTimeRoute,
   lockRoute,
 );
 

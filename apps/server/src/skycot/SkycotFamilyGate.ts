@@ -4,6 +4,12 @@
 // check, so a raw RPC from any client (the plain client, Advanced mode, a script with the
 // session cookie) meets the same rule as a click.
 //
+// The Family limits (bedtime, daily time, messages a day, the allowance line) are checked here
+// too, at every turn start: a child's message is refused while SKYCOT is asleep for them, and
+// so is allowing the next step of a turn already running ("finish the current step, then
+// pause"). The step that is running finishes; nothing is interrupted half-way, so a project is
+// never left half-edited.
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
 // those are closed separately by issuing Family-profile threads an MCP credential without the
 // orchestration, worktree and pull-request capabilities (`SkycotFamily.keepFamilyMcpCapabilities`).
@@ -30,11 +36,15 @@ import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-ru
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 
 /** `requiredPermission` on the refusal, so a client can tell "ask a grown-up" from a scope error. */
 export const FAMILY_PERMISSION = "skycot:family-parent-code";
+
+/** `requiredPermission` when SKYCOT is asleep for the child: the client shows its asleep screen. */
+export const FAMILY_ASLEEP_PERMISSION = "skycot:family-asleep";
 
 export const FAMILY_REFUSAL_MESSAGE =
   "The Family profile is on, so a grown-up needs to enter the parent code first.";
@@ -253,6 +263,63 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
   return null;
 }
 
+/** Commands that start (or continue with) a message from the child: each is a turn. */
+const TURN_COMMANDS = new Set([
+  "message.dispatch",
+  "queue.resume",
+  "queued-message.promote-to-steer",
+  "prepared-run.release",
+  "prepared-run.retry",
+]);
+
+export interface TurnStart {
+  readonly threadId: string | undefined;
+  /** The assistant it runs on when the call says so; otherwise the thread's. */
+  readonly instanceId: string | undefined;
+}
+
+/** Pure: whether a call starts a turn, for the Family limits. Exported for tests. */
+export function turnStartFor(method: string, payload: unknown): TurnStart | null {
+  const input = record(payload);
+  const threadId = typeof input["threadId"] === "string" ? input["threadId"] : undefined;
+  const selection = record(input["modelSelection"]);
+  const instanceId =
+    typeof selection["instanceId"] === "string" ? selection["instanceId"] : undefined;
+  if (method === ORCHESTRATION_V2_WS_METHODS.launchThread) {
+    return input["initialMessage"] === undefined ? null : { threadId, instanceId };
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand) {
+    return typeof input["type"] === "string" && TURN_COMMANDS.has(input["type"])
+      ? { threadId, instanceId }
+      : null;
+  }
+  return null;
+}
+
+/** Pure: the conversation or project a call starts, so the engine can remember whose it is. */
+export function startedBy(
+  method: string,
+  payload: unknown,
+): { readonly threadId?: string; readonly projectId?: string } | null {
+  const input = record(payload);
+  const text = (key: string) =>
+    typeof input[key] === "string" ? (input[key] as string) : undefined;
+  if (method === ORCHESTRATION_V2_WS_METHODS.launchThread) {
+    if (input["reuseExistingThread"] === true) return null;
+    return {
+      ...(text("threadId") ? { threadId: text("threadId")! } : {}),
+      ...(text("projectId") ? { projectId: text("projectId")! } : {}),
+    };
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input["type"] === "thread.create") {
+    return text("threadId") ? { threadId: text("threadId")! } : null;
+  }
+  if (method === "projects.mutate" && input["type"] === "project.create") {
+    return text("projectId") ? { projectId: text("projectId")! } : null;
+  }
+  return null;
+}
+
 /**
  * The same rule for the HTTP API routes that change things (`/api/projects/mutate` is the
  * HTTP twin of `projects.mutate`). Revoking access stays open: it only ever takes away.
@@ -297,6 +364,14 @@ export const familyRefusal = () =>
     requiredPermission: FAMILY_PERMISSION,
   });
 
+/** SKYCOT is asleep for this child: the engine's own sentence, and a permission the client knows. */
+export const asleepRefusal = (refusal: SkycotFamilyLimits.FamilyLimitRefusal) =>
+  new EnvironmentAuthorizationError({
+    message: refusal.sentence,
+    ...authScopeRequiredResponse(AuthOrchestrationOperateScope),
+    requiredPermission: FAMILY_ASLEEP_PERMISSION,
+  });
+
 export class SkycotFamilyGate extends Context.Service<
   SkycotFamilyGate,
   {
@@ -327,6 +402,8 @@ const make = Effect.gen(function* () {
   const family = yield* SkycotFamily.SkycotFamily;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  // Optional so a gate built without the limits (older tests, tools) keeps its old behaviour.
+  const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
 
   /** Where the thread works (its private copy, else the folder), and the project's folder. */
   const projectRootsFor = Effect.fnUntraced(function* (thread: {
@@ -429,7 +506,13 @@ const make = Effect.gen(function* () {
     const grownUp =
       need.widens ||
       (yield* requestNeedsGrownUp({ threadId: need.threadId, requestId: need.requestId }));
-    if (!grownUp) return;
+    if (!grownUp) {
+      // An ordinary step the child may allow: not while SKYCOT is asleep for them.
+      if (Option.isSome(limits)) {
+        yield* limits.value.admitStep({ sessionId }).pipe(Effect.mapError(asleepRefusal));
+      }
+      return;
+    }
     const allowed = yield* family.allows({
       sessionId,
       purpose: "approve",
@@ -441,9 +524,41 @@ const make = Effect.gen(function* () {
     return yield* familyRefusal();
   });
 
+  /** A turn start meets the limits; a grown-up working in Advanced mode is not a child. */
+  const admit = Effect.fn("SkycotFamilyGate.admit")(function* (
+    sessionId: string,
+    method: string,
+    payload: unknown,
+  ) {
+    if (Option.isNone(limits)) return;
+    const turn = turnStartFor(method, payload);
+    const started = startedBy(method, payload);
+    if (turn === null && started === null) return;
+    if (!(yield* family.isEnabled)) return;
+    if (turn !== null && !(yield* family.allows({ sessionId, purpose: "advanced" }))) {
+      const instanceId =
+        turn.instanceId ??
+        (turn.threadId === undefined
+          ? undefined
+          : yield* projections.getThread(turn.threadId as ThreadId).pipe(
+              Effect.map((thread) => String(thread.providerInstanceId)),
+              Effect.orElseSucceed(() => undefined),
+            ));
+      yield* limits.value.admitTurn({ sessionId, instanceId }).pipe(
+        Effect.tapError((refusal) =>
+          Effect.logInfo("skycot-family.refused", { method, asleep: refusal.reason }),
+        ),
+        Effect.mapError(asleepRefusal),
+      );
+    }
+    if (started !== null) yield* limits.value.recordStart({ sessionId, ...started });
+  });
+
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
     Effect.suspend(() =>
-      enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)),
+      enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)).pipe(
+        Effect.andThen(admit(input.sessionId, input.method, input.payload)),
+      ),
     );
 
   const checkHttp: SkycotFamilyGate["Service"]["checkHttp"] = (input) =>
@@ -458,7 +573,11 @@ const make = Effect.gen(function* () {
   return SkycotFamilyGate.of({ check, checkHttp, requestNeedsGrownUp });
 });
 
-export const layer = Layer.effect(SkycotFamilyGate, make);
+/** The gate alone; the Family limits apply when `SkycotFamilyLimits` is provided beside it. */
+export const layerCore = Layer.effect(SkycotFamilyGate, make);
+
+/** The gate with the engine's limits under it (both are exported: the HTTP routes use the limits too). */
+export const layer = layerCore.pipe(Layer.provideMerge(SkycotFamilyLimits.layer));
 
 /**
  * The scope middleware with the Family check in front of it, for ws.ts. Provided inside the

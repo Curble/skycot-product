@@ -777,6 +777,9 @@ importers:
       '@t3tools/provider-pi':
         specifier: workspace:*
         version: link:../../packages/provider-pi
+      '@t3tools/skycot-brand':
+        specifier: workspace:*
+        version: link:../../packages/skycot-brand
       '@t3tools/skycot-rules':
         specifier: workspace:*
         version: link:../../packages/skycot-rules
