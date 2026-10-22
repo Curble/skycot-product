@@ -273,22 +273,67 @@ it.layer(NodeServices.layer)("Family profile enforcement", (it) => {
         );
         return yield* SkycotFamilyHttp.developerPageRedirect(request, url);
       });
-    const layerServed = Layer.succeed(ServerConfig.ServerConfig, {
-      devUrl: undefined,
-    } as unknown as ServerConfig.ServerConfig["Service"]);
-
-    it.effect("sends `/` and the stock app's routes to /simple/ while locked", () =>
+    /** A built client like `apps/server/dist/client`: the stock app, the plain one, assets. */
+    const layerServed = Layer.effect(
+      ServerConfig.ServerConfig,
       Effect.gen(function* () {
-        for (const pathname of ["/", "/index.html", "/settings", "/pair"]) {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const staticDir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-family-static-" });
+        yield* fs.makeDirectory(path.join(staticDir, "simple", "assets"), { recursive: true });
+        yield* fs.makeDirectory(path.join(staticDir, "assets"), { recursive: true });
+        yield* fs.writeFileString(path.join(staticDir, "index.html"), "stock");
+        yield* fs.writeFileString(path.join(staticDir, "simple", "index.html"), "plain");
+        yield* fs.writeFileString(path.join(staticDir, "simple", "assets", "app-1.js"), "");
+        yield* fs.writeFileString(path.join(staticDir, "assets", "index-abc12345.js"), "");
+        yield* fs.writeFileString(path.join(staticDir, "favicon.ico"), "");
+        yield* fs.writeFileString(path.join(staticDir, "manifest.webmanifest"), "{}");
+        return { devUrl: undefined, staticDir } as unknown as ServerConfig.ServerConfig["Service"];
+      }),
+    );
+
+    it.effect("sends every developer page to /simple/ while locked, whatever its address", () =>
+      Effect.gen(function* () {
+        for (const pathname of [
+          "/",
+          "/index.html",
+          "/settings",
+          "/settings/general",
+          "/pair",
+          "/new",
+          // QA FK-02: the single-page-app fallback served the stock page for these.
+          "/axolotl.png",
+          "/a.json",
+          "/x.png",
+          "/foo.html",
+          "/settings/general.x",
+          "/%2e%2e/",
+          "/.%2e/index.html",
+          "/assets%2Findex-abc12345.js",
+          "/assets/missing-file.js",
+          "/assets/",
+          "/simple/x",
+          "/simple/x.png",
+          "/simple%2F..%2Findex.html",
+          "/simple/..%2Findex.html",
+        ]) {
           const response = yield* redirectFor(pathname);
           assert.isNotNull(response, pathname);
-          assert.equal(response!.status, 302);
-          assert.equal(response!.headers["location"], "/simple/");
+          assert.equal(response!.status, 302, pathname);
+          assert.equal(response!.headers["location"], "/simple/", pathname);
         }
-        // The plain client and plain assets still load.
-        assert.isNull(yield* redirectFor("/simple/"));
-        assert.isNull(yield* redirectFor("/simple/index.html"));
-        assert.isNull(yield* redirectFor("/assets/index-abc12345.js"));
+        // The plain client and real files still load.
+        for (const pathname of [
+          "/simple",
+          "/simple/",
+          "/simple/index.html",
+          "/simple/assets/app-1.js",
+          "/assets/index-abc12345.js",
+          "/favicon.ico",
+          "/manifest.webmanifest",
+        ]) {
+          assert.isNull(yield* redirectFor(pathname), pathname);
+        }
       }).pipe(Effect.provide(Layer.merge(layerFamilyIn(true), layerServed))),
     );
 

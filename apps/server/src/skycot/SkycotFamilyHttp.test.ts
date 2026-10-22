@@ -28,6 +28,8 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
   const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-family-http-" });
   const staticDir = path.join(dir, "client");
   yield* fs.makeDirectory(path.join(staticDir, "simple"), { recursive: true });
+  yield* fs.makeDirectory(path.join(staticDir, "assets"), { recursive: true });
+  yield* fs.writeFileString(path.join(staticDir, "assets", "index-abc12345.js"), "// bundle");
   yield* fs.writeFileString(path.join(staticDir, "index.html"), "<p>developer interface</p>");
   yield* fs.writeFileString(path.join(staticDir, "simple", "index.html"), "<p>SKYCOT</p>");
   const pinned: Array<unknown> = [];
@@ -111,6 +113,25 @@ it.layer(
         const settingsRoute = yield* send("GET", "/settings");
         assert.notInclude(yield* settingsRoute.text, "developer interface");
         assert.equal((yield* send("GET", "/simple/")).status, 200);
+        // QA FK-02: any address the single-page-app fallback answers is the developer page.
+        for (const resource of [
+          "/axolotl.png",
+          "/a.json",
+          "/foo.html",
+          "/settings/general.x",
+          "/%2e%2e/",
+          "/assets%2Findex-abc12345.js",
+          "/simple/x",
+          "/simple/x.png",
+        ]) {
+          const page = yield* send("GET", resource, { headers: { accept: "text/html" } });
+          const pageText = yield* page.text;
+          assert.notInclude(pageText, "developer interface", resource);
+          assert.include(pageText, "SKYCOT", resource);
+        }
+        const asset = yield* send("GET", "/assets/index-abc12345.js");
+        assert.equal(asset.status, 200);
+        assert.equal(yield* asset.text, "// bundle");
 
         const wrong = yield* send("POST", "/api/skycot/family/verify", {
           body: { code: "000000", purpose: "advanced" },

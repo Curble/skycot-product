@@ -6,6 +6,7 @@
 import { AuthOrchestrationOperateScope, AuthSettingsWriteScope } from "@t3tools/contracts";
 import type { AuthEnvironmentScope } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
@@ -194,15 +195,42 @@ export const layer = Layer.mergeAll(
   lockRoute,
 );
 
-function isPagePath(path: Path.Path, pathname: string): boolean {
-  const ext = path.extname(pathname);
-  return ext === "" || ext === ".html";
-}
+const PAGE_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".shtml"]);
 
 /**
- * While the Family profile is on, any page outside `/simple/` (the developer interface and
- * its routes, `/pair` included: the redirect keeps the `#token` fragment) redirects to the
- * plain client unless the browser holds a live Advanced-mode unlock cookie. Assets still
+ * Whether the static handler (http.ts `handleStaticAndDevRequest`) would answer with a page
+ * outside the plain client. Mirrors its resolution rather than guessing from the URL: `/` is
+ * `index.html`, a path without an extension is that folder's `index.html`, and anything that
+ * is not a real file falls back to the developer interface's `index.html`, whatever its
+ * extension (QA FK-02: `/axolotl.png`, `/simple/x`). Only a real non-page file, or a file under
+ * `simple/`, is not a developer page; a script or image is inert without the page.
+ */
+export const servesDeveloperPage = Effect.fn("SkycotFamilyHttp.servesDeveloperPage")(function* (
+  staticDir: string,
+  pathname: string,
+) {
+  const path = yield* Path.Path;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const root = path.resolve(staticDir);
+  const relative = path
+    .normalize((pathname === "/" ? "/index.html" : pathname).replace(/^[/\\]+/, ""))
+    .replace(/^[/\\]+/, "");
+  // The handler refuses these with a plain-text 400; redirecting is just as safe.
+  if (relative.length === 0 || relative.startsWith("..") || relative.includes("\0")) return true;
+  const requested = path.resolve(root, relative);
+  const candidate = path.extname(requested) === "" ? path.join(requested, "index.html") : requested;
+  if (!candidate.startsWith(`${root}${path.sep}`)) return true;
+  const info = yield* fileSystem.stat(candidate).pipe(Effect.option);
+  if (Option.isNone(info) || info.value.type !== "File") return true;
+  const served = path.relative(root, candidate).replaceAll("\\", "/");
+  if (served.startsWith("simple/")) return false;
+  return PAGE_EXTENSIONS.has(path.extname(served).toLowerCase());
+});
+
+/**
+ * While the Family profile is on, any page outside the plain client (the developer interface and
+ * its routes, `/pair` included: the redirect keeps the `#token` fragment) redirects to
+ * `/simple/` unless the browser holds a live Advanced-mode unlock cookie. Real assets still
  * load: a script file is not an interface.
  *
  * Dev mode is skipped: there the stock client is served by its own Vite port, not by this
@@ -213,16 +241,13 @@ export const developerPageRedirect = Effect.fn("SkycotFamilyHttp.developerPageRe
   url: URL,
 ) {
   const config = yield* ServerConfig.ServerConfig;
-  if (config.devUrl) return null;
-  const pathname = url.pathname;
-  if (pathname === "/simple" || pathname.startsWith("/simple/")) return null;
-  const path = yield* Path.Path;
-  if (!isPagePath(path, pathname)) return null;
+  if (config.devUrl || config.staticDir === undefined) return null;
   // Optional so the static route's type (and upstream's tests) stay as they were.
   const familyService = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
   if (Option.isNone(familyService)) return null;
   const family = familyService.value;
   if (!(yield* family.isEnabled)) return null;
+  if (!(yield* servesDeveloperPage(config.staticDir, url.pathname))) return null;
   const cookie = request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
   if (yield* family.tokenAllows(cookie, "advanced")) return null;
   return HttpServerResponse.redirect("/simple/", { status: 302, headers: NO_STORE });
