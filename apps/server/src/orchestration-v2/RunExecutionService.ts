@@ -51,8 +51,6 @@ import {
   makeProviderFailureTurnItem,
 } from "@t3tools/provider-core/server/failure";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
-import * as SkycotFamily from "../skycot/SkycotFamily.ts"; // nondev-seam: skycot-family-instructions
-import * as SkycotFamilyInstructions from "../skycot/SkycotFamilyInstructions.ts"; // nondev-seam: skycot-family-instructions
 import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
 
 export interface ProviderEventRoutingState {
@@ -613,7 +611,6 @@ export const layer: Layer.Layer<
     const mcpAppModelContext = yield* McpAppModelContext.McpAppModelContext;
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
     const finalizationObserver = yield* RunFinalizationService.RunFinalizationObserver;
-    const skycotFamily = yield* Effect.serviceOption(SkycotFamily.SkycotFamily); // nondev-seam: skycot-family-instructions
 
     const writeFinalRunEvents = Effect.fn("RunExecutionService.writeFinalRunEvents")(
       function* (input: {
@@ -1543,7 +1540,7 @@ export const layer: Layer.Layer<
           attemptId: input.attemptId,
           rootNodeId: input.rootNode.id,
           providerThread: input.providerThread,
-          message: yield* SkycotFamilyInstructions.withFamilyRules(skycotFamily, input.message), // nondev-seam: skycot-family-instructions
+          message: input.message,
           modelSelection: input.modelSelection,
           runtimePolicy: input.runtimePolicy,
           ...(appContext.length === 0 ? {} : { appContext }),
