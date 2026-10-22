@@ -87,6 +87,8 @@
   overflow-wrap: anywhere;
 }
 .fm-peek__line {
+  /* Holds the screen-reader words, which are absolutely placed. */
+  position: relative;
   display: block;
   padding: 0 10px 0 0;
 }

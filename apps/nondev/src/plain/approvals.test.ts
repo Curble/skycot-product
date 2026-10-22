@@ -661,6 +661,9 @@ describe("describeRuntimeRequest — the real project folder beside a private co
     expect(card.risk).toBe("medium");
     expect(card.warning).toBe(REAL_PROJECT_WARNING);
     expect(card.warning).toContain("which Undo can't reverse");
+    expect(card.scopeExplainer).toBe(
+      "Your real project folder — not the private copy this conversation works in.",
+    );
     expect(decisions(card)).not.toContain("acceptAlways");
   });
 

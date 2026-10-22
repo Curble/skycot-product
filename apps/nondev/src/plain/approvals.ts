@@ -329,6 +329,9 @@ const READS_OUTSIDE_SCOPE = "Reads one file outside the project; changes nothing
 export const REAL_PROJECT_TITLE = "May I change your real project?";
 export const REAL_PROJECT_WARNING = `${REAL_PROJECT_SENTENCE} Undo only puts back the private copy this conversation works in.`;
 
+const REAL_PROJECT_SCOPE =
+  "Your real project folder — not the private copy this conversation works in.";
+
 const changesRealProject = (rules: RuleEvaluation) =>
   rules.matches.some((match) => match.rule.id === "changes-real-project");
 
@@ -500,7 +503,9 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
       ? READS_OUTSIDE_SCOPE
       : leavesSandbox
         ? "Runs outside the assistant's safe area, where it can reach the rest of this Mac."
-        : undefined,
+        : realProject
+          ? REAL_PROJECT_SCOPE
+          : undefined,
   );
 }
 
@@ -631,6 +636,7 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
       technical: item.prompt ?? "file change",
     },
     ctx,
+    realProject ? REAL_PROJECT_SCOPE : undefined,
   );
 }
 
