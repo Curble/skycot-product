@@ -190,7 +190,14 @@
     var(--fm-bg-window);
 }
 :root.dark .fm-asleep {
+  /* A few still stars: painted once, never animated. */
   background:
+    radial-gradient(2.2px 2.2px at 18% 22%, #fff8 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 32% 12%, #fff6 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 71% 18%, #fff8 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 84% 31%, #fff6 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 9% 41%, #fff5 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 58% 8%, #fff7 50%, transparent 51%),
     radial-gradient(
       1200px 600px at 50% 0%,
       color-mix(in srgb, #8894ff 22%, transparent),

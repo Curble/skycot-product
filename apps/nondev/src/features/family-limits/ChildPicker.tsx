@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "../../ui/Button";
+import { Mascot } from "../brand/Mascot";
 import { useModal } from "../../ui/useModal";
 import { ChildAvatar } from "../family/ChildAvatar";
 import { childLabel } from "../family/children";
@@ -65,6 +66,7 @@ export function ChildPicker({
       tabIndex={-1}
     >
       <div className="fm-picker__inner">
+        <Mascot pose="hello" size={104} decorative />
         <h1 id="fm-picker-title" className="fm-picker__title">
           <span className="fm-marker-underline">Who's using SKYCOT?</span>
         </h1>

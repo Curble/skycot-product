@@ -219,7 +219,7 @@ export function ChildEditorSheet({
 
         <section className="fm-child-editor__section">
           <h3>Look</h3>
-          <label className="fm-visually-hidden" htmlFor={ids.look}>
+          <label className="fm-sr-only" htmlFor={ids.look}>
             Look
           </label>
           <select

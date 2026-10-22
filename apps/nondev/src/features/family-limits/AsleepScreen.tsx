@@ -33,7 +33,8 @@ export function AsleepScreen({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [asking, setAsking] = useState(false);
-  useModal(ref, { open: true, onClose: () => setAsking(false), initialFocus: "first" });
+  // Focus lands on the screen itself: nothing is pressed for the child by accident.
+  useModal(ref, { open: true, onClose: () => setAsking(false), initialFocus: "body" });
   const copy = asleepCopy(state, child.limits, child.name, now, timeZone);
 
   return createPortal(
