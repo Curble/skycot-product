@@ -28,6 +28,8 @@ export const familyCopy = {
   storage: `${PRODUCT_NAME}'s engine keeps a scrambled version of the code on this Mac. Nobody can read it back, including ${PRODUCT_NAME}. If it's forgotten, see "Forgotten the code?" in the guide.`,
   askGrownUp: "Ask a grown-up",
   needsGrownUp: "Needs a grown-up",
+  /** Beside the mascot's "ask a grown-up" pose, above a card only a parent may allow. */
+  fetchGrownUp: "Time to find a grown-up",
   legacyTitle: "Move the Family profile to SKYCOT's engine",
   legacyBody:
     "This profile was set up in this browser only, so it could be cleared from the browser. Enter the parent code once and SKYCOT's engine will keep it and enforce it everywhere.",

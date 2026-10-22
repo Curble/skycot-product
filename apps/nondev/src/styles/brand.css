@@ -1,0 +1,102 @@
+/* The mascot (features/brand/Mascot.tsx). Artwork, not chrome: no theme or flavour restyles it,
+   and it never animates except one cross-fade when the sky changes while it is on screen. */
+.fm-mascot {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  line-height: 0;
+}
+.fm-mascot__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+/* Brand guide: the day drawing belongs on a light, calm background. On a dark window it sits on
+   a soft card of its own morning sky so the ink outline still reads. */
+html.dark .fm-mascot--day {
+  padding: 8%;
+  border-radius: 28%;
+  background: linear-gradient(180deg, #bbdfff 0%, #e8f4ff 100%);
+}
+.fm-mascot__img--fade {
+  animation: fm-mascot-fade 1s ease-out both;
+}
+@keyframes fm-mascot-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-mascot__img--fade {
+    animation: none;
+  }
+}
+
+/* Home: the greeting with a small hello beside it. */
+.fm-home__hello {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.fm-home__hello > div {
+  min-width: 0;
+}
+
+/* Empty states and standalone pages take the mascot in place of the icon tile. */
+.fm-empty__art {
+  margin-bottom: 4px;
+}
+.fm-standalone__art {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 10px;
+}
+
+/* A small mascot beside a card, outside its [data-sober] region so the card itself stays plain. */
+.fm-mascot-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: calc(12.5px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label-2);
+}
+
+/* Settings → About: the mascot above the product row, like a Mac About window's icon. */
+.fm-about-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 18px;
+  text-align: center;
+}
+.fm-about-hero__name {
+  font-family: var(--fm-font-label);
+  font-size: calc(17px * var(--fm-text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.fm-about-hero__line {
+  font-size: calc(12.5px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-sheet__art {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
+/* Settings → Appearance → Mascot: the drawing it will show, beside the choice. */
+.fm-mascot-setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fm-mascot-setting > :last-child {
+  flex: 1;
+  min-width: 0;
+}

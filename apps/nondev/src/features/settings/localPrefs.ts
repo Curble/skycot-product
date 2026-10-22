@@ -7,10 +7,15 @@ import {
   type AppearanceMode,
   writeAppearanceMode as writeThemeAppearanceMode,
 } from "../../app/theme";
+import {
+  MASCOT_OVERRIDE_KEY,
+  parseMascotOverride,
+  type MascotOverride,
+} from "../../plain/daylight";
 
 const listeners = new Set<() => void>();
 
-function subscribe(listener: () => void) {
+export function subscribeLocalPrefs(listener: () => void) {
   listeners.add(listener);
   window.addEventListener("storage", listener);
   return () => {
@@ -39,7 +44,7 @@ function write(key: string, value: string | null) {
 
 export function useStoredString(key: string): string | null {
   return useSyncExternalStore(
-    subscribe,
+    subscribeLocalPrefs,
     () => read(key),
     () => null,
   );
@@ -94,4 +99,16 @@ export function writeTextSize(size: TextSize) {
 }
 export function useTextSize(): TextSize {
   return useStoredString(TEXT_SIZE_KEY) === "large" ? "large" : "normal";
+}
+
+// Mascot: follow the sky (no key), or always one drawing. Only the in-app mascot and the tab
+// icon read it; the desktop Dock icon always follows the sky (apps/desktop/src/skycot/dockIcon.ts).
+export function readMascotOverride(): MascotOverride {
+  return parseMascotOverride(read(MASCOT_OVERRIDE_KEY));
+}
+export function writeMascotOverride(override: MascotOverride) {
+  write(MASCOT_OVERRIDE_KEY, override);
+}
+export function useMascotOverride(): MascotOverride {
+  return parseMascotOverride(useStoredString(MASCOT_OVERRIDE_KEY));
 }

@@ -11,6 +11,7 @@ import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
+import { Mascot } from "../brand/Mascot";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
 import { summarySentence } from "./summary";
 
@@ -55,17 +56,23 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               />
             </div>
           ) : null}
-          <div>
-            {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
-            <h2 className="fm-home__greeting">
-              <span className="fm-marker-underline">
-                {greeting()}
-                {family.enabled && family.profile.childName ? `, ${family.profile.childName}` : ""}.
-              </span>
-            </h2>
-            <p className="fm-home__sub">
-              {summarySentence(working, waiting, ready, rows.length, connected)}
-            </p>
+          <div className="fm-home__hello">
+            <Mascot pose="hello" size={60} />
+            <div>
+              {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
+              <h2 className="fm-home__greeting">
+                <span className="fm-marker-underline">
+                  {greeting()}
+                  {family.enabled && family.profile.childName
+                    ? `, ${family.profile.childName}`
+                    : ""}
+                  .
+                </span>
+              </h2>
+              <p className="fm-home__sub">
+                {summarySentence(working, waiting, ready, rows.length, connected)}
+              </p>
+            </div>
           </div>
           <div className="fm-home__grid">
             <Card label="Today, across every project">

@@ -3,7 +3,6 @@
 // the fragment is reset and the page reloads so the WebSocket picks up the new
 // session cookie, as the stock /pair route does.
 import type { AuthSessionState } from "@t3tools/contracts";
-import { Laptop } from "lucide-react";
 import React, { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
@@ -13,6 +12,7 @@ import {
 } from "~/environments/primary/auth";
 
 import { CLI_NAME, PRODUCT_NAME } from "../brand";
+import { Mascot } from "../features/brand/Mascot";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -76,8 +76,8 @@ export function PairRoute({
 
   return (
     <StandalonePage>
-      <span className="fm-standalone__icon" aria-hidden>
-        <Laptop size={30} strokeWidth={1.6} />
+      <span className="fm-standalone__art">
+        <Mascot pose="hello" size={88} />
       </span>
       <h1 className="fm-standalone__title">Connect to your Mac</h1>
       <p className="fm-standalone__text">

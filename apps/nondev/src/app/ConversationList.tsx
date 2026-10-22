@@ -2,8 +2,10 @@ import { useAtomValue } from "@effect/atom-react";
 import type { ThreadId } from "@t3tools/contracts";
 import { Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
 
+import { Mascot } from "../features/brand/Mascot";
 import { navigate, threadHref } from "../router";
 import { conversationRowsAtom, filterRows, type ConversationRow } from "../state/conversations";
+import { environmentProjects } from "../state/projects";
 import { IconButton } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchField } from "../ui/SearchField";
@@ -35,6 +37,7 @@ export function ConversationList({
   const crew = useCrew();
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
+  const projectCount = useAtomValue(environmentProjects.projectsAtom).length;
   const visible = filterRows(rows, shell.filter, shell.projectKey, shell.search);
   const now = new Date();
   const groups = new Map<DateGroup, ConversationRow[]>();
@@ -76,8 +79,18 @@ export function ConversationList({
           <EmptyState icon={Laptop} title="Waiting for your Mac…">
             Your conversations appear as soon as it's reachable.
           </EmptyState>
+        ) : rows.length === 0 && projectCount === 0 ? (
+          <EmptyState art={<Mascot pose="hello" size={72} />} title="No projects yet">
+            Open a folder in the sidebar, the one that holds your website or app, then say what
+            you'd like done.
+          </EmptyState>
         ) : visible.length === 0 ? (
-          <EmptyState icon={MessageSquareDashed} title={emptyTitle(shell.filter, shell.search)}>
+          <EmptyState
+            {...(rows.length === 0
+              ? { art: <Mascot pose="hello" size={72} /> }
+              : { icon: MessageSquareDashed })}
+            title={emptyTitle(shell.filter, shell.search)}
+          >
             {emptyText(shell.filter, shell.search, rows.length, crew.builder.name)}
           </EmptyState>
         ) : (

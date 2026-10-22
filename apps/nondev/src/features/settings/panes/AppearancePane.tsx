@@ -1,20 +1,27 @@
-import { ADVANCED_MODE_LABEL } from "../../../brand";
+import { ADVANCED_MODE_LABEL, MASCOT_REFERENCE } from "../../../brand";
+import type { MascotOverride } from "../../../plain/daylight";
+import { Mascot } from "../../brand/Mascot";
 import { ThemeGallery } from "../../../themes/ThemeGallery";
 import { ListExtra, ListRow } from "../../../ui/ListRow";
 import { SegmentedControl } from "../../../ui/SegmentedControl";
 import { Switch } from "../../../ui/Switch";
 import {
   useAppearanceMode,
+  useMascotOverride,
   useTextSize,
   writeAppearanceMode,
+  writeMascotOverride,
   writeTextSize,
   type AppearanceMode,
 } from "../localPrefs";
+
+type MascotChoice = "sky" | "day" | "dusk";
 import { SettingsGroup } from "../SettingsGroup";
 
 export function AppearancePane() {
   const mode = useAppearanceMode();
   const textSize = useTextSize();
+  const mascot = useMascotOverride();
   return (
     <>
       <SettingsGroup
@@ -46,6 +53,27 @@ export function AppearancePane() {
         </ListExtra>
       </SettingsGroup>
       <SettingsGroup
+        title="Mascot"
+        footer={`By day ${MASCOT_REFERENCE} sits in a blue morning sky; from dusk to dawn where you are, it switches to its twilight look with a star. Light or dark mode is separate.`}
+      >
+        <ListExtra>
+          <div className="fm-setting-block fm-mascot-setting">
+            <Mascot pose="hello" size={48} />
+            <SegmentedControl<MascotChoice>
+              label="Mascot"
+              value={mascot ?? "sky"}
+              onChange={(choice) => writeMascotOverride(toOverride(choice))}
+              block
+              options={[
+                { value: "sky", label: "Follow the sky" },
+                { value: "day", label: "Always day" },
+                { value: "dusk", label: "Always dusk" },
+              ]}
+            />
+          </div>
+        </ListExtra>
+      </SettingsGroup>
+      <SettingsGroup
         title="Text size"
         footer="Larger text makes every word in the app about an eighth bigger; buttons and rows grow to fit, and sheets still fit the window. On by default for a Family profile."
       >
@@ -63,4 +91,8 @@ export function AppearancePane() {
       </SettingsGroup>
     </>
   );
+}
+
+function toOverride(choice: MascotChoice): MascotOverride {
+  return choice === "sky" ? null : choice;
 }

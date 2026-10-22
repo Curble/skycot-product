@@ -40,6 +40,7 @@ import { List, ListExtra, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { Sheet } from "../../ui/Sheet";
+import { Mascot } from "../brand/Mascot";
 import { StepBadge } from "../../ui/StepBadge";
 import { TextField } from "../../ui/TextField";
 import { AUTONOMY_LEVELS, describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
@@ -167,6 +168,11 @@ export function OnboardingSheet({
       open
       onClose={cancel}
       icon={meta.icon}
+      {...(step === "who"
+        ? { art: <Mascot pose="hello" size={64} /> }
+        : step === "done"
+          ? { art: <Mascot pose="yay" size={64} /> }
+          : {})}
       iconTone={step === "autonomy" ? "orange" : step === "family" ? "grey" : "blue"}
       title={meta.title}
       description={

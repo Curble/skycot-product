@@ -9,14 +9,7 @@ import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import {
-  ChevronLeft,
-  Clock,
-  MessageSquareDashed,
-  Receipt,
-  ShieldAlert,
-  Square,
-} from "lucide-react";
+import { ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { newMessageId } from "~/lib/utils";
@@ -41,6 +34,7 @@ import { TypingIndicator } from "../../ui/Bubble";
 import { EmptyState } from "../../ui/EmptyState";
 import { Pill } from "../../ui/Pill";
 import { ProgressBar } from "../../ui/ProgressBar";
+import { Mascot } from "../brand/Mascot";
 import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
 import { useStartNote } from "../compose/startNotes";
@@ -272,7 +266,7 @@ export function ConversationView({
         </div>
       ) : projection.turnItems.length === 0 ? (
         <div className="fm-stream">
-          <EmptyState icon={MessageSquareDashed} title="Nothing has been said yet">
+          <EmptyState art={<Mascot pose="hello" size={72} />} title="Nothing has been said yet">
             Say what you'd like done and {crewName} will show you a plan first.
           </EmptyState>
         </div>

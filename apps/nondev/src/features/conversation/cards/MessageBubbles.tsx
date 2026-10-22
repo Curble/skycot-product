@@ -4,6 +4,7 @@ import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { CircleAlert } from "lucide-react";
 
 import { describeTurnItem } from "../../../plain/narration";
+import { Mascot } from "../../brand/Mascot";
 import { useCrew } from "../../../themes/useCrew";
 import { Bubble, TypingIndicator } from "../../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../../ui/Card";
@@ -71,6 +72,10 @@ export function ErrorNote({
         : null;
   return (
     <Bubble author="crew" full meta={shortTime(item.updatedAt)}>
+      <p className="fm-mascot-kicker">
+        <Mascot pose="oops" size={36} />
+        Oops
+      </p>
       <div className="fm-approval fm-approval--high" data-sober="">
         <Card label="Something went wrong">
           <CardHeader

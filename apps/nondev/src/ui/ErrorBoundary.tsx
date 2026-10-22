@@ -1,7 +1,7 @@
-import { CircleAlert } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { PRODUCT_NAME } from "../brand";
+import { Mascot } from "../features/brand/Mascot";
 import { Button } from "./Button";
 import { Card } from "./Card";
 
@@ -32,8 +32,8 @@ export class ErrorBoundary extends Component<{ readonly children: ReactNode }, S
       <div className="fm-standalone" data-sober="">
         <Card label={PRODUCT_NAME}>
           <div className="fm-standalone__card" role="alert">
-            <span className="fm-standalone__icon fm-standalone__icon--danger" aria-hidden>
-              <CircleAlert size={30} strokeWidth={1.6} />
+            <span className="fm-standalone__art">
+              <Mascot pose="oops" size={88} />
             </span>
             <h1 className="fm-standalone__title">Something went wrong</h1>
             <p className="fm-standalone__text">

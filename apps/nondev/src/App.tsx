@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ServerProvider } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { Laptop, SearchX, WifiOff } from "lucide-react";
+import { Laptop } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -24,6 +24,7 @@ import { HOME_HREF, navigate, useRoute, type Route } from "./router";
 import { HomeRoute } from "./routes/Home";
 import { enabledEnvironmentIdsAtom } from "./state/catalog";
 import { serverEnvironment } from "./state/server";
+import { Mascot } from "./features/brand/Mascot";
 import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
 import { useColumns } from "./app/useColumns";
@@ -88,8 +89,8 @@ export function App() {
   if (gate.status === "failed") {
     return (
       <StandalonePage>
-        <span className="fm-standalone__icon fm-standalone__icon--danger" aria-hidden>
-          <WifiOff size={30} strokeWidth={1.6} />
+        <span className="fm-standalone__art">
+          <Mascot pose="oops" size={88} />
         </span>
         <h1 className="fm-standalone__title">Can't reach your Mac</h1>
         <p className="fm-standalone__text">
@@ -142,8 +143,8 @@ export function App() {
               case "not-found":
                 return (
                   <StandalonePage>
-                    <span className="fm-standalone__icon fm-standalone__icon--muted" aria-hidden>
-                      <SearchX size={30} strokeWidth={1.6} />
+                    <span className="fm-standalone__art">
+                      <Mascot pose="thinking" size={88} />
                     </span>
                     {/* An h2: the title bar already carries the page's h1. */}
                     <h2 className="fm-standalone__title">There's nothing here</h2>

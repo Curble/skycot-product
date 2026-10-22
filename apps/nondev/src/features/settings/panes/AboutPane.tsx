@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { Globe, Hammer, Scale, ScrollText } from "lucide-react";
+import { Globe, Scale, ScrollText } from "lucide-react";
 import { useState } from "react";
 
 import { APP_VERSION } from "~/branding";
@@ -10,6 +10,7 @@ import { APP_VERSION } from "~/branding";
 import mitLicenseText from "../../../../../../LICENSE?raw";
 import { ADVANCED_MODE_LABEL, COPYRIGHT_LINE, PRODUCT_NAME } from "../../../brand";
 import { serverEnvironment } from "../../../state/server";
+import { Mascot } from "../../brand/Mascot";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
 import { Sheet } from "../../../ui/Sheet";
@@ -82,12 +83,15 @@ export function AboutPane({ environmentId }: { readonly environmentId: Environme
   const [noticesOpen, setNoticesOpen] = useState(false);
   return (
     <>
-      <SettingsGroup title={PRODUCT_NAME} footer={`${COPYRIGHT_LINE}, Melbourne, Australia.`}>
-        <ListRow
-          leading={<StepBadge state="now" icon={Hammer} />}
-          title={PRODUCT_NAME}
-          subtitle={`Version ${APP_VERSION}${config ? ` · engine ${config.environment.serverVersion}` : ""}`}
-        />
+      <div className="fm-about-hero">
+        <Mascot pose="hello" size={88} />
+        <span className="fm-about-hero__name">{PRODUCT_NAME}</span>
+        <span className="fm-about-hero__line">
+          Version {APP_VERSION}
+          {config ? ` · engine ${config.environment.serverVersion}` : ""}
+        </span>
+      </div>
+      <SettingsGroup title="Online" footer={`${COPYRIGHT_LINE}, Melbourne, Australia.`}>
         <ListRow
           leading={<StepBadge state="todo" icon={Globe} />}
           title="Website"

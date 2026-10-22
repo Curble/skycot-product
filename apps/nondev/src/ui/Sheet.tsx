@@ -13,6 +13,8 @@ interface SheetProps {
   readonly description?: ReactNode;
   readonly icon?: LucideIcon;
   readonly iconTone?: SheetIconTone;
+  /** Artwork (the mascot) shown instead of the icon tile. */
+  readonly art?: ReactNode;
   readonly children?: ReactNode;
   /** Buttons, right-aligned. Nothing is pre-selected: pass `initialFocus="body"` to keep it so. */
   readonly actions?: ReactNode;
@@ -38,6 +40,7 @@ export function Sheet({
   description,
   icon: Icon,
   iconTone = "blue",
+  art,
   children,
   actions,
   note,
@@ -71,7 +74,11 @@ export function Sheet({
         data-sober={sober ? "" : undefined}
       >
         <div className="fm-sheet__top">
-          {Icon ? (
+          {art ? (
+            <span className="fm-sheet__art" aria-hidden>
+              {art}
+            </span>
+          ) : Icon ? (
             <span className={`fm-sheet__icon fm-sheet__icon--${iconTone}`} aria-hidden>
               <Icon size={28} strokeWidth={1.7} />
             </span>

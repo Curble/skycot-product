@@ -9,23 +9,14 @@ import { App } from "./App";
 import { applyPlatformClasses, writeUiMode } from "./app/platform";
 import { startThemeSync } from "./app/theme";
 import { applyTextSize, readTextSize } from "./features/settings/localPrefs";
-import { FAVICON_DATA_URI, PRODUCT_NAME } from "./brand";
+import { PRODUCT_NAME } from "./brand";
+import { startDaylightBranding } from "./features/brand/useDaylightPhase";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 
-function applyBranding() {
-  document.title = PRODUCT_NAME;
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "icon";
-    document.head.appendChild(link);
-  }
-  link.type = "image/svg+xml";
-  link.href = FAVICON_DATA_URI;
-}
-
 export const startup = Promise.resolve().then(() => {
-  applyBranding();
+  document.title = PRODUCT_NAME;
+  // Tab icon: day or dusk drawing, switched at local civil dusk and dawn.
+  startDaylightBranding();
   applyPlatformClasses();
   startThemeSync();
   applyTextSize(readTextSize());

@@ -52,6 +52,7 @@ import {
   isFamilyRefusal,
   toolItemTypeFor,
 } from "../../family/cards";
+import { Mascot } from "../../brand/Mascot";
 import { familyCopy } from "../../family/copy";
 import { useFamily } from "../../family/FamilyProvider";
 
@@ -292,6 +293,13 @@ export function RequestCard({
       full
       meta={decided ? undefined : shortTime(item.startedAt ?? item.updatedAt)}
     >
+      {grownUp !== null && !decided ? (
+        // Outside the sober region on purpose: the card below stays plain in every theme.
+        <p className="fm-mascot-kicker">
+          <Mascot pose="ask-a-grown-up" size={40} />
+          {familyCopy.fetchGrownUp}
+        </p>
+      ) : null}
       <div className={classes} ref={cardRef} tabIndex={decided ? undefined : -1} data-sober="">
         {crew.named && !decided ? (
           <p className="fm-crew-kicker">
