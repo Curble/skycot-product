@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 import { isElectron } from "../../app/platform";
+import { currentChild } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import {
   readAloudOn,
@@ -109,10 +110,15 @@ export function useVoiceSettings(): VoiceSettings {
   const choiceOff = useVoiceTypingOff();
   const parentOff = useFamilyVoiceTypingOff();
   const readAloudChoice = useReadAloudChoice();
+  // In a Family profile the child's own settings (kept by the engine) decide: voice typing is
+  // off until a parent turns it on for that child, and this device's switch can still keep it
+  // off for everyone.
+  const child = family.enabled ? currentChild(family.profile) : null;
+  const childTyping = child?.voice.typing === true;
   const typingOffBecause =
     speechService === "none"
       ? "browser"
-      : family.enabled && parentOff
+      : family.enabled && (parentOff || !childTyping)
         ? "parent"
         : choiceOff
           ? "choice"
@@ -122,7 +128,8 @@ export function useVoiceSettings(): VoiceSettings {
     typing: typingOffBecause === null,
     typingOffBecause,
     service: speechService,
-    readAloud: canSpeak && readAloudOn(readAloudChoice, family.enabled),
+    readAloud:
+      canSpeak && readAloudOn(readAloudChoice, family.enabled && (child?.voice.readAloud ?? true)),
     canSpeak,
     rate: speakingRate(family.enabled),
   };

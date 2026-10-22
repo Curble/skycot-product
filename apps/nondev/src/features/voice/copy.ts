@@ -64,3 +64,47 @@ export function problemSentence(problem: VoiceTypingProblem): string {
       return "I stopped listening after a minute. Tap the microphone to keep going.";
   }
 }
+
+/**
+ * For the parent turning voice typing on for a child (Settings › Family): where this browser
+ * sends the child's voice, in plain words, and which browser is the better choice for a child.
+ */
+export function whereChildVoiceGoes(
+  service: SpeechService,
+  childName: string | null,
+): {
+  readonly where: string;
+  readonly advice: string | null;
+} {
+  const whose = childName ? `${childName}'s` : "the child's";
+  const safari =
+    "For children, Safari is the better choice: on recent Macs Apple's dictation can turn the voice into words on the Mac itself.";
+  switch (service) {
+    case "apple":
+      return {
+        where: `In Safari, Apple's dictation turns ${whose} voice into words. On recent Macs that can happen on the Mac itself; otherwise the sound goes to Apple, under Apple's privacy terms.`,
+        advice: null,
+      };
+    case "google":
+      return {
+        where: `This browser is Chrome. It sends the sound of ${whose} voice to Google, which turns it into words under Google's privacy terms.`,
+        advice: safari,
+      };
+    case "microsoft":
+      return {
+        where: `This browser is Edge. It sends the sound of ${whose} voice to Microsoft, which turns it into words under Microsoft's privacy terms.`,
+        advice: safari,
+      };
+    case "browser":
+      return {
+        where: `This browser turns ${whose} voice into words with its own speech service, which may send the sound to its maker.`,
+        advice: safari,
+      };
+    case "none":
+      return {
+        where:
+          "This browser can't listen, so voice typing won't show here even when it's on. It works in Safari or Chrome on the Mac.",
+        advice: null,
+      };
+  }
+}
