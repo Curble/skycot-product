@@ -189,9 +189,10 @@ export function RequestCard({
       : projection.runtimeRequests.find((r) => r.id === item.requestId);
   const toolCallInput =
     item.type === "approval_request" ? toolCallInputFor(item, projection.turnItems) : undefined;
-  // Files live in the thread's private copy when it has one; the project
-  // folder is only "outside" when neither matches.
-  const projectRoot = shell?.worktreePath ?? project?.workspaceRoot ?? null;
+  // Files live in the thread's private copy when it has one; the project's
+  // own folder is inside too, so only a path under neither is "outside".
+  const projectFolder = project?.workspaceRoot ?? null;
+  const projectRoot = shell?.worktreePath ?? projectFolder;
   // A push is judged by branch, as the server's policy judged it: the thread's
   // own branch first, else the folder's; the live branch from the folder. Only
   // a push ask pays for the status lookup.
@@ -202,6 +203,7 @@ export function RequestCard({
   const card = describeRuntimeRequest(item, {
     ...(projectName === null ? {} : { projectName }),
     ...(projectRoot === null ? {} : { projectRoot }),
+    ...(projectFolder === null ? {} : { projectFolder }),
     ...(needsBranch
       ? {
           currentBranch: shell?.branch ?? vcsStatus?.refName ?? null,
@@ -221,6 +223,7 @@ export function RequestCard({
     familyApplies && item.type === "approval_request"
       ? familyHoldFor(item, {
           projectRoot,
+          projectFolder,
           toolCallInput,
           toolItemType: toolItemTypeFor(item, projection.turnItems),
         })

@@ -110,6 +110,7 @@ const withGate = <A, E, R>(
     readonly gate: SkycotFamilyGate.SkycotFamilyGate["Service"];
     readonly family: SkycotFamily.SkycotFamily["Service"];
   }) => Effect.Effect<A, E, R>,
+  threadWorktreePath: string | null = ROOT,
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -118,7 +119,7 @@ const withGate = <A, E, R>(
     const layerFamily = SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME));
     const layerProjections = Layer.mergeAll(
       Layer.mock(ProjectionStore.ProjectionStoreV2)({
-        getThread: () => Effect.succeed(thread),
+        getThread: () => Effect.succeed({ ...thread, worktreePath: threadWorktreePath }),
         getTurnItem: ({ itemId }) =>
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
       }),
@@ -519,6 +520,21 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
       }),
     ),
   );
+
+  it.effect("lets the child allow an edit in the conversation's private copy", () => {
+    const copy = "/Users/kid/.t3/worktrees/Space game copy/skycot-rockets-1a2b";
+    return withGate(
+      [approval("file-change", `add ${copy}/rockets.html`)],
+      ({ gate, family }) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          assert.isFalse(
+            yield* gate.requestNeedsGrownUp({ threadId: THREAD_ID, requestId: REQUEST_ID }),
+          );
+        }),
+      copy,
+    );
+  });
 
   it.effect("holds an internet step for the parent code, and spends the grant once", () =>
     withGate(

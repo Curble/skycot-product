@@ -13,6 +13,18 @@ const PROMPT_FILE_VERB =
 /** Claude's fallback summary: `Write: /abs/path`, `Read: /abs/path`, `Edit: /abs/path`. */
 const TOOL_PREFIX = /^(write|edit|multiedit|notebookedit|read|glob|grep|ls|create|delete)\s*:\s+/i;
 
+/** `/Users/…`, `~/…`, `C:\…`: a path that cannot be the first word of a sentence. */
+const ABSOLUTE_PATH = /^(\/|~[\\/]|[A-Za-z]:\\)/;
+
+/**
+ * The full paths on one line: split only where another full path starts (or at a rename's
+ * `->`), so a space inside a folder name stays part of the path and a second path is never
+ * hidden behind the first.
+ */
+function splitFullPaths(rest: string): Array<string> {
+  return rest.split(/\s+->\s+|\s+(?=\/|~[\\/]|[A-Za-z]:\\)/).filter((part) => part.length > 0);
+}
+
 function promptOperation(verb: string | undefined): PromptFileOperation {
   const value = verb?.toLowerCase() ?? "";
   if (value === "add" || value === "create" || value === "write") return "add";
@@ -47,13 +59,25 @@ export function filesFromPrompt(prompt: string | undefined): Array<PromptFile> {
     if (tool) {
       const rest = line.replace(TOOL_PREFIX, "").trim();
       if (rest.length > 0 && !/\s{2,}/.test(rest))
-        push(rest.split(/\s+/)[0]!, promptOperation(tool[1]));
+        for (const path of ABSOLUTE_PATH.test(rest)
+          ? splitFullPaths(rest)
+          : [rest.split(/\s+/)[0]!])
+          push(path, promptOperation(tool[1]));
       continue;
     }
     const verb = line.match(PROMPT_FILE_VERB)?.[1];
     const rest = line.replace(PROMPT_FILE_VERB, "").trim();
     // Two or more spaces means prose, not a path; a single space may still be "verb path".
     if (rest.length === 0 || /\s{2,}/.test(rest)) continue;
+    // A full path is the whole rest of the line: folders are often named with spaces
+    // ("Little Fern Café website"), and the engine names a private copy after the project.
+    if (verb !== undefined && ABSOLUTE_PATH.test(rest)) {
+      const renamed = /\s->\s/.test(rest);
+      splitFullPaths(rest).forEach((path, index) =>
+        push(path, renamed && index > 0 ? "add" : promptOperation(verb)),
+      );
+      continue;
+    }
     const [first, arrow, second] = rest.split(/\s+/);
     // "Edit the booking page": several words and the first is not path-shaped is prose.
     if (arrow !== undefined && !/[\\/.]/.test(first!)) continue;
@@ -84,19 +108,22 @@ function isUnder(path: string, root: string): boolean {
   return path === r || path.startsWith(`${r}/`) || path.startsWith(`${r}\\`);
 }
 
+type ProjectRoots = string | undefined | null | ReadonlyArray<string | undefined | null>;
+
 /**
- * True when a path escapes the project folder (the thread's private copy when it has one).
- * Relative paths count as outside only when they climb with `..`. Without a known root,
- * only well-known system and home prefixes count.
+ * True when a path escapes the project: the thread's private copy and the project's own
+ * folder both count as inside. Relative paths count as outside only when they climb with
+ * `..`. Without a known root, only well-known system and home prefixes count.
  */
-export function isOutsideProject(
-  path: string | undefined,
-  projectRoot: string | undefined | null,
-): boolean {
+export function isOutsideProject(path: string | undefined, projectRoots: ProjectRoots): boolean {
   if (!path) return false;
   if (HARMLESS_DEVICES.has(path)) return false;
-  if (SYSTEM_PREFIX.test(path)) return !projectRoot || !isUnder(path, projectRoot);
-  if (path.startsWith("/")) return projectRoot ? !isUnder(path, projectRoot) : false;
+  const roots = (typeof projectRoots === "string" ? [projectRoots] : (projectRoots ?? [])).filter(
+    (root): root is string => typeof root === "string" && root.length > 0,
+  );
+  const inside = roots.some((root) => isUnder(path, root));
+  if (SYSTEM_PREFIX.test(path)) return !inside;
+  if (path.startsWith("/")) return roots.length > 0 && !inside;
   return /(^|[\\/])\.\.([\\/]|$)/.test(path);
 }
 

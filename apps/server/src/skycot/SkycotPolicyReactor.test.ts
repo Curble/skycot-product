@@ -374,6 +374,30 @@ describe("SkycotPolicyReactor", () => {
     }),
   );
 
+  // The engine names a private copy after the project, spaces and all; an edit inside it, or
+  // in the project's own folder, is in the project.
+  it.effect("approves edits in a private copy whose path has spaces, and in the folder", () =>
+    Effect.gen(function* () {
+      const copy = "/home/kid/.t3/worktrees/Little Fern Café website/skycot-menu-eedf";
+      const edit = (prompt: string) =>
+        run(
+          {
+            thread: thread("auto-accept-edits", copy),
+            request: request("file-change"),
+            items: [approvalItem("file-change", prompt)],
+          },
+          requestEvent(request("file-change")),
+        );
+      assert.equal((yield* edit(`add ${copy}/christmas.html`)).outcome.type, "approved");
+      assert.equal((yield* edit("update /projects/site/menu.html")).outcome.type, "approved");
+      assert.equal(
+        (yield* edit("update /home/kid/.t3/worktrees/Little Fern Café website/other/a.html"))
+          .outcome.type,
+        "held",
+      );
+    }),
+  );
+
   it.effect("holds file deletes and edits outside the project, approves ordinary edits", () =>
     Effect.gen(function* () {
       const del = yield* run(

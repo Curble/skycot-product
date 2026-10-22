@@ -30,6 +30,27 @@ describe("filesFromPrompt", () => {
     ]);
   });
 
+  // The engine names a private copy after the project, so its path often has spaces in it.
+  it("keeps a full path whole when its folders have spaces", () => {
+    const copy = "/Users/kid/.t3/worktrees/Little Fern Café website/skycot-christmas-eedf";
+    expect(filesFromPrompt(`add ${copy}/christmas.html\nupdate ${copy}/menu.html`)).toEqual([
+      { path: `${copy}/christmas.html`, operation: "add" },
+      { path: `${copy}/menu.html`, operation: "change" },
+    ]);
+    expect(filesFromPrompt(`Write: ${copy}/new page.html`)).toEqual([
+      { path: `${copy}/new page.html`, operation: "add" },
+    ]);
+    expect(filesFromPrompt(`update ${copy}/old.html -> ${copy}/new.html`)).toEqual([
+      { path: `${copy}/old.html`, operation: "change" },
+      { path: `${copy}/new.html`, operation: "add" },
+    ]);
+    // A second full path on the line is its own file, never hidden behind the first.
+    expect(filesFromPrompt(`update ${copy}/menu.html /etc/hosts`)).toEqual([
+      { path: `${copy}/menu.html`, operation: "change" },
+      { path: "/etc/hosts", operation: "change" },
+    ]);
+  });
+
   it("ignores prose and empty prompts", () => {
     expect(filesFromPrompt(undefined)).toEqual([]);
     expect(filesFromPrompt("Allow the  assistant to  edit the booking page")).toEqual([]);
@@ -50,6 +71,17 @@ describe("isOutsideProject", () => {
     expect(isOutsideProject("../other/index.html", root)).toBe(true);
     expect(isOutsideProject("~/.zshrc", root)).toBe(true);
     expect(isOutsideProject("/dev/null", root)).toBe(false);
+  });
+
+  it("counts the thread's private copy and the project's own folder as inside", () => {
+    const roots = ["/Users/me/.t3/worktrees/site/skycot-menu-1a2b", root];
+    expect(isOutsideProject("/Users/me/.t3/worktrees/site/skycot-menu-1a2b/a.html", roots)).toBe(
+      false,
+    );
+    expect(isOutsideProject("/Users/me/site/a.html", roots)).toBe(false);
+    expect(isOutsideProject("/Users/me/.t3/worktrees/site/other-copy/a.html", roots)).toBe(true);
+    expect(isOutsideProject("/etc/hosts", roots)).toBe(true);
+    expect(isOutsideProject("/etc/hosts", [null, undefined])).toBe(true);
   });
 
   it("falls back to system prefixes when the root is unknown", () => {

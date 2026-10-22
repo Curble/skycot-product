@@ -146,13 +146,14 @@ const make = Effect.gen(function* () {
     });
   });
 
-  const projectRootFor = Effect.fnUntraced(function* (thread: {
+  /** Where the thread works (its private copy, else the folder), and the project's folder. */
+  const projectRootsFor = Effect.fnUntraced(function* (thread: {
     readonly projectId: ProjectId;
     readonly worktreePath: string | null;
   }) {
-    if (thread.worktreePath !== null) return thread.worktreePath;
     const project = yield* projects.get(thread.projectId);
-    return Option.isSome(project) ? project.value.workspaceRoot : null;
+    const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
+    return { projectRoot: thread.worktreePath ?? projectFolder, projectFolder };
   });
 
   /** False once the person asked to stop the run, or the run has already settled. */
@@ -197,9 +198,11 @@ const make = Effect.gen(function* () {
     const toolCall = yield* toolCallFor(input.threadId, approval, input.driver);
     const facts = requestFacts(approval, toolCall, input.driver);
     if (facts === null) return skipped("request kind unknown");
-    const projectRoot = yield* projectRootFor(thread);
-    const branches = needsBranchContext(facts) ? yield* branchContextFor(thread, projectRoot) : {};
-    const evaluation = evaluateRequest(facts, { projectRoot, ...branches });
+    const roots = yield* projectRootsFor(thread);
+    const branches = needsBranchContext(facts)
+      ? yield* branchContextFor(thread, roots.projectRoot)
+      : {};
+    const evaluation = evaluateRequest(facts, { ...roots, ...branches });
     if (evaluation.decision === "hold") {
       yield* Effect.logInfo("skycot-policy.held", {
         threadId: input.threadId,

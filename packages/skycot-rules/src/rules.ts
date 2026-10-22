@@ -142,6 +142,8 @@ export function hardRule(id: HardRuleId): HardRule {
 export interface RuleContext {
   /** The thread's private copy when it has one, else the project folder. */
   readonly projectRoot?: string | null | undefined;
+  /** The project's own folder when `projectRoot` is a private copy of it: inside too. */
+  readonly projectFolder?: string | null | undefined;
   /** The branch everyone sees, when the engine knows it. */
   readonly defaultBranch?: string | null | undefined;
   /**
@@ -151,6 +153,8 @@ export interface RuleContext {
    */
   readonly currentBranch?: string | null | undefined;
 }
+
+const projectRoots = (ctx: RuleContext) => [ctx.projectRoot, ctx.projectFolder];
 
 export interface RuleMatch {
   readonly rule: HardRule;
@@ -652,7 +656,7 @@ function evaluateSegment(segment: string, ctx: RuleContext, namesOnly = false): 
   const onlyLooks = looksWithoutWriting(base, args, segment);
   const outside = [...(base === "cd" ? positional.slice(0, 1) : []), ...pathTokens(args)].filter(
     (candidate) =>
-      isOutsideProject(candidate, ctx.projectRoot) &&
+      isOutsideProject(candidate, projectRoots(ctx)) &&
       !(onlyLooks && isProviderInstructionPath(candidate)),
   );
   if (outside.length > 0) {
@@ -703,7 +707,7 @@ export function evaluateFileChange(
   for (const file of files) {
     if (file.operation === "remove")
       matches.push({ rule: hardRule("deletes-files"), detail: file.path });
-    if (isOutsideProject(file.path, ctx.projectRoot)) {
+    if (isOutsideProject(file.path, projectRoots(ctx))) {
       matches.push({ rule: hardRule("outside-project"), detail: file.path });
     }
     if (isSecretPath(file.path)) matches.push({ rule: hardRule("secrets"), detail: file.path });
@@ -718,7 +722,7 @@ export function evaluateFileRead(
 ): RuleEvaluation {
   const matches: Array<RuleMatch> = [];
   for (const file of files) {
-    if (isOutsideProject(file.path, ctx.projectRoot) && !isProviderInstructionPath(file.path)) {
+    if (isOutsideProject(file.path, projectRoots(ctx)) && !isProviderInstructionPath(file.path)) {
       matches.push({ rule: hardRule("reads-outside-project"), detail: file.path });
     }
     if (isSecretPath(file.path)) matches.push({ rule: hardRule("secrets"), detail: file.path });

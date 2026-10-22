@@ -328,13 +328,14 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
 
-  const projectRootFor = Effect.fnUntraced(function* (thread: {
+  /** Where the thread works (its private copy, else the folder), and the project's folder. */
+  const projectRootsFor = Effect.fnUntraced(function* (thread: {
     readonly projectId: ProjectId;
     readonly worktreePath: string | null;
   }) {
-    if (thread.worktreePath !== null) return thread.worktreePath;
     const project = yield* projects.get(thread.projectId);
-    return Option.isSome(project) ? project.value.workspaceRoot : null;
+    const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
+    return { projectRoot: thread.worktreePath ?? projectFolder, projectFolder };
   });
 
   const toolCallFor = Effect.fnUntraced(function* (
@@ -372,10 +373,9 @@ const make = Effect.gen(function* () {
     const toolCall = yield* toolCallFor(input.threadId, approval, driver);
     const facts = requestFacts(approval, toolCall, driver);
     if (facts === null) return null;
-    const projectRoot = yield* projectRootFor(thread);
     return evaluateFamilyRequest(
       { ...facts, toolItemType: toolCall?.type },
-      { projectRoot },
+      yield* projectRootsFor(thread),
     ) satisfies FamilyEvaluation;
   });
 

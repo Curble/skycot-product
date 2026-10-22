@@ -58,13 +58,14 @@ export function familyHoldFor(
   item: ApprovalItem,
   ctx: {
     readonly projectRoot?: string | null;
+    readonly projectFolder?: string | null;
     readonly toolCallInput?: string | undefined;
     readonly toolItemType?: string | undefined;
   },
 ): string | null {
   const evaluation = evaluateFamilyRequest(
     { ...factsFor(item, ctx.toolCallInput), toolItemType: ctx.toolItemType },
-    { projectRoot: ctx.projectRoot ?? null },
+    { projectRoot: ctx.projectRoot ?? null, projectFolder: ctx.projectFolder ?? null },
   );
   if (!evaluation.needsGrownUp) return null;
   const parts = [describeFamilyMatches(evaluation.family), describeMatches(evaluation.base.matches)]

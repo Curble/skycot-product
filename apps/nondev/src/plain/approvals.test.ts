@@ -199,6 +199,35 @@ describe("describeRuntimeRequest — files and apps", () => {
     expect(card.risk).toBe("low");
   });
 
+  // Found recording screenshots: a private copy of "Little Fern Café website" was cut at the
+  // first space, so an edit inside it read "create the little file" and "outside the project".
+  it("treats the private copy (spaces and all) and the project folder as inside", () => {
+    const copy =
+      "/Users/kid/.skycot-family/worktrees/Little Fern Café website/skycot-christmas-menu-eedf";
+    const ctx = { projectRoot: copy, projectFolder: "/Users/kid/Sites/Little Fern Café website" };
+    const card = describeRuntimeRequest(
+      items.approval("file-change", { prompt: `add ${copy}/christmas.html` }),
+      ctx,
+    );
+    expect(card.whatItWants).toBe("The assistant wants to create the christmas page.");
+    expect(card.scope).toBe("only this project");
+    expect(card.risk).toBe("low");
+    expect(card.warning).toBeUndefined();
+    const folder = describeRuntimeRequest(
+      items.approval("file-change", {
+        prompt: "update /Users/kid/Sites/Little Fern Café website/menu.html",
+      }),
+      ctx,
+    );
+    expect(folder.scope).toBe("only this project");
+    const elsewhere = describeRuntimeRequest(
+      items.approval("file-change", { prompt: "update /Users/kid/Documents/diary.txt" }),
+      ctx,
+    );
+    expect(elsewhere.scope).toBe("your computer");
+    expect(elsewhere.warning).toContain("outside the project folder");
+  });
+
   it("raises risk for settings files and blocks paths outside the project", () => {
     const settings = describeRuntimeRequest(items.approval("file-change", { prompt: ".env" }));
     expect(settings.risk).toBe("medium");

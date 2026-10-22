@@ -113,6 +113,8 @@ export type RuntimeRequestInput =
 export interface ApprovalContext {
   readonly projectName?: string;
   readonly projectRoot?: string;
+  /** The project's own folder when `projectRoot` is the thread's private copy: inside too. */
+  readonly projectFolder?: string;
   /** From the matching OrchestrationV2RuntimeRequest when the caller has it. */
   readonly responseCapability?: OrchestrationV2RuntimeRequest["responseCapability"]["type"];
   /** Set when the autonomy level is "fully hands-off"; destructive asks still show. */
@@ -375,6 +377,7 @@ function describeCommandApproval(item: ApprovalItem, ctx: ApprovalContext): Appr
   // never paints a hold the engine did not make.
   const inside: RuleEvaluation = evaluateCommand(command, {
     projectRoot: ctx.projectRoot,
+    projectFolder: ctx.projectFolder,
     defaultBranch: ctx.defaultBranch,
     currentBranch: ctx.currentBranch,
   });
@@ -522,7 +525,7 @@ interface DescribedPromptFile extends PromptFile {
 
 function describePromptFiles(
   prompt: string | undefined,
-  projectRoot: string | undefined,
+  ctx: ApprovalContext,
 ): Array<DescribedPromptFile> {
   return filesFromPrompt(prompt).map((file) => {
     const described = describeFile(file.path);
@@ -530,7 +533,7 @@ function describePromptFiles(
       ...file,
       noun: described.noun,
       isConfigOrSecret: described.isConfigOrSecret,
-      outside: isOutsideProject(file.path, projectRoot),
+      outside: isOutsideProject(file.path, [ctx.projectRoot, ctx.projectFolder]),
     };
   });
 }
@@ -560,8 +563,11 @@ function fileChangePhrase(files: ReadonlyArray<DescribedPromptFile>): string {
 }
 
 function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
-  const files = describePromptFiles(item.prompt, ctx.projectRoot);
-  const rules = evaluateFileChange(files, { projectRoot: ctx.projectRoot });
+  const files = describePromptFiles(item.prompt, ctx);
+  const rules = evaluateFileChange(files, {
+    projectRoot: ctx.projectRoot,
+    projectFolder: ctx.projectFolder,
+  });
   const outside = files.some((file) => file.outside);
   const deletes = files.some((file) => file.operation === "remove");
   const sensitive = files.some((file) => file.isConfigOrSecret);
@@ -609,12 +615,15 @@ function describeFileChangeApproval(item: ApprovalItem, ctx: ApprovalContext): A
 }
 
 function describeFileReadApproval(item: ApprovalItem, ctx: ApprovalContext): ApprovalCard {
-  const files = describePromptFiles(item.prompt, ctx.projectRoot);
+  const files = describePromptFiles(item.prompt, ctx);
   const outside = files.some((file) => file.outside);
   const secret = files.some(
     (file) => file.isConfigOrSecret && /\.env|secret|credential|\.pem|\.key/i.test(file.path),
   );
-  const rules = evaluateFileRead(files, { projectRoot: ctx.projectRoot });
+  const rules = evaluateFileRead(files, {
+    projectRoot: ctx.projectRoot,
+    projectFolder: ctx.projectFolder,
+  });
   const risk: ApprovalRisk = maxRisk(secret ? "medium" : outside ? "medium" : "low", rules.risk);
   const what =
     files.length === 0
