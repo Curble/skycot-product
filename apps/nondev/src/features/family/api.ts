@@ -149,6 +149,12 @@ export const familyApi = {
   rename: (input: { readonly childName: string | null }) =>
     request("POST", "/rename", input, parseServerStatus),
   lock: () => request("POST", "/lock", {}, parseServerStatus),
+  /** The code goes with the one request; the engine counts the try like any other. */
+  allowAssistant: (input: { readonly driver: string; readonly code: string }) =>
+    request("POST", "/assistants/allow", input, parseServerStatus),
+  /** No code: taking an allowance back only makes the profile stricter. */
+  stopAllowingAssistant: (input: { readonly driver: string }) =>
+    request("POST", "/assistants/stop", input, parseServerStatus),
 } satisfies Record<string, (...args: never[]) => Promise<FamilyResult<unknown>>>;
 
 export type { FamilyResult, ServerFamilyStatus, SessionLimits };

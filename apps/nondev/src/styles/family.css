@@ -245,3 +245,73 @@
   line-height: 1.45;
   color: var(--fm-label-2);
 }
+
+/* ---- Allowing an assistant SKYCOT can't lock down ------------------------ */
+.fm-allow-points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: fm-allow;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fm-allow-points li {
+  counter-increment: fm-allow;
+  position: relative;
+  padding: 12px 14px 12px 44px;
+  border: 1px solid var(--fm-sep);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-card);
+  font-size: calc(13px * var(--fm-text-scale));
+  line-height: 1.45;
+}
+.fm-allow-points li::before {
+  content: counter(fm-allow);
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--fm-bg-fill-2);
+  color: var(--fm-label);
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+.fm-allow-points h3 {
+  margin: 0 0 4px;
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-allow-points p {
+  margin: 0;
+  color: var(--fm-label-2);
+}
+.fm-allow-points p + p {
+  margin-top: 6px;
+}
+.fm-allow-points__still {
+  font-size: calc(12px * var(--fm-text-scale));
+}
+.fm-allow-points__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--fm-accent);
+  font-size: calc(12.5px * var(--fm-text-scale));
+  text-decoration: none;
+}
+.fm-allow-points__link:hover {
+  text-decoration: underline;
+}
+.fm-family-assistant__title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}

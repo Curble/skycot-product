@@ -39,6 +39,7 @@ import {
   strengthHint,
   type FamilySetupDraft,
 } from "../../family/family";
+import { FamilyAssistantsGroup } from "../../family/FamilyAssistantsGroup";
 import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
 import { useFamily } from "../../family/FamilyProvider";
@@ -96,7 +97,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
     );
   }
 
-  return <FamilyOnPane />;
+  return <FamilyOnPane environmentId={environmentId} />;
 }
 
 type Row = "code" | "off" | null;
@@ -109,7 +110,7 @@ const subscribeClock = (onChange: () => void) => {
   return () => window.clearInterval(timer);
 };
 
-function FamilyOnPane() {
+function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const { profile, requireParentCode } = useFamily();
   const [openRow, setOpenRow] = useState<Row>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -158,6 +159,8 @@ function FamilyOnPane() {
       </SettingsGroup>
 
       <ChildrenGroup />
+
+      <FamilyAssistantsGroup environmentId={environmentId} />
 
       <SettingsGroup title="Parent code" footer={familyCopy.storage}>
         <ListRow

@@ -34,6 +34,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
 import { formatClockTime, knownTimeZone, parseClockTime } from "@t3tools/skycot-brand/bedtime";
+import { canAllowAssistant, MAX_ALLOWED_ASSISTANTS } from "@t3tools/skycot-rules/assistants";
 
 import * as ServerConfig from "../config.ts";
 
@@ -178,6 +179,11 @@ const FamilyFile = Schema.Struct({
   /** The household's IANA zone for bedtimes and "today"; null means the engine's own. */
   timeZone: Schema.NullOr(Schema.String),
   children: Schema.Array(Child),
+  /**
+   * Assistants SKYCOT can't lock down that a grown-up allowed for the Family profile with the
+   * parent code (driver ids, "cursor"). Optional so files written before it read unchanged.
+   */
+  allowedAssistants: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -251,6 +257,8 @@ export interface FamilyStatus {
   readonly children: ReadonlyArray<FamilyChild>;
   /** The zone bedtimes are read in (the profile's, else the engine's). */
   readonly timeZone: string;
+  /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
+  readonly allowedAssistants: ReadonlyArray<string>;
 }
 
 /** What a parent sets for a child; anything left out keeps its value (or the default). */
@@ -377,6 +385,24 @@ export class SkycotFamily extends Context.Service<
      * behind. Counts towards the same five tries.
      */
     readonly checkCode: (input: { readonly code: string }) => Effect.Effect<void, FamilyError>;
+    /**
+     * A grown-up allows an assistant SKYCOT can't lock down (Cursor, OpenCode, …) for the
+     * Family profile: one code attempt, counted like every other. Codex and Claude are refused
+     * as `invalid-request`: they are locked down and need no allowance.
+     */
+    readonly allowAssistant: (input: {
+      readonly code: string;
+      readonly driver: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /**
+     * Takes an allowance back. No code: it only makes the profile stricter. The assistant's
+     * next Family turn is refused (SkycotFamilyLockdown).
+     */
+    readonly stopAllowingAssistant: (input: {
+      readonly driver: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Whether the profile is on and lists this assistant as allowed. Cheap, like `isEnabled`. */
+    readonly assistantAllowed: (driver: string) => Effect.Effect<boolean>;
     /** Ends every grant this session holds (a parent leaving Advanced mode). */
     readonly lock: (input: { readonly sessionId: string }) => Effect.Effect<void, FamilyError>;
     /**
@@ -507,6 +533,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       lockedForMs: 0,
       children: [],
       timeZone: familyTimeZone(null),
+      allowedAssistants: [],
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
@@ -519,7 +546,15 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     lockedForMs,
     children: file.children,
     timeZone: familyTimeZone(file),
+    allowedAssistants: allowedAssistantsOf(file),
   };
+}
+
+/** The file's allowed assistants, cleaned: a hand-edited file can never allow Codex or Claude. */
+export function allowedAssistantsOf(file: Pick<FamilyFile, "allowedAssistants"> | null) {
+  return [...new Set(file?.allowedAssistants ?? [])]
+    .filter(canAllowAssistant)
+    .slice(0, MAX_ALLOWED_ASSISTANTS);
 }
 
 function cleanChildName(name: string | null): string | null {
@@ -909,6 +944,50 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     lock.withPermits(1),
   );
 
+  const allowAssistant: SkycotFamily["Service"]["allowAssistant"] = Effect.fn(
+    "SkycotFamily.allowAssistant",
+  )(function* (input) {
+    if (!canAllowAssistant(input.driver)) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const cleared = yield* attempt(file, input.code, at);
+    const allowed = allowedAssistantsOf(cleared);
+    if (!allowed.includes(input.driver) && allowed.length >= MAX_ALLOWED_ASSISTANTS) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const next: FamilyFile = {
+      ...cleared,
+      allowedAssistants: allowed.includes(input.driver) ? allowed : [...allowed, input.driver],
+    };
+    yield* save(next);
+    yield* Effect.logInfo("skycot-family.assistant-allowed", { driver: input.driver });
+    return toStatus(next, at);
+  }, lock.withPermits(1));
+
+  const stopAllowingAssistant: SkycotFamily["Service"]["stopAllowingAssistant"] = Effect.fn(
+    "SkycotFamily.stopAllowingAssistant",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const allowed = allowedAssistantsOf(file);
+    if (!allowed.includes(input.driver)) return toStatus(file, yield* now);
+    const next: FamilyFile = {
+      ...file,
+      allowedAssistants: allowed.filter((driver) => driver !== input.driver),
+    };
+    yield* save(next);
+    yield* Effect.logInfo("skycot-family.assistant-no-longer-allowed", { driver: input.driver });
+    return toStatus(next, yield* now);
+  }, lock.withPermits(1));
+
+  const assistantAllowed: SkycotFamily["Service"]["assistantAllowed"] = (driver) =>
+    load.pipe(
+      Effect.map(
+        (file) => file !== null && file.enabled && allowedAssistantsOf(file).includes(driver),
+      ),
+    );
+
   const lockSession: SkycotFamily["Service"]["lock"] = Effect.fn("SkycotFamily.lock")(function* (
     input,
   ) {
@@ -982,6 +1061,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     removeChild,
     setTimeZone,
     checkCode,
+    allowAssistant,
+    stopAllowingAssistant,
+    assistantAllowed,
     lock: lockSession,
     allows,
     tokenAllows,

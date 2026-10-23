@@ -13,8 +13,11 @@
 //     (`sessionLockdown`) and applies it to the process it starts and to every thread and query
 //     (SkycotFamilyCodex, SkycotFamilyClaude). The returned runtime is remembered as locked.
 //   - profile on, any other provider: refused before anything starts, with a plain sentence a
-//     grown-up can act on (fail closed: a provider whose add-ons we cannot switch off never
-//     runs for a child, including new providers an upstream merge adds).
+//     grown-up can act on, unless a grown-up allowed that provider for the Family profile with
+//     the parent code (SkycotFamily `allowAssistant`, after the client showed its age terms and
+//     that its add-ons stay on). An allowed provider opens unlocked, as the parent's informed
+//     choice; SKYCOT's other Family rules still apply to it. Fail closed: a provider nobody
+//     allowed never runs for a child, including new providers an upstream merge adds.
 //   - profile off: the session opens exactly as upstream would. Its runtime is wrapped so that
 //     if the profile is switched on while it is still live, it refuses new threads, turns,
 //     follow-ups and MCP-app calls instead of running them with the parent's add-ons.
@@ -23,9 +26,16 @@
 // `releaseIfMismatched` before reusing one (seam skycot-family-lockdown-restart). An unlocked
 // session is closed the moment the profile is on, so the child's next turn starts a fresh,
 // locked process; a locked one is closed once it is idle after the profile goes off, so the
-// parent gets their own setup back. Between the two, the guard above refuses.
+// parent gets their own setup back. Between the two, the guard above refuses. An unlocked
+// session of an allowed provider is kept while the profile is on; once the allowance is taken
+// back it is closed like any other unlocked one, so its next Family turn is refused.
 
 import { ProviderDriverKind } from "@t3tools/contracts";
+import {
+  assistantName,
+  LOCKED_DOWN_ASSISTANTS,
+  notAllowedSentence,
+} from "@t3tools/skycot-rules/assistants";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -34,29 +44,29 @@ import * as Option from "effect/Option";
 import type * as ProviderAdapterRegistry from "../orchestration-v2/ProviderAdapterRegistry.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 
-/** Providers whose adapter applies the lockdown. Everything else is refused in Family. */
-export const LOCKED_DOWN_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set([
-  ProviderDriverKind.make("codex"),
-  ProviderDriverKind.make("claudeAgent"),
-]);
-
-const PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  codex: "Codex",
-  claudeAgent: "Claude",
-  cursor: "Cursor",
-  opencode: "OpenCode",
-  opencode2: "OpenCode",
-  grok: "Grok",
-  antigravity: "Antigravity",
-  pi: "Pi",
-  muse: "Muse",
-  acp: "this assistant",
-  acpRegistry: "this assistant",
-};
+/**
+ * Providers whose adapter applies the lockdown. Every other one is refused in Family unless a
+ * grown-up allowed it (`allowedUnlocked`).
+ */
+export const LOCKED_DOWN_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
+  LOCKED_DOWN_ASSISTANTS.map((driver) => ProviderDriverKind.make(driver)),
+);
 
 export function providerName(driver: string): string {
-  return PROVIDER_NAMES[driver] ?? "this assistant";
+  return assistantName(driver);
 }
+
+/**
+ * Whether this provider may run unlocked for a child: one SKYCOT can't lock down that a
+ * grown-up allowed. Never true for Codex or Claude, which always run locked in Family.
+ */
+export const allowedUnlocked = (
+  family: SkycotFamily.SkycotFamily["Service"],
+  driver: string,
+): Effect.Effect<boolean> =>
+  LOCKED_DOWN_DRIVERS.has(ProviderDriverKind.make(driver))
+    ? Effect.succeed(false)
+    : family.assistantAllowed(driver);
 
 /** What an adapter is handed while the profile is on. Today it carries no options. */
 export class FamilyLockdown {
@@ -83,7 +93,7 @@ export type FamilyLockdownRefusal = "unsupported-provider" | "switched-on-mid-se
 export function familyLockdownSentence(driver: string, reason: FamilyLockdownRefusal): string {
   const name = providerName(driver);
   return reason === "unsupported-provider"
-    ? `The Family profile is on, and SKYCOT can't switch off ${name}'s own add-ons (plugins, connectors and helper tools set up on this computer), so ${name} won't start for a child. A grown-up can pick Codex or Claude for this conversation, or switch the Family profile off.`
+    ? notAllowedSentence(driver)
     : `The Family profile was switched on while ${name} was already running with this computer's own add-ons. SKYCOT stopped it so it can start again without them: send the message again.`;
 }
 
@@ -94,10 +104,16 @@ export class FamilyLockdownOpenRefused extends ProviderAdapter.ProviderAdapterOp
   }
 }
 
-/** A call on an unlocked session after the profile was switched on. */
+/**
+ * A call on an unlocked session while the profile is on: one opened before it was switched on
+ * (Codex, Claude: it restarts locked), or one whose allowance was taken back (the others).
+ */
 export class FamilyLockdownCallRefused extends ProviderAdapter.ProviderAdapterProtocolError {
   override get message(): string {
-    return familyLockdownSentence(this.driver, "switched-on-mid-session");
+    return familyLockdownSentence(
+      this.driver,
+      LOCKED_DOWN_DRIVERS.has(this.driver) ? "switched-on-mid-session" : "unsupported-provider",
+    );
   }
 }
 
@@ -117,8 +133,10 @@ export function markLocked<R extends object>(runtime: R): R {
 type Runtime = ProviderAdapter.ProviderAdapterV2SessionRuntime;
 
 /**
- * An unlocked runtime that refuses work while the profile is on. Interrupting, answering a
- * pending request, reading and closing still work, so a grown-up can stop what was running.
+ * An unlocked runtime that refuses work while the profile is on, unless its provider is one a
+ * grown-up allowed (checked on every call, so taking the allowance back counts at once).
+ * Interrupting, answering a pending request, reading and closing still work, so a grown-up can
+ * stop what was running.
  */
 export function guardUnlockedRuntime(
   family: SkycotFamily.SkycotFamily["Service"],
@@ -128,6 +146,7 @@ export function guardUnlockedRuntime(
     effect: Effect.Effect<A, E>,
   ): Effect.fn.Return<A, E | FamilyLockdownCallRefused> {
     if (!(yield* family.isEnabled)) return yield* effect;
+    if (yield* allowedUnlocked(family, runtime.driver)) return yield* effect;
     yield* Effect.logWarning("skycot-family.lockdown.refused-unlocked-session", {
       driver: runtime.driver,
       providerSessionId: runtime.providerSessionId,
@@ -179,6 +198,14 @@ export function lockAdapter(
         return guardUnlockedRuntime(family, yield* adapter.openSession(input));
       }
       if (!LOCKED_DOWN_DRIVERS.has(adapter.driver)) {
+        if (yield* allowedUnlocked(family, adapter.driver)) {
+          // The grown-up's informed choice: started as upstream would, add-ons and all.
+          yield* Effect.logInfo("skycot-family.lockdown.session-allowed-unlocked", {
+            driver: adapter.driver,
+            providerSessionId: input.providerSessionId,
+          });
+          return guardUnlockedRuntime(family, yield* adapter.openSession(input));
+        }
         yield* Effect.logWarning("skycot-family.lockdown.refused-provider", {
           driver: adapter.driver,
           providerSessionId: input.providerSessionId,
@@ -222,11 +249,17 @@ export const lockRegistry = (registry: Registry): Effect.Effect<Registry> =>
 /**
  * Before ProviderSessionManager reuses a live session: close it when it does not match the
  * profile. Unlocked while the profile is on: always (a turn it is running stops; the child's
- * next message starts a locked one). Locked while the profile is off: once nothing runs on it.
+ * next message starts a locked one, or is refused), except for a provider a grown-up allowed.
+ * Locked while the profile is off: once nothing runs on it.
  */
 export const releaseIfMismatched = <E>(
   family: Option.Option<SkycotFamily.SkycotFamily["Service"]>,
-  entry: { readonly runtime: object; readonly busyTurns: ReadonlySet<string> } | undefined,
+  entry:
+    | {
+        readonly runtime: { readonly driver: string };
+        readonly busyTurns: ReadonlySet<string>;
+      }
+    | undefined,
   release: (detail: string) => Effect.Effect<void, E>,
 ): Effect.Effect<void, E> =>
   Option.isNone(family) || entry === undefined
@@ -234,7 +267,7 @@ export const releaseIfMismatched = <E>(
     : Effect.gen(function* () {
         const on = yield* family.value.isEnabled;
         const locked = isLocked(entry.runtime);
-        if (on && !locked) {
+        if (on && !locked && !(yield* allowedUnlocked(family.value, entry.runtime.driver))) {
           yield* Effect.logInfo("skycot-family.lockdown.restart-unlocked-session");
           yield* release(
             "The Family profile is on: SKYCOT restarts this assistant without the computer's own add-ons.",

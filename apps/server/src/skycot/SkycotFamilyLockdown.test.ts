@@ -11,8 +11,12 @@ import * as SkycotFamilyLockdown from "./SkycotFamilyLockdown.ts";
 type Runtime = ProviderAdapter.ProviderAdapterV2SessionRuntime;
 type Adapter = ProviderAdapter.ProviderAdapterV2["Service"];
 
+/** A profile that is on or off and has allowed no assistant (SkycotFamilyAnyAssistant.test.ts covers allowing). */
 const family = (on: Ref.Ref<boolean>) =>
-  ({ isEnabled: Ref.get(on) }) as unknown as SkycotFamily.SkycotFamily["Service"];
+  ({
+    isEnabled: Ref.get(on),
+    assistantAllowed: () => Effect.succeed(false),
+  }) as unknown as SkycotFamily.SkycotFamily["Service"];
 
 /** A runtime whose work methods only count calls. */
 function fakeRuntime(driver: string, calls: Array<string>): Runtime {
@@ -80,8 +84,10 @@ describe("SkycotFamilyLockdown.lockAdapter", () => {
         ).pipe(Effect.flip);
         assert.lengthOf(seen, 0, `${driver} must not start at all`);
         assert.strictEqual(error._tag, "ProviderAdapterOpenSessionError");
-        assert.include(error.message, "The Family profile is on, and SKYCOT can't switch off");
-        assert.include(error.message, "A grown-up can pick Codex or Claude");
+        assert.include(error.message, "isn't allowed in the Family profile yet");
+        assert.include(error.message, "SKYCOT can't switch off");
+        assert.include(error.message, "A grown-up can allow");
+        assert.include(error.message, "or pick Codex or Claude for this conversation");
       }
     }),
   );
@@ -176,7 +182,7 @@ describe("SkycotFamilyLockdown.releaseIfMismatched", () => {
       const released: Array<string> = [];
       yield* SkycotFamilyLockdown.releaseIfMismatched(
         Option.none(),
-        { runtime: {}, busyTurns: new Set() },
+        { runtime: { driver: "codex" }, busyTurns: new Set() },
         (detail) => Effect.sync(() => void released.push(detail)),
       );
       assert.lengthOf(released, 0);

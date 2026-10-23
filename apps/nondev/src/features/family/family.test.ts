@@ -232,6 +232,7 @@ describe("the engine's answers", () => {
       lockedForMs: 0,
       children: [],
       timeZone: null,
+      allowedAssistants: [],
     });
   });
 

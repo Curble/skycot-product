@@ -52,6 +52,7 @@ import { FAMILY_THEME_ID, useEnableFamilyWithDefaults } from "../family/applyDef
 import { familyCopy } from "../family/copy";
 import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
+import { familyAgeTermsNote } from "../family/assistantAllowance";
 import { FamilySetupForm } from "../family/FamilySetupForm";
 import { canContinue, onboardingSteps, type Audience, type OnboardingStep } from "./onboarding";
 import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
@@ -215,7 +216,9 @@ export function OnboardingSheet({
         <WhoStep audience={audience} onAudience={setAudience} familyEnabled={family.enabled} />
       ) : null}
       {step === "family" ? <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus /> : null}
-      {step === "assistant" ? <AssistantStep environmentId={environmentId} /> : null}
+      {step === "assistant" ? (
+        <AssistantStep environmentId={environmentId} forChild={childPath} />
+      ) : null}
       {step === "work" ? <WorkStep environmentId={environmentId} /> : null}
       {step === "autonomy" ? (
         childPath ? (
@@ -333,7 +336,14 @@ function FamilyAutonomyStep({ environmentId }: { readonly environmentId: Environ
   );
 }
 
-function AssistantStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
+function AssistantStep({
+  environmentId,
+  forChild,
+}: {
+  readonly environmentId: EnvironmentId;
+  /** Setting up the Family profile: the parent reads each service's age rules here. */
+  readonly forChild: boolean;
+}) {
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const settings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
@@ -387,6 +397,7 @@ function AssistantStep({ environmentId }: { readonly environmentId: EnvironmentI
           ? "At least one assistant is ready. You can connect more later in Settings."
           : "Green ticks appear as soon as an assistant is signed in. You can also do this later."}
       </p>
+      {forChild ? <p className="fm-help">{familyAgeTermsNote()}</p> : null}
     </div>
   );
 }

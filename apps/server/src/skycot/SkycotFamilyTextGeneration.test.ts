@@ -42,10 +42,15 @@ const recordingService = (seen: Array<string | null>): ProviderTextGeneration =>
   } as unknown as ProviderTextGeneration;
 };
 
-const locked = (on: Ref.Ref<boolean>, seen: Array<string | null>) =>
+const locked = (
+  on: Ref.Ref<boolean>,
+  seen: Array<string | null>,
+  allowed: ReadonlyArray<string> = [],
+) =>
   SkycotFamilyTextGeneration.lockTextGeneration(Effect.succeed(recordingService(seen))).pipe(
     Effect.provideService(SkycotFamily.SkycotFamily, {
       isEnabled: Ref.get(on),
+      assistantAllowed: (driver: string) => Effect.succeed(allowed.includes(driver)),
     } as unknown as SkycotFamily.SkycotFamily["Service"]),
     Effect.provideService(ProviderInstanceRegistry.ProviderInstanceRegistry, {
       getInstance: (instanceId: string) =>
@@ -77,6 +82,17 @@ describe("SkycotFamilyTextGeneration.lockTextGeneration", () => {
       );
       assert.include(error.detail, "SKYCOT can't switch off OpenCode's own add-ons");
       assert.lengthOf(seen, 0);
+    }),
+  );
+
+  it.effect("runs an allowed provider's text generation as upstream does", () =>
+    Effect.gen(function* () {
+      const seen: Array<string | null> = [];
+      const service = yield* locked(yield* Ref.make(true), seen, ["opencode"]);
+      yield* service.generateThreadTitle(titleInput("opencode") as never);
+      assert.deepEqual(seen, [null]);
+      const error = yield* Effect.flip(service.generateThreadTitle(titleInput("cursor") as never));
+      assert.include(error.detail, "Cursor isn't allowed in the Family profile yet");
     }),
   );
 

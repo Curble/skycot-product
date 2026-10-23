@@ -51,6 +51,10 @@
     "./browse": {
       "types": "./src/browse.ts",
       "import": "./src/browse.ts"
+    },
+    "./assistants": {
+      "types": "./src/assistants.ts",
+      "import": "./src/assistants.ts"
     }
   },
   "scripts": {
