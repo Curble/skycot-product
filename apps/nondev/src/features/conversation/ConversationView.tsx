@@ -5,7 +5,13 @@ import {
   threadRuntimeIsActive,
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  MessageId,
+  OrchestrationV2ThreadProjection,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { withExplainMarker } from "@t3tools/skycot-rules/explain";
 import { withPointing } from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
@@ -17,6 +23,7 @@ import {
   ChevronLeft,
   Clock,
   FolderPlus,
+  Pencil,
   Receipt,
   ShieldAlert,
   Square,
@@ -60,6 +67,11 @@ import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
+import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
+import { copy as rewindCopy, type FilesChoice, type RewindTarget } from "../rewind/rewind";
+import { RewindHost } from "../rewind/RewindHost";
+import { stopEditing, useEditDraft } from "../rewind/store";
+import { useGoBackCommand, useRewindFacts } from "../rewind/useGoBack";
 import { ConversationMenuButton } from "../tidy/ConversationMenu";
 import { DeleteSheet } from "../tidy/DeleteSheet";
 import { RenameSheet } from "../tidy/RenameSheet";
@@ -214,6 +226,7 @@ export function ConversationView({
   const startNote = useStartNote(threadId);
   useBadgeWatcher({ threadId, shell, projection, active, retryMade });
 
+  const rewindFacts = useRewindFacts({ environmentId, threadId, shell, projection, archived });
   const [publishOpen, setPublishOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -415,8 +428,17 @@ export function ConversationView({
           shell={shell}
           active={active}
           seed={seed}
+          projection={projection}
+          rewindFacts={rewindFacts}
         />
       )}
+
+      <RewindHost
+        environmentId={environmentId}
+        threadId={threadId}
+        shell={shell}
+        facts={rewindFacts}
+      />
 
       <RenameSheet
         shell={renameOpen ? shell : null}
@@ -590,6 +612,8 @@ function ReplyComposer({
   shell,
   active,
   seed,
+  projection,
+  rewindFacts,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -597,6 +621,8 @@ function ReplyComposer({
   readonly active: boolean;
   /** A starter card tapped in an empty conversation. */
   readonly seed: ComposerSeed | null;
+  readonly projection: OrchestrationV2ThreadProjection | null;
+  readonly rewindFacts: ReturnType<typeof useRewindFacts>;
 }) {
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
@@ -648,6 +674,38 @@ function ReplyComposer({
     field.setSelectionRange(at, at);
     if (suggestedMode === "replace") field.scrollTop = 0;
   }, [appliedSuggestion, suggestedMode]);
+  // "Edit" on an earlier message puts its words here; sending then goes back to there.
+  const editing = useEditDraft(threadId);
+  const goBack = useGoBackCommand({ environmentId, threadId, projection });
+  const [beforeEdit, setBeforeEdit] = useState<string | null>(null);
+  const [appliedEdit, setAppliedEdit] = useState<number | null>(null);
+  if (editing !== null && editing.nonce !== appliedEdit) {
+    setAppliedEdit(editing.nonce);
+    if (beforeEdit === null) setBeforeEdit(text);
+    setText(editing.text);
+    setProblem(null);
+  }
+  if (editing === null && appliedEdit !== null) {
+    setAppliedEdit(null);
+    setBeforeEdit(null);
+  }
+  useEffect(() => {
+    const field = inputRef.current;
+    if (appliedEdit === null || field === null) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [appliedEdit]);
+  const [goBackOpen, setGoBackOpen] = useState<{
+    readonly target: RewindTarget;
+    readonly choice: FilesChoice;
+    readonly message: { readonly text: string; readonly messageId: MessageId };
+  } | null>(null);
+  const [goBackStage, setGoBackStage] = useState<GoBackStage>("idle");
+  const [goBackProblem, setGoBackProblem] = useState<string | null>(null);
+  const cancelEditing = () => {
+    stopEditing(threadId);
+    setText(beforeEdit ?? "");
+  };
   const crew = useCrew();
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
@@ -663,27 +721,16 @@ function ReplyComposer({
     }
   };
 
-  const send = async (asNewRequest = false) => {
-    if (!ready || !hasContent || shell === null) return;
-    if (!active && typedWhileActive && !asNewRequest) {
-      setConfirmNewTurn(true);
-      return;
-    }
-    // What was pointed at in the preview travels as words in the message, so the shield reads
-    // it too. Family profile: a full name, school or address waits for the child's pick.
-    const outgoing = withPointing(
-      trimmed,
-      pointers.map((draft) => draft.pointer),
-    );
-    const cleared = await shield.clear(outgoing, pictures.pictures.length);
-    if (cleared.kind === "edit") {
-      if (cleared.dropPictures) pictures.clear();
-      return;
-    }
+  /** Sends one checked message as a turn: plan first decides how a new request runs. */
+  const deliver = async (
+    message: { readonly text: string; readonly messageId: MessageId },
+    asNote: boolean,
+  ): Promise<boolean> => {
+    if (shell === null) return false;
     setSending(true);
     setProblem(null);
-    // Plan first decides how a new request runs; a note typed while it works joins that turn.
-    const interactionMode = active ? shell.interactionMode : requestMode(planFirst);
+    // A note typed while it works joins that turn; anything else is a new request.
+    const interactionMode = asNote ? shell.interactionMode : requestMode(planFirst);
     const modeProblem = await ensureMode({
       environmentId,
       threadId,
@@ -698,9 +745,9 @@ function ReplyComposer({
             input: {
               threadId,
               message: {
-                messageId: cleared.messageId,
+                messageId: message.messageId,
                 role: "user",
-                text: withExplainMarker(cleared.text, explainOn, family.enabled),
+                text: withExplainMarker(message.text, explainOn, family.enabled),
                 attachments: pictures.uploads(),
               },
               modelSelection: shell.modelSelection,
@@ -716,13 +763,73 @@ function ReplyComposer({
           ? "This connection isn't allowed to send messages."
           : "That didn't send. Check your Mac is awake and try again.",
       );
-      return;
+      return false;
     }
     setText("");
     pictures.clear();
     clearPointers(threadId);
     setTypedWhileActive(false);
     setConfirmNewTurn(false);
+    return true;
+  };
+
+  const send = async (asNewRequest = false) => {
+    if (!ready || !hasContent || shell === null) return;
+    if (!active && typedWhileActive && !asNewRequest && editing === null) {
+      setConfirmNewTurn(true);
+      return;
+    }
+    // What was pointed at in the preview travels as words in the message, so the shield reads
+    // it too. Family profile: a full name, school or address waits for the child's pick.
+    const outgoing = withPointing(
+      trimmed,
+      pointers.map((draft) => draft.pointer),
+    );
+    const cleared = await shield.clear(outgoing, pictures.pictures.length);
+    if (cleared.kind === "edit") {
+      if (cleared.dropPictures) pictures.clear();
+      return;
+    }
+    if (editing !== null) {
+      // Checked again here: the conversation may have moved since Edit was pressed.
+      const check = rewindFacts.check(editing.itemId);
+      if (check === null || !check.ok) {
+        const words = rewindCopy.blocked(check?.block ?? "gone", crew.builder.name);
+        setProblem(`${words.title}. ${words.body}`);
+        return;
+      }
+      setGoBackProblem(null);
+      setGoBackStage("idle");
+      setGoBackOpen({
+        target: check.target,
+        choice: rewindFacts.choiceFor(check.target),
+        message: { text: cleared.text, messageId: cleared.messageId },
+      });
+      return;
+    }
+    await deliver(cleared, active);
+  };
+
+  const confirmGoBack = async (restoreFiles: boolean) => {
+    if (goBackOpen === null) return;
+    setGoBackProblem(null);
+    setGoBackStage("going-back");
+    const problemGoingBack = await goBack(goBackOpen.target, restoreFiles);
+    if (problemGoingBack !== null) {
+      setGoBackStage("idle");
+      setGoBackProblem(problemGoingBack);
+      return;
+    }
+    setGoBackStage("sending");
+    stopEditing(threadId);
+    const sent = await deliver(goBackOpen.message, false);
+    setGoBackStage("idle");
+    setGoBackOpen(null);
+    if (!sent) {
+      setProblem(
+        "Went back, but your changed message didn't send. It's still in the box: press Return to try again.",
+      );
+    }
   };
 
   const noteOutlivedRun = !active && typedWhileActive && trimmed.length > 0;
@@ -771,6 +878,41 @@ function ReplyComposer({
             <Banner tone="warning">{pictures.problem}</Banner>
           </div>
         ) : null}
+        {editing !== null ? (
+          <div className="fm-composer__editing">
+            <Banner
+              tone="info"
+              action={
+                <Button size="sm" onClick={cancelEditing} disabled={sending}>
+                  Cancel
+                </Button>
+              }
+            >
+              <span className="fm-composer__editing-what">
+                <Pencil size={13} strokeWidth={2} aria-hidden />
+                <b>Changing your earlier message.</b>
+              </span>{" "}
+              Sending it goes back to there and replaces what came after.
+              {editing.pictures > 0
+                ? ` Its ${editing.pictures === 1 ? "picture doesn't" : "pictures don't"} come back: add ${editing.pictures === 1 ? "it" : "them"} again with + if you still want ${editing.pictures === 1 ? "it" : "them"}.`
+                : ""}
+              {editing.pointedAt > 0
+                ? " What you pointed at doesn't come back: point at it again if you need to."
+                : ""}
+            </Banner>
+          </div>
+        ) : null}
+        <GoBackSheet
+          key={goBackOpen === null ? "closed" : goBackOpen.message.messageId}
+          open={goBackOpen !== null}
+          target={goBackOpen?.target ?? null}
+          choice={goBackOpen?.choice ?? { kind: "nothing" }}
+          planFirst={planFirst.on}
+          stage={goBackStage}
+          problem={goBackProblem}
+          onCancel={() => setGoBackOpen(null)}
+          onConfirm={(restoreFiles) => void confirmGoBack(restoreFiles)}
+        />
         {shield.card}
         <PointerChips threadId={threadId} pointers={pointers} disabled={sending} />
         <MessageField
@@ -785,18 +927,23 @@ function ReplyComposer({
           onRemovePicture={pictures.remove}
           placeholder={
             canOperate
-              ? active
-                ? "Add a note while it works… (“also add a vegan option”)"
-                : "Reply, change course, or ask for something else…"
+              ? editing !== null
+                ? "Change your message…"
+                : active
+                  ? "Add a note while it works… (“also add a vegan option”)"
+                  : "Reply, change course, or ask for something else…"
               : "This connection can read but not reply"
           }
-          label="Reply"
+          label={editing !== null ? "Your changed message" : "Reply"}
           foot={{
-            left: active
-              ? `Replies while ${crew.builder.name} is working get picked up at the next step.`
-              : noteOutlivedRun
-                ? `${crew.builder.name} has finished — Return now starts a new request.`
-                : "Return to send · Shift-Return for a new line",
+            left:
+              editing !== null
+                ? "Return to go back and send · Shift-Return for a new line"
+                : active
+                  ? `Replies while ${crew.builder.name} is working get picked up at the next step.`
+                  : noteOutlivedRun
+                    ? `${crew.builder.name} has finished — Return now starts a new request.`
+                    : "Return to send · Shift-Return for a new line",
             right: sending ? "Sending…" : "",
           }}
         />

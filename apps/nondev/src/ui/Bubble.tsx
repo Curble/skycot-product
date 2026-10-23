@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 export type BubbleAuthor = "me" | "crew";
 
@@ -13,6 +13,7 @@ export function Bubble({
   meta,
   full = false,
   muted = false,
+  onContextMenu,
 }: {
   readonly author: BubbleAuthor;
   readonly children: ReactNode;
@@ -20,12 +21,14 @@ export function Bubble({
   readonly meta?: ReactNode;
   readonly full?: boolean;
   readonly muted?: boolean;
+  /** The message's own right-click menu (Edit on your messages). */
+  readonly onContextMenu?: ((event: MouseEvent<HTMLDivElement>) => void) | undefined;
 }) {
   const classes = ["fm-msg", `fm-msg--${author}`, full ? "fm-msg--full" : ""]
     .filter(Boolean)
     .join(" ");
   return (
-    <div className={classes}>
+    <div className={classes} onContextMenu={onContextMenu}>
       {full ? (
         children
       ) : (
