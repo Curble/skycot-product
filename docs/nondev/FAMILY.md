@@ -246,8 +246,8 @@ too.
 ## The fridge
 
 **The fridge** (sidebar, and **On the fridge** on Home) shows everything made on this Mac: one
-magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running),
-its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
+magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running
+and nothing loaded: the engine puts the page's own stylesheets and pictures inside it), its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
 SKYCOT. With several children there is a shelf per child and a filter; children see their own
 shelf and their siblings'. **Pin to the fridge** keeps a magnet at the top and **Take it down**
 unpins it; neither needs the code, and neither deletes anything: the page stays in its project.

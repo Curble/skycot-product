@@ -1,27 +1,31 @@
 // A live thumbnail of a page a child made: the file as it is now, drawn at a quarter of its
 // size in a frame with no scripts at all (`sandbox=""`) and the same offline policy as "Open
-// it". It is read only once the magnet scrolls into view, so a full fridge stays light.
-import type { EnvironmentId } from "@t3tools/contracts";
+// it". The engine sends the page with its own stylesheets and pictures already inside it
+// (`/api/skycot/family/fridge/page`), because the frame may not load anything, not even from
+// SKYCOT. It is read only once the magnet scrolls into view, so a full fridge stays light.
 import { useEffect, useRef, useState } from "react";
 
-import { useEnvironmentQuery } from "~/state/query";
-
-import { projectEnvironment } from "../../state/projects";
 import { offlinePreviewDocument } from "../starters/preview";
+import { readMagnetPage, type MagnetPage } from "./pages";
 
 export function MagnetThumb({
-  environmentId,
-  cwd,
+  threadId,
   page,
+  version,
   title,
 }: {
-  readonly environmentId: EnvironmentId | null;
-  readonly cwd: string;
+  readonly threadId: string;
   readonly page: string;
+  /** When the page last changed, so a newer version is fetched again. */
+  readonly version: number;
   readonly title: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
+  const [loaded, setLoaded] = useState<{ readonly key: string; readonly page: MagnetPage } | null>(
+    null,
+  );
+  const key = `${threadId}\n${page}\n${version}`;
   useEffect(() => {
     const node = ref.current;
     if (node === null || seen) return;
@@ -34,15 +38,20 @@ export function MagnetThumb({
     observer.observe(node);
     return () => observer.disconnect();
   }, [seen]);
-  const file = useEnvironmentQuery(
-    seen && environmentId !== null
-      ? projectEnvironment.readFile({ environmentId, input: { cwd, relativePath: page } })
-      : null,
-  );
-  const contents = file.data && file.data.exists !== false ? file.data.contents : null;
+  useEffect(() => {
+    if (!seen) return;
+    let live = true;
+    void readMagnetPage({ threadId, page, version }).then((result) => {
+      if (live) setLoaded({ key, page: result });
+    });
+    return () => {
+      live = false;
+    };
+  }, [seen, key, threadId, page, version]);
+  const current = loaded?.key === key ? loaded.page : null;
   return (
     <div ref={ref} className="fm-magnet__thumb" aria-hidden>
-      {contents !== null ? (
+      {current?.kind === "page" ? (
         <iframe
           className="fm-magnet__frame"
           title={`Picture of ${title}`}
@@ -50,11 +59,11 @@ export function MagnetThumb({
           tabIndex={-1}
           loading="lazy"
           referrerPolicy="no-referrer"
-          srcDoc={offlinePreviewDocument(contents)}
+          srcDoc={offlinePreviewDocument(current.html)}
         />
       ) : (
         <span className="fm-magnet__placeholder">
-          {file.data?.exists === false ? "Not there any more" : ""}
+          {current?.kind === "gone" ? "Not there any more" : ""}
         </span>
       )}
     </div>

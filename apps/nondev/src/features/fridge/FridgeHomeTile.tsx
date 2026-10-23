@@ -34,7 +34,6 @@ export function FridgeHomeTile() {
               key={item.threadId}
               item={item}
               index={index}
-              environmentId={environmentId}
               now={now}
               maker={null}
               compact
