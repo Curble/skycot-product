@@ -10,6 +10,7 @@
 export const OUR_PATH_GLOBS = [
   "apps/nondev/**",
   "apps/nondev/themes-community/**",
+  "apps/skycot-mobile/**",
   "apps/server/src/skycot/**",
   "packages/skycot-rules/**",
   "packages/skycot-brand/**",

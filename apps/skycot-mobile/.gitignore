@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+expo-env.d.ts
+
+# Generated native folder: `expo prebuild` writes it, never edit by hand.
+/ios
+/android
+
+# Native secrets never belong here
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+.metro-health-check*
+.DS_Store
+*.tsbuildinfo
+.env*.local

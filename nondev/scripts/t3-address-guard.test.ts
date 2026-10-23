@@ -9,6 +9,8 @@ import {
   REVIEWED_MENTIONS,
   ROOT,
   runtimeSourceFiles,
+  phoneAppProblems,
+  PHONE_APP_ROOT,
   t3AddressProblems,
 } from "./t3-address-guard.ts";
 
@@ -93,5 +95,43 @@ NodeTest.describe("no T3 Code address is reachable from SKYCOT's engine", () => 
     } finally {
       NodeFS.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+NodeTest.describe("SKYCOT's phone app carries none of T3's mobile identity", () => {
+  function copyOfApp(): string {
+    const dir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "skycot-phone-guard-"));
+    NodeFS.mkdirSync(NodePath.join(dir, PHONE_APP_ROOT, "src"), { recursive: true });
+    NodeFS.copyFileSync(
+      NodePath.join(ROOT, PHONE_APP_ROOT, "app.config.ts"),
+      NodePath.join(dir, PHONE_APP_ROOT, "app.config.ts"),
+    );
+    return dir;
+  }
+
+  NodeTest.it("passes on this checkout", () => {
+    NodeAssert.deepEqual(phoneAppProblems(), []);
+  });
+
+  NodeTest.it("refuses T3's update URL, Expo project, bundle id or Clerk", () => {
+    for (const line of [
+      'url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454"',
+      'import { ClerkProvider } from "@clerk/expo";',
+      'const id = "com.t3tools.t3code";',
+    ]) {
+      const dir = copyOfApp();
+      NodeFS.writeFileSync(NodePath.join(dir, PHONE_APP_ROOT, "src", "x.ts"), `${line}\n`);
+      NodeAssert.equal(phoneAppProblems(dir).length, 1, line);
+    }
+  });
+
+  NodeTest.it("keeps over-the-air updates off and no EAS owner", () => {
+    const dir = copyOfApp();
+    edit(dir, `${PHONE_APP_ROOT}/app.config.ts`, (text) =>
+      text
+        .replace("updates: { enabled: false }", 'updates: { url: "https://example.com" }')
+        .replace('slug: "skycot",', 'slug: "skycot",\n  owner: "someone",'),
+    );
+    NodeAssert.equal(phoneAppProblems(dir).length, 2);
   });
 });
