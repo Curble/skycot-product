@@ -8,6 +8,7 @@ import type {
   OrchestrationV2ThreadProjection,
   ThreadId,
 } from "@t3tools/contracts";
+import { retrySpan } from "@t3tools/skycot-rules/checkpoints";
 import * as DateTime from "effect/DateTime";
 
 import type { VersionEntry } from "../../plain/versions";
@@ -77,6 +78,39 @@ export function findBefore(
   return earlier.at(-1) ?? null;
 }
 
+/**
+ * For a retry after a turn that failed part-way: where its changes are measured from, so the
+ * card covers the page the failed turn already wrote. Null for every ordinary turn.
+ */
+export function retrySpanFor(
+  projection: OrchestrationV2ThreadProjection,
+  checkpoint: OrchestrationV2Checkpoint,
+) {
+  return retrySpan(rootCheckpoints(projection), projection.runs, checkpoint);
+}
+
+/** A checkpoint that may hold changes: its own files, or a retry's span (only the diff can tell). */
+export function mayHaveChanges(
+  projection: OrchestrationV2ThreadProjection,
+  checkpoint: OrchestrationV2Checkpoint,
+): boolean {
+  return checkpoint.files.length > 0 || retrySpanFor(projection, checkpoint) !== null;
+}
+
+/** The newest retry checkpoint whose own summary is empty, when it is newer than every card with files. */
+export function latestRetryCheckpoint(
+  projection: OrchestrationV2ThreadProjection,
+): OrchestrationV2Checkpoint | undefined {
+  const rolledBack = new Set(
+    projection.runs.filter((run) => run.status === "rolled_back").map((run) => run.id),
+  );
+  const roots = rootCheckpoints(projection).filter(
+    (c) => c.runId === null || !rolledBack.has(c.runId),
+  );
+  const latest = roots.findLast((c) => mayHaveChanges(projection, c));
+  return latest !== undefined && latest.files.length === 0 ? latest : undefined;
+}
+
 export function reviewTargetFor(
   projection: OrchestrationV2ThreadProjection,
   threadId: ThreadId,
@@ -89,14 +123,19 @@ export function reviewTargetFor(
   if (!checkpoint) return null;
   const run = projection.runs.find((r) => r.id === checkpoint.runId) ?? null;
   const ordinal = checkpoint.appRunOrdinal;
+  const span = retrySpanFor(projection, checkpoint);
   return {
     checkpoint,
     run,
-    before: findBefore(projection, checkpoint),
+    before: span?.before ?? findBefore(projection, checkpoint),
     diffInput:
       ordinal === null
         ? null
-        : { threadId, fromTurnCount: Math.max(0, ordinal - 1), toTurnCount: ordinal },
+        : {
+            threadId,
+            fromTurnCount: span?.fromTurnCount ?? Math.max(0, ordinal - 1),
+            toTurnCount: ordinal,
+          },
   };
 }
 

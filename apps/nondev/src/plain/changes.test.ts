@@ -5,7 +5,9 @@ import {
   describeFile,
   describeTurnDiff,
   fromCheckpointFiles,
+  describeFileChange,
   humanizeFileName,
+  named,
   parseUnifiedDiff,
 } from "./changes";
 
@@ -95,6 +97,34 @@ describe("describeFile", () => {
     const described = describeFile(path);
     expect(described.area).toBe(area);
     expect(described.noun).toBe(noun);
+  });
+
+  // A child's own file names (F4): "my-pet.html" is theirs, not "the my pet page".
+  it.each([
+    ["my-pet.html", "your pet page"],
+    ["my_drawing.html", "your drawing page"],
+    ["MyRocket.html", "your rocket page"],
+    ["our-club.html", "your club page"],
+    ["my.html", "your page"],
+    ["my-page.html", "your page"],
+    ["pet-page.html", "the pet page"],
+    ["the-end.html", "the end page"],
+    ["bubbles.html", "the bubbles page"],
+    ["src/pages/my-games.tsx", "your games page"],
+    ["my-styles.css", "the site's overall styling"],
+    ["images/my-cat.png", "your cat image or media file"],
+    ["src/lib/my-helpers.test.ts", "the checks for your helpers"],
+    ["mystery.html", "the mystery page"],
+  ])("names %s as %s", (path, noun) => {
+    expect(describeFile(path).noun).toBe(noun);
+  });
+
+  it("starts a What changed line with a capital, never 'The my'", () => {
+    expect(
+      describeFileChange({ path: "my-pet.html", operation: "added", additions: 3, deletions: 0 })
+        .line,
+    ).toBe("Added your pet page (+3 / −0 lines)");
+    expect(named("My Pet", "page")).toBe("your Pet page");
   });
 
   it("flags secrets, config and dependency manifests", () => {

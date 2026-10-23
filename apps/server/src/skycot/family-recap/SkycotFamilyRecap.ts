@@ -8,7 +8,9 @@ import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
+import * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
@@ -32,6 +34,10 @@ const make = Effect.gen(function* () {
   const gate = yield* SkycotFamilyGate.SkycotFamilyGate;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  // Optional so the tests and tools that build this alone still work; the server provides it.
+  const diffs = Option.getOrUndefined(
+    yield* Effect.serviceOption(CheckpointDiffQuery.CheckpointDiffQuery),
+  );
 
   const recap: SkycotFamilyRecap["Service"]["recap"] = Effect.fn("SkycotFamilyRecap.recap")(
     function* (input) {
@@ -46,6 +52,7 @@ const make = Effect.gen(function* () {
         if (childId !== input.childId) continue;
         const loaded = yield* loadThread(projections, projects, threadId as ThreadId, {
           messages: true,
+          ...(diffs === undefined ? {} : { diffs }),
         });
         // Nothing happened in it since the range began: no need to judge its cards.
         if (loaded === null || loaded.deleted || loaded.updatedAt < from) continue;

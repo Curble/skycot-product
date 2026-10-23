@@ -3,8 +3,8 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { ProviderInteractionMode, ServerConfig, ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { AlertCircle, ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { AlertCircle, ChevronDown, Info } from "lucide-react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import { newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -30,6 +30,7 @@ import { MenuItem, Popover } from "../../ui/Popover";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
+import { useShortWindow } from "../../app/useShortWindow";
 import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
@@ -132,6 +133,13 @@ export function NewConversationComposer({
     ) ??
     (projects.length === 1 ? projects[0]! : null);
   const phone = columns === 1;
+  // On a phone or a laptop-height window the explanation folds away (F8): the pills already
+  // say what is on, and the message box and the Home screen get the room.
+  const shortWindow = useShortWindow();
+  const foldNotes = phone || shortWindow;
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesId = useId();
+  const showNotes = !foldNotes || notesOpen;
 
   return (
     <div className="fm-composer">
@@ -199,25 +207,39 @@ export function NewConversationComposer({
               <PlanFirstSwitch />
             </>
           )}
-        </div>
-        {/* One sentence for the chosen level, not a paragraph about every level. */}
-        <p className="fm-help" style={{ marginBottom: 6 }}>
-          <b>{autonomyLabel(autonomy)}.</b>{" "}
-          {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
-          {planFirst.on ? (
-            <>
-              {" "}
-              <b>Plan first.</b> You'll see the plan before anything changes.
-            </>
+          {foldNotes ? (
+            <Button
+              size="sm"
+              variant="plain"
+              icon={Info}
+              aria-expanded={notesOpen}
+              aria-controls={notesId}
+              onClick={() => setNotesOpen((open) => !open)}
+            >
+              {notesOpen ? "Hide" : phone ? "What's this?" : "What does this mean?"}
+            </Button>
           ) : null}
-        </p>
-        {!phone ? (
-          <p className="fm-rule" style={{ marginBottom: 10 }}>
-            <span className="fm-rule__icon">
-              <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
-            </span>
-            <span>{hardRulesStatement(policyEnforced, undefined, family.enabled)}</span>
-          </p>
+        </div>
+        {showNotes ? (
+          <div id={notesId}>
+            {/* One sentence for the chosen level, not a paragraph about every level. */}
+            <p className="fm-help" style={{ marginBottom: 6 }}>
+              <b>{autonomyLabel(autonomy)}.</b>{" "}
+              {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
+              {planFirst.on ? (
+                <>
+                  {" "}
+                  <b>Plan first.</b> You'll see the plan before anything changes.
+                </>
+              ) : null}
+            </p>
+            <p className="fm-rule" style={{ marginBottom: 10 }}>
+              <span className="fm-rule__icon">
+                <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
+              </span>
+              <span>{hardRulesStatement(policyEnforced, undefined, family.enabled)}</span>
+            </p>
+          </div>
         ) : null}
         {problem ? (
           <div style={{ marginBottom: 10 }}>

@@ -12,10 +12,16 @@ import { RequestCard } from "./RequestCard";
 
 // The explain-mode marker is for the engine; the person sees what they typed.
 // So is the "Point at something" block: the person sees chips, the assistant the element.
-registerTimelineRenderer("user_message", ({ item }) => {
+registerTimelineRenderer("user_message", ({ item, environmentId }) => {
   if (item.type !== "user_message") return null;
   const pointing = readPointing(readExplainMarker(item.text).text);
-  return <UserBubble item={{ ...item, text: pointing.text }} pointing={pointing.labels} />;
+  return (
+    <UserBubble
+      item={{ ...item, text: pointing.text }}
+      environmentId={environmentId}
+      pointing={pointing.labels}
+    />
+  );
 });
 // A "How I did it" section becomes its own Explain card under the message.
 registerTimelineRenderer("assistant_message", (context) => {

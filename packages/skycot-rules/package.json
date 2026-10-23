@@ -39,6 +39,10 @@
     "./preview": {
       "types": "./src/preview.ts",
       "import": "./src/preview.ts"
+    },
+    "./checkpoints": {
+      "types": "./src/checkpoints.ts",
+      "import": "./src/checkpoints.ts"
     }
   },
   "scripts": {

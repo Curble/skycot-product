@@ -22,7 +22,7 @@ import {
   navigate,
   type Route,
 } from "../router";
-import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
+import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf } from "../state/conversations";
 import { environmentProjects } from "../state/projects";
 import { CrewAvatar } from "../themes/CrewAvatar";
@@ -50,7 +50,6 @@ export function AppSidebar({
   const rows = useAtomValue(conversationRowsAtom);
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const projects = useAtomValue(environmentProjects.projectsAtom);
-  const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
@@ -65,12 +64,11 @@ export function AppSidebar({
     if (row.status.attention === "waiting") attentionByProject.add(key);
   }
 
+  const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
+  // The Mac's own name ("MamaBear") is not a person, and a child should never see it.
+  const meLabel = sidebarPersonLabel(family.enabled);
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
-  const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
-  const environmentLabel = primaryEnvironmentId
-    ? (catalog.entries.get(primaryEnvironmentId)?.target.label ?? "This Mac")
-    : "This Mac";
 
   const select = (apply: () => void) => {
     apply();
@@ -204,8 +202,8 @@ export function AppSidebar({
       <footer className="fm-sidebar__footer">
         <div className="fm-sidebar__footer-row">
           <span className="fm-sidebar__me">
-            <Avatar kind="person" value={environmentLabel} size="sm" label={environmentLabel} />
-            <b>{environmentLabel}</b>
+            <Avatar kind="person" value={meLabel} size="sm" label={meLabel} />
+            <b>{meLabel}</b>
           </span>
           <IconButton
             icon={Settings}
@@ -227,4 +225,9 @@ export function AppSidebar({
       </footer>
     </nav>
   );
+}
+
+/** Who the footer stands for: the grown-up whose settings the gear opens, never the computer. */
+export function sidebarPersonLabel(familyOn: boolean): string {
+  return familyOn ? "Grown-up" : "You";
 }

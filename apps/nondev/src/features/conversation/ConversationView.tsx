@@ -44,6 +44,7 @@ import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCar
 import { useStartNote } from "../compose/startNotes";
 import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
 import { latestReviewable } from "../review";
+import { useRetryMade } from "../review/useRetryMade";
 import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
@@ -176,7 +177,9 @@ export function ConversationView({
   // already following the end of the stream), and keep a pill in the strip
   // that jumps back to it. Someone re-reading an earlier message is not moved.
   const latest = projection ? (latestReviewable(projection) ?? null) : null;
-  const latestId = latest?.id ?? null;
+  // A retry after a failed turn is newer than any card with files when it exists at all.
+  const retryMade = useRetryMade(environmentId, threadId, projection);
+  const latestId = retryMade ?? latest?.id ?? null;
   const seenLatest = useRef<string | null>(null);
   useEffect(() => {
     if (latestId === null || latestId === seenLatest.current) return;
@@ -185,7 +188,7 @@ export function ConversationView({
     if (firstSighting || readerIsNearBottom()) scrollToCheckpoint(latestId);
   }, [latestId, seenLatest]);
   const startNote = useStartNote(threadId);
-  useBadgeWatcher({ threadId, shell, projection, active });
+  useBadgeWatcher({ threadId, shell, projection, active, retryMade });
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);

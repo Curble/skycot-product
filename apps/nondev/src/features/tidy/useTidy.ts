@@ -7,6 +7,7 @@ import { refreshOldConversations } from "../../state/oldConversations";
 import { threadEnvironment } from "../../state/threads";
 import { showToast } from "../../ui/Toast";
 import { refreshFridge } from "../fridge/store";
+import { forgetRename, rememberRename } from "./renamedTitles";
 import { cleanTitle } from "./tidy";
 
 export type TidyOutcome = { readonly ok: true } | { readonly ok: false; readonly message: string };
@@ -79,7 +80,12 @@ export function useTidy() {
   const rename = async (
     shell: EnvironmentThreadShell,
     raw: string,
-    options: { readonly toast?: boolean; readonly archived?: boolean } = {},
+    options: {
+      readonly toast?: boolean;
+      readonly archived?: boolean;
+      /** Undo of a rename: the old title goes back to being the assistant's. */
+      readonly undo?: boolean;
+    } = {},
   ): Promise<TidyOutcome> => {
     const checked = cleanTitle(raw);
     if (!checked.ok) return { ok: false, message: checked.reason };
@@ -90,6 +96,8 @@ export function useTidy() {
       input: { threadId: shell.id, title: checked.title },
     });
     if (outcome._tag === "Failure") return { ok: false, message: DIDNT_GO };
+    if (options.undo) forgetRename(shell.id);
+    else rememberRename(shell.id, checked.title);
     if (options.archived) refreshOldConversations(shell.environmentId);
     // The fridge's magnets carry the name too.
     void refreshFridge();
@@ -100,6 +108,7 @@ export function useTidy() {
         run: () =>
           rename({ ...shell, title: checked.title }, previous, {
             toast: false,
+            undo: true,
             ...(options.archived ? { archived: true } : {}),
           }),
       });

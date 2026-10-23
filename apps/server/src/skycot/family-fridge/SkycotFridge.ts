@@ -13,11 +13,13 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
 import * as ServerConfig from "../../config.ts";
+import * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
@@ -64,6 +66,10 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  // Optional so the tests and tools that build this alone still work; the server provides it.
+  const diffs = Option.getOrUndefined(
+    yield* Effect.serviceOption(CheckpointDiffQuery.CheckpointDiffQuery),
+  );
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
 
@@ -99,6 +105,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
       if (thread.deletedAt !== null) continue;
       const loaded = yield* loadThread(projections, projects, thread.id as ThreadId, {
         messages: false,
+        ...(diffs === undefined ? {} : { diffs }),
       });
       if (loaded !== null) threads.push(loaded);
     }

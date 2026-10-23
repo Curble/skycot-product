@@ -95,30 +95,30 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
             }}
           />
           <div className="fm-home__grid">
-            <Card label="Today, across every project">
-              <CardHeader
-                icon={ListTodo}
-                title="Today, across every project"
-                subtitle={
-                  active.length === 0
-                    ? connected
-                      ? "Nothing is running or waiting on you right now."
-                      : "Your jobs appear once your Mac is reachable."
-                    : "Tap any row to open its conversation."
-                }
-              />
-              {active.length > 0 ? (
-                <CardBody>
-                  <List label="Jobs">
-                    {active.map((row) => (
-                      <JobRow key={`${row.shell.environmentId}:${row.shell.id}`} row={row} />
-                    ))}
-                  </List>
-                </CardBody>
-              ) : null}
-            </Card>
-            <div className="fm-home__side">
-              <FridgeHomeTile />
+            <div className="fm-home__main">
+              <Card label="Today, across every project">
+                <CardHeader
+                  icon={ListTodo}
+                  title="Today, across every project"
+                  subtitle={
+                    active.length === 0
+                      ? connected
+                        ? "Nothing is running or waiting on you right now."
+                        : "Your jobs appear once your Mac is reachable."
+                      : "Tap any row to open its conversation."
+                  }
+                />
+                {active.length > 0 ? (
+                  <CardBody>
+                    <List label="Jobs">
+                      {active.map((row) => (
+                        <JobRow key={`${row.shell.environmentId}:${row.shell.id}`} row={row} />
+                      ))}
+                    </List>
+                  </CardBody>
+                ) : null}
+              </Card>
+              {/* Under "Today", not below the fridge: on a laptop it stays above the fold. */}
               <Card label="Tip" tip>
                 <CardHeader
                   icon={Sparkles}
@@ -127,6 +127,9 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   subtitle={homeTip(kids, crew.builder.name, planFirst.on)}
                 />
               </Card>
+            </div>
+            <div className="fm-home__side">
+              <FridgeHomeTile />
             </div>
           </div>
         </div>

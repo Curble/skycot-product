@@ -582,3 +582,41 @@
 .fm-approval[tabindex="-1"]:focus-visible {
   box-shadow: 0 0 0 2px var(--fm-accent);
 }
+
+/* Pictures sent with a message: small in the bubble, like Messages; tap for the big one. */
+.fm-bubble-pictures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.fm-bubble-pictures__thumb {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 104px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--fm-bg-content) 70%, transparent);
+  color: var(--fm-label-2);
+  cursor: zoom-in;
+}
+.fm-bubble-pictures__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fm-bubble-pictures__thumb:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+.fm-bubble-pictures__large {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--fm-bg-content);
+}
