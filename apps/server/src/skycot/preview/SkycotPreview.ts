@@ -31,7 +31,8 @@ import * as SkycotFamily from "../SkycotFamily.ts";
 import {
   findPreviewCommand,
   frameableFromHeaders,
-  IDLE_STOP_MS,
+  IDLE_CHECK_MS,
+  idleVerdict,
   outputTail,
   START_TIMEOUT_MS,
   startDecision,
@@ -262,6 +263,14 @@ export const make = Effect.gen(function* () {
   });
 
   const describe = (entry: Running): PreviewStatus => {
+    // It had answered on its address, so it started: its program ended afterwards.
+    if (entry.exited && entry.url !== null) {
+      return {
+        state: "stopped",
+        command: entry.command,
+        output: outputTail(entry.output, homeDir),
+      };
+    }
     if (entry.failure !== null && (entry.exited || entry.url === null)) {
       return {
         state: "failed",
@@ -322,7 +331,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const context = yield* contextFor(input.threadId).pipe(Effect.orElseSucceed(() => null));
           const previous = context === null ? undefined : running.get(context.folder);
-          // A start that already failed is started afresh; a live one is left as it is.
+          // A start that failed, or a site that stopped, is started afresh; a live one is left.
           if (previous !== undefined && previous.failure !== null) yield* stopEntry(previous);
           const current = yield* statusUnlocked(input.threadId);
           if (current.state !== "ready" || context === null) {
@@ -419,17 +428,27 @@ export const make = Effect.gen(function* () {
     return { allowed: false, requestId };
   });
 
-  // A preview nobody has looked at for a while is stopped, so sites do not pile up.
+  // A preview nobody has looked at for a while is stopped, so sites do not pile up. The open
+  // panel asks every few seconds, which counts as looking. After the Mac sleeps, the first check
+  // can come before the panel's next question, and the wall clock says everything went idle:
+  // the time asleep is not counted, or an open preview would stop by itself on waking.
+  let lastCheck: number | null = null;
   const reapIdle = lock.withPermits(1)(
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
+      const previousCheck = lastCheck;
+      lastCheck = now;
       // Stopping deletes from the map, which a Map's own iterator tolerates.
       for (const entry of running.values()) {
-        if (now - entry.lastSeen > IDLE_STOP_MS) yield* stopEntry(entry);
+        const verdict = idleVerdict({ now, lastCheck: previousCheck, lastSeen: entry.lastSeen });
+        if (verdict === "woke") entry.lastSeen = now;
+        else if (verdict === "stop") yield* stopEntry(entry);
       }
     }),
   );
-  yield* Effect.forkScoped(reapIdle.pipe(Effect.repeat(Schedule.spaced(Duration.minutes(1)))));
+  yield* Effect.forkScoped(
+    reapIdle.pipe(Effect.repeat(Schedule.spaced(Duration.millis(IDLE_CHECK_MS)))),
+  );
   yield* Effect.addFinalizer(() => Effect.forEach(running.values(), stopEntry, { discard: true }));
 
   return SkycotPreview.of({ status, start, stop, checkAddress });

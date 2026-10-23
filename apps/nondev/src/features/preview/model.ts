@@ -33,7 +33,9 @@ export type PreviewStatusView =
       readonly command: PreviewCommandView;
       readonly reason: "exited" | "no-address";
       readonly output: string;
-    };
+    }
+  /** It was showing, then its program ended: not a start that failed. */
+  | { readonly state: "stopped"; readonly command: PreviewCommandView; readonly output: string };
 
 const record = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -90,6 +92,8 @@ export function parsePreviewStatus(body: unknown): PreviewStatusView | null {
         reason: status["reason"] === "no-address" ? "no-address" : "exited",
         output: text(status["output"]) ?? "",
       };
+    case "stopped":
+      return { state, command, output: text(status["output"]) ?? "" };
     default:
       return null;
   }
@@ -135,11 +139,15 @@ export function shortAddress(url: string): string {
 }
 
 /** The message the "Ask Sam to fix it" button puts in the box, ready to send. */
-export function fixItMessage(status: PreviewStatusView & { readonly state: "failed" }): string {
+export function fixItMessage(
+  status: PreviewStatusView & { readonly state: "failed" | "stopped" },
+): string {
   const what =
-    status.reason === "no-address"
-      ? "The preview didn't start: it ran but never opened a page I could see."
-      : "The preview didn't start.";
+    status.state === "stopped"
+      ? "The preview was working, then it stopped by itself."
+      : status.reason === "no-address"
+        ? "The preview didn't start: it ran but never opened a page I could see."
+        : "The preview didn't start.";
   const said = status.output.trim();
   return [
     `${what} Can you fix it so the preview works? It runs \`${status.command.runner}\`.`,

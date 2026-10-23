@@ -8,6 +8,7 @@ import {
   parseFridge,
   type FridgeItem,
 } from "./fridge";
+import { parseMagnetPage } from "./pages";
 
 const item = (threadId: string, overrides: Partial<FridgeItem> = {}): FridgeItem => ({
   threadId,
@@ -71,5 +72,14 @@ describe("the family fridge", () => {
       parseFridge({ items: [item("ok"), { threadId: "broken" }] })?.map((entry) => entry.threadId),
     ).toEqual(["ok"]);
     expect(parseFridge({ error: "x" })).toBeNull();
+  });
+});
+
+describe("a magnet's page", () => {
+  it("reads the page, or that it is gone, and nothing else", () => {
+    expect(parseMagnetPage({ html: "<p>hi</p>" })).toEqual({ html: "<p>hi</p>" });
+    expect(parseMagnetPage({ html: null })).toEqual({ html: null });
+    expect(parseMagnetPage({})).toBeNull();
+    expect(parseMagnetPage({ html: 3 })).toBeNull();
   });
 });

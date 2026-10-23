@@ -1,7 +1,6 @@
 // One magnet: a live thumbnail of the page, its title, when it was made and by whom, and the
 // crew's sticker. Tapping the picture opens it with "Open it" (running, offline). Pinning and
 // taking it down are free for everyone; neither touches the page.
-import type { EnvironmentId } from "@t3tools/contracts";
 import { Pin, PinOff, Play } from "lucide-react";
 import type { CSSProperties } from "react";
 
@@ -19,7 +18,6 @@ function tiltOf(threadId: string): number {
 
 export function FridgeMagnet({
   item,
-  environmentId,
   now,
   maker,
   index,
@@ -28,7 +26,6 @@ export function FridgeMagnet({
   onPin,
 }: {
   readonly item: FridgeItem;
-  readonly environmentId: EnvironmentId | null;
   readonly now: number;
   /** "Ava", or null when nobody is known to have made it. */
   readonly maker: string | null;
@@ -55,9 +52,9 @@ export function FridgeMagnet({
         aria-label={`Open ${item.title}`}
       >
         <MagnetThumb
-          environmentId={environmentId}
-          cwd={item.cwd}
+          threadId={item.threadId}
           page={item.page}
+          version={item.madeAt}
           title={item.title}
         />
       </button>

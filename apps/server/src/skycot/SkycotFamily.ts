@@ -315,32 +315,6 @@ export function familyFailureSentence(
   }
 }
 
-/**
- * The engine's own MCP capabilities a thread's agent loses while the Family profile is on: all of
- * them. No thread control or scheduled tasks (orchestration), no worktrees, no pull requests, no
- * devices, and no page previews: the preview tools drive a browser the engine may first have to
- * download (about 200 MB), and they report what a page shows without the shield reading it. The
- * child's own Preview button (`/api/skycot/preview`) is unaffected.
- *
- * Removes them from `capabilities` in place and returns them for the credential registry, which
- * otherwise grants orchestration, worktrees and pull requests to every credential.
- */
-export const FAMILY_WITHHELD_MCP_CAPABILITIES = [
-  "orchestration",
-  "worktree",
-  "pull-requests",
-  "device",
-  "preview",
-] as const;
-
-export function withholdFamilyMcpCapabilities<C extends string>(
-  capabilities: Set<C>,
-): ReadonlySet<(typeof FAMILY_WITHHELD_MCP_CAPABILITIES)[number]> {
-  for (const capability of FAMILY_WITHHELD_MCP_CAPABILITIES)
-    capabilities.delete(capability as string as C);
-  return new Set(FAMILY_WITHHELD_MCP_CAPABILITIES);
-}
-
 export interface VerifyInput {
   readonly code: string;
   readonly purpose: FamilyPurpose;

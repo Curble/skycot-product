@@ -5,11 +5,17 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell
 import { describeThreadStatus } from "../conversation/status";
 import {
   decide,
+  EMPTY_MARK,
   firstSeenMark,
   groupOf,
+  kindOf,
   markFor,
+  NOTIFY_WINDOW_MS,
   notificationText,
+  stillNews,
+  throttle,
   type NotifyEvent,
+  type ThreadMark,
 } from "./decide";
 import { notifySettingsFor } from "./prefs";
 
@@ -135,6 +141,72 @@ describe("which moments notify", () => {
       ["finished", "plan", "needs-ok", "needs-grown-up", "question", "failed"] as const
     ).map(groupOf);
     expect(groups).toEqual(["finished", "needsOk", "needsOk", "needsOk", "needsOk", "failed"]);
+  });
+});
+
+describe("how often a conversation pings", () => {
+  const ask = (requestId: string): ThreadMark => ({
+    attention: `run-1:approval:${requestId}`,
+    attentionEvent: "needs-ok",
+    completion: null,
+    requestId,
+  });
+
+  it("sends a build's seventeen OK steps as one ping now and the latest one at the window's end", () => {
+    const sent: Array<{ readonly at: number; readonly requestId: string }> = [];
+    let lastSentAt: number | undefined;
+    let held: { readonly at: number; readonly mark: ThreadMark } | null = null;
+    let current: ThreadMark = EMPTY_MARK;
+    const flushUntil = (now: number) => {
+      if (held === null || held.at > now) return;
+      const due = held;
+      held = null;
+      if (stillNews("needs-ok", due.mark, current)) {
+        sent.push({ at: due.at, requestId: due.mark.requestId! });
+        lastSentAt = due.at;
+      }
+    };
+    // One step every 10 seconds, each answered by a rule or the child before the next.
+    for (let step = 0; step < 17; step++) {
+      const now = step * 10_000;
+      flushUntil(now);
+      current = ask(`request-${step}`);
+      const answer = throttle(lastSentAt, now);
+      if (answer.send === "now") {
+        sent.push({ at: now, requestId: `request-${step}` });
+        lastSentAt = now;
+      } else held = { at: answer.at, mark: current };
+    }
+    flushUntil(NOTIFY_WINDOW_MS);
+
+    expect(sent).toEqual([
+      { at: 0, requestId: "request-0" },
+      { at: NOTIFY_WINDOW_MS, requestId: "request-16" },
+    ]);
+  });
+
+  it("drops a held-back ping that is no longer true", () => {
+    expect(stillNews("needs-ok", ask("a"), ask("a"))).toBe(true);
+    expect(stillNews("needs-ok", ask("a"), { ...ask("a"), attention: null })).toBe(false);
+    expect(stillNews("needs-ok", ask("a"), undefined)).toBe(false);
+    const finished: ThreadMark = { ...EMPTY_MARK, completion: 100 };
+    expect(stillNews("finished", finished, finished)).toBe(true);
+    expect(stillNews("finished", finished, ask("b"))).toBe(false);
+    expect(stillNews("finished", finished, { ...EMPTY_MARK, completion: 200 })).toBe(false);
+  });
+
+  it("pings again once the window has passed", () => {
+    expect(throttle(undefined, 5)).toEqual({ send: "now" });
+    expect(throttle(0, NOTIFY_WINDOW_MS - 1)).toEqual({ send: "later", at: NOTIFY_WINDOW_MS });
+    expect(throttle(0, NOTIFY_WINDOW_MS)).toEqual({ send: "now" });
+  });
+
+  it("throttles needs-a-grown-up with needs-your-OK, and keeps the other kinds apart", () => {
+    expect(kindOf("needs-grown-up")).toBe(kindOf("needs-ok"));
+    const kinds = new Set(
+      (["finished", "failed", "plan", "question", "needs-ok"] as const).map(kindOf),
+    );
+    expect(kinds.size).toBe(5);
   });
 });
 

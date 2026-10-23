@@ -3504,12 +3504,13 @@ it.effect(
     }),
 );
 
-// nondev-seam: skycot-family-mcp-test (with the Family profile on, the agent's credential carries none of the engine's own tools, page previews included, even with browser access on)
+// nondev-seam: skycot-family-mcp-test (with the Family profile on, the agent is given no engine tool server: no credential reaches the provider, so none of the engine's tools, html_render and html_preview included, is listed or callable; an earlier credential is revoked, and turning the profile off gives it back)
 it.effect(
-  "ProviderSessionManagerV2 gives a Family-profile thread none of the engine's own tools",
+  "ProviderSessionManagerV2 gives a Family-profile thread no engine tool server at all",
   () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
+      const familyOn = yield* Ref.make(false);
       const mcpConfigs = yield* Ref.make<
         ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
       >([]);
@@ -3518,25 +3519,38 @@ it.effect(
         const idAllocator = yield* IdAllocator.IdAllocatorV2;
         const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
         const registry = yield* McpSessionRegistry.McpSessionRegistry;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
         const now = yield* DateTime.now;
         const threadId = ThreadId.make("thread-provider-session-manager-family");
-        const providerSessionId = yield* idAllocator.allocate.providerSession({
-          providerInstanceId: modelSelection.instanceId,
-          threadId,
-        });
         yield* eventSink.write({
           events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
         });
-        yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+        const openOnce = Effect.gen(function* () {
+          const providerSessionId = yield* idAllocator.allocate.providerSession({
+            providerInstanceId: modelSelection.instanceId,
+            threadId,
+          });
+          yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+          return { providerSessionId, captured: (yield* Ref.get(mcpConfigs)).at(-1) };
+        });
 
-        const captured = (yield* Ref.get(mcpConfigs))[0];
-        assert.isDefined(captured);
-        assert.equal(captured?.browserToolsAvailable, false);
-        const resolved = yield* registry.resolve(
-          captured!.authorizationHeader.replace(/^Bearer\s+/, ""),
-        );
-        assert.deepEqual(resolved?.capabilities, new Set());
-        yield* manager.close(providerSessionId);
+        const before = yield* openOnce;
+        const earlierToken = before.captured?.authorizationHeader.replace(/^Bearer\s+/, "");
+        assert.isDefined(earlierToken);
+        assert.isDefined(yield* registry.resolve(earlierToken!));
+        yield* manager.close(before.providerSessionId);
+
+        yield* Ref.set(familyOn, true);
+        const during = yield* openOnce;
+        assert.isUndefined(during.captured);
+        assert.isUndefined(yield* mcpSessions.read(threadId));
+        assert.isUndefined(yield* registry.resolve(earlierToken!));
+        yield* manager.close(during.providerSessionId);
+
+        yield* Ref.set(familyOn, false);
+        const after = yield* openOnce;
+        assert.isTrue(after.captured?.capabilities?.has("orchestration"));
+        yield* manager.close(after.providerSessionId);
       });
 
       yield* effect.pipe(
@@ -3549,9 +3563,7 @@ it.effect(
               enableAgentBrowserAccess: true,
             }).pipe(Layer.orDie),
           }).pipe(
-            Layer.provide(
-              Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) }),
-            ),
+            Layer.provide(Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Ref.get(familyOn) })),
           ),
         ),
       );

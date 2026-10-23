@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { askLine, grownUpLines, madeSummary, minutesPhrase, parseRecap, weekBars } from "./recap";
+import {
+  askLine,
+  grownUpLines,
+  madeSummary,
+  minutesPhrase,
+  parseRecap,
+  recapOpenOn,
+  weekBars,
+} from "./recap";
 
 const MELBOURNE = "Australia/Melbourne";
 const file = (path: string, additions = 10) => ({
@@ -83,5 +91,17 @@ describe("the recap in plain words", () => {
 
   it("refuses an answer that is not a recap", () => {
     expect(parseRecap({ error: "forbidden" })).toBeNull();
+  });
+});
+
+describe("asking for the code before the recap loads", () => {
+  it("loads straight away only while a yes the engine accepts is open on this device", () => {
+    const now = 1_000_000;
+    expect(recapOpenOn({}, now)).toBe(false);
+    expect(recapOpenOn({ publish: now + 60_000 } as never, now)).toBe(false);
+    expect(recapOpenOn({ recap: now - 1 }, now)).toBe(false);
+    expect(recapOpenOn({ recap: now + 60_000 }, now)).toBe(true);
+    expect(recapOpenOn({ settings: now + 60_000 }, now)).toBe(true);
+    expect(recapOpenOn({ advanced: now + 60_000 }, now)).toBe(true);
   });
 });

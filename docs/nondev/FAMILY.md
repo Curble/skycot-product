@@ -82,11 +82,20 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   sent back with **Ask a grown-up**; the code allows that one site while the preview stays open.
   What the child points at with **Point at something** travels as words in their next message, so
   the shield reads it like anything they type.
-- **The assistant's own SKYCOT tools are off.** While the profile is on, the engine gives the
-  assistant none of SKYCOT's own tools: it cannot start other conversations, schedule
-  automations, open pull requests, use other devices, or open, click and take pictures of pages
-  itself (those page tools would first download a browser of about 200 MB). The child's own
-  **Preview** button works as before; the assistant is told to suggest it instead.
+- **The assistant's own SKYCOT tools are off.** While the profile is on, the engine does not
+  connect the assistant to SKYCOT's own tool server at all, so the assistant is not even shown
+  those tools' names: it cannot start other conversations, schedule automations, open pull
+  requests, use other devices, open, click and take pictures of pages, or draw a page as a
+  picture (`html_render`, `html_preview`; those page tools would first download a browser of
+  about 200 MB). This holds for every assistant (Codex, Claude, Cursor, OpenCode, Grok and the
+  other ACP agents, Muse, Pi): each one is handed SKYCOT's tool server only when the engine
+  issues it a key, and in the Family profile it issues none. While the profile is on, the engine
+  also refuses every key it issued before, so an assistant that was already running when the
+  profile was turned on can no longer use the tools; it may still see their names until it next
+  starts. The child's own **Preview** button works as before; the assistant is told to suggest
+  it instead. After the profile is turned off, a conversation gets the tools back when its
+  assistant next starts. Outside agents a grown-up approved (MCP clients) are not affected; see
+  below.
 - **The look.** Workshop (cream paper, marker pens, Sam builds and Mo checks; SKYCOT's
   default look) stays on unless a parent picked another look, and larger text comes on. Both are ordinary preferences anyone can change; looks never change what
   SKYCOT does.
@@ -237,8 +246,8 @@ too.
 ## The fridge
 
 **The fridge** (sidebar, and **On the fridge** on Home) shows everything made on this Mac: one
-magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running),
-its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
+magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running
+and nothing loaded: the engine puts the page's own stylesheets and pictures inside it), its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
 SKYCOT. With several children there is a shelf per child and a filter; children see their own
 shelf and their siblings'. **Pin to the fridge** keeps a magnet at the top and **Take it down**
 unpins it; neither needs the code, and neither deletes anything: the page stays in its project.
@@ -359,9 +368,6 @@ Honestly, so a parent can decide how nearby to stay:
   the project's own scripts (`npm run start`). With Codex, the engine's sandbox keeps the
   network off for those; with Claude, a project script that itself downloads something is
   not caught by name.
-- **Rendering a page to a picture** (the assistant's `html_render` and `html_preview` tools) is
-  not switched off by the engine, only asked against in the assistant's instructions; the first use
-  on a computer without SKYCOT's small browser downloads it (about 200 MB).
 - **The live preview's start command runs outside the assistant's safe area.** SKYCOT checks its
   words (and the script it runs) for installs and the internet, not what the program then does: a
   project server that itself downloads something is not caught.

@@ -101,9 +101,9 @@ export function RecapReportView({
                   aria-label={`Open ${proud.title}`}
                 >
                   <MagnetThumb
-                    environmentId={environmentId}
-                    cwd={proud.cwd}
+                    threadId={proud.threadId}
                     page={proud.page}
+                    version={proud.at}
                     title={proud.title}
                   />
                 </button>

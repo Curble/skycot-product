@@ -79,4 +79,46 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
       ]);
     }).pipe(Effect.scoped),
   );
+
+  it.effect("sends a made page with its own stylesheet inside, and only pages it made", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fridge-page-" });
+      const root = path.join(dir, "games");
+      yield* fs.makeDirectory(root, { recursive: true });
+      yield* fs.writeFileString(
+        path.join(root, "index.html"),
+        '<html><head><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="leak.css"></head><body>Space</body></html>',
+      );
+      yield* fs.writeFileString(path.join(root, "style.css"), "body { color: hotpink }");
+      yield* fs.writeFileString(path.join(dir, "secret.css"), "body { content: 'secret' }");
+      // A link that leaves the project is refused even though its name looks like the project's.
+      yield* fs.symlink(path.join(dir, "secret.css"), path.join(root, "leak.css"));
+      const live = records("live", "Space game", false);
+      const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getThreadRecords: (() => Effect.succeed(live as never)) as never,
+      });
+      const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
+        get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
+      });
+      const [made, other] = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        return [
+          yield* fridge.page({ threadId: "live", page: "index.html" }),
+          yield* fridge.page({ threadId: "live", page: "style.css" }),
+        ] as const;
+      }).pipe(
+        Effect.provide(
+          SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+            Layer.provide(Layer.merge(projections, projects)),
+          ),
+        ),
+      );
+      assert.include(made ?? "", "<style>body { color: hotpink }</style>");
+      assert.notInclude(made ?? "", "secret");
+      assert.notInclude(made ?? "", "<link");
+      assert.isNull(other);
+    }).pipe(Effect.scoped),
+  );
 });

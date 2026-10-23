@@ -135,7 +135,6 @@ export function FridgeScreen() {
                         key={item.threadId}
                         item={item}
                         index={index}
-                        environmentId={environmentId}
                         now={now}
                         maker={only === "everyone" && children.length > 1 ? name : null}
                         onOpen={() => setOpen(item)}

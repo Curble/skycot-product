@@ -521,8 +521,29 @@ const fridgePinRoute = madeRoute("POST", "/fridge/pin", ({ fridge, body }) =>
   }),
 );
 
+/**
+ * One magnet's page for its thumbnail, with the project's own stylesheets and pictures inside it
+ * (the thumbnail frame may not load anything). Only a page that conversation made.
+ */
+const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query }) =>
+  Effect.gen(function* () {
+    const threadId = query.get("threadId") ?? "";
+    const page = query.get("page") ?? "";
+    if (threadId.length === 0 || page.length === 0) {
+      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    }
+    // `html: null`: that conversation never made the page, or it is not there any more.
+    return json({ html: yield* fridge.page({ threadId, page }) });
+  }),
+);
+
 /** The recap and fridge routes, without their services (tests provide stand-ins). */
-export const layerMadeRoutes = Layer.mergeAll(recapRoute, fridgeRoute, fridgePinRoute);
+export const layerMadeRoutes = Layer.mergeAll(
+  recapRoute,
+  fridgeRoute,
+  fridgePinRoute,
+  fridgePageRoute,
+);
 
 /** The profile's own routes. */
 export const layerCore = Layer.mergeAll(
