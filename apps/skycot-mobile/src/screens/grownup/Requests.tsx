@@ -104,7 +104,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
       {done ? (
         <Banner tone="success" text={done} />
       ) : request.lapsed ? null : (
-        <ButtonRow>
+        <ButtonRow minWidthEach={120}>
           <Button
             title="Decline"
             kind="grey"
