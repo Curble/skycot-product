@@ -85,7 +85,8 @@ function addWatchTarget(project, options) {
   const sourceGroup = uuid();
   const children = [];
   const sourceBuildFiles = [];
-  for (const name of [...swiftFiles, "Info.plist"]) {
+  const resourceBuildFiles = [];
+  for (const name of [...swiftFiles, "Info.plist", "PrivacyInfo.xcprivacy"]) {
     const ref = uuid();
     addObject(
       objects,
@@ -93,7 +94,11 @@ function addWatchTarget(project, options) {
       ref,
       {
         isa: "PBXFileReference",
-        lastKnownFileType: name.endsWith(".swift") ? "sourcecode.swift" : "text.plist.xml",
+        lastKnownFileType: name.endsWith(".swift")
+          ? "sourcecode.swift"
+          : name.endsWith(".xcprivacy")
+            ? "text.xml"
+            : "text.plist.xml",
         path: q(name),
         sourceTree: q("<group>"),
       },
@@ -110,6 +115,17 @@ function addWatchTarget(project, options) {
         `${name} in Sources`,
       );
       sourceBuildFiles.push({ value: build, comment: `${name} in Sources` });
+    } else if (name.endsWith(".xcprivacy")) {
+      // Apple's privacy manifest travels inside the Watch app.
+      const build = uuid();
+      addObject(
+        objects,
+        "PBXBuildFile",
+        build,
+        { isa: "PBXBuildFile", fileRef: ref, fileRef_comment: name },
+        `${name} in Resources`,
+      );
+      resourceBuildFiles.push({ value: build, comment: `${name} in Resources` });
     }
   }
   const catalogRef = uuid();
@@ -201,7 +217,7 @@ function addWatchTarget(project, options) {
   const frameworks = phase("PBXFrameworksBuildPhase", [], "Frameworks");
   const resources = phase(
     "PBXResourcesBuildPhase",
-    [{ value: catalogBuild, comment: "Assets.xcassets in Resources" }],
+    [{ value: catalogBuild, comment: "Assets.xcassets in Resources" }, ...resourceBuildFiles],
     "Resources",
   );
 

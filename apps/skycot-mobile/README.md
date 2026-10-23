@@ -28,6 +28,10 @@ part of SKYCOT on the Mac that runs everything. **Relay** is SKYCOT Relay (Phase
   (today, their conversations read only, their week, more time) and This device (Face ID, Lock
   everything, linked Macs, Unlink). The words and rules are Phase 1's grown-up phone.
 - **iPad:** a sidebar beside the content (T3's layout breakpoints); iPhone: the system tab bar.
+- **Apple Watch** (grown-ups, Phase 4, [WATCH.md](../../docs/nondev/WATCH.md)): a SwiftUI
+  companion in `watch/SkycotWatch` with Requests (Allow once / Decline on the wrist, while the
+  Watch is unlocked and on the wrist), Today and Lock SKYCOT now. It talks only to this app
+  (WatchConnectivity); a yes is signed by the Watch's own key over the Mac's challenge.
 - **Live Activity and widget:** "Sam is building…" / "Sam needs your OK" on a child's device,
   "Ava needs a grown-up" on a grown-up's, content-free, from what the app last saw.
 
@@ -40,6 +44,8 @@ part of SKYCOT on the Mac that runs everything. **Relay** is SKYCOT Relay (Phase
 | `src/engine/`, `src/family/`             | the engine's reads and commands (T3's own RPC protocol), the Family routes; parsing is the plain client's own code                              |
 | `src/screens/child`, `grownup`, `shared` | the screens; `src/app/` the shells for each mode                                                                                                |
 | `src/widgets/`, `src/activity/`          | the Live Activity (forked from T3's `AgentActivity`) and widget, and the words they show                                                        |
+| `watch/SkycotWatch/`                     | the Apple Watch app (Swift); `plugins/withSkycotWatch.cjs` adds its target at prebuild                                                          |
+| `modules/skycot-watch/`, `src/watch/`    | the iPhone side of the Watch: WatchConnectivity, the notification with Allow once / Decline, the snapshot and the Watch's messages              |
 | `modules/skycot-speech/`                 | on-device voice typing (Apple Speech, `requiresOnDeviceRecognition`)                                                                            |
 | `src/dev/`                               | development-build demo conversations (screenshots); not reachable in the App Store build                                                        |
 
@@ -72,6 +78,13 @@ xcrun simctl install booted <DerivedData>/Build/Products/Debug-iphonesimulator/S
 ```
 
 No Apple account, certificate or profile is needed for the Simulator ("sign to run locally").
+Run `pod install` with `LANG=en_US.UTF-8` (CocoaPods fails on a non-UTF-8 terminal).
+
+**With the Watch:** the same build also builds `SkycotWatch.app` (watchOS Simulator) into
+`SKYCOTDev.app/Watch/`. Pair simulators once (`xcrun simctl pair <watch> <phone>`), install the
+iPhone app on the phone and `SKYCOTDev.app/Watch/SkycotWatch.app` on the Watch
+(`xcrun simctl install <watch> …`), and open both. The Watch's own test steps are in
+[WATCH.md](../../docs/nondev/WATCH.md#testing-in-the-simulator).
 
 **Development-build test hooks** (never in the App Store build): `-skycotTestLink <url>` as a launch
 argument hands the app a link at start (`xcrun simctl launch <device> com.skycot.app.ios.dev
@@ -97,7 +110,9 @@ screens.
 - **Away from home** works through the relay once Mark deploys it; until then, the home Wi-Fi or
   Tailscale. A relay-only QR code doesn't carry the Mac's home address, so such a device uses the
   relay at home too.
-- **Apple Watch** is Phase 4. **Android** later (the code is ready for it; no Android build here).
+- **Apple Watch**: built (Phase 4). Notifications reach it only while SKYCOT runs on the phone
+  until the relay pushes; the Smart Stack view itself was not opened in the Simulator.
+  **Android** later (the code is ready for it; no Android build here).
 - Pictures in messages, drawing starter cards and reading replies aloud are not on the phone yet.
 
 ## What needs Mark (Apple)
@@ -105,4 +120,5 @@ screens.
 App Store Connect app record for `com.skycot.app.ios` (and `.dev` for TestFlight), App Groups
 `group.com.skycot.app.ios`, the widget extension id `com.skycot.app.ios.widgets`, Push Notifications
 and an APNs key (shared with the relay), the associated domain for passkeys, and the signing set-up
-for team `3F72LCWGG2`. None of this was done here.
+for team `3F72LCWGG2`, and the Watch app's id `com.skycot.app.ios.watchkitapp` (signed with the
+same team; App Attest for the Watch's key is optional, later). None of this was done here.
