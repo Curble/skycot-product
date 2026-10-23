@@ -14,7 +14,10 @@
  *     local `.env` points the build at T3's relay;
  *   - every remaining mention of a T3 address in the engine's runtime code (server, desktop,
  *     shared packages; tests excluded) is on the reviewed list below, with why it is never
- *     fetched. A new mention fails until someone decides.
+ *     fetched. A new mention fails until someone decides;
+ *   - SKYCOT's iPhone and iPad app (apps/skycot-mobile, a fork of T3's apps/mobile) carries none of
+ *     T3's identity: no T3 address, Expo/EAS owner or project, update URL, Clerk, Axiom, T3 team or
+ *     bundle id, and its own config keeps SKYCOT's bundle ids with over-the-air updates off.
  *
  * Run by apply-brand.ts, by t3-address-guard.test.ts (CI: `node --test nondev/scripts/*.test.ts`)
  * and directly: `node nondev/scripts/t3-address-guard.ts`.
@@ -145,6 +148,68 @@ export function runtimeSourceFiles(root: string = ROOT): Array<string> {
   return files.filter((file) => !file.includes("/skycot/"));
 }
 
+/** SKYCOT's own iPhone and iPad app. */
+export const PHONE_APP_ROOT = "apps/skycot-mobile";
+
+/** T3's mobile identity: its sites, Expo project, update host, sign-in, traces, team, ids. */
+export const T3_MOBILE_IDENTITY =
+  /pingdotgg|(?<![\w-])t3\.(?:codes|gg|chat)\b|t3tools\.t3code|com\.t3tools|u\.expo\.dev|d763fcb8-d37c-41ea-a773-b54a0ab4a454|ARK85ZXQ4Z|@clerk\/|clerk\.t3|api\.axiom\.co|t3code-dev:|t3code:\/\//iu;
+
+const PHONE_APP_SKIP = new Set(["node_modules", "ios", "android", ".expo", "dist"]);
+
+function phoneAppFiles(root: string, dir: string, out: Array<string>): void {
+  const absolute = NodePath.join(root, dir);
+  if (!NodeFS.existsSync(absolute)) return;
+  for (const entry of NodeFS.readdirSync(absolute, { withFileTypes: true })) {
+    const relative = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (!PHONE_APP_SKIP.has(entry.name)) phoneAppFiles(root, relative, out);
+    } else if (/\.(?:[cm]?[jt]sx?|json|swift|podspec|plist|svg|md)$/u.test(entry.name)) {
+      out.push(relative);
+    }
+  }
+}
+
+/** What would let T3 Tools reach, update or identify SKYCOT's phone app. */
+export function phoneAppProblems(root: string = ROOT): string[] {
+  if (!NodeFS.existsSync(NodePath.join(root, PHONE_APP_ROOT))) return [];
+  const problems: string[] = [];
+  const files: Array<string> = [];
+  phoneAppFiles(root, PHONE_APP_ROOT, files);
+  for (const file of files) {
+    const text = read(root, file) ?? "";
+    const lines = text.split("\n");
+    const line = lines.findIndex((candidate) => T3_MOBILE_IDENTITY.test(candidate));
+    if (line >= 0) {
+      problems.push(
+        `${file}:${line + 1}: names T3's mobile identity (an address, the Expo project, Clerk, Axiom, T3's team or bundle id). SKYCOT's app carries none of it.`,
+      );
+    }
+  }
+  const config = read(root, `${PHONE_APP_ROOT}/app.config.ts`);
+  if (config === undefined) {
+    problems.push(`${PHONE_APP_ROOT}/app.config.ts: missing`);
+  } else {
+    if (!config.includes('iosBundleIdentifier: "com.skycot.app.ios"')) {
+      problems.push(
+        `${PHONE_APP_ROOT}/app.config.ts: the App Store build must be com.skycot.app.ios`,
+      );
+    }
+    if (!/updates:\s*\{\s*enabled:\s*false\s*\}/u.test(config)) {
+      problems.push(
+        `${PHONE_APP_ROOT}/app.config.ts: over-the-air updates must stay off (updates: { enabled: false })`,
+      );
+    }
+    if (/\bowner\s*:|projectId\s*:/u.test(config)) {
+      problems.push(`${PHONE_APP_ROOT}/app.config.ts: names an Expo/EAS owner or project`);
+    }
+  }
+  if (NodeFS.existsSync(NodePath.join(root, PHONE_APP_ROOT, "eas.json"))) {
+    problems.push(`${PHONE_APP_ROOT}/eas.json: SKYCOT builds its app itself; no EAS cloud profile`);
+  }
+  return problems;
+}
+
 export function t3AddressProblems(root: string = ROOT): string[] {
   const problems: string[] = [];
   const mod = loadBrandEnv(root);
@@ -232,6 +297,7 @@ export function t3AddressProblems(root: string = ROOT): string[] {
       `${file}:${line}: names a T3 Code address in the engine's runtime code. If it is fetched, route it through brand.json (like the model list) or remove it; if it is only text, add it to REVIEWED_MENTIONS with why.`,
     );
   }
+  problems.push(...phoneAppProblems(root));
   return problems;
 }
 
@@ -250,5 +316,7 @@ if (
     for (const problem of problems) process.stderr.write(`  - ${problem}\n`);
     process.exit(1);
   }
-  process.stdout.write("t3-address-guard: no T3 Code address is reachable from the engine\n");
+  process.stdout.write(
+    "t3-address-guard: no T3 Code address is reachable from the engine or SKYCOT's phone app\n",
+  );
 }

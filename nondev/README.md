@@ -35,6 +35,7 @@ Our code lives **only** in paths upstream does not own. Anything there can never
 | Path                                                                     | What goes there                                                                 |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | `apps/nondev/**`                                                         | our client (the workspace package `@t3tools/nondev`), incl. `themes-community/` |
+| `apps/skycot-mobile/**`                                                  | SKYCOT for iPhone and iPad (Expo), a SKYCOT-only fork of `apps/mobile`          |
 | `apps/server/src/skycot/**`                                              | SKYCOT-only server modules (provider policy)                                    |
 | `packages/skycot-rules/**`                                               | SKYCOT-only shared rules package                                                |
 | `packages/skycot-brand/**`                                               | SKYCOT-only brand logic (day/dusk from the sky), shared by client and desktop   |
