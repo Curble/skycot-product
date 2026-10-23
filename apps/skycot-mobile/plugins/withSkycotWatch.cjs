@@ -160,7 +160,7 @@ function addWatchTarget(project, options) {
   const mainGroup = objects.PBXGroup[project.getFirstProject().firstProject.mainGroup];
   mainGroup.children.push({ value: sourceGroup, comment: TARGET });
 
-  // The product, in Products.
+  // The built SkycotWatch.app, listed under Products so the iPhone app can embed it.
   const productRef = uuid();
   addObject(
     objects,
@@ -265,7 +265,7 @@ function addWatchTarget(project, options) {
     `Build configuration list for PBXNativeTarget "${TARGET}"`,
   );
 
-  // The target.
+  // A single-target watchOS app (Xcode 14 and later): no separate WatchKit extension.
   const target = uuid();
   addObject(
     objects,
