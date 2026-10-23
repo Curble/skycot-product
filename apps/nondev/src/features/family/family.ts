@@ -28,7 +28,9 @@ export type FamilyAction =
   | "seeRecap"
   | "restartToUpdate"
   /** One conversation, for good: the yes names it (`deleteConversationApprovalId`). */
-  | "deleteConversation";
+  | "deleteConversation"
+  /** Files: Show everything (hidden and secret files, add-ons) and Show in Finder. */
+  | "seeAllFiles";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -57,6 +59,7 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "seeRecap",
   "restartToUpdate",
   "deleteConversation",
+  "seeAllFiles",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -68,7 +71,8 @@ export type FamilyPurpose =
   | "settings"
   | "advanced"
   | "recap"
-  | "update";
+  | "update"
+  | "files";
 
 /**
  * The engine grant an action asks for. Turning the profile off and changing the code are not
@@ -91,6 +95,8 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
       return "recap";
     case "restartToUpdate":
       return "update";
+    case "seeAllFiles":
+      return "files";
     case "aiSettings":
     case "rerunOnboarding":
     case "changeAutonomy":
@@ -137,6 +143,7 @@ const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
   "settings",
   "advanced",
   "recap",
+  "files",
 ]);
 
 function parseGrants(value: unknown): ReadonlyArray<OpenGrant> | undefined {
@@ -404,6 +411,7 @@ const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
   ["publish", "publishing"],
   ["automation", "automations"],
   ["openFolder", "other folders"],
+  ["files", "all of a project's files"],
 ];
 
 /**

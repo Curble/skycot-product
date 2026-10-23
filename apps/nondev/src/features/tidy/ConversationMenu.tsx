@@ -2,6 +2,7 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell
 import { MoreHorizontal } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { filesHref, navigate } from "../../router";
 import { useCrew } from "../../themes/useCrew";
 import { IconButton } from "../../ui/Button";
 import { MenuItem, MenuSeparator, Popover, type PopoverTriggerProps } from "../../ui/Popover";
@@ -10,8 +11,8 @@ import { useTidy } from "./useTidy";
 
 /**
  * The rows every conversation menu shows (the list's "…", right-click, the header's "…"):
- * Rename…, then Put away or Bring back, then Delete… on its own after a rule. Putting away
- * and deleting wait while the crew is working.
+ * See the files, Rename…, then Put away or Bring back, then Delete… on its own after a rule.
+ * Putting away and deleting wait while the crew is working.
  */
 export function ConversationMenuItems({
   shell,
@@ -31,6 +32,14 @@ export function ConversationMenuItems({
   const blocked = archived ? null : putAwayBlocked(shell, crew.builder.name);
   return (
     <>
+      <MenuItem
+        onSelect={() => {
+          close();
+          navigate(filesHref(shell.environmentId, shell.projectId, shell.id));
+        }}
+      >
+        See the files
+      </MenuItem>
       <MenuItem
         onSelect={() => {
           close();

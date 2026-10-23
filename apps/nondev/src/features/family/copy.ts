@@ -80,6 +80,8 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "Deleting a conversation can't be undone, so a grown-up says yes with the parent code. It opens nothing else.";
     case "restartToUpdate":
       return `Restarting puts a new version of ${PRODUCT_NAME} in place, so a grown-up says when.`;
+    case "seeAllFiles":
+      return "Hidden files can hold passwords and keys, and Finder shows the rest of this Mac, so a grown-up opens them. The code shows everything on this device for 10 minutes.";
     case "changeTheme":
       return "";
   }

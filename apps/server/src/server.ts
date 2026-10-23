@@ -14,6 +14,7 @@ import * as SkycotFamilyHttp from "./skycot/SkycotFamilyHttp.ts"; // nondev-seam
 import * as SkycotFamilyMcp from "./skycot/SkycotFamilyMcp.ts"; // nondev-seam: skycot-family-mcp-guard
 import * as SkycotBadgesHttp from "./skycot/badges/SkycotBadgesHttp.ts"; // nondev-seam: skycot-family
 import * as SkycotPreviewHttp from "./skycot/preview/SkycotPreviewHttp.ts"; // nondev-seam: skycot-preview
+import * as SkycotFilesHttp from "./skycot/files/SkycotFilesHttp.ts"; // nondev-seam: skycot-files
 // Effect wraps this raw Node HTTP server after its startup and write-error guards attach.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
@@ -731,6 +732,7 @@ const layerMakeRoutes = Layer.mergeAll(
     SkycotFamilyHttp.layer, // nondev-seam: skycot-family
     SkycotBadgesHttp.layer, // nondev-seam: skycot-family
     SkycotPreviewHttp.layer, // nondev-seam: skycot-preview
+    SkycotFilesHttp.layer, // nondev-seam: skycot-files
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),

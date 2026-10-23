@@ -24,6 +24,7 @@ import {
   Clock,
   FolderPlus,
   Pencil,
+  FolderOpen,
   Receipt,
   ShieldAlert,
   Square,
@@ -35,7 +36,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
 import { useElapsedLabel } from "../../app/useElapsed";
-import { HOME_HREF } from "../../router";
+import { filesHref, HOME_HREF, navigate } from "../../router";
 import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
 import { useConversationShell } from "../../state/oldConversations";
 import { environmentProjects, projectAtomOrEmpty } from "../../state/projects";
@@ -282,6 +283,11 @@ export function ConversationView({
             />
           ) : null}
           {project && !archived ? <PreviewButton threadId={threadId} /> : null}
+          {shell ? (
+            <FilesButton
+              onClick={() => navigate(filesHref(environmentId, shell.projectId, threadId))}
+            />
+          ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
           {archived || question ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
@@ -555,6 +561,19 @@ function PreviewButton({ threadId }: { readonly threadId: ThreadId }) {
   return (
     <Button size="sm" icon={AppWindow} aria-pressed={open} onClick={toggle}>
       Preview
+    </Button>
+  );
+}
+
+/**
+ * Opens this conversation's files: its private copy of the project, read-only. A phone's
+ * header has no room left; there it is "See the files" in the "…" menu.
+ */
+function FilesButton({ onClick }: { readonly onClick: () => void }) {
+  if (useColumns() === 1) return null;
+  return (
+    <Button size="sm" icon={FolderOpen} onClick={onClick}>
+      Files
     </Button>
   );
 }

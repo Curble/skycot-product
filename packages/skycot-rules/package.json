@@ -47,6 +47,10 @@
     "./questions": {
       "types": "./src/questions.ts",
       "import": "./src/questions.ts"
+    },
+    "./browse": {
+      "types": "./src/browse.ts",
+      "import": "./src/browse.ts"
     }
   },
   "scripts": {

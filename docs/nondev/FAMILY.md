@@ -73,6 +73,17 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   parent has entered the code; the code opens it on that device for 15 minutes, and
   Settings → Family says how long is left. Its terminal, installs and AI settings need the
   code too.
+- **Files stay inside the project.** **Files** (in a conversation's header and its **…** menu as
+  **See the files**, and beside **New conversation** when a project is picked in the sidebar) lists
+  a project's files the way Finder does, and **Quick Look** shows any of them: pictures, pages
+  (running offline, like **Open it**), PDFs, Markdown, code and text, sounds and videos. Nothing
+  there edits, moves or deletes a file. The engine picks the folder (the project's own, or the
+  conversation's private copy) and refuses any path that leaves it: a typed `../`, a full path, or
+  a shortcut (symlink) pointing elsewhere on the Mac. Hidden and secret files (`.env`, `.git`, keys),
+  installed add-ons (`node_modules`) and build output wait behind **Show everything**, which needs
+  the parent code. **Show in Finder** is a grown-up's button: Finder shows the rest of the Mac, so
+  children never see it, and the engine refuses it without the parent code. See
+  [Files](#files).
 - **The live preview stays on this Mac.** **Preview** (beside a conversation, or full screen on a
   phone) shows the project's site running. Starting it runs the project's own start command, so it
   asks first like any command; the child may start an ordinary one (`node server.js`), but a start
@@ -135,6 +146,27 @@ Limits, honestly:
 - **Going back past a plan** (Undo, or changing an earlier message) takes the plan away: a Build
   it that names it runs as a new plan, because the assistant no longer has the plan it would
   build.
+
+## Files
+
+- **Where.** A conversation's **Files** shows its private copy (what that conversation changed);
+  a project's **Files** shows the project's own folder. Any SKYCOT project can be browsed,
+  siblings' projects too, as their conversations can be opened. Folders open in place; a path bar
+  and **Find in this folder** help; nothing is written.
+- **Quick Look** shows pictures up to 10 MB, pages up to 2 MB (with the page's own styles,
+  scripts and pictures put inside it, running offline in the same sandbox as **Open it**), PDFs,
+  sounds and videos up to 10 MB (never playing by themselves), and the first 512 KB of Markdown,
+  code and text. Code carries a short "This is the code behind your page" note. Anything bigger
+  says so plainly; anything else (a `.zip`, a Word file) says "SKYCOT can't show this kind of
+  file".
+- **Held for a grown-up.** With the profile on, hidden and secret files, add-ons and build output
+  are left out of the list and refused by the engine until a grown-up turns on **Show everything**
+  with the parent code (10 minutes on that device). The same yes shows **Show in Finder**, which is
+  never offered to a child: Finder would show the rest of the Mac. Without the profile, Show
+  everything is an ordinary switch and Show in Finder is there on the Mac itself.
+- **Reading elsewhere.** The same rule covers the engine's older ways to read a file: reading a
+  file, listing or searching a folder, or making a picture address is open inside SKYCOT's projects
+  and their private copies and needs the parent code anywhere else, or for a hidden or secret file.
 
 ## Several children
 
@@ -416,6 +448,7 @@ Entering the code allows one thing, for this device, for a short time:
 | The AI assistants              | connecting, signing out, installing, other changes | 10 minutes |
 | A key or password, a rename    | handing one over, the child's name                 | 10 minutes |
 | Restart to update              | restarting the Mac app into the downloaded version | 2 minutes  |
+| Show everything (Files)        | hidden and secret files, add-ons, Show in Finder   | 10 minutes |
 | Advanced mode                  | the developer interface and everything above       | 15 minutes |
 
 Settings → Family → **Lock again now** ends them all early.
@@ -483,7 +516,10 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | The parent code, with the request                                                                                                    | wakes SKYCOT for a child; nothing stays open afterwards                                  |
 | A child's turn, whatever starts it (`sourcePlanRef` marks a Build it; a plan whose turn was taken back does not count)                                                                                                                                                                                                                                                                                                                                                                                                                                       | Runs as a plan unless it builds a waiting plan                                                                                       | a plan before making anything                                                            |
 | A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Refused while SKYCOT is asleep for the child                                                                                         | bedtime and the daily limits; Advanced mode is exempt                                    |
-| Everything else: reading and watching (lists, diffs, files, status, searches), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                                                                                                          | Open                                                                                                                                 | the child's own work, or it only stops or takes away                                     |
+| `/api/skycot/files/list`, `/api/skycot/files/read` (Files and Quick Look)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Open inside a SKYCOT project or a conversation's private copy; hidden and secret files, add-ons and build output: Grown-up: Show everything; outside the project (`../`, a full path, a symlink out): refused, code or not | a child's own work; secrets and the rest of the Mac stay a grown-up's                    |
+| `projects.readFile`, `projects.listEntries`, `listIgnoredFiles`, `searchEntries`, `searchContents`; `assets.createUrl` for a draft or media file                                                                                                                                                                                                                                                                                                                                                                                                                                            | Open inside a SKYCOT project or private copy (real paths, so a symlinked folder counts as where it is); elsewhere, or a hidden or secret file: Grown-up: Show everything                                                   | reading the rest of the Mac                                                              |
+| `shell.openInEditor` as Show in Finder (`file-manager`, `reveal`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Grown-up: Show everything                                                                                                                                                                                                  | Finder shows the rest of the Mac                                                         |
+| Everything else: reading and watching (lists, diffs, status, searches inside a project), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                                                                                           | Open                                                                                                                                                                                                                       | the child's own work, or it only stops or takes away                                     |
 
 ## What is still possible
 
@@ -526,6 +562,16 @@ Honestly, so a parent can decide how nearby to stay:
 - **The shield is a word-spotter.** It catches common shapes of names, schools, addresses, phone
   numbers, emails and birthdays; a detail written in an unusual way can slip past, and an
   ordinary word can be caught. The recap hides the same things the shield catches, no more.
+- **Files: a shortcut changed at just the wrong moment.** The engine checks where a path really
+  leads and then reads it; a program on the Mac swapping a folder for a shortcut between those two
+  steps could slip past. Nothing in SKYCOT does that; a person at Terminal could.
+- **Files: what a page loads by itself.** Quick Look puts a page's own styles, scripts and pictures
+  inside it; pictures named inside a style sheet (`url(...)`) and anything from the internet do not
+  load. PDFs use the browser's own viewer: where there is none (some Mac app builds), Quick Look
+  says so and a grown-up opens it from Finder. The browser's PDF viewer has its own Download and
+  Print buttons, which save a copy and never change the file.
+- **Files: folder names when opening a folder.** **Open a folder…** still lists the names of
+  folders on the Mac (not their files) before the parent code is asked for adding one.
 - **The recap needs the code, the fridge does not.** Siblings can see each other's magnets and
   open each other's pages, as they can open each other's conversations. A child who knows the code
   can read the recap.

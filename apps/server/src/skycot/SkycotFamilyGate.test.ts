@@ -151,6 +151,7 @@ const withGate = <A, E, R>(
     readonly plans: ReadonlyArray<unknown>;
     readonly runs: ReadonlyArray<unknown>;
   } = WAITING_PLAN,
+  extraRoots: ReadonlyArray<string> = [],
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -163,6 +164,12 @@ const withGate = <A, E, R>(
         getTurnItem: ({ itemId }) =>
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
         getThreadProjection: () => Effect.succeed(planState as never),
+        getThreadWorktreePaths: () =>
+          Effect.succeed(
+            threadWorktreePath === null
+              ? []
+              : [{ threadId: THREAD_ID, worktreePath: threadWorktreePath }],
+          ),
       }),
       Layer.mock(ProjectStore.ProjectStoreV2)({
         get: (projectId) =>
@@ -170,6 +177,10 @@ const withGate = <A, E, R>(
             projectId === thread.projectId
               ? Option.some({ id: projectId, workspaceRoot: ROOT } as never)
               : Option.none(),
+          ),
+        list: () =>
+          Effect.succeed(
+            [ROOT, ...extraRoots].map((workspaceRoot) => ({ workspaceRoot }) as never),
           ),
         findActiveByWorkspaceRoot: (root) =>
           Effect.succeed(
@@ -446,15 +457,9 @@ describe("gateNeedFor", () => {
       "subscribeAuthAccess",
       "subscribeBackgroundPolicy",
       "subscribeResourceTelemetry",
-      "projects.listEntries",
-      "projects.listIgnoredFiles",
-      "projects.readFile",
-      "projects.searchContents",
-      "projects.searchEntries",
       "projects.createNew",
       "projects.ensureScratch",
       "filesystem.getMetadata",
-      "assets.createUrl",
       "assets.persistChatAttachments",
       "attachments.createUploadUrl",
       "attachments.delete",
@@ -528,6 +533,13 @@ describe("gateNeedFor", () => {
       "secrets.answerRequest",
       "preview.open",
       "preview.navigate",
+      "projects.readFile",
+      "projects.listEntries",
+      "projects.listIgnoredFiles",
+      "projects.searchEntries",
+      "projects.searchContents",
+      "assets.createUrl",
+      "shell.openInEditor",
     ]);
     const undecided = [
       ...Object.values(WS_METHODS),
@@ -539,6 +551,67 @@ describe("gateNeedFor", () => {
         SkycotFamilyGate.gateNeedFor(method, {}) === null,
     );
     assert.deepEqual(undecided, []);
+  });
+});
+
+describe("gateNeedFor: reading files", () => {
+  it("judges stock file reads by the folder and path they name", () => {
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.readFile", { cwd: ROOT, relativePath: "index.html" }),
+      { type: "readInProject", cwd: ROOT, path: "index.html" },
+    );
+    assert.deepEqual(SkycotFamilyGate.gateNeedFor("projects.readFile", {}), {
+      type: "grant",
+      purpose: "files",
+    });
+    assert.deepEqual(SkycotFamilyGate.gateNeedFor("projects.listEntries", { cwd: "/" }), {
+      type: "readInProject",
+      cwd: "/",
+    });
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.listEntries", { cwd: ROOT, directoryPath: ".git" }),
+      { type: "readInProject", cwd: ROOT, path: ".git" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.searchContents", { cwd: "/Users/kid" }),
+      { type: "readInProject", cwd: "/Users/kid" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "media-file", threadId: "t", path: "/Users/kid/Pictures/me.jpg" },
+      }),
+      { type: "grant", purpose: "files" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "draft-workspace-file", cwd: ROOT, path: "cat.png" },
+      }),
+      { type: "readInProject", cwd: ROOT, path: "cat.png" },
+    );
+    assert.isNull(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "workspace-file", threadId: "t", path: "cat.png" },
+      }),
+    );
+  });
+
+  it("lets Show in Finder use the files yes, and keeps editors with the developer tools", () => {
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", {
+        cwd: `${ROOT}/cat.png`,
+        editor: "file-manager",
+        reveal: true,
+      }),
+      { type: "grant", purpose: "files" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", { cwd: ROOT, editor: "vscode" }),
+      { type: "grant", purpose: "advanced" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", { cwd: ROOT, editor: "file-manager" }),
+      { type: "grant", purpose: "advanced" },
+    );
   });
 });
 
@@ -1123,6 +1196,87 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  it.effect("keeps a child's file reads inside SKYCOT's projects and private copies", () => {
+    const copy = "/Users/kid/.t3/worktrees/space-game-copy";
+    return withGate(
+      [],
+      ({ gate, family }) =>
+        Effect.gen(function* () {
+          const read = (payload: unknown, method = "projects.readFile") =>
+            refused(gate.check({ sessionId: SESSION, method, payload }));
+          // Off: nothing is gated.
+          assert.isFalse(yield* read({ cwd: "/", relativePath: "etc/passwd" }));
+          yield* family.enable({ code: CODE, childName: null });
+          assert.isFalse(yield* read({ cwd: ROOT, relativePath: "index.html" }));
+          assert.isFalse(yield* read({ cwd: `${ROOT}/pictures`, relativePath: "cat.png" }));
+          assert.isFalse(yield* read({ cwd: copy, relativePath: "rockets.html" }));
+          assert.isFalse(yield* read({ cwd: ROOT }, "projects.listEntries"));
+          for (const payload of [
+            { cwd: ROOT, relativePath: "/Users/kid/Documents/diary.txt" },
+            { cwd: ROOT, relativePath: "../../Documents/diary.txt" },
+            { cwd: ROOT, relativePath: "~/Documents/diary.txt" },
+            { cwd: ROOT, relativePath: ".env" },
+            { cwd: ROOT, relativePath: ".git/config" },
+            { cwd: "/Users/kid/Documents", relativePath: "diary.txt" },
+            { cwd: "/Users/kid/projects/space-game-secret", relativePath: "x.txt" },
+          ]) {
+            assert.isTrue(yield* read(payload), JSON.stringify(payload));
+          }
+          assert.isTrue(yield* read({ cwd: "/Users/kid" }, "projects.listEntries"));
+          assert.isTrue(yield* read({ cwd: "/", query: "diary" }, "projects.searchEntries"));
+          assert.isTrue(
+            yield* read(
+              { resource: { _tag: "media-file", threadId: THREAD_ID, path: "/Users/kid/me.jpg" } },
+              "assets.createUrl",
+            ),
+          );
+          const reveal = { cwd: `${ROOT}/cat.png`, editor: "file-manager", reveal: true };
+          assert.isTrue(yield* read(reveal, "shell.openInEditor"));
+
+          yield* family.verify({ code: CODE, purpose: "files", sessionId: SESSION });
+          assert.isFalse(yield* read({ cwd: ROOT, relativePath: ".env" }));
+          assert.isFalse(yield* read({ cwd: "/Users/kid/Documents", relativePath: "diary.txt" }));
+          assert.isFalse(yield* read(reveal, "shell.openInEditor"));
+          // An editor is still the developer tools'.
+          assert.isTrue(yield* read({ cwd: ROOT, editor: "vscode" }, "shell.openInEditor"));
+        }),
+      copy,
+    );
+  });
+
+  it.effect("judges a symlinked folder by where it really is", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-gate-links-" });
+      const project = path.join(dir, "pets");
+      const outside = path.join(dir, "documents");
+      yield* fs.makeDirectory(path.join(project, "pictures"), { recursive: true });
+      yield* fs.makeDirectory(outside, { recursive: true });
+      yield* fs.symlink(outside, path.join(project, "sneaky"));
+      yield* withGate(
+        [],
+        ({ gate, family }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: null });
+            const list = (cwd: string) =>
+              refused(
+                gate.check({
+                  sessionId: SESSION,
+                  method: "projects.listEntries",
+                  payload: { cwd },
+                }),
+              );
+            assert.isFalse(yield* list(path.join(project, "pictures")));
+            assert.isTrue(yield* list(path.join(project, "sneaky")));
+          }),
+        null,
+        WAITING_PLAN,
+        [project],
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("wraps the scope middleware: a refused call never reaches it", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {
@@ -1148,7 +1302,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
           );
         assert.isTrue(Exit.isFailure(yield* call("terminal.open")));
         assert.equal(scopeChecks, 0);
-        assert.isTrue(Exit.isSuccess(yield* call("projects.readFile")));
+        assert.isTrue(Exit.isSuccess(yield* call("projects.list")));
         assert.equal(scopeChecks, 1);
       }),
     ),

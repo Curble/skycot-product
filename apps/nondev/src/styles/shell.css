@@ -126,6 +126,11 @@
   gap: 8px;
   padding: 10px 12px 6px;
 }
+.fm-list-column__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 .fm-list-column__title {
   margin: 0;
   font-family: var(--fm-font-label);
