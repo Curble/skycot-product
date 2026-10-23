@@ -5,6 +5,8 @@ main = "src/worker.ts"
 compatibility_date = "2026-10-01"
 # Only on its own domain once deployed (relay.skycot.com), never on *.workers.dev.
 workers_dev = false
+# Live on its own domain since 24 October 2026 (docs/nondev/RELAY.md).
+routes = [{ pattern = "relay.skycot.com", custom_domain = true }]
 
 [[durable_objects.bindings]]
 name = "HOMES"
@@ -32,5 +34,3 @@ APNS_BUNDLE_ID = ""
 [observability]
 enabled = true
 
-# Uncomment at deploy time (docs/nondev/RELAY.md):
-# routes = [{ pattern = "relay.skycot.com", custom_domain = true }]

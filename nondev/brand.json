@@ -18,8 +18,8 @@
     "url": null
   },
   "relay": {
-    "$comment": "SKYCOT Relay (docs/nondev/RELAY.md): where a Mac's engine connects when a grown-up turns on Settings > Family > Reach this Mac from anywhere. env.cjs hands it on as SKYCOT_RELAY_URL; the engine accepts only https. null = not in this build (the switch shows 'Not in this version of SKYCOT yet'). Set to \"https://relay.skycot.com\" once Curble has deployed it.",
-    "url": null
+    "$comment": "SKYCOT Relay (docs/nondev/RELAY.md): where a Mac's engine connects when a grown-up turns on Settings > Family > Reach this Mac from anywhere. env.cjs hands it on as SKYCOT_RELAY_URL; the engine accepts only https. null = not in this build (the switch shows 'Not in this version of SKYCOT yet'). Deployed 24 October 2026 on Cloudflare Workers Free (no cost).",
+    "url": "https://relay.skycot.com"
   },
   "telemetryEnabledByDefault": false,
   "telemetry": {
