@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFridge from "./SkycotFridge.ts";
@@ -77,6 +78,68 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
         ["live", "Space game"],
         ["old", "Mia's dinosaur game"],
       ]);
+    }).pipe(Effect.scoped),
+  );
+
+  // The allowance ran out while the card was being written; "Please try again" finished it.
+  // The failed turn saved no checkpoint and the retry's own list is empty, but the page is
+  // there, so it still goes on the fridge.
+  it.effect("puts a page made across a failed turn and its retry on the fridge", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fridge-" });
+      const point = (ordinal: number, runId: string | null) => ({
+        id: `checkpoint:${ordinal}`,
+        runId,
+        scopeId: "scope:card",
+        ordinalWithinScope: ordinal,
+        appRunOrdinal: runId === null ? null : ordinal,
+        capturedAt: AT,
+        files: [],
+      });
+      const card = {
+        thread: { ...records("card", "Create Nan's 80th Birthday Card", false).thread },
+        checkpointScopes: [{ id: "scope:card", kind: "root_run" }],
+        checkpoints: [point(0, null), point(1, null), point(2, "run:2")],
+        runs: [
+          { id: "run:1", status: "failed" },
+          { id: "run:2", status: "completed" },
+        ],
+      };
+      const asked: Array<[number, number]> = [];
+      const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getShellSnapshot: () =>
+          Effect.succeed({ threads: [card.thread], archivedThreads: [] } as never),
+        getThreadRecords: (() => Effect.succeed(card as never)) as never,
+      });
+      const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
+        get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: ROOT } as never)),
+      });
+      const diffs = Layer.mock(CheckpointDiffQuery.CheckpointDiffQuery)({
+        getTurnDiff: ((input: { fromTurnCount: number; toTurnCount: number }) => {
+          asked.push([input.fromTurnCount, input.toTurnCount]);
+          return Effect.succeed({
+            ...input,
+            diff: "diff --git a/birthday-card.html b/birthday-card.html\nnew file mode 100644\n+<h1>Hi</h1>",
+          } as never);
+        }) as never,
+      });
+      const items = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        return yield* fridge.list;
+      }).pipe(
+        Effect.provide(
+          SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+            Layer.provide(Layer.mergeAll(projections, projects, diffs)),
+          ),
+        ),
+      );
+      assert.deepEqual(
+        items.map((item) => [item.threadId, item.page]),
+        [["card", "birthday-card.html"]],
+      );
+      assert.deepEqual(asked, [[0, 2]]);
     }).pipe(Effect.scoped),
   );
 });

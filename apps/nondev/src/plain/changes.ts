@@ -1,5 +1,7 @@
 import type { OrchestrationV2CheckpointFileSummary } from "@t3tools/contracts";
 
+import { parseUnifiedDiff as parseSharedDiff } from "@t3tools/skycot-rules/checkpoints";
+
 import { changes as copy } from "./copy";
 
 export type ChangeArea = "pages" | "styles" | "content" | "settings" | "behind the scenes";
@@ -263,50 +265,9 @@ export function describeFile(path: string): FileDescription {
   };
 }
 
-/**
- * Reads a unified diff (the `diff` string from `getTurnDiff` / `getFullThreadDiff`) into
- * per-file changes. Tolerant: unknown headers are skipped, binary files count as a change
- * with no line numbers.
- */
+/** Reads a unified diff into per-file changes; the engine's fridge and recap read it the same way. */
 export function parseUnifiedDiff(diff: string): Array<FileChange> {
-  const files: Array<{
-    path: string;
-    oldPath?: string;
-    operation: ChangeOperation;
-    additions: number;
-    deletions: number;
-    binary: boolean;
-  }> = [];
-  let current: (typeof files)[number] | undefined;
-  for (const rawLine of diff.split(/\r?\n/)) {
-    const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(rawLine);
-    if (header) {
-      const oldPath = header[1]!;
-      const path = header[2]!;
-      current = {
-        path,
-        operation: "edited",
-        additions: 0,
-        deletions: 0,
-        binary: false,
-        ...(oldPath !== path ? { oldPath, operation: "renamed" as const } : {}),
-      };
-      files.push(current);
-      continue;
-    }
-    if (!current) continue;
-    if (rawLine.startsWith("new file mode")) current.operation = "added";
-    else if (rawLine.startsWith("deleted file mode")) current.operation = "deleted";
-    else if (rawLine.startsWith("rename from ")) {
-      current.operation = "renamed";
-      current.oldPath = rawLine.slice("rename from ".length);
-    } else if (rawLine.startsWith("rename to ")) current.path = rawLine.slice("rename to ".length);
-    else if (rawLine.startsWith("Binary files ") || rawLine.startsWith("GIT binary patch"))
-      current.binary = true;
-    else if (rawLine.startsWith("+") && !rawLine.startsWith("+++")) current.additions += 1;
-    else if (rawLine.startsWith("-") && !rawLine.startsWith("---")) current.deletions += 1;
-  }
-  return files.map(({ binary, ...file }) => (binary ? { ...file, binary } : file));
+  return parseSharedDiff(diff);
 }
 
 /** Checkpoint summaries name the operation loosely ("A", "added", "modify"); normalise it. */

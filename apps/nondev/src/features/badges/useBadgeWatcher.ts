@@ -16,12 +16,15 @@ export function useBadgeWatcher({
   shell,
   projection,
   active,
+  retryMade = null,
 }: {
   readonly threadId: ThreadId;
   readonly shell: EnvironmentThreadShell | null;
   readonly projection: OrchestrationV2ThreadProjection | null;
   /** A turn is running: "made" waits for it to finish. */
   readonly active: boolean;
+  /** A retry after a failed turn that made something (review/useRetryMade). */
+  readonly retryMade?: string | null;
 }) {
   let lastMessage: string | null = null;
   let messages = 0;
@@ -31,7 +34,8 @@ export function useBadgeWatcher({
       lastMessage = item.messageId;
     }
   }
-  const made = projection !== null && !active ? (latestReviewable(projection)?.id ?? null) : null;
+  const made =
+    projection !== null && !active ? (retryMade ?? latestReviewable(projection)?.id ?? null) : null;
   // Waits for the shell too: a key spent before the shell arrived would report nothing.
   const key =
     projection === null || shell === null ? null : `${threadId}:${messages}:${lastMessage}:${made}`;

@@ -19,7 +19,7 @@ import { useCrew } from "../../themes/useCrew";
 import { Bubble } from "../../ui/Bubble";
 import { Button } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
-import { rootCheckpoints, reviewTargetFor } from "../review/turnReview";
+import { mayHaveChanges, rootCheckpoints, reviewTargetFor } from "../review/turnReview";
 import { peekAtCode } from "./peek";
 import { PeekAtCode } from "./PeekAtCode";
 import "./explain.css";
@@ -32,7 +32,7 @@ function changedCheckpointFor(projection: OrchestrationV2ThreadProjection, runId
   if (runId === null) return null;
   return (
     rootCheckpoints(projection).findLast(
-      (checkpoint) => checkpoint.runId === runId && checkpoint.files.length > 0,
+      (checkpoint) => checkpoint.runId === runId && mayHaveChanges(projection, checkpoint),
     ) ?? null
   );
 }
