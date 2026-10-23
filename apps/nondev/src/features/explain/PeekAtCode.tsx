@@ -1,6 +1,6 @@
 // The simplified code view behind "Peek at the code": a few lines, three colours, a legend.
 // Plain text on purpose (no syntax highlighter): it loads instantly and reads like a page.
-import { describeFile } from "../../plain/changes";
+import { capitalize, describeFile } from "../../plain/changes";
 import type { Peek } from "./peek";
 
 const MARK = { added: "+", removed: "−", same: " " } as const;
@@ -19,7 +19,7 @@ export function PeekAtCode({ peek }: { readonly peek: Peek }) {
       {peek.files.map((file) => (
         <figure key={file.path} className="fm-peek__file">
           <figcaption>
-            <b>{describeFile(file.path).noun}</b> <code>{file.path}</code>
+            <b>{capitalize(describeFile(file.path).noun)}</b> <code>{file.path}</code>
           </figcaption>
           <pre className="fm-peek__code">
             {file.lines.map((line) => (
