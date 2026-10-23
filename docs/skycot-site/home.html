@@ -2018,6 +2018,25 @@ complete still page with one sky colour per section.
         flex-direction: column;
         min-width: 0;
       }
+      .promo {
+        margin: 0 auto 28px;
+        max-width: 880px;
+        border-radius: 22px;
+        overflow: hidden;
+      }
+      .promo video {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+        background: #cfe6fb;
+      }
+      .promo figcaption {
+        padding: 10px 16px 12px;
+        font-size: 14px;
+        color: var(--ink2);
+        text-align: center;
+      }
       .fcard .shot {
         aspect-ratio: 16/9;
         overflow: hidden;
@@ -3132,6 +3151,27 @@ complete still page with one sky colour per section.
             </p>
           </div>
 
+          <figure class="promo glass reveal">
+            <video
+              controls
+              playsinline
+              muted
+              preload="none"
+              poster="assets/video/poster-16x9.jpg"
+              width="1920"
+              height="1080"
+              aria-label="A 30-second tour of SKYCOT: tap an idea or say it, draw a rocket and SKYCOT builds it, a grown-up's code before anything goes online, private details kept private, bedtime, and stickers, the family fridge and the weekly recap."
+            >
+              <source
+                src="https://downloads.skycot.com/media/skycot-beta-launch-16x9.mp4"
+                type="video/mp4"
+              />
+            </video>
+            <figcaption>
+              Watch it in 30 seconds. No sound needed. Beta screens with a sample family.
+            </figcaption>
+          </figure>
+
           <article class="rk glass reveal" aria-labelledby="rk-title">
             <div class="rk-stage" id="rkStage">
               <div class="mac">
@@ -3779,7 +3819,7 @@ complete still page with one sky colour per section.
                   </svg>
                 </div>
                 <h3>Files stay on your Mac.</h3>
-                <p>Only what each job needs goes to the AI you chose. No analytics.</p>
+                <p>Only what each job needs goes to the AI you chose. The app sends us nothing.</p>
               </div>
             </div>
           </div>
@@ -3824,12 +3864,12 @@ complete still page with one sky colour per section.
             </div>
             <ul class="fam" aria-label="Features for kids">
               <li class="fcard glass reveal">
-                <div class="shot ph" style="--o: 62% 42%; --z: 1.7">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-starters.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-starters.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Eight colourful starter cards such as Make a game and A birthday card."
                   />
@@ -3840,12 +3880,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.05s">
-                <div class="shot ph" style="--o: 40% 90%; --z: 1.7">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-talk.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-talk.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="SKYCOT listening, with Ava's spoken words appearing in the message box."
                   />
@@ -3856,12 +3896,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.1s">
-                <div class="shot ph" style="--o: 50% 52%; --z: 1.6">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-draw.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-draw.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Ava's crayon rocket drawing, running as a page inside SKYCOT."
                   />
@@ -3872,12 +3912,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.15s">
-                <div class="shot ph" style="--o: 30% 22%; --z: 1.5">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-explain.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-explain.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Sam explains how he drew Bubbles the axolotl in simple words."
                   />
@@ -3888,12 +3928,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.2s">
-                <div class="shot ph" style="--o: 48% 36%; --z: 1.6">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-stickers.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-stickers.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Ava's sticker book with First creation, Game maker, Animal friend and Drew it first."
                   />
@@ -3910,12 +3950,12 @@ complete still page with one sky colour per section.
             </div>
             <ul class="fam" aria-label="Features for grown-ups">
               <li class="fcard glass reveal">
-                <div class="shot ph" style="--o: 66% 40%; --z: 1.7">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-recap.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-recap.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="The grown-up recap: Ava made 4 things this week, with 40 minutes on SKYCOT."
                   />
@@ -3926,12 +3966,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.05s">
-                <div class="shot ph" style="--o: 50% 46%; --z: 1.3">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-shield.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-shield.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Mo spots a full name and a school in Ava's message and suggests nicknames instead."
                   />
@@ -3942,12 +3982,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.1s">
-                <div class="shot ph" style="--o: 50% 62%; --z: 1.25">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-siblings.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-siblings.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="The Who's using SKYCOT? picker with big buttons for Ava and Leo."
                   />
@@ -3958,12 +3998,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.15s">
-                <div class="shot ph" style="--o: 50% 40%; --z: 1.35">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-bedtime.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-bedtime.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="SKYCOT is asleep: it's bedtime, Leo. SKYCOT wakes up at 7:00 am."
                   />
@@ -3974,12 +4014,12 @@ complete still page with one sky colour per section.
                 </div>
               </li>
               <li class="fcard glass reveal" style="--d: 0.2s">
-                <div class="shot ph" style="--o: 72% 52%; --z: 1.6">
+                <div class="shot ph">
                   <img
                     class="lz"
-                    src="assets/fam-fridge.jpg"
-                    width="1200"
-                    height="707"
+                    src="assets/fam-card-fridge.jpg"
+                    width="960"
+                    height="540"
                     loading="lazy"
                     alt="Ava's fridge with a rocket page, a star-catching game and a page about her axolotl."
                   />
@@ -4400,7 +4440,7 @@ complete still page with one sky colour per section.
                 </p>
                 <p>
                   SKYCOT also doesn’t create AI accounts for anyone, sell AI time, or send anything
-                  to us: no analytics are switched on.
+                  to us: the app has no analytics switched on.
                 </p>
               </div>
             </details>

@@ -333,7 +333,7 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 '''
 
 SITE = "https://skycot.com"
-LAST_UPDATED = "22 October 2026"
+LAST_UPDATED = "23 October 2026"
 H1 = "The family-friendly AI developer."
 LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
         "Plain English, on your own Mac, with the AI you already pay for.")
@@ -341,8 +341,8 @@ LEDE2 = "Grown-ups use it for their business too: no code, no jargon, nothing li
 TITLE = "SKYCOT · The family-friendly AI developer"
 DESC = ("Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI "
         "developer for families and small businesses, on your own Mac, with the AI you already pay for.")
-OG_ALT = ("SKYCOT. The family-friendly AI developer. Kids dream it up. SKYCOT builds it. Nothing goes online without a "
-          "grown-up's code. SKYCOT for Mac. A smiling cloud waves hello beside Sam and Mo.")
+OG_ALT = ("SKYCOT. Free beta, out now. The family-friendly AI developer. Kids say what they want to make, SKYCOT builds it on your Mac, "
+          "asks before every change, and nothing goes online without a grown-up's code. skycot.com. Beside it, the SKYCOT app's Home screen and a cheering cloud.")
 
 # Identity metadata for search engines. Never add an address here (standing rule: no street, postal
 # or registered address anywhere on skycot.com).
@@ -353,8 +353,18 @@ STRUCTURED = json.dumps({
          "legalName": "Curble Pty Ltd", "url": SITE + "/", "email": "markhallam@skycot.com"},
         {"@type": "WebSite", "@id": SITE + "/#website", "name": "SKYCOT", "url": SITE + "/",
          "publisher": {"@id": SITE + "/#organization"}},
-        {"@type": "SoftwareApplication", "name": "SKYCOT", "operatingSystem": "macOS",
-         "applicationCategory": "DeveloperApplication", "publisher": {"@id": SITE + "/#organization"}},
+        {"@type": "SoftwareApplication", "@id": SITE + "/#app", "name": "SKYCOT", "url": SITE + "/",
+         "description": "The family-friendly AI developer. Kids dream it up, SKYCOT builds it, and nothing "
+                        "goes online without a grown-up's code. Free beta for Mac.",
+         "operatingSystem": "macOS 13 Ventura or later", "processorRequirements": "Apple silicon (M1 or later)",
+         "applicationCategory": "DeveloperApplication", "applicationSubCategory": "Family",
+         "softwareVersion": "0.1.1 beta", "releaseNotes": SITE + "/#new",
+         "downloadUrl": "https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.1.beta-arm64.dmg",
+         "fileSize": "160MB", "image": SITE + "/assets/brand/og-beta.png",
+         "screenshot": SITE + "/assets/hero.jpg",
+         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "AUD",
+                    "availability": "https://schema.org/InStock"},
+         "publisher": {"@id": SITE + "/#organization"}},
     ],
 }, separators=(",", ":"))
 
@@ -382,7 +392,7 @@ def head(title, desc, path="/", robots=None, css=None, open_body=True):
 <meta property="og:description" content="{attr(desc)}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{url}">
-<meta property="og:image" content="{SITE}/assets/brand/og-day.png">
+<meta property="og:image" content="{SITE}/assets/brand/og-beta.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -390,7 +400,7 @@ def head(title, desc, path="/", robots=None, css=None, open_body=True):
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{attr(title)}">
 <meta name="twitter:description" content="{attr(desc)}">
-<meta name="twitter:image" content="{SITE}/assets/brand/og-day.png">
+<meta name="twitter:image" content="{SITE}/assets/brand/og-beta.png">
 <meta name="twitter:image:alt" content="{attr(OG_ALT)}">
 <script id="skycot-structured-data" type="application/ld+json">{STRUCTURED}</script>
 <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -796,6 +806,10 @@ HOME = open(HERE + "home.html", encoding="utf-8").read()
 _home_head = HOME[HOME.index("<head>") + 6:HOME.index("</head>")]
 _home_extras = "\n".join(_re.findall(r"<style[\s\S]*?</style>|<script[\s\S]*?</script>", _home_head))
 _home_body = HOME[HOME.index("<body"):]
+# The repo's formatter re-wraps home.html; keep each footer legal line on one line so the credits read
+# (and are checked) exactly as written.
+_home_body = _re.sub(r'<p class="legal">([\s\S]*?)</p>',
+                    lambda m: '<p class="legal">' + " ".join(m.group(1).split()) + "</p>", _home_body)
 write("index.html", head(TITLE, DESC, "/", css="", open_body=False) + _home_extras + "\n</head>\n" + _home_body)
 # Variant B is now the dark side of index.html; the separate file is retired.
 if os.path.exists(OUT + "index-b.html"):
@@ -817,7 +831,7 @@ PRIVACY = f'''{nav(True)}
     <li>Your project files stay on your Mac. When you work, the assistant you chose (for example Claude Code or Codex) receives what it needs for that task, under that company's terms and your own account.</li>
     <li>Voice typing is off until you turn it on. It uses your browser's speech service: Apple's in Safari, Google's in Chrome, Microsoft's in Edge. Reading replies aloud uses the Mac's own voices and sends nothing.</li>
     <li>We never receive your files, your messages or the assistant's replies, so we cannot use them for anything, including training AI.</li>
-    <li>skycot.com uses no cookies, no analytics and no third-party scripts, fonts or images.</li>
+    <li>skycot.com uses no cookies and no advertising. It counts visits with Cloudflare Web Analytics, which doesn't use cookies or follow you to other sites, and it loads no other third-party scripts, fonts or images.</li>
     <li>We do not sell personal information or use it for advertising.</li>
     <li>If you email us or join our Discord, we hold what you send us, and Discord's own policy applies there.</li>
     <li>A child can use SKYCOT on a parent's Mac and the parent's own AI account, under the parent's supervision. We do not knowingly collect children's information. The Family profile's settings, limits, recap, stickers and fridge are kept on your Mac and send nothing to us (section 8).</li>
@@ -843,16 +857,15 @@ PRIVACY = f'''{nav(True)}
   <p>If you connect a code-hosting account (for example GitHub) to send work for review or put it live, SKYCOT talks to that service on your instruction only, using your own account. Their terms and privacy policy apply to what you upload there.</p>
 
   <h2>3. The website, skycot.com</h2>
-  <p>The site is a set of plain pages served by Cloudflare. The cloud on the site switches between day and dusk using your device's own clock and time zone, worked out in your browser; nothing about that is sent anywhere. We set no cookies and run no analytics, advertising or tracking, so there is nothing for a browser's "Do Not Track" setting to switch off. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
+  <p>The site is a set of plain pages served by Cloudflare. The cloud on the site switches between day and dusk using your device's own clock and time zone, worked out in your browser; nothing about that is sent anywhere. We set no cookies and run no advertising. To see how many people visit and which pages help, we use Cloudflare Web Analytics: a small script from Cloudflare that counts page views and records the page, the site that linked you here, your browser and device type, your country and how fast the page loaded. It sets no cookies, doesn't build a profile of you and doesn't follow you to other sites; we only see totals, never who you are. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
 
   <h2>4. Email, Discord and early access</h2>
   <p>If you email us to be notified when SKYCOT is ready, we keep your email address for that purpose only, email you when it is, and delete the list afterwards unless you ask to stay in touch. Other emails are kept for as long as we need them to help you and to keep ordinary business records, and are then deleted. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
 
   <h2>5. Companies that handle information for us</h2>
   <ul>
-    <li><b>Cloudflare</b> hosts skycot.com.</li>
+    <li><b>Cloudflare</b> hosts skycot.com and SKYCOT's downloads and updates (downloads.skycot.com), and counts visits to skycot.com with its Web Analytics.</li>
     <li><b>Google Workspace</b> runs our email.</li>
-    <li><b>GitHub</b> hosts SKYCOT's updates and the public files the app downloads.</li>
     <li><b>Discord</b> runs our community, if you choose to join it.</li>
   </ul>
   <p>These companies may store information outside Australia, including in the United States. We do not share personal information with anyone else, except where the law requires it, where it is needed to protect people or our rights against fraud or harm, or if the SKYCOT business is sold or reorganised, in which case this policy continues to apply to what we hold.</p>
@@ -874,7 +887,7 @@ PRIVACY = f'''{nav(True)}
   <p>If this policy changes, the new version will be posted here with its date before it applies, and the app will tell you on first launch after an update if the change affects what the app sends.</p>
 </div></main>
 '''
-write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what each job needs goes to the AI you chose, no analytics, no cookies, no SKYCOT account.", "/privacy") + PRIVACY + footer(True))
+write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your information: files stay on your Mac, only what each job needs goes to the AI you chose, no analytics in the app, no cookies, no SKYCOT account.", "/privacy") + PRIVACY + footer(True))
 
 TERMS = f'''{nav(True)}
 <main class="doc"><div class="narrow">
@@ -994,7 +1007,13 @@ for src in ["web/favicon-day.svg", "web/favicon-dusk.svg", "web/mask-icon.svg", 
 shutil.copyfile(BRAND + "web/favicon.ico", OUT + "favicon.ico")
 shutil.copyfile(BRAND + "web/apple-touch-icon-day.png", OUT + "apple-touch-icon.png")
 # og.png (and /opengraph-image, which redirects to it) keeps working for old links; pages point at og-day.png.
-shutil.copyfile(BRAND + "web/og-day.png", OUT + "og.png")
+shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "og.png")
+# The beta share card (23 October 2026): a new file name so X, LinkedIn and others fetch it fresh.
+shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "assets/brand/og-beta.png")
+# The 30-second promo on the home page (tap to play). Only its poster ships with the site; the video is
+# served from downloads.skycot.com/media/ because Pages ignores partial requests, which Safari needs.
+os.makedirs(OUT + "assets/video", exist_ok=True)
+shutil.copyfile(HERE + "../marketing/launch/video/poster-16x9.jpg", OUT + "assets/video/poster-16x9.jpg")
 # A manifest cannot change with the time of day, so installed icons stay day (brand guide section 9).
 MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "The family-friendly AI developer.",
             "start_url": "/", "display": "minimal-ui", "background_color": "#ffffff", "theme_color": "#0071e3",
