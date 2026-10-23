@@ -14,12 +14,33 @@ import {
   type ReactNode,
 } from "react";
 
-import { directTransport, type MacTransport } from "../transport/MacTransport";
+import type { HomeRecord } from "@t3tools/skycot-relay/client/home";
+
+import type { MacTransport } from "../transport/MacTransport";
+import { closeRelayHome, relayHomeFor, waysToMac } from "../transport/ways";
 import { acceptsLink, modeOf, type DeviceMode, type LinkedMac, type MacLink } from "./pairing";
 
 const LIST_KEY = "skycot.links.v1";
 const tokenKey = (macId: string) => `skycot.token.${macId.replace(/[^A-Za-z0-9._-]/gu, "_")}`;
+const relayKey = (macId: string) => `skycot.relay.${macId.replace(/[^A-Za-z0-9._-]/gu, "_")}`;
 const KEYCHAIN = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY } as const;
+
+/** The tunnel's record changes (cookies, a renewed pass): kept in the keychain too. */
+function saveRelayRecord(macId: string, record: HomeRecord): void {
+  void SecureStore.setItemAsync(relayKey(macId), JSON.stringify(record), KEYCHAIN).catch(
+    () => undefined,
+  );
+}
+
+function parseRelayRecord(raw: string | null): HomeRecord | null {
+  if (raw === null) return null;
+  try {
+    const value = JSON.parse(raw) as HomeRecord;
+    return typeof value.homeId === "string" && typeof value.relayUrl === "string" ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface Mac extends LinkedMac {
   readonly transport: MacTransport;
@@ -47,9 +68,13 @@ function parseList(raw: string | null): Array<MacLink> {
 }
 
 function withTransport(link: LinkedMac): Mac {
+  const relay =
+    link.relayRecord === null
+      ? null
+      : relayHomeFor(link.relayRecord, (record) => saveRelayRecord(link.macId, record));
   return {
     ...link,
-    transport: directTransport({ httpBaseUrl: link.httpBaseUrl, bearerToken: link.bearerToken }),
+    transport: waysToMac({ httpBaseUrl: link.httpBaseUrl, bearerToken: link.bearerToken, relay }),
   };
 }
 
@@ -66,7 +91,11 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
         const token = await SecureStore.getItemAsync(tokenKey(link.macId), KEYCHAIN).catch(
           () => null,
         );
-        if (token !== null) loaded.push(withTransport({ ...link, bearerToken: token }));
+        const relayRecord = parseRelayRecord(
+          await SecureStore.getItemAsync(relayKey(link.macId), KEYCHAIN).catch(() => null),
+        );
+        if (token !== null)
+          loaded.push(withTransport({ ...link, bearerToken: token, relayRecord }));
       }
       if (live) {
         setMacs(loaded);
@@ -93,6 +122,9 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
     async (linked: LinkedMac) => {
       if (!acceptsLink(macs, linked)) return false;
       await SecureStore.setItemAsync(tokenKey(linked.macId), linked.bearerToken, KEYCHAIN);
+      if (linked.relayRecord !== null) saveRelayRecord(linked.macId, linked.relayRecord);
+      else
+        await SecureStore.deleteItemAsync(relayKey(linked.macId), KEYCHAIN).catch(() => undefined);
       const next = [...macs.filter((mac) => mac.macId !== linked.macId), withTransport(linked)];
       await save(next);
       setMacs(next);
@@ -104,6 +136,9 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
   const forget = useCallback(
     async (macId: string) => {
       await SecureStore.deleteItemAsync(tokenKey(macId), KEYCHAIN).catch(() => undefined);
+      await SecureStore.deleteItemAsync(relayKey(macId), KEYCHAIN).catch(() => undefined);
+      const gone = macs.find((mac) => mac.macId === macId);
+      if (gone?.relayRecord) closeRelayHome(gone.relayRecord.homeId);
       const next = macs.filter((mac) => mac.macId !== macId);
       await save(next);
       setMacs(next);

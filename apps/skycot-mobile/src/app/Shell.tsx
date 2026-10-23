@@ -180,6 +180,27 @@ export function Shell(props: {
   const sectionLink = useDeepLink("section");
   const conversationLink = useDeepLink("conversation");
   const demoLink = useDeepLink("demo");
+  const openLink = useDeepLink("open");
+  useEffect(() => {
+    const link = openLink.link;
+    if (link === null) return;
+    openLink.consume();
+    const title = link.route === "Macs" ? "This device" : "About SKYCOT";
+    if (layout.usesSplitView) {
+      setOpened({
+        key: `open:${link.route}`,
+        title,
+        subtitle: "",
+        symbol: "info.circle",
+        open: { name: link.route, params: {}, title },
+      });
+      return;
+    }
+    setTimeout(() => {
+      const ref = refs.get(selected);
+      if (ref?.isReady()) ref.navigate(link.route);
+    }, 300);
+  }, [openLink, layout.usesSplitView, refs, selected]);
   useEffect(() => {
     const link = demoLink.link;
     if (link === null || !props.screens.some((screen) => screen.name === "Demo")) return;

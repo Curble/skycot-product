@@ -41,11 +41,16 @@ export function MacsScreen() {
     <Page>
       <Section
         title="Linked Macs"
-        footer={
+        footer={[
           links.macs.length > 1
             ? "Each conversation stays on the Mac where it started. SKYCOT shows them side by side, labelled with their Mac."
-            : "This device reaches the Mac on your home Wi-Fi or Tailscale. Reaching it from anywhere comes with SKYCOT Relay."
-        }
+            : null,
+          links.macs.some((mac) => mac.relayRecord !== null)
+            ? "SKYCOT Relay reaches the Mac from anywhere, sealed on this device so the relay can't read it. At home, the Mac's own address works too."
+            : "This device reaches the Mac on your home Wi-Fi or Tailscale. To reach it from anywhere, turn on Away from home in the Mac's Settings › Family, then link again.",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         {links.macs.map((mac) => {
           const status = byMac[mac.macId]?.status ?? null;

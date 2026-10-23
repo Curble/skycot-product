@@ -85,20 +85,25 @@ function withQuery(url: string, query: MacRequest["query"]): string {
   return text.length === 0 ? url : `${url}?${text}`;
 }
 
-/** The Mac on the home Wi-Fi or Tailscale, straight to its own address. */
-export function directTransport(
-  route: DirectRoute,
-  options: {
-    readonly fetch?: typeof fetch;
-    readonly webSocket?: MacSocket["webSocketConstructor"];
-  } = {},
-): MacTransport {
-  const doFetch = options.fetch ?? fetch;
-  const base = route.httpBaseUrl.replace(/\/+$/u, "");
-  const makeSocket =
-    options.webSocket ??
-    ((url: string, protocols?: string | Array<string>) => new WebSocket(url, protocols));
+interface FetchRoute {
+  readonly kind: TransportKind;
+  readonly routeLabel: string;
+  /** Where requests go: the Mac's own address, or the tunnel's placeholder origin. */
+  readonly base: string;
+  readonly bearerToken: string | null;
+  readonly fetch: typeof fetch;
+  readonly webSocket: MacSocket["webSocketConstructor"];
+  /** Bodies as bytes: the relay's tunnel reads them without the platform's Blob reader. */
+  readonly bytesBody: boolean;
+  /**
+   * The tunnel reads only a socket address's path and query, and React Native's URL class finds
+   * the path of http addresses only, so through the relay the socket keeps the http scheme.
+   */
+  readonly socketScheme: "ws" | "http";
+}
 
+/** T3's HTTP API and its ticketed WebSocket over any fetch: the Mac's own, or the tunnel's. */
+function fetchTransport(route: FetchRoute): MacTransport {
   const request = async (input: MacRequest): Promise<MacResponse> => {
     const headers: Record<string, string> = {
       accept: "application/json",
@@ -107,21 +112,24 @@ export function directTransport(
     if (input.signedIn !== false && route.bearerToken !== null) {
       headers.authorization = `Bearer ${route.bearerToken}`;
     }
-    let body: string | undefined;
+    let text: string | undefined;
     if (input.form !== undefined) {
       headers["content-type"] = "application/x-www-form-urlencoded";
-      body = new URLSearchParams(input.form as Record<string, string>).toString();
+      text = new URLSearchParams(input.form as Record<string, string>).toString();
     } else if (input.body !== undefined) {
       headers["content-type"] = "application/json";
-      body = JSON.stringify(input.body);
+      text = JSON.stringify(input.body);
     }
+    const body =
+      text === undefined ? undefined : route.bytesBody ? new TextEncoder().encode(text) : text;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await doFetch(withQuery(`${base}${input.path}`, input.query), {
+      response = await route.fetch(withQuery(`${route.base}${input.path}`, input.query), {
         method: input.method,
         headers,
+        credentials: "omit",
         ...(body === undefined ? {} : { body }),
         signal: controller.signal,
       });
@@ -130,11 +138,11 @@ export function directTransport(
     } finally {
       clearTimeout(timer);
     }
-    const text = await response.text().catch(() => "");
+    const answer = await response.text().catch(() => "");
     let json: unknown = null;
-    if (text.length > 0) {
+    if (answer.length > 0) {
       try {
-        json = JSON.parse(text);
+        json = JSON.parse(answer);
       } catch {
         json = null;
       }
@@ -143,8 +151,8 @@ export function directTransport(
   };
 
   return {
-    kind: "direct",
-    routeLabel: routeLabelFor(base),
+    kind: route.kind,
+    routeLabel: route.routeLabel,
     request,
     socket: async () => {
       const answer = await request({ method: "POST", path: "/api/auth/websocket-ticket" });
@@ -155,15 +163,99 @@ export function directTransport(
       if (answer.status !== 200 || typeof ticket !== "string") {
         throw new MacUnreachableError(`The Mac refused the live connection (${answer.status}).`);
       }
-      const wsBase = base.replace(/^http/u, "ws");
+      const wsBase = route.socketScheme === "ws" ? route.base.replace(/^http/u, "ws") : route.base;
       return {
         url: withQuery(`${wsBase}/ws`, {
           wsTicket: ticket,
           orchestrationProtocol: ORCHESTRATION_PROTOCOL,
           clientSurface: "mobile",
         }),
-        webSocketConstructor: makeSocket,
+        webSocketConstructor: route.webSocket,
       };
     },
+  };
+}
+
+/** The Mac on the home Wi-Fi or Tailscale, straight to its own address. */
+export function directTransport(
+  route: DirectRoute,
+  options: {
+    readonly fetch?: typeof fetch;
+    readonly webSocket?: MacSocket["webSocketConstructor"];
+  } = {},
+): MacTransport {
+  const base = route.httpBaseUrl.replace(/\/+$/u, "");
+  return fetchTransport({
+    kind: "direct",
+    routeLabel: routeLabelFor(base),
+    base,
+    bearerToken: route.bearerToken,
+    fetch: options.fetch ?? ((input, init) => fetch(input, init)),
+    webSocket:
+      options.webSocket ??
+      ((url: string, protocols?: string | Array<string>) => new WebSocket(url, protocols)),
+    bytesBody: false,
+    socketScheme: "ws",
+  });
+}
+
+/**
+ * The same Mac through SKYCOT Relay's sealed tunnel (packages/skycot-relay, RelayHome): the
+ * device's own sign-in, T3's own API, sealed on this device for the Mac's key and opened only
+ * on the Mac. The relay passes bytes along and can't read them (docs/nondev/RELAY.md).
+ */
+export interface RelayTunnel {
+  fetch(input: string, init?: RequestInit): Promise<Response>;
+  readonly WebSocket: new (url: string, protocols?: string | ReadonlyArray<string>) => unknown;
+}
+
+/** Only the path and query are carried; the origin is a placeholder the tunnel ignores. */
+const TUNNEL_ORIGIN = "http://home.skycot.invalid";
+
+export function relayTransport(tunnel: RelayTunnel, bearerToken: string | null): MacTransport {
+  return fetchTransport({
+    kind: "relay",
+    routeLabel: "SKYCOT Relay",
+    base: TUNNEL_ORIGIN,
+    bearerToken,
+    fetch: (input, init) => tunnel.fetch(String(input), init),
+    webSocket: (url, protocols) => new tunnel.WebSocket(url, protocols) as WebSocket,
+    bytesBody: true,
+    socketScheme: "http",
+  });
+}
+
+/**
+ * Several ways to one Mac, in order of preference: the first that answers is used and kept
+ * until it stops answering, then the next is tried. Only "the Mac didn't answer" moves on; an
+ * answer of any kind (a refusal too) is the Mac's and is returned as it is.
+ */
+export function failoverTransport(ways: ReadonlyArray<MacTransport>): MacTransport {
+  if (ways.length === 0) throw new Error("A Mac needs at least one way to reach it.");
+  let current = 0;
+  const attempt = async <A>(run: (way: MacTransport) => Promise<A>): Promise<A> => {
+    let lastError: unknown = null;
+    for (let step = 0; step < ways.length; step += 1) {
+      const index = (current + step) % ways.length;
+      try {
+        const result = await run(ways[index]!);
+        current = index;
+        return result;
+      } catch (cause) {
+        if (!(cause instanceof MacUnreachableError)) throw cause;
+        lastError = cause;
+      }
+    }
+    throw lastError;
+  };
+  return {
+    get kind() {
+      return ways[current]!.kind;
+    },
+    get routeLabel() {
+      return ways[current]!.routeLabel;
+    },
+    request: (input) => attempt((way) => way.request(input)),
+    socket: () => attempt((way) => way.socket()),
   };
 }

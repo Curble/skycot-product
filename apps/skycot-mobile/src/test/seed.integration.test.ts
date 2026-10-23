@@ -26,7 +26,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function device(code: string) {
   const linked = await linkToMac(readLinkInput({ kind: "typed", code, address: base! }));
-  return directTransport({ httpBaseUrl: linked.httpBaseUrl, bearerToken: linked.bearerToken });
+  return directTransport({ httpBaseUrl: linked.httpBaseUrl!, bearerToken: linked.bearerToken });
 }
 
 async function start(transport: ReturnType<typeof directTransport>, text: string) {

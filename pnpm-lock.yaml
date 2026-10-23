@@ -919,6 +919,9 @@ importers:
       '@t3tools/skycot-brand':
         specifier: workspace:*
         version: link:../../packages/skycot-brand
+      '@t3tools/skycot-relay':
+        specifier: workspace:*
+        version: link:../../packages/skycot-relay
       '@t3tools/skycot-rules':
         specifier: workspace:*
         version: link:../../packages/skycot-rules

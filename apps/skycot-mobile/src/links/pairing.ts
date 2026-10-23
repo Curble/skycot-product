@@ -10,6 +10,9 @@
  */
 import { groupLinkCode, normaliseLinkCode } from "@t3tools/skycot-rules/people";
 
+import type { HomeRecord } from "@t3tools/skycot-relay/client/home";
+import { parseRelayLink, type RelayLink } from "@t3tools/skycot-relay/link";
+
 import { parseMe, type FamilyMe } from "../../../nondev/src/features/family/people";
 import { directTransport, type MacTransport } from "../transport/MacTransport";
 
@@ -21,8 +24,11 @@ export type LinkInput =
   | { readonly kind: "typed"; readonly code: string; readonly address: string };
 
 export interface LinkTarget {
-  readonly httpBaseUrl: string;
+  /** The Mac's own address; null when the link only names SKYCOT Relay's. */
+  readonly httpBaseUrl: string | null;
   readonly code: string;
+  /** SKYCOT Relay's part of a scanned link, when the Mac reaches beyond home (RELAY.md). */
+  readonly relay: RelayLink | null;
 }
 
 export type LinkProblem =
@@ -97,7 +103,10 @@ export function readLinkInput(input: LinkInput): LinkTarget {
     if (!CODE_PATTERN.test(code) || base === null) {
       throw new LinkError("not-a-skycot-code", LINK_COPY["not-a-skycot-code"]);
     }
-    return { httpBaseUrl: base, code };
+    const relay = parseRelayLink(url.hash);
+    // A link that opens through the relay is served from the relay's address, not the Mac's.
+    const ownAddress = relay !== null && relay.relayUrl === base ? null : base;
+    return { httpBaseUrl: ownAddress, code, relay };
   }
   const code = normaliseLinkCode(input.code);
   if (!CODE_PATTERN.test(code)) throw new LinkError("code-shape", LINK_COPY["code-shape"]);
@@ -106,7 +115,7 @@ export function readLinkInput(input: LinkInput): LinkTarget {
   }
   const base = normaliseAddress(input.address);
   if (base === null) throw new LinkError("address-shape", LINK_COPY["address-shape"]);
-  return { httpBaseUrl: base, code };
+  return { httpBaseUrl: base, code, relay: null };
 }
 
 export { groupLinkCode };
@@ -117,14 +126,20 @@ export interface MacLink {
   readonly macId: string;
   /** "MamaBear": the Mac's name, shown beside its conversations. */
   readonly macName: string;
-  readonly httpBaseUrl: string;
+  /** The Mac's own address on the home Wi-Fi or Tailscale; null when it's reached by relay only. */
+  readonly httpBaseUrl: string | null;
   readonly me: Extract<FamilyMe, { kind: "child" | "grown-up" }>;
   readonly linkedAt: number;
 }
 
 export interface LinkedMac extends MacLink {
   readonly bearerToken: string;
+  /** This device's tunnel keys and pass for the Mac, when it can be reached through the relay. */
+  readonly relayRecord: HomeRecord | null;
 }
+
+/** The ways to one Mac for a sign-in (null while linking): see src/links/store.tsx. */
+export type WaysToMac = (bearerToken: string | null) => MacTransport;
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -137,12 +152,21 @@ export async function linkToMac(
     readonly fetch?: typeof fetch;
     readonly deviceLabel?: string;
     readonly deviceType?: "mobile" | "tablet";
+    /** How to reach the Mac; the Mac's own address when not given. */
+    readonly ways?: WaysToMac;
+    readonly relayRecord?: HomeRecord | null;
   } = {},
 ): Promise<LinkedMac> {
-  const open = directTransport(
-    { httpBaseUrl: target.httpBaseUrl, bearerToken: null },
-    options.fetch ? { fetch: options.fetch } : {},
-  );
+  const ways: WaysToMac =
+    options.ways ??
+    ((bearerToken) => {
+      if (target.httpBaseUrl === null) throw new LinkError("unreachable", LINK_COPY.unreachable);
+      return directTransport(
+        { httpBaseUrl: target.httpBaseUrl, bearerToken },
+        options.fetch ? { fetch: options.fetch } : {},
+      );
+    });
+  const open = ways(null);
   const call = async (run: (transport: MacTransport) => ReturnType<MacTransport["request"]>) => {
     try {
       return await run(open);
@@ -187,10 +211,7 @@ export async function linkToMac(
     throw new LinkError("not-linked", LINK_COPY["not-linked"]);
   }
 
-  const signedIn = directTransport(
-    { httpBaseUrl: target.httpBaseUrl, bearerToken: token },
-    options.fetch ? { fetch: options.fetch } : {},
-  );
+  const signedIn = ways(token);
   const status = await call(() => signedIn.request({ method: "GET", path: "/api/skycot/family" }));
   const me = parseMe(record(status.json).me);
   if (me.kind === "shared") {
@@ -203,6 +224,7 @@ export async function linkToMac(
     me,
     linkedAt: Date.now(),
     bearerToken: token,
+    relayRecord: options.relayRecord ?? null,
   };
 }
 

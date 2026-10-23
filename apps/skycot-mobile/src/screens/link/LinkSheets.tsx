@@ -16,6 +16,8 @@ import {
   type LinkedMac,
 } from "../../links/pairing";
 import { useLinks } from "../../links/store";
+import { newHomeRecord, RelayHome } from "@t3tools/skycot-relay/client/home";
+import { waysToMac } from "../../transport/ways";
 import { Banner, Button, haptic, Sheet, Symbol, Txt } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 
@@ -31,11 +33,21 @@ function useLinkAction(onLinked: (outcome: LinkOutcome) => void) {
     setProblem(null);
     try {
       const target = readLinkInput(input);
+      // A link that carries SKYCOT Relay's part: this device makes its own tunnel key for the
+      // Mac now, and links through the tunnel or, failing that, the Mac's own address.
+      const relayRecord = target.relay === null ? null : newHomeRecord(target.relay);
+      const relay =
+        relayRecord === null ? null : new RelayHome({ record: relayRecord, save: () => undefined });
       const linked = await linkToMac(target, {
+        ways: (bearerToken) => waysToMac({ httpBaseUrl: target.httpBaseUrl, bearerToken, relay }),
+
         deviceLabel: "SKYCOT app",
         deviceType: Platform.OS === "ios" && Platform.isPad ? "tablet" : "mobile",
       });
-      if (!(await links.add(linked))) {
+      // The tunnel's record after the handshake (its newest time and cookies) is the one kept.
+      const finalRecord = relay?.currentRecord ?? null;
+      relay?.close();
+      if (!(await links.add({ ...linked, relayRecord: finalRecord }))) {
         setProblem(LINK_COPY["wrong-kind"]);
         haptic("warning");
         return;
@@ -43,6 +55,7 @@ function useLinkAction(onLinked: (outcome: LinkOutcome) => void) {
       haptic("success");
       onLinked({ kind: "linked", mac: linked });
     } catch (cause) {
+      if (__DEV__) console.warn("[skycot] link:", cause instanceof Error ? cause.message : cause);
       haptic("warning");
       setProblem(cause instanceof LinkError ? cause.message : LINK_COPY.unreachable);
     } finally {
@@ -71,6 +84,7 @@ export function TypeCodeSheet(props: {
     readonly code: string;
     readonly address: string;
     readonly go: boolean;
+    readonly scanned?: string | undefined;
   } | null;
 }) {
   const theme = useTheme();
@@ -80,6 +94,10 @@ export function TypeCodeSheet(props: {
   const prefill = props.prefill ?? null;
   useEffect(() => {
     if (prefill === null) return;
+    if (prefill.scanned !== undefined) {
+      if (prefill.go) void action.run({ kind: "scanned", text: prefill.scanned });
+      return;
+    }
     setCode(prefill.code);
     setAddress(prefill.address);
     if (prefill.go)

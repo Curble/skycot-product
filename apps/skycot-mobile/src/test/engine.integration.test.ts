@@ -19,7 +19,7 @@ describe.skipIf(base === undefined || code === undefined)("a live engine", () =>
     const linked = await linkToMac(target, { deviceLabel: "Test iPad", deviceType: "tablet" });
     expect(linked.me.kind).toBe("child");
     const transport = directTransport({
-      httpBaseUrl: linked.httpBaseUrl,
+      httpBaseUrl: linked.httpBaseUrl!,
       bearerToken: linked.bearerToken,
     });
     const status = await familyApi.status(transport);
