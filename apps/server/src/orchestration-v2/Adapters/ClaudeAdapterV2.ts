@@ -188,6 +188,8 @@ import {
   makeSubagentConversationArtifacts,
   subagentThreadTitle,
 } from "@t3tools/provider-core/server/subagentProjection";
+import * as SkycotFamilyClaude from "../../skycot/SkycotFamilyClaude.ts"; // nondev-seam: skycot-family-lockdown-claude
+import * as SkycotFamilyLockdown from "../../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown-claude
 
 export const CLAUDE_PROVIDER = ProviderDriverKind.make("claudeAgent");
 const CLAUDE_AGENT_SDK_QUERY_PROTOCOL = "claude-agent-sdk.query" as const;
@@ -3887,6 +3889,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     planSelectionTransition: () => Effect.succeed(turnScopedSelectionTransition()),
     openSession: Effect.fn("ClaudeAdapterV2.openSession")(
       function* (input: ProviderAdapter.ProviderAdapterV2OpenSessionInput) {
+        const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown; // nondev-seam: skycot-family-lockdown-claude
         const sessionScope = yield* Effect.scope;
         const now = yield* DateTime.now;
         const session = providerSession({
@@ -9177,7 +9180,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             .open({
               threadId: turnInput.threadId,
               providerSessionId: input.providerSessionId,
-              options: queryOptions,
+              options: SkycotFamilyClaude.lockQueryOptions(skycotLockdown, queryOptions), // nondev-seam: skycot-family-lockdown-claude
             })
             .pipe(
               Effect.onError(() =>

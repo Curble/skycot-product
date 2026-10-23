@@ -150,6 +150,8 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as SkycotPolicy from "../../skycot/SkycotPolicy.ts"; // nondev-seam: skycot-codex-mode
+import * as SkycotFamilyCodex from "../../skycot/SkycotFamilyCodex.ts"; // nondev-seam: skycot-family-lockdown-codex
+import * as SkycotFamilyLockdown from "../../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown-codex
 
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 export const CODEX_DRIVER_KIND = CODEX_PROVIDER;
@@ -1739,14 +1741,21 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     }),
                 ),
               );
-        const client = yield* clientFactory.open({
-          instanceId: adapterOptions.instanceId,
-          threadId: input.threadId,
-          providerSessionId: input.providerSessionId,
-          runtimePolicy: input.runtimePolicy,
-          settings: resolvedRuntime?.config ?? adapterOptions.settings,
-          environment: resolvedRuntime?.environment ?? adapterOptions.environment,
-        });
+        // nondev-seam: skycot-family-lockdown-codex (Family profile on: the process starts with plugins, apps, hooks, computer and browser use and notify off, and every thread with each MCP server and skill off)
+        const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown;
+        const client = SkycotFamilyCodex.lockClient(
+          skycotLockdown,
+          yield* clientFactory.open({
+            instanceId: adapterOptions.instanceId,
+            threadId: input.threadId,
+            providerSessionId: input.providerSessionId,
+            runtimePolicy: input.runtimePolicy,
+            ...SkycotFamilyCodex.lockLaunch(skycotLockdown, {
+              settings: resolvedRuntime?.config ?? adapterOptions.settings,
+              environment: resolvedRuntime?.environment ?? adapterOptions.environment,
+            }),
+          }),
+        );
         const additionalContextByThread = yield* Ref.make(
           new Map<
             string,

@@ -33,6 +33,8 @@ import {
   hasClaudeManagedMcpConfig,
   makeClaudeEnvironment,
 } from "../provider/Drivers/ClaudeHome.ts";
+import * as SkycotFamilyClaude from "../skycot/SkycotFamilyClaude.ts"; // nondev-seam: skycot-family-lockdown-text-claude
+import * as SkycotFamilyLockdown from "../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown-text-claude
 
 const CLAUDE_TIMEOUT_MS = 180_000;
 /** The tools an investigation can see. `--tools` takes bare names; patterns go in the allow list. */
@@ -183,7 +185,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
     };
     const settingsJson = yield* encodeJsonForOperation(
       operation,
-      settings,
+      SkycotFamilyClaude.lockTextSettings(yield* SkycotFamilyLockdown.sessionLockdown, settings), // nondev-seam: skycot-family-lockdown-text-claude
       "Failed to encode Claude CLI settings.",
     );
 

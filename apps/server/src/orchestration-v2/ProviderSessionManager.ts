@@ -54,6 +54,7 @@ import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as SkycotFamily from "../skycot/SkycotFamily.ts"; // nondev-seam: skycot-family-mcp
 import * as SkycotFamilyInstructions from "../skycot/SkycotFamilyInstructions.ts"; // nondev-seam: skycot-family-instructions
+import * as SkycotFamilyLockdown from "../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_MAX_IDLE_PIN_MS = 4 * 60 * 60 * 1000;
@@ -313,7 +314,10 @@ export const layerWithOptions = (
   Layer.effect(
     ProviderSessionManagerV2,
     Effect.gen(function* () {
-      const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2;
+      // nondev-seam: skycot-family-lockdown (while the Family profile is on, sessions open without the parent's AI add-ons, or not at all)
+      const registry = yield* SkycotFamilyLockdown.lockRegistry(
+        yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2,
+      );
       const fileSystem = yield* FileSystem.FileSystem;
       const mcpSessionRegistry = yield* McpSessionRegistry.McpSessionRegistry;
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -2127,6 +2131,17 @@ export const layerWithOptions = (
                 }
               }
               const key = sessionKey(input.providerSessionId);
+              // nondev-seam: skycot-family-lockdown-restart (a live session opened under the other Family setting is closed, so this one opens to match)
+              yield* SkycotFamilyLockdown.releaseIfMismatched(
+                skycotFamily,
+                (yield* Ref.get(sessions)).get(key),
+                (detail) =>
+                  releaseEntry({
+                    providerSessionId: input.providerSessionId,
+                    reason: "manual_shutdown",
+                    detail,
+                  }).pipe(logReleaseFailure(input.providerSessionId)),
+              );
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
                 const attached = existing.attachedThreadIds.has(input.threadId);

@@ -9,6 +9,7 @@ import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import * as ThreadTitleLinks from "./ThreadTitleLinks.ts";
+import * as SkycotFamilyTextGeneration from "../skycot/SkycotFamilyTextGeneration.ts"; // nondev-seam: skycot-family-lockdown-text
 
 export type {
   BranchNameGenerationInput,
@@ -92,4 +93,7 @@ export const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(TextGeneration, make);
+export const layer = Layer.effect(
+  TextGeneration,
+  SkycotFamilyTextGeneration.lockTextGeneration(make),
+); // nondev-seam: skycot-family-lockdown-text
