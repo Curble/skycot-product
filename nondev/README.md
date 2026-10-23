@@ -38,6 +38,8 @@ Our code lives **only** in paths upstream does not own. Anything there can never
 | `apps/server/src/skycot/**`                                              | SKYCOT-only server modules (provider policy)                                    |
 | `packages/skycot-rules/**`                                               | SKYCOT-only shared rules package                                                |
 | `packages/skycot-brand/**`                                               | SKYCOT-only brand logic (day/dusk from the sky), shared by client and desktop   |
+| `packages/skycot-relay/**`                                               | SKYCOT Relay protocol and device transport, shared by relay, engine and clients |
+| `infra/skycot-relay/**`                                                  | SKYCOT Relay itself (a Cloudflare Worker; see `docs/nondev/RELAY.md`)           |
 | `apps/desktop/src/skycot/**`                                             | SKYCOT-only desktop-shell modules (the day/dusk Dock icon)                      |
 | `nondev/**`                                                              | this folder: tooling, scripts, docs, brand assets, `bin/skycot.cjs`             |
 | `docs/nondev/**`                                                         | design docs for the fork                                                        |

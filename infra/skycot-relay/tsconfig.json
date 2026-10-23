@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "WebWorker"],
+    "types": ["@cloudflare/workers-types", "node"],
+    // A Cloudflare Worker with no Effect: its Date/timer/fetch/console diagnostics do not apply.
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalTimers": "off",
+          "globalFetch": "off",
+          "globalRandom": "off",
+          "globalConsole": "off"
+        }
+      }
+    ]
+  },
+  // The browser end-to-end scripts run under plain Node with a Playwright found at run time.
+  "include": ["src/**/*.ts", "e2e/relay-smoke.ts"]
+}

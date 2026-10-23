@@ -1,0 +1,36 @@
+# SKYCOT Relay. Nothing here is deployed yet: see docs/nondev/RELAY.md for the steps, the
+# secrets and the domain. `pnpm run dev` (wrangler dev --local) runs it on this Mac only.
+name = "skycot-relay"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+# Only on its own domain once deployed (relay.skycot.com), never on *.workers.dev.
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "HOMES"
+class_name = "HomeRoom"
+
+# SQLite-backed Durable Objects work on the free Workers plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["HomeRoom"]
+
+# New connections per network address (Workers Rate Limiting); the per-home and per-device
+# limits live in the home's own object (src/limits.ts).
+[[ratelimits]]
+name = "ADDRESS_LIMITER"
+namespace_id = "7301"
+simple = { limit = 30, period = 60 }
+
+[vars]
+# The iOS app's bundle id (Phase 3). Empty: notifications stay off.
+APNS_BUNDLE_ID = ""
+
+# Secrets, set with `wrangler secret put` (never in this file or the repository):
+#   APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY (the .p8 file's text), PUSH_REF_KEY
+
+[observability]
+enabled = true
+
+# Uncomment at deploy time (docs/nondev/RELAY.md):
+# routes = [{ pattern = "relay.skycot.com", custom_domain = true }]

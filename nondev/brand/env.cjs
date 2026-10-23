@@ -97,6 +97,9 @@ function resolveBrandEnv(b, host) {
     // domains or a provisioning profile, and refuses to build if a Connect setting is present
     // (seam: skycot-mac-signing, packages/skycot-brand/src/macBuild.ts).
     T3CODE_SKYCOT_CONNECT: "off",
+    // SKYCOT Relay, SKYCOT's own (docs/nondev/RELAY.md): empty until Curble runs one. The engine
+    // reads it in apps/server/src/skycot/relay/SkycotRelay.ts; t3-address-guard.ts checks it.
+    SKYCOT_RELAY_URL: (b.relay && b.relay.url) || "",
   };
 }
 

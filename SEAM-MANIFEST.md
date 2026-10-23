@@ -203,6 +203,18 @@ a new project) rides along in the same file.
 | skycot-questions-history | `apps/server/src/project/ManagedProjectFolders.ts` | 27, 344, 356 (1 import, 1 const, 1 return) | `folderForThread` keeps the claimed folder in `claimed` and returns `SkycotQuestions.keepVersions(git, claimed)`: with `T3CODE_SKYCOT_POLICY=1` it runs `git init` there | a question's folder needs a repository for the engine's checkpoints, so "What changed", Undo, the fridge and the recap work in a question; best effort, and upstream's Scratch (no flag) is unchanged |
 | skycot-project-readme    | `apps/server/src/project/ManagedProjectFolders.ts` | 187 (1 line modified)                      | a new project's README says `Made with SKYCOT.` (was `Created in [T3 Code](https://t3.codes).`)                                                                          | BACKLOG F16: SKYCOT must not write T3's name and address into a family's project; `t3-address-guard.ts` no longer needs an exemption for the file                                                     |
 
+## Relay seams (23 October 2026)
+
+SKYCOT Relay (Phase 2 of the phone plan, `docs/nondev/RELAY.md`) lives in fork-owned paths:
+the Worker in `infra/skycot-relay/`, the shared protocol in `packages/skycot-relay/`, the engine
+side in `apps/server/src/skycot/relay/` (wired through `SkycotFamilyHttp.layer`, so `server.ts`
+gains no line) and the client side in `apps/nondev/`. Off by default, and impossible unless the
+build names a relay (`SKYCOT_RELAY_URL`). The only upstream line is the engine's dependency.
+
+| id                      | file                       | lines                         | change                                   | reason                                                                                                                                                           | marker      | upstream churn |
+| ----------------------- | -------------------------- | ----------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------- |
+| skycot-relay-server-dep | `apps/server/package.json` | 52 (1 line in `dependencies`) | `"@t3tools/skycot-relay": "workspace:*"` | the engine's end of SKYCOT Relay uses the same tunnel, pass and link code as the relay and the devices (Noise IK on `@noble`, MIT); nothing runs until turned on | none (JSON) | 54             |
+
 ## Not touched (by design)
 
 - `apps/mobile/**`, `packages/contracts/**`, `packages/client-runtime/**`:

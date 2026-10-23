@@ -89,7 +89,10 @@ const CONNECT_VARIABLES = [
 ];
 
 interface BrandEnvModule {
-  readonly brand: { readonly modelManifest?: { readonly url?: string | null } };
+  readonly brand: {
+    readonly modelManifest?: { readonly url?: string | null };
+    readonly relay?: { readonly url?: string | null };
+  };
   readonly resolveBrandEnv: (brand: unknown, host: { homedir: string }) => Record<string, string>;
 }
 
@@ -174,6 +177,20 @@ export function t3AddressProblems(root: string = ROOT): string[] {
     problems.push(
       `env.cjs: ${MODEL_MANIFEST_ENV}="${env[MODEL_MANIFEST_ENV]}" does not follow brand.json modelManifest.url (${expected})`,
     );
+  }
+
+  // SKYCOT Relay is SKYCOT's own: https, and never T3's relay.
+  const relayUrl = mod.brand.relay?.url;
+  if (typeof relayUrl === "string" && relayUrl.trim() !== "") {
+    if (!/^https:\/\//iu.test(relayUrl)) {
+      problems.push(`brand.json: relay.url "${relayUrl}" must be an https URL`);
+    }
+    if (T3_ADDRESS.test(relayUrl)) {
+      problems.push(`brand.json: relay.url "${relayUrl}" is T3's; SKYCOT Relay is SKYCOT's own`);
+    }
+  }
+  if (env["SKYCOT_RELAY_URL"] !== undefined && T3_ADDRESS.test(env["SKYCOT_RELAY_URL"])) {
+    problems.push("env.cjs: SKYCOT_RELAY_URL names T3's service");
   }
 
   for (const name of CONNECT_VARIABLES) {

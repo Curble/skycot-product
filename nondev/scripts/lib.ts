@@ -13,6 +13,8 @@ export const OUR_PATH_GLOBS = [
   "apps/server/src/skycot/**",
   "packages/skycot-rules/**",
   "packages/skycot-brand/**",
+  "packages/skycot-relay/**",
+  "infra/skycot-relay/**",
   "apps/desktop/src/skycot/**",
   "nondev/**",
   "docs/nondev/**",

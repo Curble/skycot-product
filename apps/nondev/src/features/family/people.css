@@ -63,3 +63,12 @@
   color: var(--fm-label-secondary, #6e6e73);
   overflow-wrap: anywhere;
 }
+.fm-relay-points {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fm-ink);
+}
