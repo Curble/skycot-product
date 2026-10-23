@@ -140,6 +140,9 @@ const config: ExpoConfig = {
     // Must stay BEFORE expo-widgets (see the plugin's own comment).
     "./plugins/withWidgetMarkAsset.cjs",
     widgetsPlugin,
+    // SKYCOT on a grown-up's Apple Watch (Phase 4): the SwiftUI Watch app in watch/SkycotWatch,
+    // bundle id `<this app's id>.watchkitapp`, embedded in this app.
+    "./plugins/withSkycotWatch.cjs",
   ],
   extra: {
     appVariant: APP_VARIANT,
