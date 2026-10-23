@@ -7,6 +7,7 @@ import {
   LOCKOUT_MS,
   MAX_ATTEMPTS,
   attemptsLeft,
+  codeComplete,
   codeStrength,
   currentChildOf,
   createProfile,
@@ -17,6 +18,7 @@ import {
   isValidCode,
   lockoutSentence,
   parseCachedView,
+  parseCodeLength,
   parseProfile,
   parseServerStatus,
   purposeFor,
@@ -267,6 +269,46 @@ describe("the engine's answers", () => {
       currentChildOf(children, { childId: null, needsChoice: true, device: "shared" }, null)
         .needsChoice,
     ).toBe(true);
+  });
+
+  it("learns the code's length (never the code) and keeps it across answers that leave it out", () => {
+    const base = {
+      enabled: true,
+      childName: null,
+      createdAt: null,
+      attemptsLeft: 5,
+      lockedForMs: 0,
+    };
+    // An older engine, or a child's device: no length, so the box waits for its button.
+    expect(parseServerStatus(base)).not.toHaveProperty("codeLength");
+    expect(parseServerStatus({ ...base, codeLength: 6 })?.codeLength).toBe(6);
+    expect(parseServerStatus({ ...base, codeLength: null })?.codeLength).toBeNull();
+    for (const odd of [3, 7, 4.5, "6", Number.NaN]) expect(parseCodeLength(odd)).toBeNull();
+
+    const known = viewFromStatus(parseServerStatus({ ...base, codeLength: 4 })!, T0, false);
+    expect(known.codeLength).toBe(4);
+    // A change's answer carries no length: keep what the status read said.
+    expect(viewFromStatus(parseServerStatus(base)!, T0, false, known).codeLength).toBe(4);
+    // A new code's answer says its own length.
+    expect(
+      viewFromStatus(parseServerStatus({ ...base, codeLength: 6 })!, T0, false, known).codeLength,
+    ).toBe(6);
+    // Off: nothing to know.
+    expect(
+      viewFromStatus(parseServerStatus({ ...base, enabled: false })!, T0, false, known).codeLength,
+    ).toBeNull();
+    // Never in the first-paint cache: a stale length must not send a code too soon.
+    expect(serializeCachedView(known)).not.toContain("codeLength");
+    expect(parseCachedView(serializeCachedView(known), false).codeLength).toBeNull();
+  });
+
+  it("takes the code on its last digit only when the length is known", () => {
+    expect(codeComplete("1234", 4)).toBe(true);
+    expect(codeComplete("123", 4)).toBe(false);
+    expect(codeComplete("12345", 4)).toBe(false);
+    expect(codeComplete("123456", null)).toBe(false);
+    expect(codeComplete("123456", undefined)).toBe(false);
+    expect(codeComplete("12a4", 4)).toBe(false);
   });
 
   it("turns a lock into a local deadline and retires a moved browser profile", () => {

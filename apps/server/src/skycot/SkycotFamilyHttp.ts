@@ -197,6 +197,19 @@ const route = (
   );
 
 /**
+ * How many digits the parent code has, for the code box to take it on the last digit (like the
+ * iPhone's lock screen). Only the family's Mac and grown-ups' devices are told: a child's own
+ * device is not, and nobody is ever sent the code itself. Unknown (`null`) means the button.
+ */
+export const codeLengthFor = (
+  family: SkycotFamily.SkycotFamily["Service"],
+  who: FamilyIdentity,
+): Effect.Effect<{ readonly codeLength?: number | null }> =>
+  who.kind === "grown-up" || who.kind === "shared"
+    ? family.codeLength.pipe(Effect.map((codeLength) => ({ codeLength })))
+    : Effect.succeed({});
+
+/**
  * The profile, plus what a grown-up has opened on this device and for how long, and who is
  * using SKYCOT here (with whether it is awake for them).
  */
@@ -209,7 +222,8 @@ const statusRoute = route(
       const status = yield* family.status;
       const grants = yield* family.openGrants({ sessionId });
       const session = yield* limits.forSession({ sessionId });
-      return json({ ...status, grants, session, me: meOf(who) });
+      const length = yield* codeLengthFor(family, who);
+      return json({ ...status, ...length, grants, session, me: meOf(who) });
     }),
 );
 
@@ -241,7 +255,7 @@ const enableRoute = route(
   "POST",
   "/enable",
   AuthSettingsWriteScope,
-  ({ family, body, pinSafeDefault }) =>
+  ({ family, body, pinSafeDefault, who }) =>
     Effect.gen(function* () {
       const status = yield* family.enable({
         code: text(body["code"]),
@@ -249,7 +263,7 @@ const enableRoute = route(
         timeZone: nullableText(body["timeZone"]),
       });
       yield* pinSafeDefault;
-      return json(status);
+      return json({ ...status, ...(yield* codeLengthFor(family, who)) });
     }),
 );
 
@@ -308,7 +322,7 @@ const changeCodeRoute = route(
   "POST",
   "/change-code",
   AuthSettingsWriteScope,
-  ({ family, body, devices }) =>
+  ({ family, body, devices, who }) =>
     Effect.gen(function* () {
       const before = yield* family.status;
       const status = yield* family.changeCode({
@@ -317,7 +331,10 @@ const changeCodeRoute = route(
       });
       // A new code unlinks grown-ups' devices: their sign-ins end now.
       if (Option.isSome(devices)) yield* devices.value.endVanished(before);
-      return json(status, 200, { "set-cookie": expiredUnlockCookie });
+      // The new code's length at once: a box still counting the old one would send it too soon.
+      return json({ ...status, ...(yield* codeLengthFor(family, who)) }, 200, {
+        "set-cookie": expiredUnlockCookie,
+      });
     }),
 );
 

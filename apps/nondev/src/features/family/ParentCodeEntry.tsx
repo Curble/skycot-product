@@ -3,12 +3,23 @@
 // grown-up" card. The host owns its buttons and calls `submit`; this file owns the field and
 // the sentence. The engine checks the code and counts the tries; this only shows its answer.
 // Always rendered inside a `data-sober` region: no marker pens on a code prompt.
-import { useEffect, useState } from "react";
+//
+// When the engine has told this device how long the code is (the Mac, a grown-up's device),
+// the last digit tries it at once, like the iPhone's lock screen; the host's button stays for
+// when the length is unknown. The engine still counts every try the same way.
+import { useEffect, useRef, useState } from "react";
 
 import { Banner } from "../../ui/Banner";
 import { TextField } from "../../ui/TextField";
 import type { FamilyResult } from "./api";
-import { CODE_MAX, digitsOnly, isValidCode, lockoutSentence, viewLockRemainingMs } from "./family";
+import {
+  CODE_MAX,
+  codeComplete,
+  digitsOnly,
+  isValidCode,
+  lockoutSentence,
+  viewLockRemainingMs,
+} from "./family";
 import { useFamilyView } from "./store";
 
 export interface ParentCodeEntryState {
@@ -20,6 +31,8 @@ export interface ParentCodeEntryState {
   readonly locked: boolean;
   readonly canSubmit: boolean;
   readonly feedback: string | null;
+  /** How many digits the code has, when the engine said; null when the button is the way. */
+  readonly codeLength: number | null;
 }
 
 /** What one try does with the code: ask the engine for a grant, turn the profile off, … */
@@ -44,26 +57,41 @@ export function useParentCodeEntry(
     return () => window.clearInterval(id);
   }, [locked]);
 
-  const setCode = (value: string) => {
-    setCodeRaw(digitsOnly(value));
-    setFeedback(null);
+  // One try at a time, even when the last digit and Enter (or the button) land together: the
+  // state's `busy` only changes on the next render, this changes at once.
+  const trying = useRef(false);
+  const codeLength = view.codeLength;
+
+  const tryCode = async (value: string) => {
+    if (trying.current || busy || locked || !isValidCode(value)) return false;
+    trying.current = true;
+    setBusy(true);
+    try {
+      const result = await attempt(value);
+      setNow(Date.now());
+      setCodeRaw("");
+      if (result.ok) {
+        setFeedback(null);
+        onVerified();
+        return true;
+      }
+      setFeedback(result.message);
+      return false;
+    } finally {
+      trying.current = false;
+      setBusy(false);
+    }
   };
 
-  const submit = async () => {
-    if (busy || locked || !isValidCode(code)) return false;
-    setBusy(true);
-    const result = await attempt(code);
-    setBusy(false);
-    setNow(Date.now());
-    setCodeRaw("");
-    if (result.ok) {
-      setFeedback(null);
-      onVerified();
-      return true;
-    }
-    setFeedback(result.message);
-    return false;
+  const setCode = (value: string) => {
+    const digits = digitsOnly(value);
+    setCodeRaw(digits);
+    setFeedback(null);
+    // The last digit is the Enter key: no button press needed once the length is known.
+    if (codeComplete(digits, codeLength)) void tryCode(digits);
   };
+
+  const submit = () => tryCode(code);
 
   return {
     code,
@@ -73,6 +101,7 @@ export function useParentCodeEntry(
     locked,
     canSubmit: !busy && !locked && isValidCode(code),
     feedback: locked && feedback === null ? lockoutSentence(remainingMs) : feedback,
+    codeLength,
   };
 }
 
@@ -85,15 +114,25 @@ export function ParentCodeEntry({
   readonly label?: string;
   readonly autoFocus?: boolean;
 }) {
+  // A wrong try empties the field: put the cursor back so the next try is just typing.
+  const field = useRef<HTMLInputElement>(null);
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !entry.busy && entry.feedback !== null && !entry.locked) {
+      field.current?.focus();
+    }
+    wasBusy.current = entry.busy;
+  }, [entry.busy, entry.feedback, entry.locked]);
   return (
     <div className="fm-family-code" data-sober="">
       <TextField
         label={label}
+        inputRef={field}
         type="password"
         inputMode="numeric"
         autoComplete="off"
-        maxLength={CODE_MAX}
-        placeholder="••••"
+        maxLength={entry.codeLength ?? CODE_MAX}
+        placeholder={"•".repeat(entry.codeLength ?? 4)}
         value={entry.code}
         disabled={entry.busy || entry.locked}
         autoFocus={autoFocus}
@@ -108,7 +147,10 @@ export function ParentCodeEntry({
       {entry.feedback ? (
         <Banner tone={entry.locked ? "danger" : "warning"}>{entry.feedback}</Banner>
       ) : (
-        <p className="fm-help">4 to 6 digits. Five wrong tries mean a five-minute wait.</p>
+        <p className="fm-help">
+          {entry.codeLength === null ? "4 to 6 digits" : `${entry.codeLength} digits`}. Five wrong
+          tries mean a five-minute wait.
+        </p>
       )}
     </div>
   );

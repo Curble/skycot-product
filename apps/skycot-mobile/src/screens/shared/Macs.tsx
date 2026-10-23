@@ -9,6 +9,7 @@ import { useDeepLink } from "../../links/deepLinks";
 
 import { familyApi } from "../../family/api";
 import { useMacData } from "../../data/MacData";
+import { codeLengthOf } from "../../family/codeLength";
 import { useLinks, type Mac } from "../../links/store";
 import { AboutSheet } from "./About";
 import { Page, ParentCodeSheet, Row, RowIcon, Section } from "../../ui/kit";
@@ -114,6 +115,7 @@ export function MacsScreen() {
         title="Forget this Mac?"
         description={`This device stops showing ${forgetting?.macName ?? "this Mac"}. A grown-up enters the parent code; to remove it completely, remove it on the Mac too.`}
         actionLabel="Forget it"
+        length={codeLengthOf(forgetting === null ? null : byMac[forgetting.macId]?.status)}
         onClose={() => setForgetting(null)}
         onCode={async (code) => {
           if (forgetting === null) return null;

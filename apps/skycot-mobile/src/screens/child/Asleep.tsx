@@ -3,13 +3,13 @@
  * for the grown-ups. The Mac decides; this only says so, calmly, with the sleeping mascot, and
  * offers "Ask a grown-up for more time" (the parent code, on this device).
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { asleepCopy } from "../../../../nondev/src/features/family-limits/limits";
 import { useChild } from "../../app/child/ChildContext";
-import { useMacData } from "../../data/MacData";
+import { useCodeLength, useMacData } from "../../data/MacData";
 import { familyApi, type MoreTimeKind } from "../../family/api";
 import type { Mac } from "../../links/store";
 import { Button, Mascot, ParentCodeField, Segmented, Sheet, Txt, haptic } from "../../ui/kit";
@@ -98,20 +98,29 @@ function MoreTimeSheet(props: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // A child's own device is never told the code's length, so this stays null there and the
+  // button is the way; it only helps if this screen is ever shown on a grown-up's device.
+  const codeLength = useCodeLength(props.mac.macId);
+  const trying = useRef(false);
   const options: Array<{ id: MoreTimeKind; label: string }> = [
     { id: "extra15", label: "15 minutes" },
     { id: "extra30", label: "30 minutes" },
     ...(props.bedtime ? [{ id: "endBedtime" as const, label: "No bedtime tonight" }] : []),
   ];
-  const give = async () => {
-    if (props.childId === null || code.length < 4) return;
+  const give = async (typed: string = code) => {
+    if (props.childId === null || typed.length < 4 || trying.current) return;
+    trying.current = true;
     setBusy(true);
-    const result = await familyApi.moreTime(props.mac.transport, {
-      childId: props.childId,
-      kind,
-      code,
-    });
-    setBusy(false);
+    const result = await familyApi
+      .moreTime(props.mac.transport, {
+        childId: props.childId,
+        kind,
+        code: typed,
+      })
+      .finally(() => {
+        trying.current = false;
+        setBusy(false);
+      });
     setCode("");
     if (!result.ok) {
       haptic("warning");
@@ -131,12 +140,20 @@ function MoreTimeSheet(props: {
         value={kind}
         onChange={setKind}
       />
-      <ParentCodeField value={code} onChange={setCode} onSubmit={give} problem={problem} />
+      <ParentCodeField
+        value={code}
+        onChange={setCode}
+        onSubmit={() => void give()}
+        onComplete={(typed) => void give(typed)}
+        length={codeLength}
+        busy={busy}
+        problem={problem}
+      />
       <Button
         title={busy ? "Checking…" : "Wake SKYCOT"}
         busy={busy}
         disabled={code.length < 4}
-        onPress={give}
+        onPress={() => void give()}
       />
       <Txt variant="footnote" tone="label2" center>
         Every bit of extra time shows in Settings › Family on the Mac.

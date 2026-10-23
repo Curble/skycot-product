@@ -20,6 +20,7 @@ import {
 import { AppState } from "react-native";
 
 import { familyApi, type PendingRequest, type ServerFamilyStatus, type Today } from "../family/api";
+import { codeLengthOf, sharedCodeLength } from "../family/codeLength";
 import { readShell } from "../engine/engine";
 import type { ShellSnapshot } from "../engine/types";
 import { useLinks, type Mac } from "../links/store";
@@ -198,4 +199,22 @@ export function useMacData(): MacDataValue {
 
 export function useMacState(macId: string): MacState {
   return useMacData().byMac[macId] ?? EMPTY;
+}
+
+/**
+ * How many digits this Mac's parent code has, for the code box to take it on the last digit.
+ * Null on a child's device (the Mac never tells one), before the Mac said, or outside the
+ * provider: the box then waits for its button.
+ */
+export function useCodeLength(macId: string | null | undefined): number | null {
+  const value = use(MacDataContext);
+  if (value === null || macId === null || macId === undefined) return null;
+  return codeLengthOf(value.byMac[macId]?.status);
+}
+
+/** The same for one code sent to several Macs: known only when they all say the same. */
+export function useSharedCodeLength(macIds: ReadonlyArray<string>): number | null {
+  const value = use(MacDataContext);
+  if (value === null) return null;
+  return sharedCodeLength(macIds.map((macId) => value.byMac[macId]?.status));
 }

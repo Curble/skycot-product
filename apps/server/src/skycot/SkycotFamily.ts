@@ -246,6 +246,12 @@ const FamilyFile = Schema.Struct({
   version: Schema.Literal(FAMILY_FILE_VERSION),
   enabled: Schema.Boolean,
   codeHash: Schema.String,
+  /**
+   * How many digits the parent code has (never the code), so a grown-up's device can take the
+   * code as soon as the last digit is typed. Recorded when the code is set; a file from before
+   * it learns it the next time the right code is typed. Optional so older files read unchanged.
+   */
+  codeLength: Schema.optionalKey(Schema.Number),
   salt: Schema.String,
   createdAt: Schema.String,
   failedAttempts: Schema.Number,
@@ -469,6 +475,12 @@ export class SkycotFamily extends Context.Service<
   SkycotFamily,
   {
     readonly status: Effect.Effect<FamilyStatus, FamilyError>;
+    /**
+     * How many digits the parent code has; null while the profile is off or the length is not
+     * known yet (a code set before it was recorded). Only for the Mac and grown-ups' devices:
+     * never part of `status`, which every device reads.
+     */
+    readonly codeLength: Effect.Effect<number | null>;
     /** Cheap: one stat when the file has not changed. False when the file is missing or unreadable. */
     readonly isEnabled: Effect.Effect<boolean>;
     readonly enable: (input: {
@@ -745,6 +757,21 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
   };
 }
 
+/**
+ * The parent code's length when the profile is on and it is known; null otherwise (an older
+ * file, or a hand-edited value no code could have). Unknown means today's behaviour: the
+ * grown-up presses the button.
+ */
+export function knownCodeLength(
+  file: Pick<FamilyFile, "enabled" | "codeLength"> | null,
+): number | null {
+  if (file === null || !file.enabled) return null;
+  const length = file.codeLength;
+  return length !== undefined && Number.isInteger(length) && length >= 4 && length <= 6
+    ? length
+    : null;
+}
+
 /** The file's allowed assistants, cleaned: a hand-edited file can never allow Codex or Claude. */
 export function allowedAssistantsOf(file: Pick<FamilyFile, "allowedAssistants"> | null) {
   return [...new Set(file?.allowedAssistants ?? [])]
@@ -947,7 +974,13 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const matches =
       CODE_PATTERN.test(code) && sameHex(yield* hashCode(code, base.salt), base.codeHash);
     if (matches) {
-      const cleared = { ...base, failedAttempts: 0, lockedUntil: null };
+      // The right code also teaches a file from before `codeLength` how long the code is.
+      const cleared: FamilyFile = {
+        ...base,
+        failedAttempts: 0,
+        lockedUntil: null,
+        codeLength: code.length,
+      };
       return cleared;
     }
     const failedAttempts = base.failedAttempts + 1;
@@ -971,6 +1004,11 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return toStatus(yield* load, yield* now);
   }).pipe(Effect.withSpan("SkycotFamily.status"));
 
+  const codeLength: SkycotFamily["Service"]["codeLength"] = load.pipe(
+    Effect.map((file) => knownCodeLength(file)),
+    Effect.orElseSucceed(() => null),
+  );
+
   const isEnabled: SkycotFamily["Service"]["isEnabled"] = load.pipe(
     Effect.map((file) => file !== null && file.enabled),
   );
@@ -990,6 +1028,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       version: FAMILY_FILE_VERSION,
       enabled: true,
       codeHash: yield* hashCode(input.code, salt),
+      codeLength: input.code.length,
       salt,
       createdAt,
       failedAttempts: 0,
@@ -1061,6 +1100,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
         ...cleared,
         salt,
         codeHash: yield* hashCode(input.newCode, salt),
+        codeLength: input.newCode.length,
         // A new code ends every grant and token issued under the old one, and unlinks every
         // grown-up's device (it may have been linked by whoever learned the old code). Children's
         // devices stay: they can do nothing a grown-up's code is needed for.
@@ -1162,10 +1202,12 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       const file = yield* requireEnabled(yield* load);
       const at = yield* now;
       const cleared = yield* attempt(file, input.code, at);
-      // Only a success after earlier misses changes the file (the counter goes back to zero).
+      // Only a success after earlier misses changes the file (the counter goes back to zero),
+      // or the first success that learns the code's length.
       if (
         cleared.failedAttempts !== file.failedAttempts ||
-        cleared.lockedUntil !== file.lockedUntil
+        cleared.lockedUntil !== file.lockedUntil ||
+        cleared.codeLength !== file.codeLength
       ) {
         yield* save(cleared);
       }
@@ -1471,6 +1513,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
 
   return SkycotFamily.of({
     lockAll,
+    codeLength,
     addGrownUp,
     updateGrownUp,
     removeGrownUp,

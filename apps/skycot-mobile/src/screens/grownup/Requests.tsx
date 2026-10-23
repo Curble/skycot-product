@@ -9,7 +9,7 @@ import { View } from "react-native";
 
 import { requestHeading } from "../../../../nondev/src/features/family/people";
 import { useGrownUp, type WaitingRequest } from "../../app/grownup/GrownUpContext";
-import { useMacData } from "../../data/MacData";
+import { useCodeLength, useMacData } from "../../data/MacData";
 import { familyApi } from "../../family/api";
 import {
   Avatar,
@@ -42,6 +42,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
   const theme = useTheme();
   const { refresh } = useMacData();
   const { mac, request, child } = props.waiting;
+  const codeLength = useCodeLength(mac.macId);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -126,6 +127,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
         title="Allow this once?"
         description={`${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}. Enter the parent code to allow it, this once.`}
         actionLabel="Allow once"
+        length={codeLength}
         onClose={() => setAsking(false)}
         onCode={async (code) => {
           const result = await familyApi.answerRequest(mac.transport, {

@@ -151,6 +151,55 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
     });
   });
 
+  describe("the code's length (for taking it on the last digit)", () => {
+    it.effect("is recorded when the code is set and changed, never in the status", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          assert.isNull(yield* family.codeLength);
+          const status = yield* family.enable({ code: CODE, childName: null });
+          assert.notProperty(status, "codeLength");
+          assert.equal(yield* family.codeLength, CODE.length);
+          yield* family.changeCode({ oldCode: CODE, newCode: "7351" });
+          assert.equal(yield* family.codeLength, 4);
+          assert.notProperty(yield* family.status, "codeLength");
+          const raw = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
+          assert.notInclude(raw, "7351");
+          yield* family.disable({ code: "7351" });
+          assert.isNull(yield* family.codeLength);
+        }),
+      ),
+    );
+
+    it.effect("an older code with no length learns it from the next right code only", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          yield* family.enable({ code: CODE, childName: null });
+          const { codeLength: _dropped, ...older } = JSON.parse(
+            yield* fs.readFileString(filePath),
+          ) as Record<string, unknown>;
+          yield* fs.writeFileString(filePath, JSON.stringify(older));
+          assert.isNull(yield* family.codeLength);
+          // A wrong code teaches nothing.
+          yield* failureOf(family.checkCode({ code: "1111" }));
+          assert.isNull(yield* family.codeLength);
+          // The right one (checkCode saves only when something changed: this is such a change).
+          yield* family.checkCode({ code: CODE });
+          assert.equal(yield* family.codeLength, CODE.length);
+          // The five-try count is untouched by any of this.
+          assert.equal((yield* family.status).attemptsLeft, SkycotFamily.MAX_ATTEMPTS);
+        }),
+      ),
+    );
+
+    it("a hand-edited length no code could have counts as unknown", () => {
+      assert.isNull(SkycotFamily.knownCodeLength({ enabled: true, codeLength: 9 }));
+      assert.isNull(SkycotFamily.knownCodeLength({ enabled: true, codeLength: 4.5 }));
+      assert.isNull(SkycotFamily.knownCodeLength({ enabled: false, codeLength: 4 }));
+      assert.equal(SkycotFamily.knownCodeLength({ enabled: true, codeLength: 6 }), 6);
+    });
+  });
+
   describe("grants and tokens", () => {
     it.effect("everything is allowed while the profile is off", () =>
       withFamily((family) =>

@@ -4,7 +4,7 @@
  */
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 
 import { childLabel, type FamilyChild } from "../../../../nondev/src/features/family/children";
@@ -12,7 +12,7 @@ import { todaySummary } from "../../../../nondev/src/features/family-limits/limi
 import type { StackRoutes } from "../../app/routes";
 import { useGrownUp } from "../../app/grownup/GrownUpContext";
 import { conversationRows, relativeTime, stateLabel } from "../../data/conversations";
-import { useMacData } from "../../data/MacData";
+import { useCodeLength, useMacData } from "../../data/MacData";
 import { familyApi, type MoreTimeKind } from "../../family/api";
 import { useLinks, type Mac } from "../../links/store";
 import { BUILDER_NAME } from "../../ui/brand";
@@ -117,11 +117,14 @@ function MoreTimeSheet(props: {
   readonly onClose: () => void;
 }) {
   const { refresh } = useMacData();
+  const codeLength = useCodeLength(props.target?.mac.macId);
   const [kind, setKind] = useState<MoreTimeKind>("extra15");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [given, setGiven] = useState(false);
+  // One try at a time: the last digit and a tap on the button can land together.
+  const trying = useRef(false);
   const name = props.target?.child.name ?? "them";
   const close = () => {
     setGiven(false);
@@ -129,15 +132,20 @@ function MoreTimeSheet(props: {
     setCode("");
     props.onClose();
   };
-  const give = async () => {
-    if (props.target === null || code.length < 4) return;
+  const give = async (typed: string = code) => {
+    if (props.target === null || typed.length < 4 || trying.current) return;
+    trying.current = true;
     setBusy(true);
-    const result = await familyApi.approverMoreTime(props.target.mac.transport, {
-      childId: props.target.child.id,
-      kind,
-      proof: { type: "code", code },
-    });
-    setBusy(false);
+    const result = await familyApi
+      .approverMoreTime(props.target.mac.transport, {
+        childId: props.target.child.id,
+        kind,
+        proof: { type: "code", code: typed },
+      })
+      .finally(() => {
+        trying.current = false;
+        setBusy(false);
+      });
     setCode("");
     if (!result.ok) {
       haptic("warning");
@@ -175,7 +183,10 @@ function MoreTimeSheet(props: {
           <ParentCodeField
             value={code}
             onChange={setCode}
-            onSubmit={give}
+            onSubmit={() => void give()}
+            onComplete={(typed) => void give(typed)}
+            length={codeLength}
+            busy={busy}
             problem={problem}
             autoFocus={false}
           />
@@ -183,7 +194,7 @@ function MoreTimeSheet(props: {
             title={busy ? "Checking…" : "Give time"}
             busy={busy}
             disabled={code.length < 4}
-            onPress={give}
+            onPress={() => void give()}
           />
         </>
       )}

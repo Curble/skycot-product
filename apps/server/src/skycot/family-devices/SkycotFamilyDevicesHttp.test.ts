@@ -260,6 +260,22 @@ it.layer(
     }).pipe(Effect.scoped),
   );
 
+  it.effect(
+    "the code's length goes to the Mac and grown-ups' phones, never to a child's iPad",
+    () =>
+      Effect.gen(function* () {
+        const { send } = yield* makeServer();
+        const mac = yield* send("mac", "GET", "/api/skycot/family");
+        assert.equal(mac.json["codeLength"], CODE.length);
+        const mum = yield* send("mum", "GET", "/api/skycot/family");
+        assert.equal(mum.json["codeLength"], CODE.length);
+        const ava = yield* send("ava", "GET", "/api/skycot/family");
+        assert.notProperty(ava.json, "codeLength");
+        // Never the code itself, to anyone.
+        for (const answer of [mac, mum, ava]) assert.notInclude(JSON.stringify(answer.json), CODE);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("a grown-up's phone may accept or decline only, and nothing else may answer", () =>
     Effect.gen(function* () {
       const { send, answers } = yield* makeServer();

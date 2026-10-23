@@ -5,7 +5,7 @@
  */
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import * as Haptics from "expo-haptics";
-import { Children, Fragment, use, useState, type ReactNode } from "react";
+import { Children, Fragment, use, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -26,6 +26,7 @@ import { useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { avatarLetter } from "../../../nondev/src/features/family/children";
+import { codeComplete } from "../family/codeLength";
 import type { ChildAvatar } from "../../../nondev/src/features/family/children";
 import { AVATAR_COLORS, mascotSource, skyPhaseNow, type MascotPose } from "./brand";
 import { RootHeaderContext } from "./rootHeader";
@@ -646,15 +647,27 @@ export function Sheet(props: {
   );
 }
 
-/** The parent code: digits only, hidden, 4 to 6 long, as the Mac asks for it. */
+/**
+ * The parent code: digits only, hidden, 4 to 6 long, as the Mac asks for it. When the Mac said
+ * how long the code is (`length`; never to a child's device), the last digit hands the code to
+ * `onComplete` at once, like the iPhone's lock screen: no button press. The host keeps its
+ * button for when the length is unknown, and for VoiceOver and Switch Control.
+ */
 export function ParentCodeField(props: {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onSubmit?: () => void;
+  /** The whole code, typed: called once with it when `length` is known. */
+  readonly onComplete?: (code: string) => void;
+  /** How many digits the code has, from the Mac's status; null or left out: the button. */
+  readonly length?: number | null;
+  /** A try is on its way: typing waits for its answer (the field empties after a wrong one). */
+  readonly busy?: boolean;
   readonly problem?: string | null;
   readonly autoFocus?: boolean;
 }) {
   const theme = useTheme();
+  const length = props.length ?? null;
   return (
     <View style={{ gap: 8 }}>
       <Txt variant="footnote" tone="label2" style={{ textTransform: "uppercase", marginLeft: 4 }}>
@@ -662,16 +675,26 @@ export function ParentCodeField(props: {
       </Txt>
       <TextInput
         value={props.value}
-        onChangeText={(text) => props.onChange(text.replace(/\D/gu, "").slice(0, 6))}
-        onSubmitEditing={props.onSubmit}
-        placeholder="••••"
+        onChangeText={(text) => {
+          if (props.busy) return;
+          const digits = text.replace(/\D/gu, "").slice(0, length ?? 6);
+          props.onChange(digits);
+          if (codeComplete(digits, length)) props.onComplete?.(digits);
+        }}
+        onSubmitEditing={() => props.onSubmit?.()}
+        placeholder={"•".repeat(length ?? 4)}
         placeholderTextColor={theme.color.label3}
         keyboardType="number-pad"
         secureTextEntry
         textContentType="oneTimeCode"
         autoFocus={props.autoFocus ?? true}
-        maxLength={6}
+        maxLength={length ?? 6}
         accessibilityLabel="Parent code"
+        accessibilityHint={
+          length === null
+            ? undefined
+            : `${length} digits. It's checked as soon as you type the last one.`
+        }
         style={{
           backgroundColor: theme.color.card,
           borderRadius: theme.radius.control,
@@ -686,7 +709,8 @@ export function ParentCodeField(props: {
         }}
       />
       <Txt variant="footnote" tone={props.problem ? "red" : "label2"} style={{ marginLeft: 4 }}>
-        {props.problem ?? "4 to 6 digits. Five wrong tries mean a five-minute wait."}
+        {props.problem ??
+          `${length === null ? "4 to 6 digits" : `${length} digits`}. Five wrong tries mean a five-minute wait.`}
       </Txt>
     </View>
   );
@@ -701,20 +725,31 @@ export function ParentCodeSheet(props: {
   readonly onClose: () => void;
   /** Resolves to a problem sentence to show, or null when it worked. */
   readonly onCode: (code: string) => Promise<string | null>;
+  /** How many digits the code has, from that Mac's status: the last digit then sends it. */
+  readonly length?: number | null;
 }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // One try at a time: the last digit and a tap on the button can land together, and `busy`
+  // only changes on the next render.
+  const trying = useRef(false);
   const close = () => {
     setCode("");
     setProblem(null);
     props.onClose();
   };
-  const submit = async () => {
-    if (code.length < 4 || busy) return;
+  const submit = async (value: string = code) => {
+    if (value.length < 4 || trying.current) return;
+    trying.current = true;
     setBusy(true);
-    const result = await props.onCode(code);
-    setBusy(false);
+    let result: string | null;
+    try {
+      result = await props.onCode(value);
+    } finally {
+      trying.current = false;
+      setBusy(false);
+    }
     if (result === null) {
       haptic("success");
       setCode("");
@@ -733,10 +768,18 @@ export function ParentCodeSheet(props: {
           {props.description}
         </Txt>
       </View>
-      <ParentCodeField value={code} onChange={setCode} onSubmit={submit} problem={problem} />
+      <ParentCodeField
+        value={code}
+        onChange={setCode}
+        onSubmit={() => void submit()}
+        onComplete={(typed) => void submit(typed)}
+        length={props.length}
+        busy={busy}
+        problem={problem}
+      />
       <Button
         title={busy ? "Checking…" : props.actionLabel}
-        onPress={submit}
+        onPress={() => void submit()}
         busy={busy}
         disabled={code.length < 4}
       />

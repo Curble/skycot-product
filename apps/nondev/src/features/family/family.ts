@@ -151,6 +151,35 @@ export interface ServerFamilyStatus {
   readonly devices?: ReadonlyArray<FamilyDeviceSummary>;
   /** Who this device is; only the status read carries it (an older engine: the Mac). */
   readonly me?: FamilyMe;
+  /**
+   * How many digits the parent code has, so the code box can take it on the last digit. Only
+   * the status read (and the answers that set the code) carry it, and only to the family's Mac
+   * and grown-ups' devices; null when the engine does not know it yet. Never the code itself.
+   */
+  readonly codeLength?: number | null;
+}
+
+/**
+ * Whether the digits typed so far are the whole code, so the box can try it without a button
+ * (like the iPhone's lock screen). Only when the engine said how long the code is.
+ */
+export function codeComplete(digits: string, codeLength: number | null | undefined): boolean {
+  return (
+    codeLength !== null &&
+    codeLength !== undefined &&
+    digits.length === codeLength &&
+    /^\d+$/.test(digits)
+  );
+}
+
+/** A length a parent code can have, or null (the box then waits for its button). */
+export function parseCodeLength(value: unknown): number | null {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= CODE_MIN &&
+    value <= CODE_MAX
+    ? value
+    : null;
 }
 
 function parseAllowedAssistants(value: unknown): ReadonlyArray<string> {
@@ -213,6 +242,7 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     grownUps: parseGrownUps(record["grownUps"]),
     devices: parseDevices(record["devices"]),
     ...("me" in record ? { me: parseMe(record["me"]) } : {}),
+    ...("codeLength" in record ? { codeLength: parseCodeLength(record["codeLength"]) } : {}),
   };
 }
 
@@ -316,6 +346,11 @@ export interface FamilyView {
   readonly devices: ReadonlyArray<FamilyDeviceSummary>;
   /** Who this device is: the family's Mac, a child's own device, or a grown-up's device. */
   readonly me: FamilyMe;
+  /**
+   * The parent code's length when the engine told this device (the Mac, a grown-up's device):
+   * the code box then tries the code on its last digit. Null: the box waits for its button.
+   */
+  readonly codeLength: number | null;
 }
 
 export const EMPTY_VIEW: FamilyView = {
@@ -335,6 +370,7 @@ export const EMPTY_VIEW: FamilyView = {
   grownUps: [],
   devices: [],
   me: SHARED_ME,
+  codeLength: null,
 };
 
 /**
@@ -372,6 +408,7 @@ export function viewFromStatus(
   legacy: boolean,
   previous: Pick<FamilyView, "openUntil" | "currentChildId"> & {
     readonly me?: FamilyMe;
+    readonly codeLength?: number | null;
   } = EMPTY_VIEW,
 ): FamilyView {
   const choice = currentChildOf(status.children, status.session, previous.currentChildId);
@@ -401,6 +438,12 @@ export function viewFromStatus(
     devices: status.enabled ? (status.devices ?? []) : [],
     // Answers other than the status read carry no `me`: keep what was known.
     me: status.me ?? previous.me ?? SHARED_ME,
+    // Answers that leave the length out keep what was known; a profile turned off has none.
+    codeLength: !status.enabled
+      ? null
+      : status.codeLength === undefined
+        ? (previous.codeLength ?? null)
+        : status.codeLength,
   };
 }
 

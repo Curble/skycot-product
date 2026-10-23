@@ -22,6 +22,7 @@ import { familyApi } from "../../family/api";
 import { respondToRequest, sendMessage, stopConversation, undoTo } from "../../engine/engine";
 import { buildTimeline, isWorking, type TimelineEntry } from "../../engine/timeline";
 import { useThread } from "../../data/hooks";
+import { useCodeLength } from "../../data/MacData";
 import type { ThreadProjection } from "../../engine/types";
 import type { Mac } from "../../links/store";
 import { BUILDER_NAME } from "../../ui/brand";
@@ -60,6 +61,8 @@ export function ConversationView(props: {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const thread = useThread(props.demo ? null : props.mac, props.threadId);
+  // Null on a child's device: the Mac tells only grown-ups' devices how long the code is.
+  const codeLength = useCodeLength(props.demo ? null : props.mac.macId);
   const projection = props.demo ?? thread.value;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
@@ -255,6 +258,7 @@ export function ConversationView(props: {
       <ParentCodeSheet
         visible={parentAsk !== null}
         title="Ask a grown-up"
+        length={codeLength}
         description={
           parentAsk === null
             ? ""

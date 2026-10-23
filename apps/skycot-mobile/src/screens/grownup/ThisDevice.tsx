@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import type { StackRoutes } from "../../app/routes";
 import { useGrownUp } from "../../app/grownup/GrownUpContext";
+import { useSharedCodeLength } from "../../data/MacData";
 import { familyApi } from "../../family/api";
 import { passkeySupport } from "../../family/passkey";
 import { useLinks, type Mac } from "../../links/store";
@@ -48,6 +49,8 @@ export function ThisDeviceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
   const links = useLinks();
   const grownUp = useGrownUp();
+  // The Watch's set-up sends one code to every linked Mac: known only when they all agree.
+  const codeLength = useSharedCodeLength(grownUp.macs.map((mac) => mac.macId));
   const faceId = passkeySupport();
   const [locked, setLocked] = useState(false);
   const [locking, setLocking] = useState(false);
@@ -184,6 +187,7 @@ export function ThisDeviceScreen() {
         title="Say yes from your Watch?"
         description="Open SKYCOT on your Apple Watch first. Then enter the parent code: your Watch makes its own key and can say yes once while it's unlocked and on your wrist."
         actionLabel="Set up"
+        length={codeLength}
         onClose={() => setSettingUpWatch(false)}
         onCode={async (code) => {
           const result = await watch.enrol(code);
