@@ -258,25 +258,6 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
     ),
   );
 
-  it("MCP credentials keep none of the engine's own tools while the profile is on", () => {
-    const capabilities = new Set([
-      "orchestration",
-      "worktree",
-      "pull-requests",
-      "preview",
-      "device",
-    ]);
-    const withheld = SkycotFamily.withholdFamilyMcpCapabilities(capabilities);
-    assert.deepEqual([...capabilities], []);
-    assert.deepEqual([...withheld].sort(), [
-      "device",
-      "orchestration",
-      "preview",
-      "pull-requests",
-      "worktree",
-    ]);
-  });
-
   describe("several children (file version 2)", () => {
     const V1 = {
       version: 1,

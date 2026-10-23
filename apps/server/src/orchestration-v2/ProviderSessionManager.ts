@@ -446,6 +446,12 @@ export const layerWithOptions = (
           : mcpPrepareLock.withLock(
               threadId,
               Effect.gen(function* () {
+                // nondev-seam: skycot-family-mcp (Family profile on: no engine tool server at all, so none of its tools is listed to the agent or callable; an earlier credential is revoked)
+                if (Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled)) {
+                  yield* mcpSessionRegistry.revokeThread(threadId);
+                  yield* mcpSessions.clear(threadId);
+                  return { mcpCredentialId: undefined, issued: false };
+                }
                 // Reuse a still-valid credential for this thread instead of
                 // rotating: long-lived provider processes (codex app-server)
                 // build their MCP client once per conversation and keep using
@@ -459,11 +465,6 @@ export const layerWithOptions = (
                 >(["orchestration", "worktree", "pull-requests"]);
                 if (browserToolsAvailable) capabilities.add("preview");
                 if (deviceToolsAvailable) capabilities.add("device");
-                // nondev-seam: skycot-family-mcp (Family profile on: none of the engine's own tools: no thread control, scheduling, PRs, worktrees, devices or page previews)
-                const withheld =
-                  Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled)
-                    ? SkycotFamily.withholdFamilyMcpCapabilities(capabilities)
-                    : undefined;
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before the async resolve so a release cannot
@@ -485,10 +486,8 @@ export const layerWithOptions = (
                     resolved !== undefined &&
                     resolved.thread.threadId === threadId &&
                     resolved.thread.providerInstanceId === providerInstanceId &&
-                    resolved.capabilities.has("preview") === capabilities.has("preview") && // nondev-seam: skycot-family-mcp
-                    resolved.capabilities.has("device") === capabilities.has("device") &&
-                    resolved.capabilities.has("orchestration") ===
-                      capabilities.has("orchestration") // nondev-seam: skycot-family-mcp
+                    resolved.capabilities.has("preview") === browserToolsAvailable &&
+                    resolved.capabilities.has("device") === deviceToolsAvailable
                   ) {
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
                   }
@@ -500,7 +499,6 @@ export const layerWithOptions = (
                   providerInstanceId,
                   browserToolsAvailable,
                   capabilities,
-                  ...(withheld === undefined ? {} : { withheld }), // nondev-seam: skycot-family-mcp
                 });
                 yield* mcpSessions.set(credential.config);
                 reserveMcpCredential(threadId, credential.config.providerSessionId);

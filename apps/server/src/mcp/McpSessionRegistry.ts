@@ -22,8 +22,6 @@ export interface McpCredentialRequest {
    */
   readonly browserToolsAvailable?: boolean;
   readonly capabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
-  /** Removed even from the capabilities every credential otherwise gets. */
-  readonly withheld?: ReadonlySet<McpInvocationContext.McpCapability>; // nondev-seam: skycot-family-mcp-registry
 }
 
 export interface McpIssuedCredential {
@@ -121,8 +119,6 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
         ]),
         issuedAt,
       };
-      for (const capability of request.withheld ?? [])
-        (scope.capabilities as Set<McpInvocationContext.McpCapability>).delete(capability); // nondev-seam: skycot-family-mcp-registry
       yield* SynchronizedRef.update(state, ({ records }) => {
         const next = new Map(records);
         next.set(tokenHash, { tokenHash, scope, lastAliveAt: issuedAt });

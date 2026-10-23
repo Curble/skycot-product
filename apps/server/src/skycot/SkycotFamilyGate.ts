@@ -16,9 +16,10 @@
 // (SkycotFamilyInstructions.familyTurnInput).
 //
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
-// those are closed separately by issuing Family-profile threads an MCP credential without any of
-// the engine's own capabilities: orchestration, worktrees, pull requests, devices and page
-// previews (`SkycotFamily.withholdFamilyMcpCapabilities`).
+// those are closed separately: while the profile is on, ProviderSessionManager issues a thread no
+// MCP credential at all (seam skycot-family-mcp), so the agent is given no engine tool server and
+// none of its tools (thread control, worktrees, pull requests, devices, page previews, and
+// html_render / html_preview, which may first download a browser) is listed or callable.
 
 import {
   AuthOrchestrationOperateScope,
