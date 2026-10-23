@@ -79,6 +79,8 @@ function screenOptions(theme: Theme): NativeStackNavigationOptions {
 
 function SectionStack(props: {
   readonly navRef?: NavigationContainerRefWithCurrent<StackRoutes>;
+  /** How many screens are pushed above the section's first one (the tab bar hides then). */
+  readonly onDepth?: (depth: number) => void;
   readonly section: ShellSection;
   readonly screens: ReadonlyArray<ShellScreen>;
   readonly headerRight?: () => ReactNode;
@@ -96,7 +98,11 @@ function SectionStack(props: {
       value={{ route: props.section.route, title: props.section.title, right: props.headerRight }}
     >
       <NavigationIndependentTree>
-        <NavigationContainer theme={navTheme} {...(props.navRef ? { ref: props.navRef } : {})}>
+        <NavigationContainer
+          theme={navTheme}
+          {...(props.navRef ? { ref: props.navRef } : {})}
+          onStateChange={(state) => props.onDepth?.(state?.index ?? 0)}
+        >
           <Stack.Navigator initialRouteName={rootName} screenOptions={screenOptions(theme)}>
             {props.screens.map((screen) => {
               const isRoot = screen.name === rootName;
@@ -161,6 +167,8 @@ export function Shell(props: {
   const [selected, setSelected] = useState(props.sections[0]!.id);
   const [opened, setOpened] = useState<SidebarItem | null>(null);
   const [provenance, setProvenance] = useState(0);
+  // Like iOS's hidesBottomBarWhenPushed: a conversation pushed in a tab gets the whole screen.
+  const [depths, setDepths] = useState<Readonly<Record<string, number>>>({});
   const refs = useMemo(
     () =>
       new Map(
@@ -230,6 +238,7 @@ export function Shell(props: {
       <View style={{ flex: 1, backgroundColor: theme.color.background }}>
         <Tabs.Host
           navStateRequest={{ selectedScreenKey: selected, baseProvenance: provenance }}
+          tabBarHidden={(depths[selected] ?? 0) > 0}
           ios={{
             tabBarControllerMode: "tabBar",
             tabBarMinimizeBehavior: "never",
@@ -263,6 +272,11 @@ export function Shell(props: {
             >
               <SectionStack
                 navRef={refs.get(section.id)!}
+                onDepth={(depth) =>
+                  setDepths((current) =>
+                    current[section.id] === depth ? current : { ...current, [section.id]: depth },
+                  )
+                }
                 section={section}
                 screens={props.screens}
                 {...(props.headerRight ? { headerRight: props.headerRight } : {})}

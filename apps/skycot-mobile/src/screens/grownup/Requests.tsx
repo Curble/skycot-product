@@ -15,6 +15,7 @@ import {
   Avatar,
   Banner,
   Button,
+  ButtonRow,
   Card,
   EmptyState,
   Mascot,
@@ -103,7 +104,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
       {done ? (
         <Banner tone="success" text={done} />
       ) : request.lapsed ? null : (
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        <ButtonRow>
           <Button
             title="Decline"
             kind="grey"
@@ -118,7 +119,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
             style={{ flex: 1 }}
             size="medium"
           />
-        </View>
+        </ButtonRow>
       )}
       <ParentCodeSheet
         visible={asking}
@@ -147,7 +148,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
 
 export function RequestsScreen() {
   const grownUp = useGrownUp();
-  const count = grownUp.waiting.length;
+  const count = grownUp.waiting.filter((waiting) => !waiting.request.lapsed).length;
   return (
     <Page>
       <View
@@ -167,7 +168,7 @@ export function RequestsScreen() {
       </View>
       {!grownUp.loaded ? (
         <Spinner />
-      ) : count === 0 ? (
+      ) : grownUp.waiting.length === 0 ? (
         <EmptyState
           symbol="checkmark.shield"
           title="All quiet"

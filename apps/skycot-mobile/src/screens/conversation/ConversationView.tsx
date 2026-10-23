@@ -16,6 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { familyApi } from "../../family/api";
 import { respondToRequest, sendMessage, stopConversation, undoTo } from "../../engine/engine";
@@ -27,6 +28,7 @@ import { BUILDER_NAME } from "../../ui/brand";
 import {
   Banner,
   Button,
+  ButtonRow,
   Card,
   Mascot,
   ParentCodeSheet,
@@ -56,6 +58,7 @@ export function ConversationView(props: {
   readonly demo?: ThreadProjection;
 }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const thread = useThread(props.demo ? null : props.mac, props.threadId);
   const projection = props.demo ?? thread.value;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -226,6 +229,7 @@ export function ConversationView(props: {
         <View
           style={{
             padding: 14,
+            paddingBottom: Math.max(14, insets.bottom),
             borderTopWidth: 0.5,
             borderTopColor: theme.color.separator,
             backgroundColor: theme.color.cardRaised,
@@ -420,7 +424,7 @@ function TimelineCard(props: {
             ))}
           </View>
           {entry.state === "ready" && props.isLatestPlan && !props.readOnly ? (
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+            <ButtonRow style={{ marginTop: 16 }}>
               <Button
                 title="Build it"
                 icon="hammer.fill"
@@ -436,7 +440,7 @@ function TimelineCard(props: {
                 style={{ flex: 1 }}
                 size="medium"
               />
-            </View>
+            </ButtonRow>
           ) : null}
         </Card>
       );
@@ -492,7 +496,7 @@ function TimelineCard(props: {
                     Answer this on the Requests page.
                   </Txt>
                 ) : (
-                  <View style={{ flexDirection: "row", gap: 10 }}>
+                  <ButtonRow>
                     <Button
                       title="Don't allow"
                       kind="grey"
@@ -507,7 +511,7 @@ function TimelineCard(props: {
                       style={{ flex: 1 }}
                       size="medium"
                     />
-                  </View>
+                  </ButtonRow>
                 )}
               </View>
             ) : null}
@@ -537,7 +541,7 @@ function TimelineCard(props: {
             </View>
           ) : null}
           {!entry.undone && !props.readOnly ? (
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+            <ButtonRow style={{ marginTop: 14 }}>
               {props.onOpenPage ? (
                 <Button
                   title="Open it"
@@ -557,7 +561,7 @@ function TimelineCard(props: {
                   size="medium"
                 />
               ) : null}
-            </View>
+            </ButtonRow>
           ) : null}
         </Card>
       );
@@ -597,6 +601,7 @@ function Composer(props: {
   readonly onStop: () => void;
 }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const placeholder =
     props.mode === "change-plan"
       ? "What should be different? (“skip step 3”)"
@@ -612,7 +617,7 @@ function Composer(props: {
         gap: 8,
         paddingHorizontal: 12,
         paddingTop: 8,
-        paddingBottom: 12,
+        paddingBottom: Math.max(12, insets.bottom),
         borderTopWidth: 0.5,
         borderTopColor: theme.color.separator,
         backgroundColor: theme.color.cardRaised,

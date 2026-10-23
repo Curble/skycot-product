@@ -768,3 +768,22 @@ export function Fill(props: {
     </SafeAreaView>
   );
 }
+
+/** Two or three buttons side by side, stacked instead when there isn't room for their words. */
+export function ButtonRow(props: {
+  readonly children: ReactNode;
+  readonly style?: StyleProp<ViewStyle>;
+  readonly minWidthEach?: number;
+}) {
+  const [width, setWidth] = useState<number | null>(null);
+  const count = Children.toArray(props.children).filter(Boolean).length;
+  const stacked = width !== null && width / Math.max(1, count) < (props.minWidthEach ?? 175);
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={[{ flexDirection: stacked ? "column" : "row", gap: 10 }, props.style]}
+    >
+      {props.children}
+    </View>
+  );
+}
