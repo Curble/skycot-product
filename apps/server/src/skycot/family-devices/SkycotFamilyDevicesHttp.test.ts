@@ -1,5 +1,3 @@
-// Test fixtures use wall-clock times on purpose.
-// @effect-diagnostics globalDateInEffect:off
 // Who is who over HTTP, through a real server: the doors of the device and approver routes, and
 // a child's own device meeting the HTTP reads that name a conversation.
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
@@ -203,7 +201,7 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
     personId: avaId,
     name: "Ava's iPad",
     linkId: "l1",
-    linkExpiresAt: Date.now() + 60_000,
+    linkExpiresAt: 4_102_444_800_000,
   });
   yield* family.addDevice({
     id: MUM_PHONE,
@@ -211,7 +209,7 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
     personId: status.grownUps[0]!.id,
     name: "Mum's phone",
     linkId: "l2",
-    linkExpiresAt: Date.now() + 60_000,
+    linkExpiresAt: 4_102_444_800_000,
   });
   yield* limits.choose({ sessionId: "mac", childId: leoId, grownUp: false });
   yield* limits.recordStart({ sessionId: "mac", threadId: "thread-leo" });

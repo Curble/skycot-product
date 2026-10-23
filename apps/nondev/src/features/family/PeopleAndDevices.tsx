@@ -3,7 +3,7 @@
 // turns into that device's own sign-in; Remove ends it at once. Every change needs the parent
 // code (the Family settings' yes), and the engine checks it again.
 import { Check, Copy, Laptop, Plus, Smartphone, Tablet, Trash2, UserRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { QrCode } from "@t3tools/shared/qrCode";
 import {
@@ -219,16 +219,19 @@ export function DevicesGroup() {
   const [linking, setLinking] = useState(false);
   const [removing, setRemoving] = useState<DeviceRow | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const refresh = () =>
-    void familyApi.devices().then((result) => {
-      if (result.ok) setRows(result.value);
-      setNow(Date.now());
-    });
+  const refresh = useCallback(
+    () =>
+      void familyApi.devices().then((result) => {
+        if (result.ok) setRows(result.value);
+        setNow(Date.now());
+      }),
+    [],
+  );
   useEffect(() => {
     refresh();
     const timer = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [refresh]);
   const personName = (row: Pick<DeviceRow, "kind" | "personId">) => {
     if (row.kind === "child") {
       const index = profile.children.findIndex((child) => child.id === row.personId);

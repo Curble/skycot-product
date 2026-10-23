@@ -1,6 +1,4 @@
-// Test fixtures use wall-clock times and loose stand-ins on purpose.
-// @effect-diagnostics globalDate:off
-// @effect-diagnostics globalDateInEffect:off
+// Test fixtures use loose stand-ins on purpose.
 // @effect-diagnostics anyUnknownInErrorContext:off
 // @effect-diagnostics unsafeEffectTypeAssertion:off
 // Who is who (Phase 1), end to end inside the engine: a child's iPad and a grown-up's phone
@@ -46,7 +44,8 @@ import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
 import { filterShellSnapshot, folderOwner, referencedBy } from "./visibility.ts";
 
 const CODE = "482913";
-const NOW = DateTime.makeUnsafe("2026-10-23T09:00:00.000Z");
+/** A fixed moment for request times and link expiries; tests set the engine's clock to it. */
+const EPOCH = Date.UTC(2026, 9, 23, 9, 0, 0);
 const AVA_IPAD = "d1111111111";
 const MUM_PHONE = "d2222222222";
 const GONE_PHONE = "d3333333333";
@@ -175,7 +174,7 @@ const withWorld = <A, E, R>(
           personId: avaId,
           name: "Ava's iPad",
           linkId: "link-ava",
-          linkExpiresAt: Date.now() + 60_000,
+          linkExpiresAt: EPOCH + 60_000,
         });
         yield* family.addDevice({
           id: MUM_PHONE,
@@ -183,7 +182,7 @@ const withWorld = <A, E, R>(
           personId: mumId,
           name: "Mum's phone",
           linkId: "link-mum",
-          linkExpiresAt: Date.now() + 60_000,
+          linkExpiresAt: EPOCH + 60_000,
         });
         // Who started what, as the Mac's picker recorded it.
         yield* limits.choose({ sessionId: "mac-ava", childId: avaId, grownUp: false });
@@ -580,9 +579,7 @@ describe("who is who: pure parts", () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// The device service: links, removal, the approver's answers.
-// ---------------------------------------------------------------------------------------------
+/* The device service: links, removal, the approver's answers. */
 
 interface Recorded {
   readonly links: Array<{
@@ -608,7 +605,7 @@ const withDevices = <A, E>(
     const recorded: Recorded = { links: [], revokedSessions: [], revokedLinks: [], dispatched: [] };
     const request = {
       status: "pending" as "pending" | "resolved",
-      createdAt: DateTime.makeUnsafe(Date.now()),
+      createdAt: DateTime.makeUnsafe(EPOCH),
     };
     return yield* withWorld((world) =>
       Effect.gen(function* () {
@@ -639,8 +636,8 @@ const withDevices = <A, E>(
                     credential: "7KQ3M9XD2HPA",
                     scopes: input?.scopes ?? [],
                     subject: input?.subject ?? "",
-                    createdAt: DateTime.makeUnsafe(Date.now()),
-                    expiresAt: DateTime.makeUnsafe(Date.now() + 300_000),
+                    createdAt: DateTime.makeUnsafe(EPOCH),
+                    expiresAt: DateTime.makeUnsafe(EPOCH + 300_000),
                   });
                 },
                 revokePairingLink: (id) => {
@@ -656,8 +653,8 @@ const withDevices = <A, E>(
                       permissions: [],
                       method: "browser-session-cookie",
                       client: { deviceType: "unknown" },
-                      issuedAt: DateTime.makeUnsafe(Date.now() - 1000),
-                      expiresAt: DateTime.makeUnsafe(Date.now() + 1000_000),
+                      issuedAt: DateTime.makeUnsafe(EPOCH - 1000),
+                      expiresAt: DateTime.makeUnsafe(EPOCH + 1000_000),
                       lastConnectedAt: null,
                       connected: false,
                       current: false,
@@ -820,9 +817,9 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
       Effect.gen(function* () {
         const { devices, recorded, request } = world;
         // The engine's clock (a test clock here) is what a request's age is read on.
-        yield* TestClock.setTime(Date.now());
+        yield* TestClock.setTime(EPOCH);
         const [pending] = yield* devices.approvals;
-        request.createdAt = DateTime.makeUnsafe(Date.now() - 11 * 60_000);
+        request.createdAt = DateTime.makeUnsafe(EPOCH - 11 * 60_000);
         assert.isTrue(
           yield* refused(
             devices.answer({
@@ -837,7 +834,7 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
             }),
           ),
         );
-        request.createdAt = DateTime.makeUnsafe(Date.now());
+        request.createdAt = DateTime.makeUnsafe(EPOCH);
         yield* devices.answer({
           who: mum(world),
           sessionId: "mum-phone",

@@ -752,11 +752,9 @@ const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query, child
   }),
 );
 
-// ---------------------------------------------------------------------------------------------
 // People and devices ("who is who", Phase 1). Managing them is a grown-up's job on the family's
 // Mac (the Family settings' yes); a grown-up's own device answers requests through the approver
 // routes below and can unlink itself. The device service does the work; these are the doors.
-// ---------------------------------------------------------------------------------------------
 
 const devicesMissing = json(
   { error: "unavailable", message: "Linking devices isn't available on this Mac." },

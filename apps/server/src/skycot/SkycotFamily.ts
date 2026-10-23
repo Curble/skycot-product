@@ -1248,17 +1248,26 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
   }).pipe(lock.withPermits(1), Effect.withSpan("SkycotFamily.lockAll"));
 
   /** One change to the people or devices, under the lock, with the profile on. */
+  const changeOnce = Effect.fn("SkycotFamily.change")(function* (
+    run: (
+      file: FamilyFile,
+      at: number,
+    ) => Effect.Effect<readonly [FamilyFile, unknown], FamilyError>,
+  ) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const [next, result] = yield* run(file, at);
+    if (next !== file) yield* save(next);
+    return { status: toStatus(next, at), result };
+  }, lock.withPermits(1));
   const change = <A>(
     name: string,
     run: (file: FamilyFile, at: number) => Effect.Effect<readonly [FamilyFile, A], FamilyError>,
   ) =>
-    Effect.gen(function* () {
-      const file = yield* requireEnabled(yield* load);
-      const at = yield* now;
-      const [next, result] = yield* run(file, at);
-      if (next !== file) yield* save(next);
-      return { status: toStatus(next, at), result };
-    }).pipe(lock.withPermits(1), Effect.withSpan(`SkycotFamily.${name}`));
+    changeOnce(run).pipe(
+      Effect.map(({ status, result }) => ({ status, result: result as A })),
+      Effect.annotateSpans({ "skycot.family.change": name }),
+    );
 
   const invalid = () => Effect.fail(new FamilyError({ reason: "invalid-request" }));
 

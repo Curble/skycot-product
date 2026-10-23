@@ -76,6 +76,20 @@ describe("the recap in plain words", () => {
         grownUp: { held: 0, approved: 0, moreTime: [], shield: {}, shieldAllowed: 0 },
       }),
     ).toEqual([]);
+    // A yes from a grown-up's own phone names the phone.
+    expect(
+      grownUpLines({
+        timeZone: MELBOURNE,
+        grownUp: {
+          held: 1,
+          approved: 1,
+          moreTime: [],
+          shield: {},
+          shieldAllowed: 0,
+          fromDevices: [{ at: Date.parse("2026-10-22T18:42:00+11:00"), device: "Mum's phone" }],
+        },
+      }),
+    ).toContain("Approved from Mum's phone, 6:42 pm.");
   });
 
   it("draws the week against its busiest day", () => {

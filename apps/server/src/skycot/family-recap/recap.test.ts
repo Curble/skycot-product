@@ -283,6 +283,8 @@ describe("buildRecap", () => {
       moreTime: [activity.log[0]],
       shield: { "full-name": 1, school: 1 },
       shieldAllowed: 1,
+      // That yes was typed on the Mac; one from a grown-up's phone would name the phone here.
+      fromDevices: [],
     });
     expect(today.proudOf).toEqual({
       threadId: "thread:space",

@@ -125,15 +125,19 @@ function GrownUpHome() {
 
 interface RequestsState {
   readonly list: ReadonlyArray<PendingRequest> | null;
+  /** When the list was read (this device's clock), for "2 minutes ago". */
+  readonly readAt: number;
   readonly problem: string | null;
   readonly refresh: () => void;
 }
 
 function usePendingRequests(): RequestsState {
   const [list, setList] = useState<ReadonlyArray<PendingRequest> | null>(null);
+  const [readAt, setReadAt] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
   const refresh = useCallback(() => {
     void familyApi.pendingRequests().then((result) => {
+      setReadAt(Date.now());
       if (result.ok) {
         setList(result.value);
         setProblem(null);
@@ -145,7 +149,7 @@ function usePendingRequests(): RequestsState {
     const timer = window.setInterval(refresh, REQUESTS_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
-  return { list, problem, refresh };
+  return { list, readAt, problem, refresh };
 }
 
 function RequestsTab({ requests }: { readonly requests: RequestsState }) {
@@ -170,6 +174,7 @@ function RequestsTab({ requests }: { readonly requests: RequestsState }) {
           request={request}
           child={profile.children.find((child) => child.id === request.childId) ?? null}
           childName={nameOf(profile.children, request.childId)}
+          readAt={requests.readAt}
           onDone={requests.refresh}
         />
       ))}
@@ -192,11 +197,13 @@ function RequestCard({
   request,
   child,
   childName,
+  readAt,
   onDone,
 }: {
   readonly request: PendingRequest;
   readonly child: FamilyChild | null;
   readonly childName: string;
+  readonly readAt: number;
   readonly onDone: () => void;
 }) {
   const { profile } = useFamily();
@@ -257,7 +264,7 @@ function RequestCard({
           <b>{childName} needs a grown-up</b>
           <small>
             {request.projectTitle ? `${request.projectTitle} · ` : ""}
-            {request.threadTitle} · {ageOf(request.createdAt, Date.now())}
+            {request.threadTitle} · {ageOf(request.createdAt, readAt)}
           </small>
         </div>
       </div>
