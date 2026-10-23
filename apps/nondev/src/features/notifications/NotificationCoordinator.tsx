@@ -3,7 +3,9 @@
 // sound, tag and Dock-badge helpers (apps/web/src/threadNotifications.ts) so both clients ping
 // and badge the same way; what pings, and the words, are SKYCOT's own (./decide.ts).
 //
-// Only while the window is not in front: someone looking at SKYCOT sees the list's dots.
+// Only while the window is not in front: someone looking at SKYCOT sees the list's dots. Each
+// conversation pings at most once per kind every few minutes, and a ping held back meanwhile goes
+// out at the window's end only if it is still news (./decide.ts `throttle`, `stillNews`).
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
@@ -29,8 +31,11 @@ import {
   decide,
   firstSeenMark,
   groupOf,
+  kindOf,
   markFor,
   notificationText,
+  stillNews,
+  throttle,
   type NotifyEvent,
   type ThreadMark,
 } from "./decide";
@@ -62,6 +67,10 @@ export function NotificationCoordinator() {
   // A little before mount, so a conversation started as the page opened still counts.
   const [watchingSince] = useState(() => Date.now() - 10_000);
   const shown = useRef(new Map<string, Notification>());
+  /** When each conversation last pinged for each kind (`<conversation>:<kind>`). */
+  const lastSent = useRef(new Map<string, number>());
+  /** The one ping held back for the end of each conversation's window, per kind. */
+  const heldBack = useRef(new Map<string, number>());
   /** Family profile: whether only a grown-up may allow each waiting step, by request id. */
   const grownUpSteps = useRef(new Map<string, boolean>());
   const anyOn = settings.finished || settings.needsOk || settings.failed;
@@ -97,8 +106,19 @@ export function NotificationCoordinator() {
     };
   }, [settings.sound]);
 
-  const deliver = useEffectEvent((event: NotifyEvent, target: Target) => {
-    if (!settings[groupOf(event)] || windowInFront() || readPermission() !== "granted") return;
+  // Timers held back for a window's end go with the page.
+  useEffect(() => {
+    const timers = heldBack.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  /** Shows one notification; false when it did not (switched off, window in front, no permission). */
+  const deliver = useEffectEvent((event: NotifyEvent, target: Target): boolean => {
+    if (!settings[groupOf(event)] || windowInFront() || readPermission() !== "granted")
+      return false;
     const text = notificationText(event, { builder: crew.builder.name, project: target.project });
     try {
       const tag = threadNotificationTag(target.environmentId, target.threadId);
@@ -114,7 +134,7 @@ export function NotificationCoordinator() {
       });
     } catch {
       // Some browsers expose Notification but refuse to show one.
-      return;
+      return false;
     }
     if (settings.sound) {
       void playNotificationSound(
@@ -122,6 +142,26 @@ export function NotificationCoordinator() {
         () => readPermission() === "granted",
       );
     }
+    return true;
+  });
+
+  /** Delivers now, or holds the ping for the end of the window (replacing one held there). */
+  const send = useEffectEvent((event: NotifyEvent, target: Target, mark: ThreadMark) => {
+    const bucket = `${target.key}:${kindOf(event)}`;
+    window.clearTimeout(heldBack.current.get(bucket));
+    heldBack.current.delete(bucket);
+    const now = Date.now();
+    const answer = throttle(lastSent.current.get(bucket), now);
+    if (answer.send === "now") {
+      if (deliver(event, target)) lastSent.current.set(bucket, now);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      heldBack.current.delete(bucket);
+      if (!stillNews(event, mark, marks.current.get(target.key))) return;
+      if (deliver(event, target)) lastSent.current.set(bucket, Date.now());
+    }, answer.at - now);
+    heldBack.current.set(bucket, timer);
   });
 
   /** Still the same moment after a short wait: nobody (and no rule) answered it meanwhile. */
@@ -153,11 +193,11 @@ export function NotificationCoordinator() {
           // ping for a parent.
           const grownUp =
             family.enabled && requestId !== null && grownUpSteps.current.get(requestId) !== false;
-          deliver(grownUp ? "needs-grown-up" : "needs-ok", target);
+          send(grownUp ? "needs-grown-up" : "needs-ok", target, mark);
         }, SETTLE_MS);
         continue;
       }
-      deliver(event, target);
+      send(event, target, mark);
     }
     marks.current = next;
     if (grownUpSteps.current.size > 200) grownUpSteps.current.clear();

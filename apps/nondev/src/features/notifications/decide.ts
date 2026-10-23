@@ -111,6 +111,57 @@ export function decide(prior: ThreadMark | undefined, next: ThreadMark): NotifyE
   return null;
 }
 
+/**
+ * How long a conversation stays quiet after a ping of one kind. One build once sent 17 "needs your
+ * OK" pings, one per step; a person needs to hear about it once, not watch a stack grow.
+ */
+export const NOTIFY_WINDOW_MS = 3 * 60_000;
+
+/**
+ * Pings that throttle together. "Needs your OK" and "needs a grown-up" are one kind: a build asks
+ * step after step and only the step waiting now matters (a conversation waits on one at a time).
+ */
+export type NotifyKind = "finished" | "failed" | "asks" | "plan" | "question";
+
+export function kindOf(event: NotifyEvent): NotifyKind {
+  switch (event) {
+    case "needs-ok":
+    case "needs-grown-up":
+      return "asks";
+    default:
+      return event;
+  }
+}
+
+export type ThrottleAnswer =
+  | { readonly send: "now" }
+  | { readonly send: "later"; readonly at: number };
+
+/**
+ * At most one ping per conversation and kind in each window. One inside the window waits for the
+ * window's end, replacing any ping already waiting there, so the one that goes out is the latest.
+ */
+export function throttle(
+  lastSentAt: number | undefined,
+  now: number,
+  windowMs: number = NOTIFY_WINDOW_MS,
+): ThrottleAnswer {
+  return lastSentAt === undefined || now - lastSentAt >= windowMs
+    ? { send: "now" }
+    : { send: "later", at: lastSentAt + windowMs };
+}
+
+/**
+ * Whether a ping held back by the window still says something true when its turn comes: the
+ * same step is still waiting (nobody answered it), or the finish is still the latest news.
+ */
+export function stillNews(event: NotifyEvent, then: ThreadMark, now: ThreadMark | undefined) {
+  if (now === undefined) return false;
+  return event === "finished"
+    ? now.attention === null && now.completion === then.completion
+    : now.attention === then.attention;
+}
+
 export interface NotificationText {
   readonly title: string;
   readonly body: string;
