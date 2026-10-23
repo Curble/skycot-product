@@ -178,6 +178,19 @@ seams take upstream's path unchanged. Churn as above, at `f7c64ebe8c`.
 | brand-dmg-background    | `scripts/build-desktop-artifact.ts` | 2601-2605 (1 line rewritten as 4, marker)                                         | `stageDesktopDmgBackground` reads `process.env.T3CODE_DESKTOP_DMG_BACKGROUND_SVG` (repo-relative) before upstream's `apps/desktop/resources/dmg/dmg-background-<channel>.svg`                                                                                                                                                                                                                                                                                                            | the DMG window said "Drag T3 Code into Applications." under T3's logo (GO-LIVE-CHECKLIST B2)                                                                                                                                                                                                          | `// nondev-seam: brand-dmg-background`    | 58             |
 | brand-package-name      | `scripts/build-desktop-artifact.ts` | 3960-3961 (1 line modified, marker)                                               | staged `package.json` `name: process.env.T3CODE_DESKTOP_PACKAGE_NAME ?? "t3code"`; `env.cjs` sets `brand.cliName` (`skycot`)                                                                                                                                                                                                                                                                                                                                                             | Electron keys its macOS Keychain secret `"<name> Safe Storage"` and electron-updater its cache `<name>-updater` by this name: as `t3code`, SKYCOT asked macOS for T3 Code's own Keychain key (a password prompt on any Mac with T3 Code) and would have shared it                                     | `// nondev-seam: brand-package-name`      | 58             |
 
+## Questions seams (23 October 2026)
+
+"Just ask" (BACKLOG #8) uses T3's own Scratch project (`<T3 home>/scratch`, one folder per
+conversation, `ManagedProjectFolders.folderForThread`) as SKYCOT's **Questions** space. The
+Family and policy rules for it live in fork-owned files (`apps/server/src/skycot/questions/`,
+`packages/skycot-rules/src/questions.ts`); the only upstream lines are below. F16 (the README of
+a new project) rides along in the same file.
+
+| id                       | file                                               | lines                                      | change                                                                                                                                                                   | reason                                                                                                                                                                                                |
+| ------------------------ | -------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| skycot-questions-history | `apps/server/src/project/ManagedProjectFolders.ts` | 27, 344, 356 (1 import, 1 const, 1 return) | `folderForThread` keeps the claimed folder in `claimed` and returns `SkycotQuestions.keepVersions(git, claimed)`: with `T3CODE_SKYCOT_POLICY=1` it runs `git init` there | a question's folder needs a repository for the engine's checkpoints, so "What changed", Undo, the fridge and the recap work in a question; best effort, and upstream's Scratch (no flag) is unchanged |
+| skycot-project-readme    | `apps/server/src/project/ManagedProjectFolders.ts` | 187 (1 line modified)                      | a new project's README says `Made with SKYCOT.` (was `Created in [T3 Code](https://t3.codes).`)                                                                          | BACKLOG F16: SKYCOT must not write T3's name and address into a family's project; `t3-address-guard.ts` no longer needs an exemption for the file                                                     |
+
 ## Not touched (by design)
 
 - `apps/mobile/**`, `packages/contracts/**`, `packages/client-runtime/**`:
@@ -188,7 +201,7 @@ seams take upstream's path unchanged. Churn as above, at `f7c64ebe8c`.
   update seams above, which call the fork-owned `apps/desktop/src/skycot/updates.ts`.
   Reuse happens through a Vite/TypeScript alias (`~` → `apps/web/src`, with
   `~/lib/utils` shimmed locally) and `@t3tools/client-runtime` subpath imports.
-- `apps/server/src/**`: only the brand, safety, Family, update and outside-connection seams listed above. Routing under `/simple/` is hash-based so
+- `apps/server/src/**`: only the brand, safety, Family, update, outside-connection and Questions seams listed above. Routing under `/simple/` is hash-based so
   the SPA fallback (which serves the stock `index.html`) never fires for us.
 - Root `vite.config.ts` lint overrides: our path gets none of the web lint
   rules yet (report item C-3); revisit once the client stabilises.

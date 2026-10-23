@@ -40,6 +40,7 @@ import * as Option from "effect/Option";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
+import { isInQuestionsSpace, workRootsFor } from "@t3tools/skycot-rules/questions";
 import {
   findPersonalDetails,
   personalCategories,
@@ -52,6 +53,7 @@ import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
+import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 
 /** `requiredPermission` on the refusal, so a client can tell "ask a grown-up" from a scope error. */
 export const FAMILY_PERMISSION = "skycot:family-parent-code";
@@ -75,6 +77,17 @@ export type GateNeed =
    * what makes Undo possible, so it is open; an unknown project is opening another folder.
    */
   | { readonly type: "projectWorktree"; readonly projectId: ProjectId }
+  /**
+   * A new project at this folder. Inside SKYCOT's Questions space it is "Make this a project"
+   * (a question's own folder becomes a project), which is the child's own work; anywhere else
+   * it is opening another folder.
+   */
+  | { readonly type: "newProject"; readonly cwd: string }
+  /**
+   * Taking a project off the list (its files stay). For a project made from a question, that
+   * is the Undo of "Make this a project", so it is open; any other project is a grown-up's.
+   */
+  | { readonly type: "removeProject"; readonly projectId: ProjectId }
   | {
       readonly type: "respond";
       readonly threadId: ThreadId;
@@ -250,6 +263,17 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
   if (method === "projects.mutate") {
     // Renaming stays open; adding a folder, moving a project's folder or removing it does not.
     if (input["type"] === "project.update" && input["workspaceRoot"] === undefined) return null;
+    if (input["type"] === "project.create" && typeof input["workspaceRoot"] === "string") {
+      return { type: "newProject", cwd: input["workspaceRoot"] };
+    }
+    // `force` also removes the project's conversations: never the child's call.
+    if (
+      input["type"] === "project.delete" &&
+      typeof input["projectId"] === "string" &&
+      input["force"] !== true
+    ) {
+      return { type: "removeProject", projectId: input["projectId"] as ProjectId };
+    }
     return { type: "grant", purpose: "openFolder" };
   }
   if (OPEN_FOLDER_METHODS.has(method)) return { type: "grant", purpose: "openFolder" };
@@ -450,15 +474,19 @@ const make = Effect.gen(function* () {
   const projects = yield* ProjectStore.ProjectStoreV2;
   // Optional so a gate built without the limits (older tests, tools) keeps its old behaviour.
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
-  /** Where the thread works (its private copy, else the folder), and the project's folder. */
+  /**
+   * Where the thread works (its private copy, else the folder), and the project's folder. A
+   * question works in its own folder only (`workRootsFor`).
+   */
   const projectRootsFor = Effect.fnUntraced(function* (thread: {
     readonly projectId: ProjectId;
     readonly worktreePath: string | null;
   }) {
     const project = yield* projects.get(thread.projectId);
     const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
-    return { projectRoot: thread.worktreePath ?? projectFolder, projectFolder };
+    return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
   });
 
   const toolCallFor = Effect.fnUntraced(function* (
@@ -514,9 +542,21 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  // A question's own folder is SKYCOT's space, not the person's: open like a project's.
   const isProjectFolder = (cwd: string) =>
-    projects.findActiveByWorkspaceRoot(cwd.replace(/[/\\]+$/, "")).pipe(
-      Effect.map(Option.isSome),
+    isInQuestionsSpace(cwd, questionsRoot)
+      ? Effect.succeed(true)
+      : projects.findActiveByWorkspaceRoot(cwd.replace(/[/\\]+$/, "")).pipe(
+          Effect.map(Option.isSome),
+          Effect.orElseSucceed(() => false),
+        );
+
+  const isQuestionProject = (projectId: ProjectId) =>
+    projects.get(projectId).pipe(
+      Effect.map(
+        (project) =>
+          Option.isSome(project) && isInQuestionsSpace(project.value.workspaceRoot, questionsRoot),
+      ),
       Effect.orElseSucceed(() => false),
     );
 
@@ -533,11 +573,20 @@ const make = Effect.gen(function* () {
   ) {
     if (need === null) return;
     if (!(yield* family.isEnabled)) return;
-    if (need.type === "projectFolder" || need.type === "projectWorktree") {
+    if (
+      need.type === "projectFolder" ||
+      need.type === "projectWorktree" ||
+      need.type === "newProject" ||
+      need.type === "removeProject"
+    ) {
       if (
         need.type === "projectFolder"
           ? yield* isProjectFolder(need.cwd)
-          : yield* isKnownProject(need.projectId)
+          : need.type === "newProject"
+            ? isInQuestionsSpace(need.cwd, questionsRoot)
+            : need.type === "removeProject"
+              ? yield* isQuestionProject(need.projectId)
+              : yield* isKnownProject(need.projectId)
       )
         return;
       if (yield* family.allows({ sessionId, purpose: "openFolder" })) return;

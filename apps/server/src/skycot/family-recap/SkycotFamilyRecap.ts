@@ -15,6 +15,7 @@ import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamilyGate from "../SkycotFamilyGate.ts";
 import { buildRecap, rangeStart, type RecapRange, type RecapReport } from "./recap.ts";
 import { loadThread } from "./threads.ts";
+import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 
 export class SkycotFamilyRecap extends Context.Service<
   SkycotFamilyRecap,
@@ -32,6 +33,7 @@ const make = Effect.gen(function* () {
   const gate = yield* SkycotFamilyGate.SkycotFamilyGate;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
   const recap: SkycotFamilyRecap["Service"]["recap"] = Effect.fn("SkycotFamilyRecap.recap")(
     function* (input) {
@@ -46,6 +48,7 @@ const make = Effect.gen(function* () {
         if (childId !== input.childId) continue;
         const loaded = yield* loadThread(projections, projects, threadId as ThreadId, {
           messages: true,
+          questionsRoot,
         });
         // Nothing happened in it since the range began: no need to judge its cards.
         if (loaded === null || loaded.deleted || loaded.updatedAt < from) continue;

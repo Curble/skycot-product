@@ -22,6 +22,7 @@ import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import { loadThread } from "../family-recap/threads.ts";
+import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import { fridgeItems, type FridgeItem } from "./fridge.ts";
 
 export const FRIDGE_FILE_NAME = "skycot-fridge.json";
@@ -54,6 +55,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
 
@@ -89,6 +91,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
       if (thread.deletedAt !== null) continue;
       const loaded = yield* loadThread(projections, projects, thread.id as ThreadId, {
         messages: false,
+        questionsRoot,
       });
       if (loaded !== null) threads.push(loaded);
     }

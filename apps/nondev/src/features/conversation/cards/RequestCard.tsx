@@ -4,6 +4,7 @@
 // the question form, and sends the chosen option's real payload. Nothing is
 // pre-selected: every button is the same weight and none has focus.
 import { useAtomValue } from "@effect/atom-react";
+import { workRootsFor } from "@t3tools/skycot-rules/questions";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type {
   OrchestrationV2Run,
@@ -191,9 +192,13 @@ export function RequestCard({
   const toolCallInput =
     item.type === "approval_request" ? toolCallInputFor(item, projection.turnItems) : undefined;
   // Files live in the thread's private copy when it has one; the project's
-  // own folder is inside too, so only a path under neither is "outside".
-  const projectFolder = project?.workspaceRoot ?? null;
-  const projectRoot = shell?.worktreePath ?? projectFolder;
+  // own folder is inside too, so only a path under neither is "outside". A
+  // question works in its own folder only, as the engine judges it.
+  const { projectRoot, projectFolder } = workRootsFor({
+    projectFolder: project?.workspaceRoot ?? null,
+    worktreePath: shell?.worktreePath ?? null,
+    questionsRoot: project?.isScratch ? project.workspaceRoot : null,
+  });
   // A push is judged by branch, as the server's policy judged it: the thread's
   // own branch first, else the folder's; the live branch from the folder. Only
   // a push ask pays for the status lookup.
