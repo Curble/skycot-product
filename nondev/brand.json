@@ -17,6 +17,10 @@
     "$comment": "Where the engine may refresh its list of AI models between releases. Upstream T3 Code fetches it hourly from its own GitHub repository, which would let T3 Tools decide which models SKYCOT offers, so SKYCOT never does: env.cjs hands this on as T3CODE_SKYCOT_MODEL_MANIFEST_URL and the engine (apps/server/src/skycot/modelManifestSource.ts) refuses anything that is not https or names T3 Code. null = use the manifest bundled with each build (refreshed by every upstream sync). To host our own later: an https URL serving the same JSON, e.g. \"https://skycot.com/models/model-manifest.json\".",
     "url": null
   },
+  "relay": {
+    "$comment": "SKYCOT Relay (docs/nondev/RELAY.md): where a Mac's engine connects when a grown-up turns on Settings > Family > Reach this Mac from anywhere. env.cjs hands it on as SKYCOT_RELAY_URL; the engine accepts only https. null = not in this build (the switch shows 'Not in this version of SKYCOT yet'). Set to \"https://relay.skycot.com\" once Curble has deployed it.",
+    "url": null
+  },
   "telemetryEnabledByDefault": false,
   "telemetry": {
     "$comment": "Leave both null until we own a PostHog project. While they are null, enabling telemetry at runtime sends nothing (an empty key is rejected locally) rather than reporting into upstream's project.",
