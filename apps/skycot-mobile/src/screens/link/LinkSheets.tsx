@@ -7,7 +7,6 @@ import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Platform, TextInput, View } from "react-native";
 
 import {
-  groupLinkCode,
   LinkError,
   linkToMac,
   LINK_COPY,

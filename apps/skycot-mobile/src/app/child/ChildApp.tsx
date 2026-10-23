@@ -62,6 +62,8 @@ const SCREENS: ReadonlyArray<ShellScreen> = [
   ...(__DEV__ ? [{ name: "Demo" as const, component: DemoRoute, options: demoOptions }] : []),
 ];
 
+const headerRight = () => <MacsHeaderButton />;
+
 export function ChildApp() {
   const child = useChild();
   const { byMac } = useMacData();
@@ -92,7 +94,7 @@ export function ChildApp() {
             title: row.thread.title,
           },
         }))}
-        headerRight={() => <MacsHeaderButton />}
+        headerRight={headerRight}
       />
       {asleep ? <AsleepCover mac={asleep} /> : null}
     </View>

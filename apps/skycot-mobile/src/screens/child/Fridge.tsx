@@ -42,7 +42,6 @@ function Magnet(props: {
   readonly onPin?: (pinned: boolean) => void;
   readonly compact?: boolean;
 }) {
-  const theme = useTheme();
   const color = MAGNET_COLORS[props.index % MAGNET_COLORS.length]!;
   const grid = useGridBasis();
   return (

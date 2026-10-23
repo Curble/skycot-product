@@ -94,7 +94,7 @@ export function ConversationView(props: {
   );
   const working = projection !== null && isWorking(projection);
   const waitingAsk = timeline.some((entry) => entry.kind === "ask" && entry.state === "waiting");
-  const lastPlan = [...timeline].reverse().find((entry) => entry.kind === "plan");
+  const lastPlan = timeline.findLast((entry) => entry.kind === "plan");
 
   useEffect(() => {
     const timer = setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 120);

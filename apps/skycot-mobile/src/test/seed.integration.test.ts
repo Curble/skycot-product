@@ -5,7 +5,7 @@
  * agent asking first to read a file, then to run `npm install three`), it leaves Ava's
  * conversation waiting on a grown-up and gives Leo a conversation Ava must never see.
  */
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { familyApi } from "../family/api";
 import {
@@ -22,7 +22,6 @@ import { directTransport } from "../transport/MacTransport";
 const base = process.env.SKYCOT_TEST_ENGINE;
 const avaCode = process.env.SKYCOT_TEST_AVA_CODE;
 const leoCode = process.env.SKYCOT_TEST_LEO_CODE;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function device(code: string) {
   const linked = await linkToMac(readLinkInput({ kind: "typed", code, address: base! }));
@@ -61,23 +60,29 @@ describe.skipIf(base === undefined || avaCode === undefined || leoCode === undef
       );
 
       // The first ask (reading a file inside the project) is a child's own call: Ava says yes.
-      let answeredRead = false;
-      for (let tries = 0; tries < 60; tries += 1) {
-        await sleep(1_000);
-        const projection = await readThread(ava, threadId);
-        const pending = projection.runtimeRequests.filter(
-          (request) => request.status === "pending",
-        );
-        if (pending.length === 0) continue;
-        const status = await familyApi.status(ava);
-        expect(status.ok).toBe(true);
-        if (!answeredRead) {
-          await respondToRequest(ava, { threadId, requestId: pending[0]!.id, decision: "accept" });
-          answeredRead = true;
-          continue;
-        }
-        break;
-      }
+      const firstAsk = await vi.waitFor(
+        async () => {
+          const pending = (await readThread(ava, threadId)).runtimeRequests.filter(
+            (request) => request.status === "pending",
+          );
+          if (pending.length === 0) throw new Error("no ask yet");
+          return pending[0]!.id;
+        },
+        { timeout: 60_000, interval: 1_000 },
+      );
+      expect((await familyApi.status(ava)).ok).toBe(true);
+      await respondToRequest(ava, { threadId, requestId: firstAsk, decision: "accept" });
+      // Then the install, which only a grown-up may allow, waits.
+      await vi.waitFor(
+        async () => {
+          const pending = (await readThread(ava, threadId)).runtimeRequests.filter(
+            (request) => request.status === "pending" && request.id !== firstAsk,
+          );
+          if (pending.length === 0) throw new Error("no second ask yet");
+        },
+        { timeout: 60_000, interval: 1_000 },
+      );
+      const answeredRead = true;
       expect(answeredRead).toBe(true);
 
       // Ava's own list never carries Leo's conversation; the engine filtered it.
@@ -85,7 +90,7 @@ describe.skipIf(base === undefined || avaCode === undefined || leoCode === undef
       expect(shell.threads.some((thread) => thread.id === leoThread.threadId)).toBe(false);
       expect(shell.threads.some((thread) => thread.id === threadId)).toBe(true);
       console.log(JSON.stringify({ avaThread: threadId, leoThread: leoThread.threadId }));
-    }, 180_000);
+    });
   },
 );
 
@@ -95,11 +100,15 @@ describe.skipIf(base === undefined || planCode === undefined)("a plan for Ava", 
   it("starts a conversation that answers with a plan, as plan first wants", async () => {
     const ava = await device(planCode!);
     const { threadId } = await start(ava, "Please make a birthday card for Nan with balloons.");
-    let planned = false;
-    for (let tries = 0; tries < 40 && !planned; tries += 1) {
-      await sleep(1_000);
-      planned = (await readThread(ava, threadId)).plans.length > 0;
-    }
+    const planned = await vi
+      .waitFor(
+        async () => {
+          if ((await readThread(ava, threadId)).plans.length === 0) throw new Error("no plan yet");
+          return true;
+        },
+        { timeout: 40_000, interval: 1_000 },
+      )
+      .catch(() => false);
     console.log(JSON.stringify({ planThread: threadId, planned }));
-  }, 120_000);
+  });
 });

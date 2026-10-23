@@ -34,5 +34,5 @@ describe.skipIf(link === undefined)("SKYCOT Relay", () => {
     // The engine's RPC channel (a WebSocket) through the tunnel too.
     expect((await readMacConfig(transport)).providers.length).toBeGreaterThan(0);
     relay.close();
-  }, 60_000);
+  });
 });

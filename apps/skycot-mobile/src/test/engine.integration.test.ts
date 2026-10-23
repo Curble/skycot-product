@@ -28,5 +28,5 @@ describe.skipIf(base === undefined || code === undefined)("a live engine", () =>
     expect(Array.isArray(shell.projects)).toBe(true);
     const providers = await readProviders(transport);
     expect(defaultModelSelection(providers, null)).not.toBeNull();
-  }, 60_000);
+  });
 });

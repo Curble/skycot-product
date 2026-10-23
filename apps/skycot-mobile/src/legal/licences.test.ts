@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import * as NodeFS from "node:fs";
+import * as NodeURL from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 
 import { MIT_LICENCE_T3_CODE } from "./licences";
