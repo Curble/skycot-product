@@ -3569,3 +3569,52 @@ it.effect(
       );
     }),
 );
+
+// nondev-seam: skycot-family-lockdown-test (a session opened before the Family profile was switched on is closed and opened again under the lockdown, and the parent's setup comes back once the profile is off)
+it.effect(
+  "ProviderSessionManagerV2 restarts a live session when the Family profile changes under it",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const familyOn = yield* Ref.make(false);
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("thread-provider-session-manager-family-lockdown");
+        yield* eventSink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+        });
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        const open = manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+        const openCount = Ref.get(state).pipe(Effect.map((current) => current.openCount));
+
+        yield* open;
+        yield* open;
+        assert.equal(yield* openCount, 1);
+
+        yield* Ref.set(familyOn, true);
+        yield* open;
+        assert.equal(yield* openCount, 2);
+        yield* open;
+        assert.equal(yield* openCount, 2);
+
+        yield* Ref.set(familyOn, false);
+        yield* open;
+        assert.equal(yield* openCount, 3);
+        yield* manager.close(providerSessionId);
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({ state, idleTimeoutMs: 1_000 }).pipe(
+            Layer.provide(Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Ref.get(familyOn) })),
+          ),
+        ),
+      );
+    }),
+);

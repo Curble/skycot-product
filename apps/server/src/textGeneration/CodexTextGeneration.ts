@@ -27,6 +27,8 @@ import {
 import { codexModelFamily, getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { getCodexServiceTierOptionValue } from "../codexModelOptions.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as SkycotFamilyCodex from "../skycot/SkycotFamilyCodex.ts"; // nondev-seam: skycot-family-lockdown-text-codex
+import * as SkycotFamilyLockdown from "../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown-text-codex
 
 const CODEX_TIMEOUT_MS = 180_000;
 const CODEX_MCP_LIST_TIMEOUT_MS = 10_000;
@@ -294,6 +296,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
           // otherwise start and could act on it, as Claude's --strict-mcp-config
           // prevents for Claude.
           ...CODEX_NO_PLUGIN_ARGS,
+          ...SkycotFamilyCodex.lockExecArgs(yield* SkycotFamilyLockdown.sessionLockdown), // nondev-seam: skycot-family-lockdown-text-codex
           ...(mcpServersOff ? ["--config", mcpServersOff] : []),
           "--ephemeral",
           "--skip-git-repo-check",
