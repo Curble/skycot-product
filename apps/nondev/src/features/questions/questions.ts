@@ -1,9 +1,15 @@
-// "Just ask": a conversation without a project. The engine keeps them in its Scratch project
-// (SKYCOT calls it "Questions"), each in a private folder of its own, so nothing in the
-// person's own folders is touched. This file holds the pure decisions: which target the
-// compose box starts in, how a question is labelled, where its row belongs once it became a
-// project, and when "Make this a project" is offered.
-import { QUESTIONS_LABEL, sameFolder } from "@t3tools/skycot-rules/questions";
+// "Just ask": a conversation without a project. The engine keeps them in its Questions spaces
+// (T3's Scratch project, and with the Family profile on one space per child), each in a private
+// folder of its own, so nothing in the person's own folders is touched. This file holds the pure
+// decisions: which target the compose box starts in, what each space is called, where a
+// question's row belongs once it became a project, and when "Make this a project" is offered.
+import type { OrchestrationProjectShell } from "@t3tools/contracts";
+import {
+  QUESTIONS_LABEL,
+  questionsSpaceLabel,
+  questionsSpaceOf,
+  sameFolder,
+} from "@t3tools/skycot-rules/questions";
 
 export { QUESTIONS_LABEL };
 
@@ -33,7 +39,46 @@ interface ProjectLike {
 export const keyOf = (project: { readonly environmentId: string; readonly id: string }) =>
   `${project.environmentId}:${project.id}`;
 
-/** True for the engine's Questions space (T3's Scratch project). */
+/** Who is looking, for a space's name: a child's own device, and the children's names. */
+export interface QuestionsViewer {
+  readonly childDevice: boolean;
+  readonly familyOn: boolean;
+  readonly children: ReadonlyArray<{ readonly id: string; readonly name: string | null }>;
+}
+
+/**
+ * Every Questions space in an engine's list, named for this viewer ("Questions" on a child's own
+ * device, "Ava's questions" on the Mac and grown-ups' devices, "Earlier questions" for the
+ * shared space while the profile is on) and marked as a Questions space (`isScratch`, which T3
+ * sets for its own Scratch project only), so the compose box, the sidebar, the avatar and "Make
+ * this a project" treat a child's space the same way. Null when nothing changes.
+ */
+export function labelQuestionsSpaces(
+  projects: ReadonlyArray<OrchestrationProjectShell>,
+  questionsRoot: string,
+  viewer: QuestionsViewer,
+): Array<OrchestrationProjectShell> | null {
+  let changed = false;
+  const named = projects.map((project) => {
+    const space = questionsSpaceOf(project.workspaceRoot, questionsRoot);
+    if (space === null) return project;
+    const title = questionsSpaceLabel(space, {
+      childDevice: viewer.childDevice,
+      familyOn: viewer.familyOn,
+      nameOf: (id) => viewer.children.find((child) => child.id === id)?.name ?? null,
+      title: project.title,
+    });
+    if (space.kind === "shared" && title === project.title) return project;
+    changed = true;
+    // `isScratch` rides along: the client runtime spreads the engine's project into its own.
+    return space.kind === "child"
+      ? ({ ...project, title, isScratch: true } as OrchestrationProjectShell)
+      : { ...project, title };
+  });
+  return changed ? named : null;
+}
+
+/** True for one of the engine's Questions spaces (T3's Scratch project, or a child's own). */
 export function isQuestionsProject(
   project: { readonly isScratch?: boolean | undefined } | null,
 ): boolean {
