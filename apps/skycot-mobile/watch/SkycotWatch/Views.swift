@@ -7,6 +7,20 @@ import WatchKit
 struct RequestRoute: Hashable {
   let key: String
   let decline: Bool
+  var allow = false
+}
+
+/// Development builds in the Simulator only (no wrist, no one to tap): `-skycotTest <step>` as
+/// a launch argument opens a screen and, for `allow-first`, `decline-first` and `lock-confirm`,
+/// presses its button through the same code as a tap. Never in an App Store build.
+enum SimulatorTest {
+  static var step: String? {
+    #if DEBUG && targetEnvironment(simulator)
+      return UserDefaults.standard.string(forKey: "skycotTest")
+    #else
+      return nil
+    #endif
+  }
 }
 
 struct RootView: View {
@@ -19,16 +33,37 @@ struct RootView: View {
     NavigationStack(path: $path) {
       content
         .navigationDestination(for: RequestRoute.self) { route in
-          RequestView(key: route.key, declineNow: route.decline)
+          RequestView(key: route.key, declineNow: route.decline, allowNow: route.allow)
         }
     }
     .task { await phone.refresh() }
+    .onChange(of: phone.snapshot?.at) { _, _ in runSimulatorStep() }
     .onChange(of: router.opened) { _, opened in
       guard let opened else { return }
       page = 0
       path = [RequestRoute(key: opened.key, decline: opened.decline)]
       router.opened = nil
     }
+  }
+
+  @State private var ranSimulatorStep = false
+
+  private func runSimulatorStep() {
+    guard !ranSimulatorStep, let step = SimulatorTest.step, let snapshot = phone.snapshot,
+      snapshot.state == "ready"
+    else { return }
+    switch step {
+    case "today": page = 1
+    case "lock-ask", "lock-confirm": page = 2
+    case "open-first", "open-first-buttons", "allow-first", "decline-first":
+      guard let first = snapshot.requests.first else { return }
+      path = [
+        RequestRoute(
+          key: first.id, decline: step == "decline-first", allow: step == "allow-first")
+      ]
+    default: break
+    }
+    ranSimulatorStep = true
   }
 
   @ViewBuilder private var content: some View {
@@ -119,6 +154,7 @@ struct RequestRow: View {
 struct RequestView: View {
   let key: String
   let declineNow: Bool
+  var allowNow = false
   @EnvironmentObject private var phone: PhoneLink
   @State private var kept: WatchRequest?
   @State private var stage: Stage = .ready
@@ -134,13 +170,24 @@ struct RequestView: View {
 
   var body: some View {
     let request = phone.snapshot?.requests.first { $0.id == key } ?? kept
-    ScrollView {
-      if let request {
-        card(request)
-      } else {
-        Notice(
-          symbol: "hourglass", title: "Just a moment",
-          text: "Asking your iPhone for this request…")
+    ScrollViewReader { reader in
+      ScrollView {
+        if let request {
+          card(request)
+          Color.clear.frame(height: 1).id("end")
+        } else {
+          Notice(
+            symbol: "hourglass", title: "Just a moment",
+            text: "Asking your iPhone for this request…")
+        }
+      }
+      // The answer shows where the buttons were: bring it into view.
+      .onChange(of: stage) { _, _ in withAnimation { reader.scrollTo("end", anchor: .bottom) } }
+      .task {
+        if SimulatorTest.step == "open-first-buttons" {
+          try? await Task.sleep(for: .seconds(2))
+          reader.scrollTo("end", anchor: .bottom)
+        }
       }
     }
     .navigationTitle(request?.childName ?? "Request")
@@ -151,6 +198,11 @@ struct RequestView: View {
       if declineNow, !startedDecline, let request {
         startedDecline = true
         await decline(request)
+      } else if allowNow, !startedDecline, let request {
+        // The Simulator check's tap on Allow once (SimulatorTest), after the card has shown.
+        startedDecline = true
+        try? await Task.sleep(for: .seconds(3))
+        await allow(request)
       }
     }
   }
@@ -368,6 +420,7 @@ struct LockPage: View {
   @State private var busy = false
 
   var body: some View {
+    ScrollViewReader { reader in
     ScrollView {
       VStack(spacing: 8) {
         Image(systemName: "lock.fill")
@@ -388,13 +441,23 @@ struct LockPage: View {
         .disabled(busy)
         if let stage {
           Text(stage).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            .id("end")
         } else if let lockedAt = snapshot.lockedAt {
           Text("Locked at \(clock(lockedAt)).").font(.footnote).foregroundStyle(.secondary)
         }
       }
       .frame(maxWidth: .infinity)
     }
+    .onChange(of: stage) { _, _ in withAnimation { reader.scrollTo("end", anchor: .bottom) } }
+    }
     .navigationTitle("Lock")
+    .task {
+      if SimulatorTest.step == "lock-ask" { asking = true }
+      if SimulatorTest.step == "lock-confirm", stage == nil {
+        try? await Task.sleep(for: .seconds(2))
+        await lock()
+      }
+    }
     .confirmationDialog("Lock SKYCOT now?", isPresented: $asking, titleVisibility: .visible) {
       Button("Lock", role: .destructive) { Task { await lock() } }
       Button("Cancel", role: .cancel) {}

@@ -24,7 +24,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform, Settings } from "react-native";
 
 import { SkycotWatch, type WatchLinkState } from "../../modules/skycot-watch";
 import { useMacData } from "../data/MacData";
@@ -71,6 +71,19 @@ export function useWatch(): WatchValue {
 }
 
 const NOT_ANSWERED = "Your iPhone couldn't reach the Mac. Try again in a moment.";
+
+/**
+ * Development builds only, for the Simulator check (no one to tap): `-skycotTestWatchSetup
+ * <parent code>` sets the Watch up as the Apple Watch row's Set up does, once the Watch app is
+ * reachable; `-skycotTestQuiet YES` skips asking to show notifications.
+ */
+function testSetting(key: string): string | null {
+  if (!__DEV__ || Platform.OS !== "ios") return null;
+  // A launch argument arrives as a string, a number or a boolean ("YES"), as macOS reads it.
+  const value: unknown = Settings.get(key);
+  if (typeof value === "string") return value.length > 0 ? value : null;
+  return typeof value === "number" || value === true ? String(value) : null;
+}
 
 export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
   const { macs, mode } = useLinks();
@@ -232,7 +245,9 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
         return;
       }
       told.current = new Set(live.map((request) => request.id));
-      void SkycotWatch.requestNotifications().catch(() => false);
+      if (testSetting("skycotTestQuiet") === null) {
+        void SkycotWatch.requestNotifications().catch(() => false);
+      }
       return;
     }
     for (const request of live) {
@@ -290,6 +305,19 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
     },
     [link.paired, link.installed, refresh],
   );
+
+  // Development builds: the Simulator check's "Set up" (see testSetting).
+  const testedSetup = useRef(false);
+  const statusesLoaded = macs.length > 0 && macs.every((mac) => byMac[mac.macId]?.status != null);
+  useEffect(() => {
+    const code = testSetting("skycotTestWatchSetup");
+    if (code === null || testedSetup.current || !statusesLoaded || !link.reachable) return;
+    if (mode !== "grown-up") return;
+    testedSetup.current = true;
+    void enrol(code).then((problem) =>
+      console.log("[skycot] test Watch setup:", problem ?? "done"),
+    );
+  }, [statusesLoaded, link.reachable, mode, enrol]);
 
   const forget = useCallback(async (): Promise<string | null> => {
     for (const mac of macsRef.current) {

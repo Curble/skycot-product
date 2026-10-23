@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
         identifier: "SKYCOT_REQUEST", actions: [allow, decline], intentIdentifiers: [],
         options: [])
     ])
+    // No permission is asked here: the Watch shows SKYCOT's notifications as the iPhone
+    // forwards them, under the iPhone's own notification setting for SKYCOT.
     Task { @MainActor in PhoneLink.shared.start() }
   }
 
