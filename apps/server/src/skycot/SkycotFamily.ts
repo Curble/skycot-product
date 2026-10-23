@@ -79,6 +79,11 @@ export const FAMILY_PURPOSES = [
   "recap",
   /** Restarting the Mac app into a downloaded SKYCOT update (skycot/updates/SkycotUpdatesHttp.ts). */
   "update",
+  /**
+   * A grown-up looking through a project's files: Show everything (hidden and secret files,
+   * add-ons, build output) and Show in Finder (skycot/files).
+   */
+  "files",
 ] as const;
 export type FamilyPurpose = (typeof FAMILY_PURPOSES)[number];
 
@@ -92,6 +97,7 @@ export const GRANT_TTL_MS: Readonly<Record<FamilyPurpose, number>> = {
   recap: 10 * 60_000,
   // Long enough to read the warning and press Restart (the desktop's note lasts as long).
   update: 2 * 60_000,
+  files: 10 * 60_000,
 };
 
 export const UNLOCK_COOKIE_NAME = "skycot_family_unlock";

@@ -11,7 +11,16 @@ import { withPointing } from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { AppWindow, Archive, ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
+import {
+  AppWindow,
+  Archive,
+  ChevronLeft,
+  Clock,
+  FolderOpen,
+  Receipt,
+  ShieldAlert,
+  Square,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -19,7 +28,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
 import { useElapsedLabel } from "../../app/useElapsed";
-import { HOME_HREF } from "../../router";
+import { filesHref, HOME_HREF, navigate } from "../../router";
 import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
 import { useConversationShell } from "../../state/oldConversations";
 import { projectAtomOrEmpty } from "../../state/projects";
@@ -238,6 +247,11 @@ export function ConversationView({
             />
           ) : null}
           {project && !archived ? <PreviewButton threadId={threadId} /> : null}
+          {shell ? (
+            <FilesButton
+              onClick={() => navigate(filesHref(environmentId, shell.projectId, threadId))}
+            />
+          ) : null}
           {archived ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
@@ -467,6 +481,19 @@ function PreviewButton({ threadId }: { readonly threadId: ThreadId }) {
   return (
     <Button size="sm" icon={AppWindow} aria-pressed={open} onClick={toggle}>
       Preview
+    </Button>
+  );
+}
+
+/**
+ * Opens this conversation's files: its private copy of the project, read-only. A phone's
+ * header has no room left; there it is "See the files" in the "…" menu.
+ */
+function FilesButton({ onClick }: { readonly onClick: () => void }) {
+  if (useColumns() === 1) return null;
+  return (
+    <Button size="sm" icon={FolderOpen} onClick={onClick}>
+      Files
     </Button>
   );
 }

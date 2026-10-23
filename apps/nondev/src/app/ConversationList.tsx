@@ -1,13 +1,18 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { Archive, Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
+import { Archive, FolderOpen, Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 
 import { Mascot } from "../features/brand/Mascot";
 import { useChildFirst } from "../features/family-limits/useChildFirst";
-import { navigate, threadHref } from "../router";
-import { conversationRowsAtom, filterRows, type ConversationRow } from "../state/conversations";
+import { filesHref, navigate, threadHref } from "../router";
+import {
+  conversationRowsAtom,
+  filterRows,
+  projectKeyOf,
+  type ConversationRow,
+} from "../state/conversations";
 import { oldConversationRowsAtom, oldConversationsLoadingAtom } from "../state/oldConversations";
 import { environmentProjects } from "../state/projects";
 import { Button, IconButton } from "../ui/Button";
@@ -52,7 +57,17 @@ export function ConversationList({
   const oldLoading = useAtomValue(old ? oldConversationsLoadingAtom : NOT_LOADING_ATOM);
   const rows = old ? oldRows : liveRows;
   const connected = useConnected();
-  const projectCount = useAtomValue(environmentProjects.projectsAtom).length;
+  const projects = useAtomValue(environmentProjects.projectsAtom);
+  const projectCount = projects.length;
+  // A project picked in the sidebar: its files are one click away, beside New conversation.
+  const selectedProject =
+    shell.projectKey === null
+      ? null
+      : (projects.find(
+          (project) =>
+            projectKeyOf({ environmentId: project.environmentId, projectId: project.id }) ===
+            shell.projectKey,
+        ) ?? null);
   const visible = filterRows(rows, old ? "all" : shell.filter, shell.projectKey, shell.search);
   const [renaming, setRenaming] = useState<ConversationRow | null>(null);
   const now = new Date();
@@ -94,7 +109,17 @@ export function ConversationList({
                   : "Conversations"}
           </span>
         </h2>
-        <IconButton icon={SquarePen} label="New conversation" onClick={onCompose} />
+        <span className="fm-list-column__actions">
+          {selectedProject ? (
+            <IconButton
+              icon={FolderOpen}
+              label={`Files in ${selectedProject.title}`}
+              title={`Files in ${selectedProject.title}`}
+              onClick={() => navigate(filesHref(selectedProject.environmentId, selectedProject.id))}
+            />
+          ) : null}
+          <IconButton icon={SquarePen} label="New conversation" onClick={onCompose} />
+        </span>
       </div>
       {columns === 1 ? (
         <div className="fm-list-column__search">

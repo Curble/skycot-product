@@ -1,0 +1,299 @@
+/* Files and Quick Look: Finder's list view in SKYCOT's tokens. */
+.fm-files__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.fm-files__glyph {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--fm-glyph-blue);
+  color: #fff;
+}
+.fm-files__titles {
+  min-width: 0;
+}
+
+.fm-files__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+.fm-files__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.fm-files__crumbs ol {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(13.5px * var(--fm-text-scale));
+}
+.fm-files__crumbs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.fm-files__crumbs button {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--fm-radius-sm);
+  background: transparent;
+  color: var(--fm-accent);
+  font: inherit;
+  cursor: default;
+}
+.fm-files__crumbs button:hover {
+  background: var(--fm-accent-soft);
+}
+.fm-files__crumbs [aria-current] {
+  padding: 2px 6px;
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-files__sep {
+  color: var(--fm-label-3);
+}
+.fm-files__tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.fm-files__search {
+  width: 220px;
+}
+.fm-files__everything {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+  white-space: nowrap;
+}
+
+.fm-files__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--fm-bg-card);
+  border: 0.5px solid var(--fm-sep);
+  border-radius: var(--fm-radius-lg);
+  overflow: hidden;
+}
+.fm-files__item + .fm-files__item .fm-files__row {
+  border-top: 0.5px solid var(--fm-sep);
+}
+.fm-files__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--fm-label);
+  text-align: left;
+  font: inherit;
+  cursor: default;
+}
+.fm-files__row:hover {
+  background: var(--fm-bg-fill);
+}
+.fm-files__row:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: -2px;
+}
+.fm-files__row--noise .fm-files__name,
+.fm-files__row--noise .fm-files__icon {
+  opacity: 0.55;
+}
+.fm-files__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--fm-bg-fill);
+  color: var(--fm-label-2);
+}
+.fm-files__icon--folder {
+  background: var(--fm-accent-soft);
+  color: var(--fm-accent);
+}
+.fm-files__icon--picture {
+  background: var(--fm-orange-soft);
+  color: var(--fm-orange-ink);
+}
+.fm-files__icon--page {
+  background: var(--fm-accent-soft);
+  color: var(--fm-accent);
+}
+.fm-files__icon--style,
+.fm-files__icon--sound,
+.fm-files__icon--video {
+  background: var(--fm-green-soft);
+  color: var(--fm-green-ink);
+}
+.fm-files__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fm-files__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(14px * var(--fm-text-scale));
+  font-weight: 500;
+}
+.fm-files__details {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(12.5px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-files__chevron {
+  color: var(--fm-label-3);
+}
+.fm-files__look {
+  font-size: calc(12.5px * var(--fm-text-scale));
+  color: var(--fm-accent);
+  opacity: 0;
+}
+.fm-files__row:hover .fm-files__look,
+.fm-files__row:focus-visible .fm-files__look {
+  opacity: 1;
+}
+.fm-files__foot {
+  margin: 0;
+}
+
+/* Quick Look */
+.fm-ql__lead {
+  margin: 0 0 10px;
+}
+.fm-ql__picture {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  max-height: min(64vh, 680px);
+  padding: 12px;
+  border-radius: var(--fm-radius-md);
+  /* A light checkerboard, so a picture with see-through parts reads as one. */
+  background: repeating-conic-gradient(var(--fm-bg-fill) 0% 25%, var(--fm-bg-content) 0% 50%) 50% /
+    20px 20px;
+  overflow: hidden;
+}
+.fm-ql__picture img {
+  display: block;
+  max-width: 100%;
+  max-height: min(60vh, 650px);
+  object-fit: contain;
+  border-radius: 4px;
+}
+.fm-ql__frame {
+  height: min(60vh, 640px);
+}
+.fm-ql__pdf {
+  display: block;
+  width: 100%;
+  height: min(64vh, 700px);
+  border: 1px solid var(--fm-sep);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-fill);
+}
+.fm-ql__video {
+  display: block;
+  width: 100%;
+  max-height: min(60vh, 640px);
+  border-radius: var(--fm-radius-md);
+  background: #000;
+}
+.fm-ql__sound {
+  display: grid;
+  place-items: center;
+  padding: 28px 12px;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-fill);
+}
+.fm-ql__sound audio {
+  width: min(100%, 420px);
+}
+.fm-ql__doc {
+  max-height: min(60vh, 640px);
+  overflow-y: auto;
+  padding: 18px 22px;
+  border: 0.5px solid var(--fm-sep);
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-content);
+}
+.fm-ql__doc h3,
+.fm-ql__doc h4 {
+  margin: 16px 0 6px;
+}
+.fm-ql__doc h3 {
+  font-size: calc(19px * var(--fm-text-scale));
+}
+.fm-ql__doc > .fm-md > :first-child {
+  margin-top: 0;
+}
+.fm-ql__code {
+  max-height: min(58vh, 620px);
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-fill);
+  color: var(--fm-label);
+  font-family: var(--fm-mono);
+  font-size: calc(12.5px * var(--fm-text-scale));
+  line-height: 1.55;
+  /* Wrapped, so nobody has to scroll sideways to read a line. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+/* Workshop: the paper list gets the dashed edge every other list has. */
+html[data-flavour-borders="sketch"] .fm-files__list {
+  border: 2px dashed var(--fm-sep);
+}
+html[data-flavour-cards="sticky"] .fm-files__glyph {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-xs, 10px);
+  background: var(--fm-marker);
+  color: var(--fm-ink);
+}
+
+/* Phones */
+.fm-shell[data-columns="1"] .fm-files__tools {
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.fm-shell[data-columns="1"] .fm-files__search {
+  flex: 1 1 100%;
+  width: auto;
+}
+.fm-shell[data-columns="1"] .fm-files__details {
+  white-space: normal;
+}
+.fm-shell[data-columns="1"] .fm-files__look {
+  display: none;
+}

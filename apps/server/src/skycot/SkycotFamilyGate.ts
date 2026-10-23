@@ -15,6 +15,12 @@
 // may run without planning; every other turn of the child's runs as a plan
 // (SkycotFamilyInstructions.familyTurnInput).
 //
+// Reading files stays open inside SKYCOT's projects and their conversations' private copies,
+// and nowhere else: the stock file RPCs (`projects.readFile` with a full path, listings and
+// searches of any folder, `assets.createUrl` for a picture anywhere on the Mac) and hidden or
+// secret files (`.env`, `.git`, keys) need a grown-up's `files` yes. The plain client's own
+// Files routes apply the same rule, and also hold add-ons and build output (skycot/files).
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
 // those are closed separately by issuing Family-profile threads an MCP credential without any of
 // the engine's own capabilities: orchestration, worktrees, pull requests, devices and page
@@ -34,10 +40,13 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import { cleanBrowsePath, pathIsHiddenOrSecret } from "@t3tools/skycot-rules/browse";
 import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import {
@@ -48,6 +57,7 @@ import {
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import { isInsideRoot } from "./files/SkycotFiles.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
@@ -75,6 +85,11 @@ export type GateNeed =
    * what makes Undo possible, so it is open; an unknown project is opening another folder.
    */
   | { readonly type: "projectWorktree"; readonly projectId: ProjectId }
+  /**
+   * Reading: open inside a SKYCOT project or a conversation's private copy, for a path that
+   * stays inside it and is not a hidden or secret file; anything else is a grown-up's `files` yes.
+   */
+  | { readonly type: "readInProject"; readonly cwd: string; readonly path?: string }
   | {
       readonly type: "respond";
       readonly threadId: ThreadId;
@@ -130,6 +145,13 @@ const OPEN_FOLDER_METHODS = new Set([
   "vcs.createWorktree",
   "vcs.removeWorktree",
 ]);
+/** Listings and searches of a folder (`cwd`): open inside SKYCOT's projects only. */
+const READ_FOLDER_METHODS = new Set([
+  "projects.listEntries",
+  "projects.listIgnoredFiles",
+  "projects.searchEntries",
+  "projects.searchContents",
+]);
 /** The developer tools: terminals, updates, outside agents, devices, data clean-up, remotes. */
 const ADVANCED_METHODS = new Set([
   "terminal.open",
@@ -151,7 +173,6 @@ const ADVANCED_METHODS = new Set([
   "server.runStorageCleanup",
   "server.checkOtlpEndpoint",
   "cloud.installRelayClient",
-  "shell.openInEditor",
   "device.configure",
   "device.testHost",
   "device.open",
@@ -263,6 +284,42 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
     return record(input["answer"])["type"] === "decline"
       ? null
       : { type: "grant", purpose: "settings" };
+  }
+  if (method === "projects.readFile") {
+    return typeof input["cwd"] === "string"
+      ? {
+          type: "readInProject",
+          cwd: input["cwd"],
+          path: typeof input["relativePath"] === "string" ? input["relativePath"] : "",
+        }
+      : { type: "grant", purpose: "files" };
+  }
+  if (READ_FOLDER_METHODS.has(method)) {
+    if (typeof input["cwd"] !== "string") return { type: "grant", purpose: "files" };
+    return typeof input["directoryPath"] === "string" && input["directoryPath"].length > 0
+      ? { type: "readInProject", cwd: input["cwd"], path: input["directoryPath"] }
+      : { type: "readInProject", cwd: input["cwd"] };
+  }
+  if (method === "assets.createUrl") {
+    const resource = record(input["resource"]);
+    // A picture anywhere on the Mac by its full path.
+    if (resource["_tag"] === "media-file") return { type: "grant", purpose: "files" };
+    if (resource["_tag"] === "draft-workspace-file") {
+      return typeof resource["cwd"] === "string" && typeof resource["path"] === "string"
+        ? { type: "readInProject", cwd: resource["cwd"], path: resource["path"] }
+        : { type: "grant", purpose: "files" };
+    }
+    return null;
+  }
+  if (method === "shell.openInEditor") {
+    // Show in Finder for a file of the project is the Files view's grown-up button; opening
+    // a code editor, or Finder anywhere else, stays with the developer tools.
+    if (input["editor"] === "file-manager" && input["reveal"] === true) {
+      return typeof input["cwd"] === "string"
+        ? { type: "grant", purpose: "files" }
+        : { type: "grant", purpose: "advanced" };
+    }
+    return { type: "grant", purpose: "advanced" };
   }
   if (method === "preview.open" || method === "preview.navigate") {
     return isLocalPreviewUrl(input["url"]) ? null : { type: "grant", purpose: "advanced" };
@@ -446,6 +503,8 @@ type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" 
 
 const make = Effect.gen(function* () {
   const family = yield* SkycotFamily.SkycotFamily;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
   // Optional so a gate built without the limits (older tests, tools) keeps its old behaviour.
@@ -526,6 +585,38 @@ const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
 
+  const realOr = (folder: string) =>
+    fs.realPath(folder).pipe(Effect.orElseSucceed(() => path.resolve(folder)));
+
+  /**
+   * Whether a folder is a SKYCOT project's, a conversation's private copy, or inside one,
+   * judged by real paths so a symlinked folder counts as where it really is.
+   */
+  const isKnownFolder = Effect.fnUntraced(function* (cwd: string) {
+    const real = yield* realOr(cwd);
+    const roots = [
+      ...(yield* projects.list().pipe(Effect.orElseSucceed(() => []))).map(
+        (project) => project.workspaceRoot,
+      ),
+      ...(yield* projections
+        .getThreadWorktreePaths({ includeArchived: true })
+        .pipe(Effect.orElseSucceed(() => []))).map((entry) => entry.worktreePath),
+    ];
+    for (const root of roots) {
+      if (isInsideRoot(yield* realOr(root), real, path.sep)) return true;
+    }
+    return false;
+  });
+
+  /** A read inside a known folder, of a path that stays in it and is not hidden or secret. */
+  const isOpenRead = Effect.fnUntraced(function* (need: { cwd: string; path?: string }) {
+    if (need.path !== undefined) {
+      const cleaned = cleanBrowsePath(need.path);
+      if (cleaned === null || pathIsHiddenOrSecret(cleaned)) return false;
+    }
+    return yield* isKnownFolder(need.cwd);
+  });
+
   const enforce = Effect.fn("SkycotFamilyGate.enforce")(function* (
     sessionId: string,
     method: string,
@@ -542,6 +633,12 @@ const make = Effect.gen(function* () {
         return;
       if (yield* family.allows({ sessionId, purpose: "openFolder" })) return;
       yield* Effect.logInfo("skycot-family.refused", { method, purpose: "openFolder" });
+      return yield* familyRefusal();
+    }
+    if (need.type === "readInProject") {
+      if (yield* isOpenRead(need)) return;
+      if (yield* family.allows({ sessionId, purpose: "files" })) return;
+      yield* Effect.logInfo("skycot-family.refused", { method, purpose: "files" });
       return yield* familyRefusal();
     }
     if (need.type === "grant") {

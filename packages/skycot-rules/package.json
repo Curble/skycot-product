@@ -39,6 +39,10 @@
     "./preview": {
       "types": "./src/preview.ts",
       "import": "./src/preview.ts"
+    },
+    "./browse": {
+      "types": "./src/browse.ts",
+      "import": "./src/browse.ts"
     }
   },
   "scripts": {

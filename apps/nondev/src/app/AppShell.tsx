@@ -220,6 +220,8 @@ function useTitleDetail(
       return "People";
     case "fridge":
       return "The fridge";
+    case "files":
+      return "Files";
     case "stickers":
       return "Sticker book";
     case "certificate":
