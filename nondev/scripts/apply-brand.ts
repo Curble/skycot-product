@@ -333,6 +333,55 @@ function seams(): Seam[] {
       mechanism: "env seam",
     },
     {
+      id: "brand-package-name",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: 'packaged app name (Keychain "<name> Safe Storage", updater cache)',
+      envName: "T3CODE_DESKTOP_PACKAGE_NAME",
+      upstreamDefault: '"t3code"',
+      effective: (e) => e.T3CODE_DESKTOP_PACKAGE_NAME!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-dmg-background",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "DMG installer window artwork",
+      envName: "T3CODE_DESKTOP_DMG_BACKGROUND_SVG",
+      upstreamDefault: 'path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`)',
+      effective: (e) => e.T3CODE_DESKTOP_DMG_BACKGROUND_SVG!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-copyright",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "copyright line (Info.plist, macOS About panel, Windows file properties)",
+      envName: "T3CODE_DESKTOP_COPYRIGHT",
+      upstreamDefault: "? { copyright: process.env.T3CODE_DESKTOP_COPYRIGHT }",
+      effective: (e) =>
+        e.T3CODE_DESKTOP_COPYRIGHT ?? "electron-builder default (Copyright © <year> T3 Tools)",
+      mechanism: "env seam",
+    },
+    {
+      id: "skycot-mac-signing",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "signed macOS build (T3 Connect passkey domains + provisioning profile)",
+      envName: "resolveSkycotMacSigning",
+      upstreamDefault: "resolveMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot }))",
+      effective: (e) =>
+        e.T3CODE_SKYCOT_CONNECT === "off"
+          ? "Developer ID + SKYCOT entitlements; no Clerk, no profile; refuses Connect settings"
+          : "upstream passkey signing",
+      mechanism: "env seam",
+    },
+    {
+      id: "skycot-mac-info-strings",
+      file: "scripts/build-desktop-artifact.ts",
+      constant: "macOS permission prompts and URL-scheme names (Info.plist)",
+      envName: "T3CODE_APP_BASE_NAME",
+      upstreamDefault: "T3 Code connects to devices on your local network",
+      effective: (e) => `"${e.T3CODE_APP_BASE_NAME!}" instead of "T3 Code"`,
+      mechanism: "env seam",
+    },
+    {
       id: "telemetry-default-off",
       file: "apps/server/src/telemetry/AnalyticsService.ts",
       constant: "telemetry enabled when T3CODE_TELEMETRY_ENABLED is unset",

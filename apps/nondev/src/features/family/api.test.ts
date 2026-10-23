@@ -1,30 +1,29 @@
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
-// The engine address is resolved from the path as given: a helper that added the Family prefix a
-// second time once sent every Family, fridge and update request to /api/skycot/family/api/...
 vi.mock("~/environments/primary/target", () => ({
-  resolvePrimaryEnvironmentHttpUrl: (path: string) => `http://engine.test${path}`,
+  resolvePrimaryEnvironmentHttpUrl: (pathname: string) => `http://127.0.0.1:47391${pathname}`,
 }));
 vi.mock("~/environments/primary/desktopAuth", () => ({
-  readDesktopPrimaryBearerToken: async () => null,
+  readDesktopPrimaryBearerToken: async () => "token",
 }));
 
-const { engineRequest, FAMILY_API_PATH } = await import("./api");
+import { engineRequest, request } from "./api";
 
-describe("engineRequest", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("asks the engine at exactly the path it was given", async () => {
-    const urls: string[] = [];
-    vi.stubGlobal("fetch", async (url: string) => {
-      urls.push(String(url));
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+// Regression: a merge left `engineRequest` prefixing the Family path a second time, so every
+// Family and update call went to `/api/skycot/family/api/skycot/...` and failed. The first-run
+// welcome steps then never opened, because they wait for the engine's Family answer.
+describe("engine requests", () => {
+  it("ask the engine for exactly the route they name", async () => {
+    const asked: string[] = [];
+    using _fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      asked.push(String(input));
+      return new Response("{}", { status: 200 });
     });
-    await engineRequest("GET", `${FAMILY_API_PATH}/fridge`, undefined, () => ({}));
+    await request("GET", "/status", undefined, () => ({}));
     await engineRequest("GET", "/api/skycot/updates", undefined, () => ({}));
-    expect(urls).toEqual([
-      "http://engine.test/api/skycot/family/fridge",
-      "http://engine.test/api/skycot/updates",
+    expect(asked).toEqual([
+      "http://127.0.0.1:47391/api/skycot/family/status",
+      "http://127.0.0.1:47391/api/skycot/updates",
     ]);
   });
 });
