@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../nondev/src/plain/**/*.ts"],
+  "exclude": ["node_modules", "ios", "**/*.test.ts"]
+}

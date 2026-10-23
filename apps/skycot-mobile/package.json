@@ -1,0 +1,63 @@
+{
+  "name": "@t3tools/skycot-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SKYCOT for iPhone and iPad: one app that becomes a child's device or a grown-up's phone when it is linked at the family's Mac. A SKYCOT-only fork of apps/mobile (T3 Code, MIT); see README.md.",
+  "main": "index.ts",
+  "scripts": {
+    "start": "APP_VARIANT=development expo start --port 8081",
+    "config:dev": "APP_VARIANT=development expo config",
+    "config:prod": "APP_VARIANT=production expo config",
+    "prebuild:ios": "EXPO_NO_GIT_STATUS=1 expo prebuild --clean --platform ios --no-install",
+    "test": "vp test run",
+    "typecheck": "tsc-rs --noEmit"
+  },
+  "dependencies": {
+    "@expo/ui": "58.0.20",
+    "@react-navigation/elements": "2.9.45",
+    "@react-navigation/native": "7.5.1",
+    "@react-navigation/native-stack": "7.21.0",
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/skycot-brand": "workspace:*",
+    "@t3tools/skycot-rules": "workspace:*",
+    "effect": "catalog:",
+    "expo": "58.0.14",
+    "expo-asset": "~58.0.16",
+    "expo-build-properties": "~58.0.11",
+    "expo-camera": "~58.0.10",
+    "expo-constants": "~58.0.12",
+    "expo-crypto": "~58.0.7",
+    "expo-haptics": "~58.0.7",
+    "expo-linking": "~58.0.13",
+    "expo-secure-store": "~58.0.2",
+    "expo-splash-screen": "~58.0.10",
+    "expo-symbols": "~58.0.4",
+    "expo-widgets": "58.0.20",
+    "react": "catalog:",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "file:../mobile/deps/react-native-screens-5.0.0-t3.30.tgz",
+    "react-native-webview": "14.0.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@types/react": "catalog:",
+    "babel-preset-expo": "~58.0.17",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript",
+        "react-native-screens"
+      ]
+    },
+    "autolinking": {
+      "buildFromSource": [
+        "@expo/ui",
+        "react-native-screens"
+      ]
+    }
+  }
+}
