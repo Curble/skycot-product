@@ -1,0 +1,61 @@
+{
+  "name": "@t3tools/skycot-relay",
+  "private": true,
+  "description": "SKYCOT Relay protocol, shared by the relay Worker, the Mac's engine and every linked device: the sealed tunnel (Noise IK), relay passes, the link in the QR code, and the device-side transport. Pure TypeScript on audited pure-JS crypto (noble), so it runs in Workers, Node, browsers and React Native.",
+  "type": "module",
+  "exports": {
+    "./encoding": {
+      "types": "./src/encoding.ts",
+      "import": "./src/encoding.ts"
+    },
+    "./noise": {
+      "types": "./src/noise.ts",
+      "import": "./src/noise.ts"
+    },
+    "./pass": {
+      "types": "./src/pass.ts",
+      "import": "./src/pass.ts"
+    },
+    "./protocol": {
+      "types": "./src/protocol.ts",
+      "import": "./src/protocol.ts"
+    },
+    "./mux": {
+      "types": "./src/mux.ts",
+      "import": "./src/mux.ts"
+    },
+    "./link": {
+      "types": "./src/link.ts",
+      "import": "./src/link.ts"
+    },
+    "./host": {
+      "types": "./src/host.ts",
+      "import": "./src/host.ts"
+    },
+    "./client/home": {
+      "types": "./src/client/home.ts",
+      "import": "./src/client/home.ts"
+    },
+    "./client/cookies": {
+      "types": "./src/client/cookies.ts",
+      "import": "./src/client/cookies.ts"
+    },
+    "./client/shim": {
+      "types": "./src/client/shim.ts",
+      "import": "./src/client/shim.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc-rs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "@noble/ciphers": "1.3.0",
+    "@noble/curves": "catalog:",
+    "@noble/hashes": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

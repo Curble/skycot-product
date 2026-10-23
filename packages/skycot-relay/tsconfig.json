@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    // Plain TypeScript shared by a Cloudflare Worker, the engine, browsers and React Native: no
+    // Effect here, so its Date/timer/fetch diagnostics do not apply.
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalTimers": "off",
+          "globalFetch": "off",
+          "globalRandom": "off",
+          "globalConsole": "off"
+        }
+      }
+    ]
+  },
+  "include": ["src"]
+}
