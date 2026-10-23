@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vite-plus/test";
+
+import {
+  childSeesProject,
+  childSeesThread,
+  cleanName,
+  deviceIdFromSubject,
+  deviceSubject,
+  groupLinkCode,
+  isApproverDecision,
+  normaliseLinkCode,
+} from "./people.ts";
+
+const owners = {
+  threads: { "thread-ava": "ava", "thread-leo": "leo" },
+  projects: { "project-ava": "ava", "project-leo": "leo" },
+};
+
+describe("who is who", () => {
+  it("reads a device only from the subject the engine gave its sign-in", () => {
+    expect(deviceIdFromSubject(deviceSubject("d0a1b2c3d4e"))).toBe("d0a1b2c3d4e");
+    expect(deviceIdFromSubject("one-time-token")).toBeNull();
+    expect(deviceIdFromSubject("skycot-family-device:../../etc")).toBeNull();
+    expect(deviceIdFromSubject("skycot-family-device:")).toBeNull();
+    expect(deviceIdFromSubject(undefined)).toBeNull();
+  });
+
+  it("a child's device sees only that child's conversations", () => {
+    expect(childSeesThread("ava", "thread-ava", owners)).toBe(true);
+    expect(childSeesThread("ava", "thread-leo", owners)).toBe(false);
+    // Nobody recorded starting it (older work, a grown-up's): not on a child's device.
+    expect(childSeesThread("ava", "thread-old", owners)).toBe(false);
+  });
+
+  it("a child sees their own and the family's projects, not a sibling's", () => {
+    expect(childSeesProject("ava", "project-ava", owners)).toBe(true);
+    expect(childSeesProject("ava", "project-family", owners)).toBe(true);
+    expect(childSeesProject("ava", "project-leo", owners)).toBe(false);
+    // Unless the child has a conversation of their own in it.
+    expect(childSeesProject("ava", "project-leo", owners, new Set(["project-leo"]))).toBe(true);
+  });
+
+  it("a grown-up's device may only accept or decline", () => {
+    expect(isApproverDecision("accept")).toBe(true);
+    expect(isApproverDecision("decline")).toBe(true);
+    expect(isApproverDecision("acceptForSession")).toBe(false);
+    expect(isApproverDecision("acceptAlways")).toBe(false);
+    expect(isApproverDecision("cancel")).toBe(false);
+  });
+
+  it("forgives how people type a link code, and groups it for reading", () => {
+    expect(normaliseLinkCode(" 7kq3-m9xd 2hpa ")).toBe("7KQ3M9XD2HPA");
+    expect(groupLinkCode("7KQ3M9XD2HPA")).toBe("7KQ3 M9XD 2HPA");
+    expect(cleanName("  Mum's   phone ", 40)).toBe("Mum's phone");
+    expect(cleanName("   ", 40)).toBeNull();
+    expect(cleanName(42, 40)).toBeNull();
+  });
+});
