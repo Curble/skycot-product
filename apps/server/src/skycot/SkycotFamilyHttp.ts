@@ -34,6 +34,7 @@ import * as SkycotUpdatesHttp from "./updates/SkycotUpdatesHttp.ts";
 import * as SkycotFamilyDevices from "./family-devices/SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
+import * as SkycotRelay from "./relay/SkycotRelay.ts";
 import { deviceGate, isWatchedPath } from "./family-devices/httpVisibility.ts";
 import { isApproverDecision, type DeviceKind } from "@t3tools/skycot-rules/people";
 
@@ -95,6 +96,8 @@ type Handler = (input: {
   /** The child view on a child's own device, for answers that list everyone's work. */
   readonly childView: SkycotFamilyVisibility.ChildView | null;
   readonly request: HttpServerRequest.HttpServerRequest;
+  /** SKYCOT Relay, when the server has it. */
+  readonly relay: Option.Option<SkycotRelay.SkycotRelay["Service"]>;
 }) => Effect.Effect<HttpServerResponse.HttpServerResponse, SkycotFamily.FamilyError, never>;
 
 const route = (
@@ -111,6 +114,7 @@ const route = (
       const identities = yield* Effect.serviceOption(SkycotFamilyIdentity.SkycotFamilyIdentity);
       const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
       const devices = yield* Effect.serviceOption(SkycotFamilyDevices.SkycotFamilyDevices);
+      const relay = yield* Effect.serviceOption(SkycotRelay.SkycotRelay);
       return HttpRouter.add(
         method,
         `${FAMILY_ROUTE}${path}`,
@@ -177,6 +181,7 @@ const route = (
             devices,
             childView,
             request,
+            relay,
           }).pipe(
             Effect.catchTags({
               SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
@@ -825,29 +830,55 @@ const devicesListRoute = managerRoute("GET", "/devices", ({ service }) =>
  * "Link a device": a one-time link for one person, as T3's pairing link (single use, five
  * minutes, the code after the "#" so it never reaches a server log).
  */
-const devicesLinkRoute = managerRoute("POST", "/devices/link", ({ service, body, request }) =>
-  Effect.gen(function* () {
-    const kind =
-      body["kind"] === "child" || body["kind"] === "grown-up" ? (body["kind"] as DeviceKind) : null;
-    const personId = text(body["personId"]);
-    if (kind === null || personId.length === 0) {
-      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
-    }
-    const link = yield* service.createLink({ kind, personId, name: nullableText(body["name"]) });
-    const bases = yield* service.linkAddresses(originOf(request));
-    return json({
-      ...link,
-      links: bases.map((entry) => ({
-        label: entry.label,
-        reachable: entry.reachable,
-        url: `${entry.base}/simple/#${new URLSearchParams([["token", link.code]]).toString()}`,
-      })),
-    });
-  }),
+const devicesLinkRoute = managerRoute(
+  "POST",
+  "/devices/link",
+  ({ service, body, request, relay }) =>
+    Effect.gen(function* () {
+      const kind =
+        body["kind"] === "child" || body["kind"] === "grown-up"
+          ? (body["kind"] as DeviceKind)
+          : null;
+      const personId = text(body["personId"]);
+      if (kind === null || personId.length === 0) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      const link = yield* service.createLink({ kind, personId, name: nullableText(body["name"]) });
+      const bases = yield* service.linkAddresses(originOf(request));
+      // With SKYCOT Relay on, the first link works from anywhere: the same one-time code, plus
+      // what the device needs to find this Mac through the relay (all after the "#").
+      const viaRelay = Option.isSome(relay)
+        ? yield* relay.value.linkFor(link.deviceId)
+        : Option.none();
+      return json({
+        ...link,
+        links: [
+          ...(Option.isSome(viaRelay)
+            ? [
+                {
+                  label: "Anywhere (SKYCOT Relay)",
+                  reachable: viaRelay.value.connected,
+                  url: `${viaRelay.value.appUrl}/simple/#${new URLSearchParams([
+                    ["token", link.code],
+                    ...viaRelay.value.params,
+                  ]).toString()}`,
+                },
+              ]
+            : []),
+          ...bases.map((entry) => ({
+            label: entry.label,
+            reachable: entry.reachable,
+            url: `${entry.base}/simple/#${new URLSearchParams([["token", link.code]]).toString()}`,
+          })),
+        ],
+      });
+    }),
 );
 
-const devicesRemoveRoute = managerRoute("POST", "/devices/remove", ({ service, body }) =>
+const devicesRemoveRoute = managerRoute("POST", "/devices/remove", ({ service, body, relay }) =>
   service.remove(text(body["deviceId"])).pipe(
+    // Its relay pass stops working too, and any tunnel it has open closes now.
+    Effect.andThen(Option.isSome(relay) ? relay.value.forgetVanished : Effect.void),
     Effect.andThen(service.list),
     Effect.map((devices) => json({ devices })),
   ),
@@ -873,14 +904,18 @@ const peopleUpdateRoute = managerRoute("POST", "/people/update", ({ family, body
     .pipe(Effect.map((status) => json(status))),
 );
 
-const peopleRemoveRoute = managerRoute("POST", "/people/remove", ({ family, body, service }) =>
-  Effect.gen(function* () {
-    const before = yield* family.status;
-    const status = yield* family.removeGrownUp({ personId: text(body["personId"]) });
-    // Their devices go with them: those sign-ins end now.
-    yield* service.endVanished(before);
-    return json(status);
-  }),
+const peopleRemoveRoute = managerRoute(
+  "POST",
+  "/people/remove",
+  ({ family, body, service, relay }) =>
+    Effect.gen(function* () {
+      const before = yield* family.status;
+      const status = yield* family.removeGrownUp({ personId: text(body["personId"]) });
+      // Their devices go with them: those sign-ins end now, and their relay passes.
+      yield* service.endVanished(before);
+      if (Option.isSome(relay)) yield* relay.value.forgetVanished;
+      return json(status);
+    }),
 );
 
 /** A route only a grown-up's own device may use. */
@@ -1048,8 +1083,53 @@ const unlinkSelfRoute = approverRoute("POST", "/devices/unlink-self", ({ service
   service.remove(grownUp.deviceId).pipe(Effect.as(json({ ok: true }))),
 );
 
+const relayMissing = json(
+  { error: "unavailable", message: "SKYCOT Relay isn't part of this Mac's SKYCOT." },
+  503,
+);
+
+/**
+ * "Reach this Mac from anywhere": SKYCOT Relay's status, on the family's Mac only. Linked devices
+ * use the relay; they never manage it.
+ */
+const relayStatusRoute = route("GET", "/relay", AuthOrchestrationReadScope, ({ who, relay }) =>
+  Effect.gen(function* () {
+    if (who.kind !== "shared") return onlyOnTheMac;
+    if (Option.isNone(relay)) return relayMissing;
+    return json(yield* relay.value.status);
+  }),
+);
+
+/** Turning the relay on or off: the Mac, with the Family settings' yes (the parent code). */
+const relaySetRoute = route(
+  "POST",
+  "/relay",
+  AuthOrchestrationOperateScope,
+  ({ who, relay, family, sessionId, body }) =>
+    Effect.gen(function* () {
+      if (who.kind !== "shared") return onlyOnTheMac;
+      if (Option.isNone(relay)) return relayMissing;
+      if (!(yield* family.isEnabled)) {
+        return json(
+          {
+            error: "not-enabled",
+            message: "Turn on the Family profile first: the relay is for linked devices.",
+          },
+          409,
+        );
+      }
+      if (!(yield* family.allows({ sessionId, purpose: "settings" }))) return grownUpFirst;
+      if (typeof body["enabled"] !== "boolean") {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      return json(yield* relay.value.setEnabled(body["enabled"]));
+    }),
+);
+
 /** People and devices. */
 export const layerDeviceRoutes = Layer.mergeAll(
+  relayStatusRoute,
+  relaySetRoute,
   devicesListRoute,
   devicesLinkRoute,
   devicesRemoveRoute,
@@ -1124,6 +1204,9 @@ export const layer = Layer.mergeAll(
     ),
   ),
 ).pipe(
+  // SKYCOT Relay rides along here too (off until a grown-up turns it on): no wiring line in
+  // upstream's server.ts.
+  Layer.provide(SkycotRelay.layer),
   Layer.provide(
     SkycotFamilyDevices.layer.pipe(
       Layer.provide(Layer.merge(ProjectionStore.layer, ProjectStore.layer)),

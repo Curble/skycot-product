@@ -16,6 +16,7 @@
     "@t3tools/contracts": "workspace:*",
     "@t3tools/shared": "workspace:*",
     "@t3tools/skycot-brand": "workspace:*",
+    "@t3tools/skycot-relay": "workspace:*",
     "@t3tools/skycot-rules": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "effect": "catalog:",
