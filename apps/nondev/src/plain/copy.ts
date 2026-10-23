@@ -129,7 +129,7 @@ export const versions = {
   // be undone. The copy says so rather than promising a safety net.
   restoreDoes: [
     "Puts every file in this project back to how it was at this point.",
-    "Keeps the whole conversation — what you asked for stays in the chat, so you can ask for it again.",
+    "Takes the conversation back to this point too: later messages leave the chat and Sam won't remember them.",
   ],
   restoreDoesNot: [
     "Doesn't touch anything already sent for review or put live.",

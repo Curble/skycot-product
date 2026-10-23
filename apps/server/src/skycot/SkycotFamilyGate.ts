@@ -112,6 +112,7 @@ export type GateNeed =
    * is the Undo of "Make this a project", so it is open; any other project is a grown-up's.
    */
   | { readonly type: "removeProject"; readonly projectId: ProjectId }
+  /**
    * Reading: open inside a SKYCOT project or a conversation's private copy, for a path that
    * stays inside it and is not a hidden or secret file; anything else is a grown-up's `files` yes.
    */

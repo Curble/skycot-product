@@ -77,7 +77,10 @@ describe("where a question may work", () => {
     expect(sibling.needsGrownUp).toBe(true);
     expect(sibling.base.matches.map((match) => match.rule.id)).toContain("outside-project");
     const documents = evaluateFamilyRequest(
-      { kind: "file-read", files: [{ path: "/Users/me/Documents/diary.txt" }] },
+      {
+        kind: "file-read",
+        files: [{ path: "/Users/me/Documents/diary.txt", operation: "change" }],
+      },
       roots,
     );
     expect(documents.needsGrownUp).toBe(true);
