@@ -110,6 +110,33 @@ const respond = (decision: "accept" | "acceptAlways" | "decline") => ({
   decision,
 });
 
+/** "Go back to here": the engine's rollback, as the plain client sends it. */
+const goBack = (restoreFiles: boolean) => ({
+  type: "checkpoint.rollback",
+  commandId: "cmd-go-back",
+  threadId: THREAD_ID,
+  scopeId: "scope-root",
+  checkpointId: "ckpt-1",
+  restoreFiles,
+});
+
+/** A proposed plan on the thread, from the turn `runId`. */
+const proposedPlan = (id: string, runId: string, status = "active") => ({
+  id,
+  threadId: THREAD_ID,
+  runId,
+  nodeId: "node:plan",
+  status,
+  kind: "proposed_plan",
+  markdown: "1. Make the button blue",
+});
+
+/** Plan-1 waits for Build it; its turn (run-1) finished normally. */
+const WAITING_PLAN = {
+  plans: [proposedPlan("plan-1", "run-1")],
+  runs: [{ id: "run-1", status: "completed" }],
+};
+
 /** The gate over a real profile file and a projection that holds `items`. */
 const withGate = <A, E, R>(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
@@ -119,6 +146,10 @@ const withGate = <A, E, R>(
     readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
   }) => Effect.Effect<A, E, R>,
   threadWorktreePath: string | null = ROOT,
+  planState: {
+    readonly plans: ReadonlyArray<unknown>;
+    readonly runs: ReadonlyArray<unknown>;
+  } = WAITING_PLAN,
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -130,6 +161,7 @@ const withGate = <A, E, R>(
         getThread: () => Effect.succeed({ ...thread, worktreePath: threadWorktreePath }),
         getTurnItem: ({ itemId }) =>
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
+        getThreadProjection: () => Effect.succeed(planState as never),
       }),
       Layer.mock(ProjectStore.ProjectStoreV2)({
         get: (projectId) =>
@@ -177,6 +209,9 @@ describe("gateNeedFor", () => {
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.create", worktreePath: null }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.archive" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unarchive" }],
+      // Going back to an earlier message, and Undo: the same rollback, with or without files.
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(true)],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(false)],
       [
         ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
         { type: "thread.metadata.update", title: "Mia's game" },
@@ -808,6 +843,106 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  it.effect(
+    "going back to an earlier message is open, and the changed message plans like a new one",
+    () =>
+      withGate(
+        [],
+        ({ gate, family }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: "Ava" });
+            const call = (payload: object) =>
+              gate.check({
+                sessionId: SESSION,
+                method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+                payload,
+              });
+            const send = (messageId: string, extra: object = {}) =>
+              call({
+                type: "message.dispatch",
+                threadId: THREAD_ID,
+                messageId,
+                text: "Make it green instead",
+                ...extra,
+              });
+            const modeFor = (messageId: string) =>
+              SkycotFamilyInstructions.familyTurnInput(family, {
+                message: {
+                  messageId: MessageId.make(messageId),
+                  text: "Make it green instead",
+                  attachments: [],
+                  createdBy: "user",
+                  creationSource: "web",
+                },
+                runtimePolicy: {
+                  runtimeMode: "approval-required",
+                  interactionMode: "default",
+                  cwd: null,
+                },
+              } as unknown as Parameters<typeof SkycotFamilyInstructions.familyTurnInput>[1]).pipe(
+                Effect.map((input) => input.runtimePolicy.interactionMode),
+              );
+
+            // The child may go back, keeping the files or putting them back (it is Undo).
+            yield* call(goBack(false));
+            yield* call(goBack(true));
+            // The changed message is an ordinary message: it runs as a plan.
+            yield* send("message:changed");
+            assert.equal(yield* modeFor("message:changed"), "plan");
+            // A Build it of the plan that going back took away plans again: the assistant no
+            // longer has that plan, though the engine still lists it as waiting.
+            yield* send("message:build-taken-back", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-taken-back" },
+            });
+            assert.equal(yield* modeFor("message:build-taken-back"), "plan");
+            // A plan made after going back builds as usual.
+            yield* send("message:build-new", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-new" },
+            });
+            assert.equal(yield* modeFor("message:build-new"), "default");
+            // A plan the gate can't find plans too.
+            yield* send("message:build-unknown", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-unknown" },
+            });
+            assert.equal(yield* modeFor("message:build-unknown"), "plan");
+          }),
+        ROOT,
+        {
+          plans: [proposedPlan("plan-taken-back", "run-2"), proposedPlan("plan-new", "run-3")],
+          runs: [
+            { id: "run-1", status: "completed" },
+            { id: "run-2", status: "rolled_back" },
+            { id: "run-3", status: "completed" },
+          ],
+        },
+      ),
+  );
+
+  it("a plan builds only while it waits and its turn still stands", () => {
+    const projection = (planStatus: string, runStatus: string) =>
+      ({
+        plans: [proposedPlan("plan-1", "run-1", planStatus)],
+        runs: [{ id: "run-1", status: runStatus }],
+      }) as never;
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(projection("active", "completed"), "plan-1"));
+    assert.isFalse(
+      SkycotFamilyGate.planStillBuildable(projection("active", "rolled_back"), "plan-1"),
+    );
+    for (const status of ["completed", "superseded", "draft"]) {
+      assert.isFalse(
+        SkycotFamilyGate.planStillBuildable(projection(status, "completed"), "plan-1"),
+      );
+    }
+    assert.isFalse(
+      SkycotFamilyGate.planStillBuildable(projection("active", "completed"), "plan-2"),
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { threadId: "t", planId: "p" } }),
+      { threadId: "t", planId: "p" },
+    );
+    assert.isNull(SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { planId: "p" } }));
+  });
+
   it.effect("a shield yes for one message does not reach another session's message", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {
@@ -954,6 +1089,39 @@ it.layer(NodeServices.layer)("SkycotFamilyGate limits", (it) => {
           assert.include(error.message, "7:00 am");
           yield* at("2026-10-23T07:00:00+11:00");
           yield* gate.check({ sessionId: SESSION, ...message() });
+        }),
+      ),
+  );
+
+  it.effect(
+    "going back is not a message; the changed message counts and sleeps like any other",
+    () =>
+      withGate([], ({ gate, family, limits }) =>
+        Effect.gen(function* () {
+          yield* setUp(family);
+          const goBackCall = {
+            sessionId: SESSION,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: goBack(true),
+          };
+          yield* at("2026-10-22T09:00:00+11:00");
+          yield* gate.check(goBackCall);
+          yield* gate.check({ ...goBackCall, payload: goBack(false) });
+          assert.equal((yield* limits.forSession({ sessionId: SESSION })).limits?.turns, 0);
+          // The changed message is the day's first message.
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          assert.equal((yield* limits.forSession({ sessionId: SESSION })).limits?.turns, 1);
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          // At the day's cap, going back still works (like Undo); the changed message waits.
+          yield* gate.check(goBackCall);
+          const capped = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.include(capped.message, "today's 3 messages");
+          // At bedtime too.
+          yield* at("2026-10-22T20:00:00+11:00");
+          yield* gate.check(goBackCall);
+          const asleep = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.equal(asleep.requiredPermission, SkycotFamilyGate.FAMILY_ASLEEP_PERMISSION);
         }),
       ),
   );

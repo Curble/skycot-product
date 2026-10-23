@@ -12,8 +12,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 
 import { describeTurnItem } from "../../plain/narration";
+import { foldTakenBack, rolledBackRunIds } from "../rewind/rewind";
+import { TakenBackFold } from "../rewind/TakenBackFold";
 import { Bubble, DayDivider, TypingIndicator } from "../../ui/Bubble";
-import { groupTimelineItems } from "./cards";
+import { groupTimelineItems, type TimelineEntry } from "./cards";
 import {
   getTimelineRenderer,
   type TimelineItemType,
@@ -109,6 +111,44 @@ export function Timeline({
     absorb: (item) =>
       item.type === "approval_request" && item.runId !== null && policyAnswered.has(item.requestId),
   });
+  // What a go-back replaced folds into one row once the conversation carried on.
+  const folded = foldTakenBack(
+    entries.map((entry) => ({
+      ...entry,
+      runId: entry.kind === "work" ? entry.runId : entry.item.runId,
+    })),
+    rolledBackRunIds(projection.runs),
+  );
+  const renderEntry = (entry: TimelineEntry) => {
+    if (entry.kind === "work") {
+      return (
+        <div key={entry.key} className="fm-stream__item">
+          <WorkingCard
+            group={entry}
+            projection={projection}
+            environmentId={environmentId}
+            threadId={threadId}
+            projectName={projectName}
+          />
+        </div>
+      );
+    }
+    const node = renderTimelineItem({
+      item: entry.item,
+      index: entry.index,
+      items,
+      projection,
+      environmentId,
+      threadId,
+      shell,
+      projectName,
+    });
+    return node === null || node === undefined ? null : (
+      <div key={entry.item.id} className="fm-stream__item">
+        {node}
+      </div>
+    );
+  };
   const stream = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   // Follow the newest message like Messages does, but only while the reader is
@@ -141,36 +181,23 @@ export function Timeline({
     >
       <div ref={inner} className="fm-stream__inner">
         {startedAt ? <DayDivider>{formatDayDivider(startedAt)}</DayDivider> : null}
-        {entries.map((entry) => {
-          if (entry.kind === "work") {
-            return (
-              <div key={entry.key} className="fm-stream__item">
-                <WorkingCard
-                  group={entry}
-                  projection={projection}
-                  environmentId={environmentId}
-                  threadId={threadId}
-                  projectName={projectName}
-                />
-              </div>
-            );
-          }
-          const node = renderTimelineItem({
-            item: entry.item,
-            index: entry.index,
-            items,
-            projection,
-            environmentId,
-            threadId,
-            shell,
-            projectName,
-          });
-          return node === null || node === undefined ? null : (
-            <div key={entry.item.id} className="fm-stream__item">
-              {node}
+        {folded.map((entry) =>
+          entry.kind === "taken-back" ? (
+            <div key={entry.key} className="fm-stream__item">
+              <TakenBackFold
+                messages={
+                  entry.entries.filter(
+                    (part) => part.kind === "item" && part.item.type === "user_message",
+                  ).length
+                }
+              >
+                {entry.entries.map(renderEntry)}
+              </TakenBackFold>
             </div>
-          );
-        })}
+          ) : (
+            renderEntry(entry)
+          ),
+        )}
         {trailing}
       </div>
     </div>

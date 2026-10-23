@@ -25,7 +25,9 @@ import {
   EnvironmentAuthorizationError,
   ORCHESTRATION_V2_WS_METHODS,
   RpcScopeAuthorization,
+  type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
+  type PlanId,
   type ProjectId,
   type ProviderDriverKind,
   type RuntimeRequestId,
@@ -366,6 +368,34 @@ export function buildsPlan(method: string, payload: unknown): boolean {
   );
 }
 
+/** Pure: the plan a Build it names, if the call is one. */
+export function sourcePlanOf(
+  payload: unknown,
+): { readonly threadId: string; readonly planId: string } | null {
+  const ref = record(record(payload)["sourcePlanRef"]);
+  return typeof ref["threadId"] === "string" && typeof ref["planId"] === "string"
+    ? { threadId: ref["threadId"], planId: ref["planId"] }
+    : null;
+}
+
+/**
+ * Pure: whether a Build it may run without a fresh plan. The plan must still be waiting, and
+ * its turn must still be part of the conversation: going back to an earlier message (or Undo)
+ * takes that turn back, the assistant forgets the plan, but the engine leaves the plan
+ * "active". Building it then would make changes from a plan the assistant no longer has, so
+ * such a message plans again, like any other.
+ */
+export function planStillBuildable(
+  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs">,
+  planId: string,
+): boolean {
+  const plan = projection.plans.find((candidate) => candidate.id === planId);
+  if (plan === undefined || plan.kind !== "proposed_plan" || plan.status !== "active") return false;
+  if (plan.runId === null) return true;
+  const run = projection.runs.find((candidate) => candidate.id === plan.runId);
+  return run !== undefined && run.status !== "rolled_back";
+}
+
 /**
  * The same rule for the HTTP API routes that change things (`/api/projects/mutate` is the
  * HTTP twin of `projects.mutate`). Revoking access stays open: it only ever takes away.
@@ -647,7 +677,18 @@ const make = Effect.gen(function* () {
   ) {
     const message = sentMessage(method, payload);
     if (message === null || !(yield* family.isEnabled)) return;
-    if (buildsPlan(method, payload)) {
+    const source = buildsPlan(method, payload) ? sourcePlanOf(payload) : null;
+    const buildable =
+      source !== null &&
+      (yield* projections.getThreadProjection(source.threadId as ThreadId).pipe(
+        Effect.map((projection) => planStillBuildable(projection, source.planId as PlanId)),
+        // A plan the gate cannot read is not one it can vouch for: it plans (the safe side).
+        Effect.orElseSucceed(() => false),
+      ));
+    if (source !== null && !buildable) {
+      yield* Effect.logInfo("skycot-family.plan-first", { buildIt: "plan-not-waiting" });
+    }
+    if (buildable) {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "builds-plan");
     } else if (yield* family.allows({ sessionId, purpose: "advanced" })) {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "grown-up");

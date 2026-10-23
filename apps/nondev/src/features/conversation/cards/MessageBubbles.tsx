@@ -2,6 +2,7 @@
 // light Markdown, and the red-tinted "something went wrong" note.
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { CircleAlert, MousePointerClick } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { describeTurnItem } from "../../../plain/narration";
 import { Mascot } from "../../brand/Mascot";
@@ -23,10 +24,15 @@ const NO_POINTING: ReadonlyArray<string> = [];
 export function UserBubble({
   item,
   pointing = NO_POINTING,
+  actions,
+  onContextMenu,
 }: {
   readonly item: UserMessage;
   /** What the person pointed at in the preview, lifted out of the message's words. */
   readonly pointing?: ReadonlyArray<string>;
+  /** Shown after the time under the bubble (Edit, on your own messages). */
+  readonly actions?: ReactNode;
+  readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
 }) {
   const steered = item.inputIntent === "steer" || item.inputIntent === "promoted_queued_to_steer";
   const queued = item.inputIntent === "queued_turn";
@@ -39,7 +45,20 @@ export function UserBubble({
     .filter((part): part is string => !!part)
     .join(" · ");
   return (
-    <Bubble author="me" meta={meta || undefined}>
+    <Bubble
+      author="me"
+      meta={
+        actions ? (
+          <>
+            {meta}
+            {actions}
+          </>
+        ) : (
+          meta || undefined
+        )
+      }
+      onContextMenu={onContextMenu}
+    >
       {item.text}
       {pointing.length > 0 ? (
         <span className="fm-bubble-pointing">
