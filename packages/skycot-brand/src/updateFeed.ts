@@ -167,16 +167,19 @@ export function skycotPublishConfig(
 ): Record<string, string> | null {
   const feed = setting.feed;
   if (feed === null || isT3UpdateFeed(feed)) return null;
-  const nightly = channel === "nightly" ? { channel: "nightly" } : {};
+  // The channel is always named. Left out, electron-builder takes it from the version's first
+  // pre-release word ("0.1.1-nondev.1.beta" -> "nondev") and writes `nondev-mac.yml`, while the
+  // app (DesktopUpdates, channel "latest") and the engine (latestMacManifestUrl) read
+  // `latest-mac.yml`: every SKYCOT beta would then miss every later version.
   return feed.provider === "github"
     ? {
         provider: "github",
         owner: feed.owner,
         repo: feed.repo,
         releaseType: channel === "nightly" ? "prerelease" : "release",
-        ...nightly,
+        channel,
       }
-    : { provider: "generic", url: feed.url, ...nightly };
+    : { provider: "generic", url: feed.url, channel };
 }
 
 export type AppUpdateFeedVerdict =
