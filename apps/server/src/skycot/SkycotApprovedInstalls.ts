@@ -36,6 +36,7 @@ import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ProviderSessionManager from "../orchestration-v2/ProviderSessionManager.ts";
 import * as RuntimeRequestService from "../orchestration-v2/RuntimeRequestService.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import { keepAddOnsOutOfVersions, type RunGit } from "./questions/SkycotKeepOutOfVersions.ts";
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 
@@ -147,6 +148,14 @@ function failureReason(output: ProcessRunner.ProcessRunOutput): string {
   return line === undefined ? "the install failed." : `${line.slice(0, 200)}.`;
 }
 
+/** `git <args>` in `cwd` through the process runner, for keepAddOnsOutOfVersions. */
+export const gitThroughRunner =
+  (runner: ProcessRunner.ProcessRunner["Service"], cwd: string): RunGit =>
+  (args) =>
+    runner
+      .run({ command: "git", args, cwd, timeout: "10 seconds", timeoutBehavior: "timedOutResult" })
+      .pipe(Effect.map((output) => ({ exitCode: output.code, stdout: output.stdout })));
+
 /**
  * RuntimeRequestService, with approved add-on installs done by SKYCOT. Wraps the service the
  * engine already has; only built while the SKYCOT policy is on (runtimeLayer).
@@ -231,6 +240,12 @@ export const layerRuntimeRequests = Layer.effect(
             Effect.orElseSucceed(() => null),
           );
           if (plan === null) return yield* base.respond(input);
+
+          // The add-ons are not something the child made: keep them out of "What changed" and
+          // the versions, for a folder that started keeping versions before SKYCOT did this.
+          yield* keepAddOnsOutOfVersions(gitThroughRunner(runner, plan.folder), plan.folder, {
+            unlessIgnored: true,
+          });
 
           const command = [plan.install.manager, ...installArguments(plan.install)]
             .map(quote)
