@@ -1010,10 +1010,10 @@ shutil.copyfile(BRAND + "web/apple-touch-icon-day.png", OUT + "apple-touch-icon.
 shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "og.png")
 # The beta share card (23 October 2026): a new file name so X, LinkedIn and others fetch it fresh.
 shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "assets/brand/og-beta.png")
-# The 30-second promo on the home page (tap to play). Only its poster ships with the site; the video is
+# The 30-second promo plays in the home page's hero. Only its poster ships with the site; the video is
 # served from downloads.skycot.com/media/ because Pages ignores partial requests, which Safari needs.
 os.makedirs(OUT + "assets/video", exist_ok=True)
-shutil.copyfile(HERE + "../marketing/launch/video/poster-16x9.jpg", OUT + "assets/video/poster-16x9.jpg")
+shutil.copyfile(HERE + "../marketing/launch/video/poster-hero.jpg", OUT + "assets/video/poster-hero.jpg")
 # A manifest cannot change with the time of day, so installed icons stay day (brand guide section 9).
 MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "The family-friendly AI developer.",
             "start_url": "/", "display": "minimal-ui", "background_color": "#ffffff", "theme_color": "#0071e3",

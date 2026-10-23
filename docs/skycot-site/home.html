@@ -1338,9 +1338,68 @@ complete still page with one sky colour per section.
         height: 100%;
         object-fit: cover;
       }
+      /* The hero film: the promo video in a plain rounded frame (no window bar). */
+      .film {
+        position: relative;
+        border-radius: 22px;
+        background: #cfe6fb;
+      }
+      .film video {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+      }
+      .film-btn {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(29, 29, 31, 0.56);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+        color: #fff;
+        cursor: pointer;
+        opacity: 0.85;
+        transition: opacity 0.2s;
+      }
+      .film-btn:hover,
+      .film-btn:focus-visible {
+        opacity: 1;
+      }
+      .film-btn:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      .film-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .film-btn .i-pause,
+      .film-btn[data-playing] .i-play {
+        display: none;
+      }
+      .film-btn[data-playing] .i-pause {
+        display: block;
+      }
       @media (max-width: 600px) {
         .mac {
           border-radius: 9px;
+        }
+        .film {
+          border-radius: 14px;
+        }
+        .film-btn {
+          right: 10px;
+          bottom: 10px;
+          width: 34px;
+          height: 34px;
         }
         .mac-bar {
           height: 20px;
@@ -2017,25 +2076,6 @@ complete still page with one sky colour per section.
         display: flex;
         flex-direction: column;
         min-width: 0;
-      }
-      .promo {
-        margin: 0 auto 28px;
-        max-width: 880px;
-        border-radius: 22px;
-        overflow: hidden;
-      }
-      .promo video {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 16/9;
-        background: #cfe6fb;
-      }
-      .promo figcaption {
-        padding: 10px 16px 12px;
-        font-size: 14px;
-        color: var(--ink2);
-        text-align: center;
       }
       .fcard .shot {
         aspect-ratio: 16/9;
@@ -3106,22 +3146,42 @@ complete still page with one sky colour per section.
         </div>
 
         <div class="hero-mac" id="heroMac">
-          <div class="mac">
-            <div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>SKYCOT</b></div>
-            <div class="screen ph">
-              <img
-                src="assets/fam-starters.jpg"
-                width="1200"
-                height="707"
-                fetchpriority="high"
-                alt="SKYCOT's Home in the Workshop look greeting Ava with Good afternoon, and eight colourful starter cards such as Make a game, A page about my pet, A birthday card and Draw it, then build it."
+          <div class="mac film">
+            <video
+              id="heroFilm"
+              muted
+              loop
+              playsinline
+              preload="auto"
+              poster="assets/video/poster-hero.jpg"
+              width="1600"
+              height="900"
+              aria-label="A 30-second tour of SKYCOT: tap an idea or say it, draw a rocket and SKYCOT builds it, a grown-up's code before anything goes online, private details kept private, bedtime, and stickers, the family fridge and the weekly recap."
+            >
+              <source
+                src="https://downloads.skycot.com/media/skycot-hero-1600.mp4"
+                type="video/mp4"
               />
-            </div>
+            </video>
+            <button
+              class="film-btn"
+              id="heroFilmBtn"
+              type="button"
+              aria-label="Play the video"
+              hidden
+            >
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5.5v13l11-6.5z" />
+              </svg>
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+              </svg>
+            </button>
           </div>
         </div>
         <p class="caption">
-          Early build: Home in the Workshop look, with the Family profile on for a sample child
-          called Ava. Plain English, on your own Mac, with the AI you already pay for.
+          Beta screens with a sample family. Plain English, on your own Mac, with the AI you already
+          pay for.
         </p>
       </section>
 
@@ -3150,27 +3210,6 @@ complete still page with one sky colour per section.
               by talking, or even by drawing.
             </p>
           </div>
-
-          <figure class="promo glass reveal">
-            <video
-              controls
-              playsinline
-              muted
-              preload="none"
-              poster="assets/video/poster-16x9.jpg"
-              width="1920"
-              height="1080"
-              aria-label="A 30-second tour of SKYCOT: tap an idea or say it, draw a rocket and SKYCOT builds it, a grown-up's code before anything goes online, private details kept private, bedtime, and stickers, the family fridge and the weekly recap."
-            >
-              <source
-                src="https://downloads.skycot.com/media/skycot-beta-launch-16x9.mp4"
-                type="video/mp4"
-              />
-            </video>
-            <figcaption>
-              Watch it in 30 seconds. No sound needed. Beta screens with a sample family.
-            </figcaption>
-          </figure>
 
           <article class="rk glass reveal" aria-labelledby="rk-title">
             <div class="rk-stage" id="rkStage">
@@ -5468,6 +5507,55 @@ complete still page with one sky colour per section.
             measure();
             kick();
           });
+
+        /* ---------- the hero film ---------- */
+        /* Plays by itself, muted and looping, once the frame has risen in. Reduce motion shows
+           the still poster and a play button instead. It pauses off-screen, and the button
+           pauses or plays it at any time. */
+        (function () {
+          var film = $("#heroFilm"),
+            btn = $("#heroFilmBtn");
+          if (!film || !btn) return;
+          var wanted = motion,
+            started = false,
+            onScreen = true;
+          function show() {
+            var playing = !film.paused;
+            btn.hidden = false;
+            if (playing) btn.setAttribute("data-playing", "");
+            else btn.removeAttribute("data-playing");
+            btn.setAttribute("aria-label", playing ? "Pause the video" : "Play the video");
+          }
+          function sync() {
+            if (wanted && started && onScreen) {
+              var p = film.play();
+              if (p && p.catch)
+                p.catch(function () {
+                  wanted = false;
+                  show();
+                });
+            } else film.pause();
+          }
+          film.addEventListener("play", show);
+          film.addEventListener("pause", show);
+          btn.addEventListener("click", function () {
+            wanted = film.paused;
+            started = true;
+            sync();
+          });
+          if ("IntersectionObserver" in window) {
+            new IntersectionObserver(function (e) {
+              onScreen = e[0].isIntersecting;
+              sync();
+            }).observe(film);
+          }
+          show();
+          if (wanted)
+            setTimeout(function () {
+              started = true;
+              sync();
+            }, 2600);
+        })();
       })();
     </script>
   </body>
