@@ -505,7 +505,7 @@ switching the profile off gives their setup back.
 | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Codex** (ChatGPT)                                                | A separate Codex is started for the child with Codex's own switches off on its command line, where neither the grown-up's settings nor a project can turn them back on: plugins, apps and connectors, hooks, computer use, browser use, remote plugins and plugin suggestions, memories, Codex's bundled skills, and `notify` emptied. Before every conversation starts or resumes, the engine asks that Codex which MCP servers and skills it can see and switches each one off by name, read fresh each time so one added a minute ago is included. |
 | **Claude**                                                         | Every Claude session is opened reading no settings files (so no enabled plugin, hook, permission rule or the grown-up's CLAUDE.md), with only SKYCOT's MCP servers (none in the Family profile), no plugins, no skills, hooks off, claude.ai connectors off and Claude in Chrome off.                                                                                                                                                                                                                                                                 |
-| Cursor, OpenCode, Grok, Antigravity, Pi, Muse and other ACP agents | Not started for a child. SKYCOT cannot switch their add-ons off yet, so the conversation shows: _"The Family profile is on, and SKYCOT can't switch off …'s own add-ons … A grown-up can pick Codex or Claude for this conversation, or switch the Family profile off."_ A provider added in a later version is refused the same way until SKYCOT can lock it down.                                                                                                                                                                                   |
+| Cursor, OpenCode, Grok, Antigravity, Pi, Muse and other ACP agents | Not started for a child **until a grown-up allows that assistant** (see [Other assistants: a grown-up's choice](#other-assistants-a-grown-ups-choice)). SKYCOT can't switch their own add-ons off, so until then the conversation shows a card for the child ("Ask a grown-up to say yes") with **Allow … for the Family profile…** for the grown-up. Once allowed, the assistant starts with its own add-ons, as the parent's informed choice. A provider added in a later version is refused the same way until a grown-up allows it.               |
 | Titles and other text SKYCOT writes with AI                        | The same rule: Codex's `codex exec` runs with the same switches off (plugins, apps and MCP servers were already off), Claude's with hooks off (it already runs with no tools and no MCP server), and any other provider is not used for it.                                                                                                                                                                                                                                                                                                           |
 
 **It fails closed.** Before a child's first Codex conversation starts, that Codex must report
@@ -520,6 +520,44 @@ Codex settings, installs anything, or calls an MCP tool.
 the child next sends anything, and a fresh one starts without the add-ons (a reply it was in the
 middle of stops). Until then it refuses new conversations, turns and follow-ups. After the profile
 is switched off, the child-safe assistant is replaced by the grown-up's normal one once it is idle.
+
+### Other assistants: a grown-up's choice
+
+Every assistant SKYCOT can drive is available in the Family profile, but the ones SKYCOT can't
+lock down (everything except Codex and Claude) only start for a child once a grown-up has allowed
+them, one assistant at a time, with the parent code. It's the parent's choice for their children;
+SKYCOT's job is to show the terms plainly first.
+
+- **Where.** In the conversation, the refused message shows "Ask a grown-up to say yes" for the
+  child and **Allow Cursor for the Family profile…** for the grown-up. In **Settings › Family › AI
+  assistants for children**, every assistant is listed as **Locked down** (Codex, Claude),
+  **Allowed by a grown-up** or **Not allowed**, with **Allow…** or **Stop allowing**.
+- **What the grown-up reads first** (the allow sheet, Cancel first): (1) that assistant's own age
+  rules, as the site's FAQ states them ("As of October 2026, Anthropic's Claude and Cursor require
+  every user to be 18 or over, and OpenAI's terms allow 13 to 17 year olds with a parent's
+  permission; Google sets its own rules for Gemini and Antigravity"), or "Check …'s own terms for
+  age rules" where SKYCOT states no fact, with a link to the provider's terms only where SKYCOT's
+  legal notes already cite one (OpenAI, Anthropic, Cursor, Antigravity, Grok); (2) that SKYCOT can't
+  switch off that assistant's own add-ons (plugins, connectors and helper tools set up on this
+  computer), so a child using it may reach them, while SKYCOT's other Family rules still apply.
+  Then the parent code. Codex's and Claude's age rules also show where a parent picks an assistant
+  for a child (the welcome steps and Settings › AI assistants); they need no allowance.
+- **How it is kept.** The allowance lives in the engine's profile file (`allowedAssistants` in
+  `skycot-family.json`), next to the children and the code. Allowing takes the parent code with
+  that one request; a wrong code counts towards the same five tries and five-minute wait as every
+  other prompt, and leaves no "yes" open afterwards. Codex and Claude can't be put on the list (they
+  are locked down anyway); a hand-edited file can't unlock them either. Allowing is for every child
+  in the profile, and turning the profile off forgets it.
+- **Stopping.** **Stop allowing** needs no code: it only makes the profile stricter, so a child
+  pressing it loses nothing a grown-up can't give back. It counts at once: an allowed assistant's
+  conversation that is still open refuses its next message and is closed, and a new one is refused
+  before it starts.
+- **Honest limits.** An allowed assistant runs with whatever its own add-ons can do on this Mac
+  (computer use, browser control, connectors), which can go around SKYCOT's checks the same way the
+  lockdown for Codex and Claude exists to prevent. Ask first and plan first are held by the engine
+  for every assistant, but how faithfully an assistant asks before its own tools act depends on how
+  it reports them to SKYCOT. The age facts are as of October 2026 and the providers can change them;
+  SKYCOT doesn't check a child's age or the parent's account type.
 
 ## What the engine checks
 
@@ -592,6 +630,8 @@ Honestly, so a parent can decide how nearby to stay:
 - **Codex still reads the grown-up's `AGENTS.md`** (instructions in words, not tools), and Codex
   itself marks a child's project folder as trusted in the grown-up's `~/.codex/config.toml`, as it
   does for any folder it works in. SKYCOT does not edit that file.
+- **An assistant a grown-up allowed** (anything other than Codex and Claude) keeps its own add-ons,
+  which can reach outside SKYCOT; see [Other assistants: a grown-up's choice](#other-assistants-a-grown-ups-choice).
 - **Settings an administrator manages** (an organisation's managed Codex or Claude settings, which
   a family Mac does not normally have) still apply as Codex and Claude intend.
 - **Checking which providers SKYCOT can use** starts Codex and Claude briefly with the grown-up's

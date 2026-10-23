@@ -380,6 +380,35 @@ const moreTimeRoute = route(
     }),
 );
 
+/**
+ * "Allow Cursor for the Family profile": an assistant SKYCOT can't lock down starts for a child
+ * once a grown-up allowed it. The code goes with the one request (counted like every other try);
+ * no grant is left open. Codex and Claude are refused: they are locked down already.
+ */
+const allowAssistantRoute = route(
+  "POST",
+  "/assistants/allow",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .allowAssistant({ code: text(body["code"]), driver: text(body["driver"]) })
+      .pipe(Effect.map((status) => json(status))),
+);
+
+/**
+ * "Stop allowing": no code, since it only makes the profile stricter (a child pressing it
+ * loses nothing a grown-up cannot give back). That assistant's next Family turn is refused.
+ */
+const stopAllowingAssistantRoute = route(
+  "POST",
+  "/assistants/stop",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .stopAllowingAssistant({ driver: text(body["driver"]) })
+      .pipe(Effect.map((status) => json(status))),
+);
+
 const lockRoute = route("POST", "/lock", AuthOrchestrationOperateScope, ({ family, sessionId }) =>
   family.lock({ sessionId }).pipe(
     Effect.andThen(family.status),
@@ -562,6 +591,8 @@ export const layerCore = Layer.mergeAll(
   heartbeatRoute,
   todayRoute,
   moreTimeRoute,
+  allowAssistantRoute,
+  stopAllowingAssistantRoute,
   lockRoute,
 );
 

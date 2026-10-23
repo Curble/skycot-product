@@ -2,8 +2,9 @@
 // Family lockdown for the engine's own background AI calls: a conversation's title, and the
 // commit message, branch name, pull-request text and review guide a grown-up may ask for.
 // They run the provider's CLI on the child's words, so they follow the same rule as the
-// child's session (SkycotFamilyLockdown.ts): while the profile is on, only Codex and Claude,
-// each without the parent's add-ons.
+// child's session (SkycotFamilyLockdown.ts): while the profile is on, Codex and Claude, each
+// without the parent's add-ons, and any other provider only once a grown-up allowed it for the
+// Family profile (then as upstream runs it).
 //
 // The first live check of the lockdown found the gap this closes: the child's Codex session
 // started clean, but T3's title generator (`codex exec`) still ran the parent's `notify`
@@ -54,6 +55,12 @@ export const lockTextGeneration = Effect.fn("SkycotFamilyTextGeneration.lockText
           input.modelSelection.instanceId as Parameters<typeof registry.getInstance>[0],
         );
         const driver = instance?.driverKind;
+        if (
+          driver !== undefined &&
+          (yield* SkycotFamilyLockdown.allowedUnlocked(family.value, driver))
+        ) {
+          return yield* run(input);
+        }
         if (driver === undefined || !SkycotFamilyLockdown.LOCKED_DOWN_DRIVERS.has(driver)) {
           return yield* new TextGenerationError({
             operation,

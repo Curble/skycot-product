@@ -296,6 +296,42 @@ it.layer(
     }),
   );
 
+  it.effect("allows an assistant only with the parent code; stopping needs none", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const post = (resource: string, body: unknown) =>
+        send("POST", `/api/skycot/family${resource}`, { body }).pipe(
+          Effect.flatMap((response) =>
+            response.json.pipe(
+              Effect.map((json) => ({
+                status: response.status,
+                json: json as Record<string, any>,
+              })),
+            ),
+          ),
+        );
+      yield* post("/enable", { code: CODE, childName: "Ava" });
+      const wrong = yield* post("/assistants/allow", { driver: "cursor", code: "000000" });
+      assert.equal(wrong.json["error"], "wrong-code");
+      assert.equal(wrong.json["attemptsLeft"], SkycotFamily.MAX_ATTEMPTS - 1);
+      const codex = yield* post("/assistants/allow", { driver: "codex", code: CODE });
+      assert.equal(codex.status, 400);
+      const allowed = yield* post("/assistants/allow", { driver: "cursor", code: CODE });
+      assert.equal(allowed.status, 200);
+      assert.deepEqual(allowed.json["allowedAssistants"], ["cursor"]);
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as Record<
+        string,
+        any
+      >;
+      assert.deepEqual(status["allowedAssistants"], ["cursor"]);
+      // No grant is left open by allowing: the code went with that one request.
+      assert.deepEqual(status["grants"], []);
+      const stopped = yield* post("/assistants/stop", { driver: "cursor" });
+      assert.equal(stopped.status, 200);
+      assert.deepEqual(stopped.json["allowedAssistants"], []);
+    }),
+  );
+
   it.effect("keeps several children: changes need a grown-up's yes, choosing does not", () =>
     Effect.gen(function* () {
       const { send } = yield* makeClient();

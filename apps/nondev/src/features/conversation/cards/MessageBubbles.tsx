@@ -5,6 +5,8 @@ import { CircleAlert, MousePointerClick } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 
 import { describeTurnItem } from "../../../plain/narration";
+import { isAssistantRefusal } from "../../family/assistantAllowance";
+import { AssistantRefusalNote } from "./AssistantRefusalNote";
 import { Mascot } from "../../brand/Mascot";
 import { useCrew } from "../../../themes/useCrew";
 import { Bubble, TypingIndicator } from "../../../ui/Bubble";
@@ -107,6 +109,20 @@ export function CrewBubble({ item }: { readonly item: AssistantMessage }) {
 }
 
 export function ErrorNote({
+  item,
+  context,
+}: {
+  readonly item: ErrorItem;
+  readonly context: TimelineRenderContext;
+}) {
+  // The Family profile refused an assistant nobody allowed: a grown-up card, not an error.
+  if (isAssistantRefusal(item.failure.message)) {
+    return <AssistantRefusalNote item={item} context={context} />;
+  }
+  return <FailureNote item={item} context={context} />;
+}
+
+function FailureNote({
   item,
   context,
 }: {

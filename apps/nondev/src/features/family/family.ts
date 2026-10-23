@@ -133,6 +133,17 @@ export interface ServerFamilyStatus {
   readonly timeZone: string | null;
   /** Who is using SKYCOT on this device; only the status read carries it. */
   readonly session?: SessionLimits;
+  /**
+   * Assistants SKYCOT can't lock down that a grown-up allowed (driver ids, "cursor"). An
+   * engine from before this sends none.
+   */
+  readonly allowedAssistants?: ReadonlyArray<string>;
+}
+
+function parseAllowedAssistants(value: unknown): ReadonlyArray<string> {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
@@ -185,6 +196,7 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     ...(parseSessionLimits(record["session"]) === null
       ? {}
       : { session: parseSessionLimits(record["session"])! }),
+    allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
   };
 }
 
@@ -271,6 +283,8 @@ export interface FamilyView {
   readonly source: "engine" | "cache";
   /** A profile set up before the engine kept it, still only in this browser. */
   readonly legacy: boolean;
+  /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
+  readonly allowedAssistants: ReadonlyArray<string>;
 }
 
 export const EMPTY_VIEW: FamilyView = {
@@ -286,6 +300,7 @@ export const EMPTY_VIEW: FamilyView = {
   openUntil: {},
   source: "cache",
   legacy: false,
+  allowedAssistants: [],
 };
 
 /**
@@ -341,6 +356,7 @@ export function viewFromStatus(
     source: "engine",
     // Once the engine has a profile, the browser copy is history.
     legacy: legacy && !status.enabled,
+    allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
   };
 }
 
@@ -368,6 +384,7 @@ export function parseCachedView(raw: string | null, legacy: boolean): FamilyView
       children,
       currentChildId,
       timeZone: typeof record["timeZone"] === "string" ? record["timeZone"] : null,
+      allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
     };
   } catch {
     return base;
@@ -382,6 +399,7 @@ export function serializeCachedView(view: FamilyView): string {
     children: view.children,
     currentChildId: view.currentChildId,
     timeZone: view.timeZone,
+    allowedAssistants: view.allowedAssistants,
   });
 }
 

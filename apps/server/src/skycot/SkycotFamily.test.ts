@@ -41,6 +41,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               lockedForMs: 0,
               children: [],
               timeZone: "engine",
+              allowedAssistants: [],
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });

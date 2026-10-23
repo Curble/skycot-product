@@ -193,6 +193,19 @@ export function tryParentCode(
   );
 }
 
+/** A grown-up allows an assistant SKYCOT can't lock down, with the parent code. */
+export function allowAssistant(
+  driver: string,
+  code: string,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.allowAssistant({ driver, code }), applyStatus);
+}
+
+/** Takes an allowance back (no code). That assistant's next Family turn is refused. */
+export function stopAllowingAssistant(driver: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.stopAllowingAssistant({ driver }), applyStatus);
+}
+
 /** Ends this device's grants (a parent leaving Advanced mode). */
 export function lockFamilyGrants(): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.lock(), applyStatus);

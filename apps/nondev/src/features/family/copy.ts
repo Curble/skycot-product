@@ -16,6 +16,7 @@ export const familyCopy = {
     "Anything that uses the internet, installs something, deletes files or reaches outside the project waits for a grown-up's parent code.",
     "Publishing, automations, opening another folder, changing the AI assistants and the developer tools all ask for the parent code.",
     "The assistant is told it is helping a child: kind, simple, age-appropriate, and never asking for personal details.",
+    "Codex and Claude start without this Mac's own AI add-ons. Any other assistant waits until a grown-up allows it with the parent code, after reading its age rules.",
     "Uses the Workshop look and larger text (both can be changed).",
   ],
   doesNot: [
