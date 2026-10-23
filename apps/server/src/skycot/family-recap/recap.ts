@@ -117,6 +117,8 @@ export interface RecapReport {
     readonly shield: Readonly<Record<string, number>>;
     /** Messages a grown-up let go as typed. */
     readonly shieldAllowed: number;
+    /** Yeses given from a grown-up's own device: when, and which device (by its name then). */
+    readonly fromDevices: ReadonlyArray<{ readonly at: number; readonly device: string }>;
   };
   readonly proudOf: {
     readonly threadId: string;
@@ -319,6 +321,11 @@ export function buildRecap(input: {
       moreTime: activity.log.filter((entry) => entry.childId === childId && inRange(entry.at)),
       shield,
       shieldAllowed: events.filter((event) => event.kind === "shield-allowed").length,
+      fromDevices: events.flatMap((event) =>
+        event.kind === "approved" && event.by !== undefined
+          ? [{ at: event.at, device: event.by.deviceName }]
+          : [],
+      ),
     },
     proudOf,
   };

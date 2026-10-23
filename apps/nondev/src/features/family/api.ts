@@ -6,6 +6,7 @@ import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target"
 
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
 import type { ChildAvatar, ChildLimits, ChildVoice } from "./children";
+import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
 import {
   ENGINE_UNREACHABLE,
   parseServerStatus,
@@ -155,6 +156,68 @@ export const familyApi = {
   /** No code: taking an allowance back only makes the profile stricter. */
   stopAllowingAssistant: (input: { readonly driver: string }) =>
     request("POST", "/assistants/stop", input, parseServerStatus),
+  // Who is who: people and devices (the family's Mac, with the Family settings' yes).
+  devices: () => request("GET", "/devices", undefined, parseDeviceRows),
+  linkDevice: (input: {
+    readonly kind: DeviceKind;
+    readonly personId: string;
+    readonly name: string | null;
+  }) => request("POST", "/devices/link", input, parseDeviceLink),
+  removeDevice: (input: { readonly deviceId: string }) =>
+    request("POST", "/devices/remove", input, parseDeviceRows),
+  addGrownUp: (person: { readonly name: string | null; readonly avatar?: ChildAvatar }) =>
+    request("POST", "/people/add", { person }, parseServerStatus),
+  updateGrownUp: (input: {
+    readonly personId: string;
+    readonly patch: { readonly name?: string | null; readonly avatar?: ChildAvatar };
+  }) => request("POST", "/people/update", input, parseServerStatus),
+  removeGrownUp: (input: { readonly personId: string }) =>
+    request("POST", "/people/remove", input, parseServerStatus),
+  // A grown-up's own device.
+  pendingRequests: () => request("GET", "/approver/requests", undefined, parsePendingRequests),
+  answerRequest: (input: {
+    readonly threadId: string;
+    readonly requestId: string;
+    readonly decision: "accept" | "decline";
+    readonly fingerprint: string;
+    readonly proof: ApproverProof | null;
+  }) => request("POST", "/approver/answer", input, okOnly),
+  approverChallenge: (input: Record<string, string>) =>
+    request("POST", "/approver/challenge", input, anyObject),
+  approverMoreTime: (input: {
+    readonly childId: string;
+    readonly kind: "extra15" | "extra30" | "endBedtime";
+    readonly proof: ApproverProof | null;
+  }) => request("POST", "/approver/more-time", input, okOnly),
+  lockEverything: () => request("POST", "/approver/lock-all", {}, okOnly),
+  passkeyOptions: (input: { readonly code: string }) =>
+    request("POST", "/devices/passkey/options", input, anyObject),
+  passkeyRegister: (input: { readonly challenge: string; readonly response: unknown }) =>
+    request("POST", "/devices/passkey/register", input, okOnly),
+  passkeyForget: () => request("POST", "/devices/passkey/forget", {}, okOnly),
+  unlinkSelf: () => request("POST", "/devices/unlink-self", {}, okOnly),
 } satisfies Record<string, (...args: never[]) => Promise<FamilyResult<unknown>>>;
+
+/** How a grown-up's device proves it is the grown-up for a yes: Face ID (a passkey) or the code. */
+export type ApproverProof =
+  | { readonly type: "code"; readonly code: string }
+  | {
+      readonly type: "passkey";
+      readonly credentialId: string;
+      readonly challenge: string;
+      readonly response: unknown;
+    };
+
+function okOnly(body: unknown): true | null {
+  return typeof body === "object" &&
+    body !== null &&
+    (body as Record<string, unknown>)["ok"] === true
+    ? true
+    : null;
+}
+
+function anyObject(body: unknown): Record<string, unknown> | null {
+  return typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
+}
 
 export type { FamilyResult, ServerFamilyStatus, SessionLimits };

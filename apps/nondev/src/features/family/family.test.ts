@@ -8,6 +8,7 @@ import {
   MAX_ATTEMPTS,
   attemptsLeft,
   codeStrength,
+  currentChildOf,
   createProfile,
   digitsOnly,
   hashCode,
@@ -233,7 +234,39 @@ describe("the engine's answers", () => {
       children: [],
       timeZone: null,
       allowedAssistants: [],
+      grownUps: [],
+      devices: [],
     });
+  });
+
+  it("knows a linked device only from the engine's own answer", () => {
+    const base = {
+      enabled: true,
+      childName: null,
+      createdAt: null,
+      attemptsLeft: 5,
+      lockedForMs: 0,
+    };
+    expect(parseServerStatus(base)?.me).toBeUndefined();
+    expect(
+      parseServerStatus({
+        ...base,
+        me: { kind: "child", deviceId: "d1", deviceName: "Ava's iPad", childId: "c1" },
+      })?.me,
+    ).toEqual({ kind: "child", deviceId: "d1", deviceName: "Ava's iPad", childId: "c1" });
+    expect(parseServerStatus({ ...base, me: { kind: "grown-up" } })?.me).toEqual({
+      kind: "shared",
+    });
+    // A linked device is never asked "Who's using SKYCOT?", whatever else it knows.
+    const children = [{ id: "a" }, { id: "b" }] as never;
+    expect(
+      currentChildOf(children, { childId: null, needsChoice: false, device: "grown-up" }, null)
+        .needsChoice,
+    ).toBe(false);
+    expect(
+      currentChildOf(children, { childId: null, needsChoice: true, device: "shared" }, null)
+        .needsChoice,
+    ).toBe(true);
   });
 
   it("turns a lock into a local deadline and retires a moved browser profile", () => {

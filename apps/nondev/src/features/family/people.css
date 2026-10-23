@@ -1,0 +1,65 @@
+/* Who is who: grown-ups, linked devices and the link sheet. Apple-like inset groups. */
+.fm-people-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fm-people-poses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fm-people-pose {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  padding: 2px;
+  background: none;
+  cursor: pointer;
+}
+.fm-people-pose--chosen {
+  border-color: var(--fm-accent);
+}
+.fm-people-pose:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+.fm-device-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fm-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.fm-link__qr {
+  width: min(240px, 70vw);
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--fm-sep);
+}
+.fm-link__code {
+  font-family: var(--fm-mono);
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  color: var(--fm-ink);
+  user-select: all;
+}
+.fm-link__url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.fm-link__url-text {
+  font-family: var(--fm-mono);
+  font-size: 12px;
+  color: var(--fm-label-secondary, #6e6e73);
+  overflow-wrap: anywhere;
+}

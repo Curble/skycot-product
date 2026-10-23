@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ServerProvider } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { Laptop } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
   peekPairingTokenFromUrl,
@@ -16,6 +16,7 @@ import { PRODUCT_NAME } from "./brand";
 import { AutomationsScreen } from "./features/automations/AutomationsScreen";
 import { FamilyProvider, useFamily } from "./features/family/FamilyProvider";
 import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
+import { GrownUpApp } from "./features/grown-up/GrownUpApp";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { FridgeScreen } from "./features/fridge/FridgeScreen";
@@ -120,73 +121,87 @@ export function App() {
 
   return (
     <FamilyProvider>
-      <SidebarSheetsHost>
-        <AppShell route={route}>
-          <OnboardingGate route={route} />
-          {(() => {
-            switch (route.name) {
-              case "home":
-              case "new":
-              case "pair":
-              case "welcome":
-                return <HomeRoute showBack={route.name === "new" && columns === 1} />;
-              case "settings":
-                return <SettingsScreen section={route.section} />;
-              case "recap":
-                return <SettingsScreen section="family" recapChildId={route.childId} />;
-              case "fridge":
-                return <FridgeScreen />;
-              case "files":
-                return (
-                  <FilesScreen
-                    key={`${route.projectId}:${route.threadId ?? ""}`}
-                    environmentId={route.environmentId}
-                    projectId={route.projectId}
-                    threadId={route.threadId}
-                  />
-                );
-              case "stickers":
-                return <StickerBook showBack={columns === 1} />;
-              case "certificate":
-                return <CertificateScreen kind={route.kind} />;
-              case "thread":
-                return (
-                  <ThreadRoute
-                    environmentId={route.environmentId}
-                    threadId={route.threadId}
-                    showBack={columns === 1}
-                  />
-                );
-              case "automations":
-                return <AutomationsScreen />;
-              case "people":
-                return <PeopleScreen />;
-              case "not-found":
-                return (
-                  <StandalonePage>
-                    <span className="fm-standalone__art">
-                      <Mascot pose="thinking" size={88} />
-                    </span>
-                    {/* An h2: the title bar already carries the page's h1. */}
-                    <h2 className="fm-standalone__title">There's nothing here</h2>
-                    <p className="fm-standalone__text">
-                      That link doesn't go anywhere in {PRODUCT_NAME}.
-                    </p>
-                    <div className="fm-standalone__actions">
-                      <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
-                        Go home
-                      </Button>
-                    </div>
-                  </StandalonePage>
-                );
-            }
-          })()}
-        </AppShell>
-        <FamilyLimitsHost />
-        <BadgeHost />
-      </SidebarSheetsHost>
+      <WhoIsWho>
+        <SidebarSheetsHost>
+          <AppShell route={route}>
+            <OnboardingGate route={route} />
+            {(() => {
+              switch (route.name) {
+                case "home":
+                case "new":
+                case "pair":
+                case "welcome":
+                  return <HomeRoute showBack={route.name === "new" && columns === 1} />;
+                case "settings":
+                  return <SettingsScreen section={route.section} />;
+                case "recap":
+                  return <SettingsScreen section="family" recapChildId={route.childId} />;
+                case "fridge":
+                  return <FridgeScreen />;
+                case "files":
+                  return (
+                    <FilesScreen
+                      key={`${route.projectId}:${route.threadId ?? ""}`}
+                      environmentId={route.environmentId}
+                      projectId={route.projectId}
+                      threadId={route.threadId}
+                    />
+                  );
+                case "stickers":
+                  return <StickerBook showBack={columns === 1} />;
+                case "certificate":
+                  return <CertificateScreen kind={route.kind} />;
+                case "thread":
+                  return (
+                    <ThreadRoute
+                      environmentId={route.environmentId}
+                      threadId={route.threadId}
+                      showBack={columns === 1}
+                    />
+                  );
+                case "automations":
+                  return <AutomationsScreen />;
+                case "people":
+                  return <PeopleScreen />;
+                case "not-found":
+                  return (
+                    <StandalonePage>
+                      <span className="fm-standalone__art">
+                        <Mascot pose="thinking" size={88} />
+                      </span>
+                      {/* An h2: the title bar already carries the page's h1. */}
+                      <h2 className="fm-standalone__title">There's nothing here</h2>
+                      <p className="fm-standalone__text">
+                        That link doesn't go anywhere in {PRODUCT_NAME}.
+                      </p>
+                      <div className="fm-standalone__actions">
+                        <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
+                          Go home
+                        </Button>
+                      </div>
+                    </StandalonePage>
+                  );
+              }
+            })()}
+          </AppShell>
+          <FamilyLimitsHost />
+          <BadgeHost />
+        </SidebarSheetsHost>
+      </WhoIsWho>
     </FamilyProvider>
   );
+}
+
+/**
+ * A grown-up's own phone gets its own small app (requests, children, this device) instead of
+ * the child's workspace: the engine says which device this is, never this browser.
+ */
+function WhoIsWho({ children }: { readonly children: React.ReactNode }) {
+  const family = useFamily();
+  if (family.profile.source === "engine" && family.profile.me.kind === "grown-up") {
+    return <GrownUpApp />;
+  }
+  return <>{children}</>;
 }
 
 const EMPTY_PROVIDERS_ATOM = Atom.make<ReadonlyArray<ServerProvider> | null>(null).pipe(

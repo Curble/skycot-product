@@ -58,7 +58,7 @@ const record = (value: unknown): Record<string, unknown> =>
 const numberOrNull = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
-function parseAvatar(value: unknown): ChildAvatar {
+export function parseAvatar(value: unknown): ChildAvatar {
   const input = record(value);
   if (
     input["kind"] === "mascot" &&

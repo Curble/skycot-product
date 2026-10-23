@@ -11,6 +11,8 @@ import {
   submitServerAuthCredential,
 } from "~/environments/primary/auth";
 
+import { normaliseLinkCode } from "@t3tools/skycot-rules/people";
+
 import { CLI_NAME, PRODUCT_NAME } from "../brand";
 import { Mascot } from "../features/brand/Mascot";
 import { Banner } from "../ui/Banner";
@@ -37,7 +39,7 @@ export function PairRoute({
   const submitCredential = async (nextCredential: string) => {
     setIsSubmitting(true);
     setProblem("");
-    const submitError = await submitServerAuthCredential(nextCredential).then(
+    const submitError = await submitServerAuthCredential(typedCode(nextCredential)).then(
       () => null,
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
@@ -120,6 +122,16 @@ export function PairRoute({
       </div>
     </StandalonePage>
   );
+}
+
+/**
+ * A code typed from the Mac's screen ("7KQ3 M9XD 2HPA", any case): one-time codes are twelve
+ * capital letters and digits, so spaces, dashes and lower case are forgiven. Anything else
+ * (a longer credential pasted whole) goes as it is.
+ */
+function typedCode(value: string): string {
+  const normalised = normaliseLinkCode(value);
+  return /^[2-9A-HJ-NP-Z]{12}$/.test(normalised) ? normalised : value.trim();
 }
 
 function calmPairingError(message: string): string {

@@ -107,7 +107,10 @@ function LimitsCover({
   const { session } = useLimits();
   const child = currentChild(view);
   const several = view.children.length > 1;
-  if (requested || view.needsChoice || (several && !picked)) {
+  // Only the family's Mac asks "Who's using SKYCOT?": a child's own device is always that
+  // child, and a grown-up's device is nobody's child (the engine says which, never this tab).
+  const shared = view.me.kind === "shared";
+  if (shared && (requested || view.needsChoice || (several && !picked))) {
     return (
       <ChildPicker
         dismissible={requested && !view.needsChoice}
@@ -127,7 +130,7 @@ function LimitsCover({
         state={limits}
         timeZone={view.timeZone ?? deviceTimeZone()}
         now={now}
-        onSomeoneElse={several ? openChildPicker : null}
+        onSomeoneElse={several && shared ? openChildPicker : null}
       />
     );
   }

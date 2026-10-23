@@ -67,6 +67,8 @@ export interface RecapReport {
     readonly moreTime: ReadonlyArray<MoreTimeEntry>;
     readonly shield: Readonly<Record<string, number>>;
     readonly shieldAllowed: number;
+    /** Yeses from a grown-up's own device. Older engines leave it out. */
+    readonly fromDevices?: ReadonlyArray<{ readonly at: number; readonly device: string }>;
   };
   readonly proudOf: {
     readonly threadId: string;
@@ -156,6 +158,9 @@ export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">):
     );
   } else if (approved > 0) {
     lines.push(`A grown-up allowed ${plural(approved, "step")} with the parent code.`);
+  }
+  for (const entry of report.grownUp.fromDevices ?? []) {
+    lines.push(`Approved from ${entry.device}, ${clockPhrase(entry.at, report.timeZone)}.`);
   }
   for (const entry of moreTime) {
     const when = clockPhrase(entry.at, report.timeZone);

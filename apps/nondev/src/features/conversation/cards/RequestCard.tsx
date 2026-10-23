@@ -385,7 +385,14 @@ export function RequestCard({
               </pre>
             </Disclosure>
           </CardBody>
-          {decided || item.type !== "approval_request" ? null : (
+          {decided || item.type !== "approval_request" ? null : family.profile.me.kind ===
+            "grown-up" ? (
+            // A grown-up's phone answers on its Requests page (Allow once or Decline, checked
+            // there by the engine); this page only reads.
+            <CardFooter>
+              <p className="fm-help">Answer this on the Requests page.</p>
+            </CardFooter>
+          ) : (
             <CardFooter>
               <div className="fm-approval__actions">
                 {orderOptions(shown.options).map((option) => (

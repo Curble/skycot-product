@@ -1,0 +1,115 @@
+/* A grown-up's own phone: one column, Apple-like inset groups, roomy touch targets. */
+.fm-grownup {
+  min-height: 100dvh;
+  background: var(--fm-bg-window);
+  color: var(--fm-ink);
+  max-width: 680px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.fm-grownup--thread {
+  max-width: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+.fm-grownup--recap {
+  max-width: 900px;
+  padding: 0;
+}
+.fm-grownup__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 16px;
+}
+.fm-grownup__title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.fm-grownup__sub {
+  margin: 2px 0 0;
+  color: var(--fm-label-secondary, #6e6e73);
+}
+.fm-grownup__tabs {
+  margin-bottom: 16px;
+}
+.fm-grownup__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fm-grownup__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fm-grownup__card {
+  background: var(--fm-bg-card);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fm-grownup__card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fm-grownup__card-head b {
+  display: block;
+  font-size: 16px;
+}
+.fm-grownup__card-head small {
+  color: var(--fm-label-secondary, #6e6e73);
+}
+.fm-grownup__card-what {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+.fm-grownup__card-what code {
+  font-family: var(--fm-mono);
+  font-weight: 400;
+  font-size: 13px;
+  background: var(--fm-bg-fill);
+  border-radius: 8px;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+}
+.fm-grownup__card-why {
+  margin: 0;
+  color: var(--fm-label-secondary, #6e6e73);
+}
+.fm-grownup__card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fm-grownup__card-actions .fm-btn {
+  min-height: 44px;
+  justify-content: center;
+}
+.fm-grownup__child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fm-grownup__readonly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--fm-sep);
+  background: var(--fm-bg-toolbar);
+  color: var(--fm-label-secondary, #6e6e73);
+  font-size: 13px;
+}

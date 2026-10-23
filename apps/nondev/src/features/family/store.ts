@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 import { familyApi, type ChildPatch, type FamilyResult, type UnlockToken } from "./api";
+import type { ChildAvatar } from "./children";
 import {
   EMPTY_VIEW,
   FAMILY_CACHE_KEY,
@@ -228,4 +229,31 @@ export async function moveLegacyProfile(code: string): Promise<string | null> {
   }
   const moved = await enableFamily({ childName: legacy.childName, code });
   return moved.ok ? null : moved.message;
+}
+
+// Who is who: grown-ups (the family's Mac, with the Family settings' yes).
+export function addGrownUp(person: {
+  readonly name: string | null;
+  readonly avatar?: ChildAvatar;
+}) {
+  return settle(familyApi.addGrownUp(person), applyStatus);
+}
+
+export function updateGrownUp(
+  personId: string,
+  patch: { readonly name?: string | null; readonly avatar?: ChildAvatar },
+) {
+  return settle(familyApi.updateGrownUp({ personId, patch }), applyStatus);
+}
+
+export function removeGrownUp(personId: string) {
+  return settle(familyApi.removeGrownUp({ personId }), applyStatus);
+}
+
+/**
+ * Any engine answer that may carry a code try (a grown-up's phone saying yes with the code):
+ * a wrong or locked code updates the counter shown here, like every other prompt.
+ */
+export function settleWithCode<A>(promise: Promise<FamilyResult<A>>): Promise<FamilyResult<A>> {
+  return settle(promise);
 }

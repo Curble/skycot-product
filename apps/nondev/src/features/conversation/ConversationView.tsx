@@ -425,7 +425,14 @@ export function ConversationView({
         />
       )}
 
-      {archived && shell ? (
+      {family.profile.me.kind === "grown-up" ? (
+        // A grown-up's phone reads only: no box to reply in (the engine refuses it anyway).
+        <div className="fm-composer">
+          <div className="fm-composer__inner">
+            <p className="fm-help">Read only on this device.</p>
+          </div>
+        </div>
+      ) : archived && shell ? (
         <PutAwayFooter shell={shell} canOperate={canOperate} />
       ) : (
         <ReplyComposer

@@ -43,6 +43,7 @@ import { FamilyAssistantsGroup } from "../../family/FamilyAssistantsGroup";
 import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
 import { useFamily } from "../../family/FamilyProvider";
+import { DevicesGroup, GrownUpsGroup, ThisDeviceRow } from "../../family/PeopleAndDevices";
 import { ParentCodeEntry, useParentCodeEntry } from "../../family/ParentCodeEntry";
 import { changeParentCode, lockFamilyGrants, moveLegacyProfile } from "../../family/store";
 import { speechService } from "../../voice/browser";
@@ -160,6 +161,13 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
 
       <ChildrenGroup />
 
+      {profile.me.kind === "shared" ? (
+        <>
+          <GrownUpsGroup />
+          <DevicesGroup />
+        </>
+      ) : null}
+
       <FamilyAssistantsGroup environmentId={environmentId} />
 
       <SettingsGroup title="Parent code" footer={familyCopy.storage}>
@@ -179,35 +187,37 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
 
       <FamilyVoiceGroup childName={profile.childName} />
 
-      <SettingsGroup
-        title="Developer tools"
-        footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on, and the engine sends its address back here unless a parent has entered the code. A parent can still open it from here.`}
-      >
-        <ListRow
-          leading={<StepBadge state="todo" icon={Wrench} />}
-          title={`Open ${ADVANCED_MODE_LABEL} (parent code)`}
-          subtitle="The full developer interface. The code opens it on this device for 15 minutes; publishing and approvals there are allowed for that time too."
-          trailing={
-            <Button size="sm" onClick={() => setAdvancedOpen(true)}>
-              Open…
-            </Button>
-          }
-        />
-        <ListRow
-          leading={<StepBadge state="todo" icon={KeyRound} />}
-          title="Lock again now"
-          subtitle={
-            openLine === null
-              ? "Nothing is open on this device. Every “yes” the parent code gives ends on its own, or here."
-              : `${openLine} Ends every “yes” the parent code gave on this device before it runs out.`
-          }
-          trailing={
-            <Button size="sm" onClick={() => void lockFamilyGrants()}>
-              Lock
-            </Button>
-          }
-        />
-      </SettingsGroup>
+      {profile.me.kind === "shared" ? (
+        <SettingsGroup
+          title="Developer tools"
+          footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on, and the engine sends its address back here unless a parent has entered the code. A parent can still open it from here.`}
+        >
+          <ListRow
+            leading={<StepBadge state="todo" icon={Wrench} />}
+            title={`Open ${ADVANCED_MODE_LABEL} (parent code)`}
+            subtitle="The full developer interface. The code opens it on this device for 15 minutes; publishing and approvals there are allowed for that time too."
+            trailing={
+              <Button size="sm" onClick={() => setAdvancedOpen(true)}>
+                Open…
+              </Button>
+            }
+          />
+          <ListRow
+            leading={<StepBadge state="todo" icon={KeyRound} />}
+            title="Lock again now"
+            subtitle={
+              openLine === null
+                ? "Nothing is open on this device. Every “yes” the parent code gives ends on its own, or here."
+                : `${openLine} Ends every “yes” the parent code gave on this device before it runs out.`
+            }
+            trailing={
+              <Button size="sm" onClick={() => void lockFamilyGrants()}>
+                Lock
+              </Button>
+            }
+          />
+        </SettingsGroup>
+      ) : null}
 
       <SettingsGroup title="Turn off" footer={familyCopy.honesty}>
         <ListRow
@@ -517,7 +527,8 @@ function ChildrenGroup() {
             }
           />
         ) : null}
-        {several ? (
+        <ThisDeviceRow />
+        {several && profile.me.kind === "shared" ? (
           <ListRow
             leading={<StepBadge state="todo" icon={ArrowLeftRight} />}
             title="Who's using SKYCOT on this device"

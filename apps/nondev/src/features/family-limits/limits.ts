@@ -31,6 +31,8 @@ export interface LimitState {
 export interface SessionLimits {
   readonly childId: string | null;
   readonly needsChoice: boolean;
+  /** The family's Mac (with the picker), a child's own device, or a grown-up's device. */
+  readonly device: "shared" | "child" | "grown-up";
   readonly limits: LimitState | null;
   readonly sentence: string | null;
 }
@@ -84,6 +86,8 @@ export function parseSessionLimits(value: unknown): SessionLimits | null {
   return {
     childId: typeof input["childId"] === "string" ? input["childId"] : null,
     needsChoice: input["needsChoice"] === true,
+    device:
+      input["device"] === "child" || input["device"] === "grown-up" ? input["device"] : "shared",
     limits: parseLimitState(input["limits"]),
     sentence: typeof input["sentence"] === "string" ? input["sentence"] : null,
   };

@@ -6,6 +6,15 @@
 // `skycot:family`) stays readable so a profile set up before the move can be carried over.
 // Nothing here touches the DOM or the network; store.ts and api.ts do.
 import { parseChildren, type FamilyChild } from "./children";
+import {
+  parseDevices,
+  parseGrownUps,
+  parseMe,
+  SHARED_ME,
+  type FamilyDeviceSummary,
+  type FamilyGrownUp,
+  type FamilyMe,
+} from "./people";
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
 
 export type FamilyAction =
@@ -138,6 +147,10 @@ export interface ServerFamilyStatus {
    * engine from before this sends none.
    */
   readonly allowedAssistants?: ReadonlyArray<string>;
+  readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
+  readonly devices?: ReadonlyArray<FamilyDeviceSummary>;
+  /** Who this device is; only the status read carries it (an older engine: the Mac). */
+  readonly me?: FamilyMe;
 }
 
 function parseAllowedAssistants(value: unknown): ReadonlyArray<string> {
@@ -197,6 +210,9 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
       ? {}
       : { session: parseSessionLimits(record["session"])! }),
     allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
+    grownUps: parseGrownUps(record["grownUps"]),
+    devices: parseDevices(record["devices"]),
+    ...("me" in record ? { me: parseMe(record["me"]) } : {}),
   };
 }
 
@@ -211,7 +227,18 @@ export type FamilyFailure =
   | "unauthenticated"
   | "forbidden"
   | "asleep"
-  | "unreachable";
+  | "unreachable"
+  // Who is who: a removed device, and the approver's answers.
+  | "removed"
+  | "gone"
+  | "lapsed"
+  | "changed"
+  | "proof-needed"
+  | "passkey"
+  | "insecure"
+  | "not-allowed"
+  | "failed"
+  | "unavailable";
 
 export type FamilyResult<A> =
   | { readonly ok: true; readonly value: A }
@@ -285,6 +312,10 @@ export interface FamilyView {
   readonly legacy: boolean;
   /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
   readonly allowedAssistants: ReadonlyArray<string>;
+  readonly grownUps: ReadonlyArray<FamilyGrownUp>;
+  readonly devices: ReadonlyArray<FamilyDeviceSummary>;
+  /** Who this device is: the family's Mac, a child's own device, or a grown-up's device. */
+  readonly me: FamilyMe;
 }
 
 export const EMPTY_VIEW: FamilyView = {
@@ -301,6 +332,9 @@ export const EMPTY_VIEW: FamilyView = {
   source: "cache",
   legacy: false,
   allowedAssistants: [],
+  grownUps: [],
+  devices: [],
+  me: SHARED_ME,
 };
 
 /**
@@ -309,14 +343,18 @@ export const EMPTY_VIEW: FamilyView = {
  */
 export function currentChildOf(
   children: ReadonlyArray<FamilyChild>,
-  session: Pick<SessionLimits, "childId" | "needsChoice"> | undefined,
+  session: Pick<SessionLimits, "childId" | "needsChoice" | "device"> | undefined,
   previous: string | null,
 ): { readonly currentChildId: string | null; readonly needsChoice: boolean } {
   const known = (id: string | null) =>
     id !== null && children.some((child) => child.id === id) ? id : null;
   if (session !== undefined) {
     const id = known(session.childId);
-    return { currentChildId: id, needsChoice: id === null && children.length > 1 };
+    // Only the family's Mac asks "Who's using SKYCOT?": a linked device belongs to one person.
+    return {
+      currentChildId: id,
+      needsChoice: id === null && children.length > 1 && session.device === "shared",
+    };
   }
   const kept = known(previous) ?? (children.length === 1 ? children[0]!.id : null);
   return { currentChildId: kept, needsChoice: kept === null && children.length > 1 };
@@ -332,7 +370,9 @@ export function viewFromStatus(
   status: ServerFamilyStatus,
   now: number,
   legacy: boolean,
-  previous: Pick<FamilyView, "openUntil" | "currentChildId"> = EMPTY_VIEW,
+  previous: Pick<FamilyView, "openUntil" | "currentChildId"> & {
+    readonly me?: FamilyMe;
+  } = EMPTY_VIEW,
 ): FamilyView {
   const choice = currentChildOf(status.children, status.session, previous.currentChildId);
   const child = status.children.find((candidate) => candidate.id === choice.currentChildId);
@@ -357,6 +397,10 @@ export function viewFromStatus(
     // Once the engine has a profile, the browser copy is history.
     legacy: legacy && !status.enabled,
     allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
+    grownUps: status.enabled ? (status.grownUps ?? []) : [],
+    devices: status.enabled ? (status.devices ?? []) : [],
+    // Answers other than the status read carry no `me`: keep what was known.
+    me: status.me ?? previous.me ?? SHARED_ME,
   };
 }
 
