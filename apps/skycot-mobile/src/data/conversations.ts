@@ -4,7 +4,11 @@
  * side (the plan's "Several Macs" decision). On a child's device the engine has already left
  * out everyone else's work; this only sorts and labels.
  */
-import { QUESTIONS_LABEL } from "@t3tools/skycot-rules/questions";
+import {
+  isQuestionsSpace,
+  questionsSpaceLabel,
+  questionsSpaceOf,
+} from "@t3tools/skycot-rules/questions";
 
 import type { ProjectShell, ShellSnapshot, ThreadShell } from "../engine/types";
 import type { Mac } from "../links/store";
@@ -46,8 +50,31 @@ export function stateLabel(state: ConversationRow["state"], builder: string): st
   }
 }
 
+/** One of the Mac's Questions spaces (Just ask): the shared one, or a child's own. */
 export function isQuestionsProject(project: ProjectShell | null, questionsRoot: string | null) {
-  return project !== null && questionsRoot !== null && project.workspaceRoot === questionsRoot;
+  return project !== null && isQuestionsSpace(project.workspaceRoot, questionsRoot);
+}
+
+/**
+ * What a conversation's project is called on this device. A Questions space: "Questions" on a
+ * child's own device (the Mac sends it only theirs), "Earlier questions" for the shared space
+ * the questions from before stay in; a grown-up's phone, which doesn't read where the Mac keeps
+ * them, shows the Mac's own title ("Ava's questions").
+ */
+export function projectTitleFor(
+  project: ProjectShell | null,
+  mac: Pick<Mac, "me">,
+  questionsRoot: string | null,
+): string {
+  const space = project === null ? null : questionsSpaceOf(project.workspaceRoot, questionsRoot);
+  if (space === null) return project?.title ?? "A project";
+  return questionsSpaceLabel(space, {
+    childDevice: mac.me.kind === "child",
+    // A linked device exists only while the Family profile is on.
+    familyOn: true,
+    nameOf: () => null,
+    title: project?.title,
+  });
 }
 
 export function conversationRows(
@@ -62,13 +89,12 @@ export function conversationRows(
     for (const thread of shell.threads) {
       if (thread.archivedAt !== null || thread.deletedAt !== null) continue;
       const project = shell.projects.find((candidate) => candidate.id === thread.projectId) ?? null;
-      const question = isQuestionsProject(project, questionsRoots[mac.macId] ?? null);
       rows.push({
         key: `${mac.macId}:${thread.id}`,
         mac,
         thread,
         project,
-        projectTitle: question ? QUESTIONS_LABEL : (project?.title ?? "A project"),
+        projectTitle: projectTitleFor(project, mac, questionsRoots[mac.macId] ?? null),
         updatedAt: Date.parse(String(thread.updatedAt)) || 0,
         state: threadState(thread),
       });
