@@ -42,6 +42,8 @@ import * as ServerConfig from "../config.ts";
 import * as ServerHttp from "../http.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
+import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SkycotFridge from "./family-fridge/SkycotFridge.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
@@ -489,6 +491,12 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
           get: () => Effect.succeed(Option.none()),
           findActiveByWorkspaceRoot: () => Effect.succeed(Option.none()),
         }),
+        // The children's Questions spaces are not exercised here.
+        Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+          scratchRoot: Effect.succeedNone,
+          namedProjectsRoot: ROOT,
+        }),
+        Layer.mock(ProjectService.ProjectService)({}),
       ),
     ),
   );

@@ -144,9 +144,10 @@ export function childSeesThread(childId: string, threadId: string, owners: Owner
 
 /**
  * Whether a child's own device may see a project: their own, or one nobody owns (a family
- * project a grown-up set up, Questions, older projects), which every child shares. Inside a
- * shared project each child still sees only their own conversations. A brother's or sister's
- * project stays hidden, unless the child has a conversation of their own in it.
+ * project a grown-up set up, older projects), which every child shares. Inside a shared project
+ * each child still sees only their own conversations. A brother's or sister's project stays
+ * hidden, unless the child has a conversation of their own in it. Questions spaces are owned
+ * like projects (a child's own, or the grown-ups' shared one: `questionsSpaceOwners`).
  */
 export function childSeesProject(
   childId: string,

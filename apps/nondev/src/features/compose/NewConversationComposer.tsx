@@ -487,8 +487,9 @@ function ComposerField({
       attachments: pictures.uploads(),
     } as const;
     const labels = firstMessageLabels(cleared.text, randomUUID(), family.enabled);
-    // Just ask: find or make the Questions space; the engine gives this question its own
-    // folder inside it, so there is no private copy to make and nothing to set up.
+    // Just ask: find or make the Questions space (with the Family profile on, the engine
+    // answers with the space of the child using SKYCOT here); the engine gives this question
+    // its own folder inside it, so there is no private copy to make and nothing to set up.
     let destination = project;
     if (destination === null) {
       const opened = await openScratch({ environmentId, input: {} });

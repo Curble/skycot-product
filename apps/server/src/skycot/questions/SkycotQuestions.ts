@@ -8,12 +8,17 @@
 //     (`workRootsFor`): its folder is open to the child, every other folder, a sibling's
 //     question included, is outside;
 //   - "Make this a project" is a `project.create` of the question's own folder, which the
-//     Family gate lets the child do (it is SKYCOT's own space, not the person's folders).
+//     Family gate lets the child do (it is SKYCOT's own space, not the person's folders);
+//   - with the Family profile on, each child has a space of their own,
+//     `<scratch>/children/<childId>` (SkycotQuestionSpaces), and a question asked in it gets
+//     its folder there (`spaceRootFor`, seam `skycot-questions-per-child`).
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+
+import { questionsSpaceOf } from "@t3tools/skycot-rules/questions";
 
 import * as ServerConfig from "../../config.ts";
 import type * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
@@ -71,3 +76,30 @@ export const keepVersions = (
           Effect.ignore,
           Effect.as(folder),
         );
+
+/**
+ * Called by ManagedProjectFolders.folderForThread (seam `skycot-questions-per-child`): the
+ * folder a new question's own folder is made in. For a child's own Questions space
+ * (`<scratch>/children/<childId>`, SKYCOT only) that is the child's space, so their questions
+ * sit together and apart from a brother's or sister's; for everything else it is T3's Scratch
+ * folder, exactly as before (upstream then checks the project is the Scratch project itself).
+ */
+export const spaceRootFor = Effect.fn("SkycotQuestions.spaceRootFor")(function* <Id, E>(
+  scratchRoot: Effect.Effect<Option.Option<string>>,
+  projects: {
+    readonly getById: (
+      projectId: Id,
+    ) => Effect.Effect<Option.Option<{ readonly workspaceRoot: string }>, E>;
+  },
+  input: { readonly projectId: Id },
+) {
+  const root = yield* scratchRoot;
+  if (Option.isNone(root) || !isSkycotPolicyEnabled(process.env)) return root;
+  const found = yield* projects
+    .getById(input.projectId)
+    .pipe(Effect.orElseSucceed(() => Option.none()));
+  if (Option.isNone(found)) return root;
+  return questionsSpaceOf(found.value.workspaceRoot, root.value)?.kind === "child"
+    ? Option.some(found.value.workspaceRoot)
+    : root;
+});

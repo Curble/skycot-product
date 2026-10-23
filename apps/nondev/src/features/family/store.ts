@@ -60,6 +60,11 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** For code outside React (the Questions labels' atom): told whenever the view changes. */
+export function subscribeFamilyView(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
 export function readFamilyView(): FamilyView {
   return view;
 }

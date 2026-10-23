@@ -23,7 +23,8 @@ parent code stays the root secret, and a passkey is only ever a per-device stand
 | People (children, grown-ups), devices, passkeys             | `skycot-family.json` (`SkycotFamily.ts`)                                                                       | Optional keys on file version 2; a beta 2 file reads with one grown-up whose id derives from the file's salt |
 | Who a session is                                            | `family-devices/SkycotFamilyIdentity.ts`                                                                       | `shared` (the Mac, older pairings), `child`, `grown-up`, `removed`                                           |
 | Device links, the devices list, Remove, passkeys, approvals | `family-devices/SkycotFamilyDevices.ts`                                                                        | Uses `EnvironmentAuth.createPairingLink`, `listSessions`, `revokeSession`, `revokePairingLink`               |
-| Per-person visibility                                       | `family-devices/SkycotFamilyVisibility.ts`, `visibility.ts`, `httpVisibility.ts`                               | Rules in `@t3tools/skycot-rules/people`                                                                      |
+| Per-person visibility                                       | `family-devices/SkycotFamilyVisibility.ts`, `visibility.ts`, `httpVisibility.ts`                               | Rules in `@t3tools/skycot-rules/people`; Questions spaces' owners in `@t3tools/skycot-rules/questions`       |
+| Each child's Questions space                                | `questions/SkycotQuestionSpaces.ts`, `SkycotFamilyGate.questionsSpaceFor`                                      | Made on first use; handed out when a session opens Questions                                                 |
 | Enforcement on the socket                                   | `SkycotFamilyGate.judgeDevice` (every RPC) and the shell stream filter (ws.ts seam `skycot-family-visibility`) |                                                                                                              |
 | Enforcement over HTTP                                       | `SkycotFamilyHttp.layerApiGate` (global middleware)                                                            | filters `/api/orchestration/shell` and `/api/projects` answers                                               |
 | Passkey checks                                              | `family-devices/passkeys.ts`                                                                                   | `@oslojs/webauthn` parses; Node's crypto verifies                                                            |
@@ -94,6 +95,30 @@ local one. On top, a relay connection only carries the sign-in of the device it 
 made through it for another device is revoked. The QR link is the same one with the relay part
 after the `#`. Removing a device also revokes its relay pass and closes its tunnel.
 
+## Just ask, one space per child (24 October 2026), as built
+
+Phase 2 testing found that Just ask used one shared Questions project, and the first child to ask
+was recorded as its owner, so a sibling's own device was refused Just ask. Now each child has a
+Questions space of their own, judged like their projects:
+
+- **The space**: `<scratch>/children/<childId>`, a project of its own made on first use
+  (`skycot/questions/SkycotQuestionSpaces.ts`). Its owner follows from its folder
+  (`questionsSpaceOwners` in `@t3tools/skycot-rules/questions`), whatever the activity file says,
+  and T3's Scratch project itself (the shared space) is the grown-ups'.
+- **Who gets which**: "open Questions" (`projects.ensureScratch`) is answered in
+  `SkycotFamilyGate.layerRpcAuthorization` with the space of `SkycotFamilyLimits.forSession`'s
+  child: a child's device always its child's (one without a child is refused), the Mac the
+  picked child's. With the profile off, or nobody picked, T3 answers with its Scratch project.
+- **Enforced**: a child's device starting a conversation (`launchThread`, `thread.create`) in a
+  Questions space that is not its own is refused (`newThreadProject`, `childMayStartQuestionIn`);
+  a sibling's space, question and folders are refused by the visibility rules as before.
+- **The folders**: a question asked in a child's space gets its folder there (ManagedProjectFolders
+  seam `skycot-questions-per-child`). Nothing in the shared space moved.
+- **Earlier questions**: each keeps its recorded asker (visible on that child's device, still
+  usable, no new ones beside it); an unrecorded one stays grown-up-only.
+- **Labels**: "Questions" on a child's device, "Ava's questions" on the Mac and grown-ups'
+  devices, "Earlier questions" for the shared space while the profile is on (`questionsSpaceLabel`).
+
 ## Phase 4 (Apple Watch), as built
 
 [WATCH.md](WATCH.md). The Watch has no sign-in of its own: it talks only to the grown-up's
@@ -112,5 +137,6 @@ A child's Watch is not in v1.
   SKYCOT is set to listen there), unless SKYCOT Relay is on (Phase 2).
 - Passkeys need `localhost` or `https`; over plain LAN the code is used.
 - Conversations with no recorded child (older ones, a grown-up's) stay off children's devices.
+  That includes earlier questions in the shared space whose asker was never recorded.
 - A sign-in lasts 30 days (T3's session lifetime), then the device is linked again.
 - Sessions paired the old way (not from Settings › Family) are treated as the Mac.

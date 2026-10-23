@@ -216,8 +216,8 @@ for later phases is [WHO-IS-WHO.md](WHO-IS-WHO.md).
   device in as that person. The QR code is drawn on the Mac; nothing is sent anywhere to make it.
 - **A child's device** is always that child: no "Who's using SKYCOT?", no switching to a
   brother or sister. Their limits, bedtime and plan first apply as on the Mac. It sees only that
-  child's conversations and projects, the family's shared projects (one a grown-up set up, and
-  Questions; inside them only their own conversations), and pages pinned to the fridge. It
+  child's conversations and projects, their own Questions, the family's shared projects (ones a
+  grown-up set up; inside them only their own conversations), and pages pinned to the fridge. It
   cannot open Advanced mode, even with the code, and cannot reach the developer tools, AI
   sign-ins, updates or pairing at all: its sign-in simply does not include them. A grown-up can
   still give more time or allow a step on it with the parent code.
@@ -363,19 +363,38 @@ for people, so a project never looks like a child in the sidebar.
 **Just ask** sits beside the project picker on Home: a question, or a quick job, without
 choosing a folder first. It works the same with the profile on or off.
 
-- **Where it works.** SKYCOT's engine keeps one space for questions, shown as **Questions** in the
-  sidebar and the list (T3's "Scratch" folder, `~/.skycot/scratch` in the Mac app). Every question
-  gets a private folder of its own inside it, so nothing in the family's own folders is touched,
+- **Where it works.** SKYCOT's engine keeps questions in its own space, shown as **Questions** in
+  the sidebar and the list (T3's "Scratch" folder, `~/.skycot/scratch` in the Mac app). Every
+  question gets a private folder of its own, so nothing in the family's own folders is touched,
   and the engine keeps versions there: **What changed**, **Undo**, **Open it** and the fridge work
   as in a project.
+- **One space per child.** With the Family profile on, each child has a Questions space of their
+  own (`~/.skycot/scratch/children/<child>`), the same way their projects are theirs: Ava's
+  questions are hers, Leo's are his. A child's own device (iPad, iPhone, a linked browser) always
+  asks in that child's space; on the family's Mac a question goes to the child picked in
+  **Who's using SKYCOT?**. The engine decides this, not the screen: a child's device is refused a
+  brother's or sister's questions exactly like their projects ("That belongs to someone else in
+  the family"), and it cannot start a question anywhere but its own space. Whose a space is
+  follows from its folder, so even a reset activity file can't hand it to someone else.
+- **What each screen calls it.** A child's own device says **Questions**. The family's Mac and
+  grown-ups' phones see every child's, labelled **Ava's questions**, **Leo's questions**. With the
+  profile off there is one shared **Questions**, as before.
 - **The child's own.** The engine treats a question's folder as the child's own project: writing
   and running things there is open (still **Ask me first**), and everything else, including a
-  brother's or sister's question next to it, is outside the project and shows **Ask a grown-up**.
+  brother's or sister's question, is outside the project and shows **Ask a grown-up**.
   Plan first, the shield, bedtime and daily limits, and the code for installs and the internet
   all apply exactly as in a project.
+- **Questions from before (24 October 2026).** Questions asked before each child had their own
+  space stay where they are, in the shared space, shown as **Earlier questions**; nothing was
+  moved, so their Undo history still works. Each stays its asker's where SKYCOT recorded who
+  asked it: that child still sees it on their own device and can keep talking in it, but new
+  questions go to their own space. One whose asker was never recorded is shown to grown-ups only
+  (on the Mac and grown-ups' phones), the same rule as any conversation from before the profile
+  knew who started what: guessing could show one child's question to another.
 - **Make this a project.** When a question made something, a strip offers **Make this a project…**:
   give it a name, and the question's folder becomes a project of that name (nothing is moved or
-  copied), with a first saved version. The conversation keeps its history and Undo, and is listed
+  copied), with a first saved version. The new project is the child's who asked, like any project
+  they start: a brother's or sister's device can't open it or make it theirs. The conversation keeps its history and Undo, and is listed
   with the new project from then on. No code is needed; the toast's **Undo** takes the project off
   the list again (its files stay), and the conversation goes back to Questions.
 - **The recap** counts a question's messages like any other, and lists it under **What they
@@ -389,8 +408,12 @@ Honest limits:
   build. Telling plain questions apart reliably would need a guess, and a wrong guess would let a
   build through without a plan.
 - **The folder is SKYCOT's, not a project folder you chose.** A question made into a project stays
-  where SKYCOT keeps questions (`~/.skycot/scratch/<date-and-words>`), because moving it would
-  break its Undo history.
+  where SKYCOT keeps questions (`~/.skycot/scratch/children/<child>/<date-and-words>`, or
+  `~/.skycot/scratch/<date-and-words>` for one from before), because moving it would break its
+  Undo history.
+- **On the family's Mac, the picker decides.** Siblings' work stays visible on the Mac (as for
+  projects), so a question asked there is the picked child's; a question asked while nobody is
+  picked (several children, the picker not answered yet) goes to the shared space.
 - **The cards say "this project".** Inside a question, "Only this project" on a card means the
   question's own folder.
 - **Not offered** when SKYCOT's data folder is inside a Git checkout (a developer's setup): the

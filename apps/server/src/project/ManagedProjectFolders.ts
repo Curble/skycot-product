@@ -331,7 +331,8 @@ const make = Effect.gen(function* () {
   const folderForThread: ManagedProjectFolders["Service"]["folderForThread"] = Effect.fn(
     "ManagedProjectFolders.folderForThread",
   )(function* (input) {
-    const root = yield* scratchRoot;
+    // nondev-seam: skycot-questions-per-child (a child's own Questions space holds its questions)
+    const root = yield* SkycotQuestions.spaceRootFor(scratchRoot, projects, input);
     if (Option.isNone(root)) return Option.none();
     if (!(yield* isScratchRoot(input.projectId, root.value))) return Option.none();
     const date = DateTime.formatIso(yield* DateTime.now).slice(0, 10);
