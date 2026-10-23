@@ -1,0 +1,20 @@
+{
+  "name": "skycot-relay",
+  "private": true,
+  "description": "SKYCOT Relay: a small Cloudflare Worker that passes sealed messages between a family's devices and their home Mac, and sends content-free notifications through Apple. No accounts, no database, no stored conversations.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "test": "vp test run --config ../../vite.config.ts --dir .",
+    "typecheck": "tsc-rs --noEmit"
+  },
+  "dependencies": {
+    "@t3tools/skycot-relay": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260601.1",
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:",
+    "wrangler": "4.148.0"
+  }
+}

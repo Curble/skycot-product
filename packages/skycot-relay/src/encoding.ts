@@ -7,13 +7,14 @@ import { randomBytes as nobleRandomBytes } from "@noble/hashes/utils";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-export const utf8 = (text: string): Uint8Array => encoder.encode(text);
+export const utf8 = (text: string): Uint8Array<ArrayBuffer> => encoder.encode(text);
 export const fromUtf8 = (bytes: Uint8Array): string => decoder.decode(bytes);
 
 /** Cryptographically secure random bytes (crypto.getRandomValues underneath). */
-export const randomBytes = (length: number): Uint8Array => nobleRandomBytes(length);
+export const randomBytes = (length: number): Uint8Array<ArrayBuffer> =>
+  Uint8Array.from(nobleRandomBytes(length));
 
-export function concatBytes(...parts: ReadonlyArray<Uint8Array>): Uint8Array {
+export function concatBytes(...parts: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffer> {
   let length = 0;
   for (const part of parts) length += part.length;
   const out = new Uint8Array(length);
@@ -55,7 +56,7 @@ export function toBase64Url(bytes: Uint8Array): string {
 }
 
 /** Strict: anything that is not unpadded base64url (or would not round-trip) is `null`. */
-export function fromBase64Url(text: string): Uint8Array | null {
+export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
   if (text.length % 4 === 1) return null;
   const out = new Uint8Array(Math.floor((text.length * 3) / 4));
   let bits = 0;
