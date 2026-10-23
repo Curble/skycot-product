@@ -161,9 +161,10 @@ back, and a rename can be changed again.
 - **A conversation that is still working** cannot be put away until the crew finishes or is
   stopped.
 - **A new name** shows in the list, at the top of the conversation, on the fridge, in the recap
-  and on a certificate. An empty name is refused. Renaming is how to fix a title the AI wrote
-  that sounds like an instruction ("Create an Offline Bubbles Pet Page"); SKYCOT does not retitle
-  conversations by itself.
+  and on a certificate. An empty name is refused. A title the AI wrote like an instruction
+  ("Create an Offline Bubbles Pet Page") reads as the thing itself on the fridge, in the recap and
+  on a certificate ("Bubbles pet page"); the list and the conversation keep the AI's words, and a
+  name someone typed is shown as typed everywhere. SKYCOT never renames a conversation itself.
 - **Siblings share the list.** As they can open each other's conversations, they can also put
   away, bring back or rename them. Nothing is lost either way.
 
