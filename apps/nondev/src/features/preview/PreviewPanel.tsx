@@ -451,7 +451,7 @@ function StatusBody({
           <Mascot pose="hello" size={72} decorative />
           <p className="fm-preview__state-title">Nothing to run yet</p>
           <p className="fm-preview__state-text">
-            This project doesn't have a site that starts on your Mac. {builder} can set one up.
+            This project doesn't have a page to show yet. {builder} can make one.
           </p>
           <Button variant="primary" onClick={() => onAsk(SET_UP_MESSAGE)}>
             Ask {builder} to set it up

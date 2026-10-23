@@ -140,6 +140,21 @@ describe("words", () => {
     expect(message).toContain("Error: Cannot find module 'server.js'");
   });
 
+  it("knows a plain web page, and says what it shows rather than a command it runs", () => {
+    const page = parsePreviewStatus({
+      state: "failed",
+      command: { runner: "SKYCOT's built-in page server", script: "index.html", source: "static" },
+      reason: "exited",
+      output: "SKYCOT couldn't show index.html.",
+    });
+    expect(page?.state === "failed" ? page.command.page : null).toBe(true);
+    const message = page?.state === "failed" ? fixItMessage(page) : "";
+    expect(message).toContain("It shows `index.html` as a plain page.");
+    expect(message).not.toContain("It runs");
+    const site = parsePreviewStatus({ state: "starting", command });
+    expect(site?.state === "starting" ? site.command.page : "x").toBeUndefined();
+  });
+
   it("tells Sam a preview that stopped had been working, not that it didn't start (M4)", () => {
     const message = fixItMessage({ state: "stopped", command, output: "Killed: 9" });
     expect(message).toContain("was working, then it stopped by itself");

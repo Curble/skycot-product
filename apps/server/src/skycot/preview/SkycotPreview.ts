@@ -2,7 +2,9 @@
 // client may show. Starting runs the project's own start script in one of T3's terminals (so a
 // grown-up sees it, output and all, in Advanced mode), T3's port scanner links the server it
 // opens back to that terminal, and the address shown is always one on this Mac. The person's
-// "yes" (or, in the Family profile, the parent code) is checked here, not only on screen.
+// "yes" (or, in the Family profile, the parent code) is checked here, not only on screen. A plain
+// web page (an index.html and nothing to start) is shown by SKYCOT's own page server instead
+// (staticSite.ts), inside the engine: no terminal, nothing of the project's runs.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
 import * as NodeNet from "node:net";
@@ -39,6 +41,7 @@ import {
   type PreviewCommand,
   type PreviewStatus,
 } from "./plan.ts";
+import { serveStaticSite, STATIC_ROOTS, type StaticSite } from "./staticSite.ts";
 
 /** The terminal the preview runs in, one per conversation that started one. */
 export const PREVIEW_TERMINAL_ID = "skycot-preview";
@@ -109,6 +112,8 @@ interface Running {
   failure: "exited" | "no-address" | null;
   lastSeen: number;
   lastScanAt: number;
+  /** A plain web page's server; null for a site started in a terminal. */
+  site: StaticSite | null;
 }
 
 const hashOf = (text: string) =>
@@ -172,7 +177,8 @@ export const make = Effect.gen(function* () {
     Effect.sync(() => {
       if (event.terminalId !== PREVIEW_TERMINAL_ID) return;
       const entry = entryFor(event.threadId);
-      if (entry === undefined) return;
+      // A plain page has no terminal: a late event from an earlier one is not about it.
+      if (entry === undefined || entry.command.source === "static") return;
       if (event.type === "output") {
         entry.output = (entry.output + event.data).slice(-OUTPUT_KEEP);
       } else if (event.type === "exited" || event.type === "closed" || event.type === "error") {
@@ -212,7 +218,19 @@ export const make = Effect.gen(function* () {
         lockfiles.push(name);
       }
     }
-    return { packageJson: yield* read("package.json"), t3Json: yield* read("t3.json"), lockfiles };
+    const pageFolders: Array<string> = [];
+    for (const name of STATIC_ROOTS) {
+      const info = yield* fs
+        .stat(path.join(folder, name, "index.html"))
+        .pipe(Effect.orElseSucceed(() => null));
+      if (info?.type === "File") pageFolders.push(name);
+    }
+    return {
+      packageJson: yield* read("package.json"),
+      t3Json: yield* read("t3.json"),
+      lockfiles,
+      pageFolders,
+    };
   });
 
   /** Answers when anything is serving there; the headers say whether it may be framed. */
@@ -290,13 +308,38 @@ export const make = Effect.gen(function* () {
     return { state: "starting", command: entry.command, startedAt: entry.startedAt };
   };
 
-  const stopEntry = (entry: Running) =>
-    terminals
-      .close({ threadId: entry.ownerThreadId, terminalId: PREVIEW_TERMINAL_ID })
-      .pipe(
-        Effect.ignoreCause({ log: true, message: "Could not stop a preview." }),
-        Effect.andThen(Effect.sync(() => running.delete(entry.folder))),
-      );
+  const stopEntry = (entry: Running) => {
+    const site = entry.site;
+    const close =
+      site !== null
+        ? Effect.promise(() => site.close())
+        : entry.command.source === "static"
+          ? Effect.void
+          : terminals.close({ threadId: entry.ownerThreadId, terminalId: PREVIEW_TERMINAL_ID });
+    return close.pipe(
+      Effect.ignoreCause({ log: true, message: "Could not stop a preview." }),
+      Effect.andThen(Effect.sync(() => running.delete(entry.folder))),
+    );
+  };
+
+  /** Shows a plain web page: SKYCOT's own server on 127.0.0.1, answering at once. */
+  const startPage = Effect.fn("SkycotPreview.startPage")(function* (entry: Running) {
+    const root = path.join(entry.folder, entry.command.pageFolder ?? "");
+    const site = yield* Effect.tryPromise(() => serveStaticSite(root)).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Could not show a page preview.", { cause }).pipe(Effect.as(null)),
+      ),
+    );
+    if (site === null) {
+      entry.exited = true;
+      entry.failure = "exited";
+      entry.output = `SKYCOT couldn't show ${entry.command.script}.`;
+      return;
+    }
+    entry.site = site;
+    entry.url = site.url;
+    entry.frameable = true;
+  });
 
   const statusUnlocked = Effect.fn("SkycotPreview.statusUnlocked")(function* (threadId: ThreadId) {
     const context = yield* contextFor(threadId).pipe(Effect.orElseSucceed(() => null));
@@ -353,7 +396,8 @@ export const make = Effect.gen(function* () {
             return yield* new SkycotPreviewError({ reason: "needs-grown-up", requestId });
           }
           const now = yield* Clock.currentTimeMillis;
-          const port = yield* freePort;
+          const isPage = command.source === "static";
+          const port = isPage ? 0 : yield* freePort;
           const entry: Running = {
             folder: context.folder,
             ownerThreadId: input.threadId,
@@ -367,8 +411,13 @@ export const make = Effect.gen(function* () {
             failure: null,
             lastSeen: now,
             lastScanAt: 0,
+            site: null,
           };
           running.set(context.folder, entry);
+          if (isPage) {
+            yield* startPage(entry);
+            return describe(entry);
+          }
           const launched = yield* terminals
             .open({
               threadId: input.threadId,

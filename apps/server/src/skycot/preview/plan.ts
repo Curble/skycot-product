@@ -13,6 +13,11 @@ export interface ProjectStartFiles {
   /** T3's project file; a script with `previewUrl` is T3's own "this starts the preview". */
   readonly t3Json: string | null;
   readonly lockfiles: ReadonlyArray<string>;
+  /**
+   * The folders (inside the project, "" for the folder itself) that hold an index.html, best
+   * first. With no start script, the first is shown as a plain web page.
+   */
+  readonly pageFolders?: ReadonlyArray<string>;
 }
 
 export interface PreviewCommand {
@@ -20,10 +25,16 @@ export interface PreviewCommand {
   readonly runner: string;
   /** What that runs in turn (the script's own text), judged by the rules too. */
   readonly script: string;
-  readonly source: "package.json" | "t3.json";
+  /** `static`: no start script, so SKYCOT shows the project's index.html itself. */
+  readonly source: "package.json" | "t3.json" | "static";
   /** The address the project file names, when it names one. */
   readonly previewUrl: string | null;
+  /** For `static`: the folder shown, inside the project ("" for the folder itself). */
+  readonly pageFolder?: string;
 }
+
+/** What a plain web page's "command" reads as, in Advanced mode and in a message to the assistant. */
+export const STATIC_RUNNER = "SKYCOT's built-in page server";
 
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -75,6 +86,17 @@ export function findPreviewCommand(files: ProjectStartFiles): PreviewCommand | n
       };
     }
   }
+  // A plain web page (index.html, no server of its own): SKYCOT shows the folder itself.
+  const pageFolder = files.pageFolders?.[0];
+  if (pageFolder !== undefined) {
+    return {
+      runner: STATIC_RUNNER,
+      script: pageFolder.length > 0 ? `${pageFolder}/index.html` : "index.html",
+      source: "static",
+      previewUrl: null,
+      pageFolder,
+    };
+  }
   return null;
 }
 
@@ -96,6 +118,9 @@ export function startDecision(input: {
   readonly familyOn: boolean;
   readonly ctx: RuleContext;
 }): StartDecision {
+  // Showing a plain page runs nothing on this Mac (no command, no install): SKYCOT reads the
+  // project's own files on 127.0.0.1, so there is nothing to say yes to, in any mode.
+  if (input.command.source === "static") return { kind: "start" };
   const texts = [...new Set([input.command.runner, input.command.script])];
   if (input.familyOn) {
     const evaluations = texts.map((command) =>
@@ -179,7 +204,7 @@ export function outputTail(output: string, homeDir: string | null): string {
 export type PreviewStatus =
   /** The conversation or its folder is gone. */
   | { readonly state: "no-folder" }
-  /** The project has no start script yet. */
+  /** The project has no start script and no index.html yet. */
   | { readonly state: "no-site" }
   | {
       readonly state: "ready";

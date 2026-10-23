@@ -72,6 +72,59 @@ describe("findPreviewCommand", () => {
   });
 });
 
+describe("findPreviewCommand for a plain web page", () => {
+  it("shows the folder's index.html when there is nothing to start (a child's first site)", () => {
+    expect(
+      findPreviewCommand({
+        packageJson: JSON.stringify({ dependencies: { three: "^0.186.1" } }),
+        t3Json: null,
+        lockfiles: [],
+        pageFolders: [""],
+      }),
+    ).toEqual({
+      runner: "SKYCOT's built-in page server",
+      script: "index.html",
+      source: "static",
+      previewUrl: null,
+      pageFolder: "",
+    });
+    expect(
+      findPreviewCommand({
+        packageJson: null,
+        t3Json: null,
+        lockfiles: [],
+        pageFolders: ["public", "dist"],
+      }),
+    ).toMatchObject({ source: "static", script: "public/index.html", pageFolder: "public" });
+  });
+
+  it("still prefers the project's own start script", () => {
+    expect(
+      findPreviewCommand({
+        packageJson: pkg({ dev: "vite" }),
+        t3Json: null,
+        lockfiles: [],
+        pageFolders: [""],
+      })?.source,
+    ).toBe("package.json");
+  });
+
+  it("starts a plain page without a question, even with the Family profile on", () => {
+    const page: PreviewCommand = {
+      runner: "SKYCOT's built-in page server",
+      script: "index.html",
+      source: "static",
+      previewUrl: null,
+      pageFolder: "",
+    };
+    for (const familyOn of [false, true]) {
+      expect(
+        startDecision({ command: page, runtimeMode: "approval-required", familyOn, ctx }),
+      ).toEqual({ kind: "start" });
+    }
+  });
+});
+
 describe("startDecision", () => {
   it("asks in Ask me first, like any command", () => {
     expect(
