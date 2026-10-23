@@ -41,7 +41,39 @@ export type ApproverProof =
       readonly credentialId: string;
       readonly challenge: string;
       readonly response: Readonly<Record<string, string>>;
+    }
+  | {
+      /** The grown-up's Apple Watch, carried by this phone (Phase 4; see src/watch). */
+      readonly type: "watch";
+      readonly keyId: string;
+      readonly challenge: string;
+      readonly signature: string;
     };
+
+/** A challenge the Mac gave for the Watch to sign, with what it is for. */
+export interface WatchChallenge {
+  readonly challenge: string;
+  readonly action: string;
+  readonly purpose: "register" | "approve";
+  readonly keyId: string | null;
+}
+
+function parseWatchChallenge(body: unknown): WatchChallenge | null {
+  const input = record(body);
+  if (
+    typeof input.challenge !== "string" ||
+    typeof input.action !== "string" ||
+    (input.purpose !== "register" && input.purpose !== "approve")
+  ) {
+    return null;
+  }
+  return {
+    challenge: input.challenge,
+    action: input.action,
+    purpose: input.purpose,
+    keyId: typeof input.keyId === "string" ? input.keyId : null,
+  };
+}
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -158,12 +190,51 @@ export const familyApi = {
       readonly decision: "accept" | "decline";
       readonly fingerprint: string;
       readonly proof: ApproverProof | null;
+      /** A no said on the Watch (a yes from the Watch is known by its proof). */
+      readonly via?: "watch";
     },
   ) =>
     call(
       transport,
       { method: "POST", path: `${FAMILY_API_PATH}/approver/answer`, body: input },
       ok,
+    ),
+  /** "Say yes from my Apple Watch": the parent code once; the Watch signs what comes back. */
+  watchOptions: (transport: MacTransport, code: string) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/watch/options`, body: { code } },
+      parseWatchChallenge,
+    ),
+  watchRegister: (
+    transport: MacTransport,
+    input: {
+      readonly challenge: string;
+      readonly publicKey: string;
+      readonly signature: string;
+      readonly name: string;
+      readonly protection: "secure-enclave" | "keychain" | "simulator";
+    },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/watch/register`, body: input },
+      (body) => (typeof record(body).keyId === "string" ? (record(body).keyId as string) : null),
+    ),
+  watchForget: (transport: MacTransport) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/watch/forget`, body: {} },
+      ok,
+    ),
+  watchChallenge: (
+    transport: MacTransport,
+    input: { readonly threadId: string; readonly requestId: string; readonly fingerprint: string },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/watch/challenge`, body: input },
+      parseWatchChallenge,
     ),
   approverMoreTime: (
     transport: MacTransport,

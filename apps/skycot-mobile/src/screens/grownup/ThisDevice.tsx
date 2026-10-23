@@ -1,7 +1,8 @@
 /**
  * This device, on a grown-up's phone: Face ID (waits for SKYCOT Relay's secure address; the
- * parent code works meanwhile), Lock everything (ends every grown-up's yes on every device),
- * the linked Macs, About, and Unlink this device. Phase 1's copy throughout.
+ * parent code works meanwhile), Apple Watch (say yes from the wrist, Phase 4), Lock everything
+ * (ends every grown-up's yes on every device), the linked Macs, About, and Unlink this device.
+ * Phase 1's copy throughout.
  */
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -12,8 +13,35 @@ import { useGrownUp } from "../../app/grownup/GrownUpContext";
 import { familyApi } from "../../family/api";
 import { passkeySupport } from "../../family/passkey";
 import { useLinks, type Mac } from "../../links/store";
-import { Button, Page, Row, RowIcon, Section, Sheet, Txt, haptic } from "../../ui/kit";
+import {
+  Button,
+  Page,
+  ParentCodeSheet,
+  Row,
+  RowIcon,
+  Section,
+  Sheet,
+  Txt,
+  haptic,
+} from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
+import { useWatch } from "../../watch/WatchBridge";
+
+/** What the Apple Watch row says, from what WatchConnectivity knows. */
+export function watchRowSubtitle(input: {
+  readonly paired: boolean;
+  readonly installed: boolean;
+  readonly watchName: string | null;
+}): string {
+  if (!input.paired) return "No Apple Watch is paired with this iPhone.";
+  if (!input.installed) {
+    return "Install SKYCOT on the Watch: open the Watch app on this iPhone, then Available Apps.";
+  }
+  if (input.watchName !== null) {
+    return `${input.watchName} can say yes once, or no, while it's unlocked and on your wrist.`;
+  }
+  return "Your Watch shows requests and today's time. Set it up to say yes too.";
+}
 
 export function ThisDeviceScreen() {
   const theme = useTheme();
@@ -26,6 +54,10 @@ export function ThisDeviceScreen() {
   const [unlinking, setUnlinking] = useState<Mac | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const watch = useWatch();
+  const [settingUpWatch, setSettingUpWatch] = useState(false);
+  const [watchProblem, setWatchProblem] = useState<string | null>(null);
+  const [watchBusy, setWatchBusy] = useState(false);
 
   const lockAll = async () => {
     setLocking(true);
@@ -36,6 +68,7 @@ export function ThisDeviceScreen() {
     if (results.every((result) => result.ok)) {
       haptic("success");
       setLocked(true);
+      watch.noteLocked();
     } else setProblem("One Mac didn't answer. Try again when it's awake.");
   };
 
@@ -54,6 +87,56 @@ export function ThisDeviceScreen() {
           }
         />
       </Section>
+      {watch.link.supported ? (
+        <Section
+          title="Apple Watch"
+          footer={
+            watchProblem ??
+            "Your Watch asks your iPhone, and your iPhone asks the Mac: the Watch has no sign-in of its own. A yes from the Watch is logged as from your Watch, through this iPhone."
+          }
+        >
+          <Row
+            leading={
+              <RowIcon
+                name="applewatch"
+                color={watch.watchName !== null ? theme.color.green : "#8E8E93"}
+              />
+            }
+            title={watch.watchName !== null ? "Say yes from my Watch" : "Apple Watch"}
+            subtitle={watchRowSubtitle({
+              paired: watch.link.paired,
+              installed: watch.link.installed,
+              watchName: watch.watchName,
+            })}
+            trailing={
+              watch.link.paired && watch.link.installed && watch.watchName === null ? (
+                <Button
+                  title="Set up"
+                  kind="tinted"
+                  size="small"
+                  onPress={() => {
+                    setWatchProblem(null);
+                    setSettingUpWatch(true);
+                  }}
+                />
+              ) : null
+            }
+          />
+          {watch.watchName !== null ? (
+            <Row
+              title="Stop saying yes from the Watch"
+              subtitle="It still shows requests and today's time, and can still say no."
+              destructive
+              onPress={async () => {
+                if (watchBusy) return;
+                setWatchBusy(true);
+                setWatchProblem(await watch.forget());
+                setWatchBusy(false);
+              }}
+            />
+          ) : null}
+        </Section>
+      ) : null}
       <Section
         title="Lock"
         footer={
@@ -96,6 +179,18 @@ export function ThisDeviceScreen() {
           />
         ))}
       </Section>
+      <ParentCodeSheet
+        visible={settingUpWatch}
+        title="Say yes from your Watch?"
+        description="Open SKYCOT on your Apple Watch first. Then enter the parent code: your Watch makes its own key and can say yes once while it's unlocked and on your wrist."
+        actionLabel="Set up"
+        onClose={() => setSettingUpWatch(false)}
+        onCode={async (code) => {
+          const result = await watch.enrol(code);
+          if (result === null) setSettingUpWatch(false);
+          return result;
+        }}
+      />
       <Sheet
         visible={unlinking !== null}
         title="Unlink this device?"
