@@ -528,7 +528,8 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
               ? { prompt: "consent" }
               : {}),
           }
-        : { agent_name_hint: "T3 Code" }),
+        : // nondev-seam: brand-codex-signin (ChatGPT's "what should we call your agent?" default)
+          { agent_name_hint: process.env.T3CODE_APP_BASE_NAME ?? "T3 Code" }),
       ext_agent_host_id: hostId,
       response_type: "code",
       redirect_uri: redirectUri,
