@@ -7,6 +7,6 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": false
   },
-  "include": ["**/*.ts", "**/*.tsx", "../nondev/src/plain/**/*.ts"],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules", "ios", "**/*.test.ts"]
 }

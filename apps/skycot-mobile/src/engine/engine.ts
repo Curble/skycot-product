@@ -107,13 +107,37 @@ export function defaultModelSelection(
   return { instanceId: provider.instanceId, model: model.slug };
 }
 
-export function readProviders(transport: MacTransport): Promise<ReadonlyArray<ServerProvider>> {
+export interface MacConfig {
+  readonly providers: ReadonlyArray<ServerProvider>;
+  /** Where Just ask's Questions live on the Mac; its project is shown as "Questions". */
+  readonly questionsRoot: string | null;
+}
+
+export function readMacConfig(transport: MacTransport): Promise<MacConfig> {
   return withMacRpc(transport, (client) =>
-    client[WS_METHODS.serverGetConfig]({}).pipe(Effect.map((config) => config.providers)),
+    client[WS_METHODS.serverGetConfig]({}).pipe(
+      Effect.map((config) => ({
+        providers: config.providers,
+        questionsRoot: config.scratchWorkspaceRoot ?? null,
+      })),
+    ),
   );
 }
 
+export function readProviders(transport: MacTransport): Promise<ReadonlyArray<ServerProvider>> {
+  return readMacConfig(transport).then((config) => config.providers);
+}
+
 const command = () => CommandId.make(newId());
+
+/** Just ask: the engine's Questions space (made on first use); each question gets its own folder. */
+export function openQuestions(transport: MacTransport): Promise<{ readonly projectId: string }> {
+  return withMacRpc(transport, (client) =>
+    client[WS_METHODS.projectsEnsureScratch]({}).pipe(
+      Effect.map((result) => ({ projectId: String(result.projectId) })),
+    ),
+  );
+}
 
 export interface StartConversationInput {
   readonly projectId: string;
