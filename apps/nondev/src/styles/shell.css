@@ -74,6 +74,8 @@
 .fm-sidebar__scroll {
   flex: 1;
   min-height: 0;
+  /* The list scrolls above the pinned footer; without this the last rows slid under it. */
+  overflow-y: auto;
 }
 .fm-sidebar__footer {
   margin-top: auto;
