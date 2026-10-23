@@ -57,7 +57,8 @@ parent code stays the root secret, and a passkey is only ever a per-device stand
 4. Short-lived: older than ten minutes (`APPROVAL_LAPSE_MS`), it waits on the Mac.
 5. Proof: a passkey assertion over a challenge bound to that device and that one action
    (`approve:<thread>:<request>:<fingerprint>` hashed with a nonce, two minutes, single use), or
-   the parent code, which counts towards the same five-try lockout.
+   the parent code, which counts towards the same five-try lockout, or (Phase 4) the
+   grown-up's Apple Watch signing a challenge of the same kind with its own key.
 6. Decline is free; `acceptForSession` and `acceptAlways` are refused by the route.
 7. Quiet lock screen: not built yet (no notifications in Phase 1).
 8. Revocable: Remove, Unlink this device, removing the person, a new parent code (grown-ups'
@@ -92,6 +93,18 @@ local one. On top, a relay connection only carries the sign-in of the device it 
 (its relay id is recorded against the Family device id when the link is made), and a sign-in
 made through it for another device is revoked. The QR link is the same one with the relay part
 after the `#`. Removing a device also revokes its relay pass and closes its tunnel.
+
+## Phase 4 (Apple Watch), as built
+
+[WATCH.md](WATCH.md). The Watch has no sign-in of its own: it talks only to the grown-up's
+iPhone, which answers through the same approver routes. For a yes the Watch proves itself, as a
+passkey would: its own P-256 key (Secure Enclave where it has one), added once with the parent
+code on the phone and kept as the public half on the phone's device record, signs the Mac's
+one-use challenge for that one card (`/approver/watch/challenge`, `proof: { type: "watch" }`).
+The phone only carries the signature, so a phone on its own can never say yes for the Watch.
+Every answer on the Watch runs watchOS's own wrist check first. Logged as
+`by.via: { kind: "watch", name }`: "Approved from Mum's Apple Watch through Mum's iPhone".
+A child's Watch is not in v1.
 
 ## Honest limits in Phase 1
 

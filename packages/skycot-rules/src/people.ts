@@ -48,6 +48,43 @@ export const APPROVAL_LAPSE_MS = 10 * 60_000;
 /** How long a passkey challenge stays open (registering one, or saying yes with Face ID). */
 export const PASSKEY_CHALLENGE_TTL_MS = 2 * 60_000;
 
+/**
+ * Saying yes from a grown-up's Apple Watch (Phase 4, decision 4: Yes and No while the Watch is
+ * unlocked and on the wrist, the Apple Pay standard). The Watch keeps its own signing key (in
+ * the Secure Enclave where the Watch has one), made once with the parent code typed on the
+ * paired phone; the Mac keeps only the public half, on that phone's device record. For each yes
+ * the Mac gives a challenge for that one action (as for a passkey: two minutes, single use, this
+ * device only) and the Watch signs this message over it. The phone only carries the message, as
+ * the relay does, so a phone on its own can never say yes for the Watch.
+ */
+export const WATCH_MESSAGE_PREFIX = "SKYCOT Watch v1";
+export type WatchPurpose = "register" | "approve";
+
+/** The exact text a Watch signs (ECDSA P-256, SHA-256). The Watch app builds the same lines. */
+export function watchSignedMessage(
+  purpose: WatchPurpose,
+  challenge: string,
+  action: string,
+): string {
+  return [WATCH_MESSAGE_PREFIX, purpose, challenge, action].join("\n");
+}
+
+/** The action a Watch's key is registered under: one key per grown-up's phone. */
+export function watchRegisterAction(deviceId: string): string {
+  return `watch-register:${deviceId}`;
+}
+
+/**
+ * Where the Watch says its key lives. A label for the record, never a reason to trust: the Mac
+ * can't check it (Apple's App Attest would, once SKYCOT has an Apple account step for it).
+ */
+export const WATCH_KEY_PROTECTIONS = ["secure-enclave", "keychain", "simulator"] as const;
+export type WatchKeyProtection = (typeof WATCH_KEY_PROTECTIONS)[number];
+
+export function isWatchKeyProtection(value: unknown): value is WatchKeyProtection {
+  return (WATCH_KEY_PROTECTIONS as ReadonlyArray<unknown>).includes(value);
+}
+
 /** Who is using SKYCOT on a signed-in device, as the engine sees it. */
 export type FamilyIdentity =
   /** The family's Mac, or any sign-in that is not a linked device: today's behaviour ("Who's using SKYCOT?"). */

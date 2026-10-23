@@ -15,6 +15,7 @@ import { LinksProvider, useLinks } from "./links/store";
 import { WelcomeScreen } from "./screens/link/WelcomeScreen";
 import { SignedOut } from "./screens/shared/SignedOut";
 import { Spinner } from "./ui/kit";
+import { WatchBridgeProvider } from "./watch/WatchBridge";
 import { ThemeProvider, lookForChild, useTheme } from "./ui/theme";
 
 function ChildLook(props: { readonly children: React.ReactNode }) {
@@ -84,7 +85,9 @@ export default function App() {
       <DeepLinkProvider>
         <LinksProvider>
           <MacDataProvider>
-            <Root />
+            <WatchBridgeProvider>
+              <Root />
+            </WatchBridgeProvider>
           </MacDataProvider>
         </LinksProvider>
       </DeepLinkProvider>

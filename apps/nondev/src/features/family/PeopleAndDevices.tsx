@@ -286,6 +286,11 @@ export function DevicesGroup() {
                       Face ID
                     </Pill>
                   ) : null}
+                  {row.watch ? (
+                    <Pill tone="ok" size="sm">
+                      Apple Watch
+                    </Pill>
+                  ) : null}
                 </span>
               }
               subtitle={`${personName(row)} · ${deviceKindLabel(row.kind)} · ${lastSeenPhrase(row, now)}`}

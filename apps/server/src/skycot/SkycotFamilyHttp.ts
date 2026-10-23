@@ -36,7 +36,11 @@ import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts"
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
 import * as SkycotRelay from "./relay/SkycotRelay.ts";
 import { deviceGate, isWatchedPath } from "./family-devices/httpVisibility.ts";
-import { isApproverDecision, type DeviceKind } from "@t3tools/skycot-rules/people";
+import {
+  isApproverDecision,
+  isWatchKeyProtection,
+  type DeviceKind,
+} from "@t3tools/skycot-rules/people";
 
 export const FAMILY_ROUTE = "/api/skycot/family";
 
@@ -966,6 +970,14 @@ const proofOf = (value: unknown): SkycotFamilyDevices.Proof | null => {
       challenge: text(input["challenge"]),
     };
   }
+  if (input["type"] === "watch") {
+    return {
+      type: "watch",
+      keyId: text(input["keyId"]),
+      challenge: text(input["challenge"]),
+      signature: text(input["signature"]),
+    };
+  }
   return null;
 };
 
@@ -1022,6 +1034,7 @@ const approverAnswerRoute = approverRoute(
         decision,
         fingerprint: text(body["fingerprint"]),
         proof: proofOf(body["proof"]),
+        via: body["via"] === "watch" ? "watch" : null,
       });
       return json({ ok: true });
     }),
@@ -1076,6 +1089,62 @@ const passkeyForgetRoute = approverRoute(
   "POST",
   "/devices/passkey/forget",
   ({ service, grownUp }) => service.passkeyForget(grownUp).pipe(Effect.as(json({ ok: true }))),
+);
+
+/**
+ * "Say yes from my Apple Watch" (Phase 4): the phone asks with the parent code once, carries
+ * the challenge to its Watch, and brings back the Watch's public key and its signature over the
+ * challenge. The Watch's key never leaves the Watch.
+ */
+const watchOptionsRoute = approverRoute(
+  "POST",
+  "/approver/watch/options",
+  ({ service, grownUp, body }) =>
+    service
+      .watchKeyOptions({ who: grownUp, code: text(body["code"]) })
+      .pipe(Effect.map((options) => json(options))),
+);
+
+const watchRegisterRoute = approverRoute(
+  "POST",
+  "/approver/watch/register",
+  ({ service, grownUp, body }) =>
+    Effect.gen(function* () {
+      const protection = body["protection"];
+      if (!isWatchKeyProtection(protection)) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      return json(
+        yield* service.watchKeyRegister({
+          who: grownUp,
+          challenge: text(body["challenge"]),
+          publicKey: text(body["publicKey"]),
+          signature: text(body["signature"]),
+          name: nullableText(body["name"]),
+          protection,
+        }),
+      );
+    }),
+);
+
+/** "Stop saying yes from the Watch": it only takes away, so no proof. */
+const watchForgetRoute = approverRoute("POST", "/approver/watch/forget", ({ service, grownUp }) =>
+  service.watchKeyForget(grownUp).pipe(Effect.as(json({ ok: true }))),
+);
+
+/** A challenge for one yes from the Watch, for the card the Watch is showing. */
+const watchChallengeRoute = approverRoute(
+  "POST",
+  "/approver/watch/challenge",
+  ({ service, grownUp, body }) =>
+    service
+      .watchChallenge({
+        who: grownUp,
+        threadId: text(body["threadId"]),
+        requestId: text(body["requestId"]),
+        fingerprint: text(body["fingerprint"]),
+      })
+      .pipe(Effect.map((issued) => json(issued))),
 );
 
 /** "Unlink this device", from the grown-up's device itself: it only takes away. */
@@ -1144,6 +1213,10 @@ export const layerDeviceRoutes = Layer.mergeAll(
   passkeyOptionsRoute,
   passkeyRegisterRoute,
   passkeyForgetRoute,
+  watchOptionsRoute,
+  watchRegisterRoute,
+  watchForgetRoute,
+  watchChallengeRoute,
   unlinkSelfRoute,
 );
 

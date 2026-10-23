@@ -106,20 +106,25 @@ export function AgentActivity(
         {glyph(22, tint)}
       </HStack>
     ),
+    // The small family: the Apple Watch Smart Stack (watchOS 11 and later) and CarPlay. Room
+    // for two short lines, so the name and "needs a grown-up" are never cut off.
     bannerSmall: (
-      <HStack spacing={8} alignment="center" modifiers={[padding({ all: 10 })]}>
-        {mark(14, tint)}
+      <VStack alignment="leading" spacing={4} modifiers={[padding({ all: 10 }), ...links]}>
+        <HStack spacing={6} alignment="center">
+          {mark(14, tint)}
+          <Spacer minLength={2} />
+          {glyph(14, tint)}
+        </HStack>
         <Text
           modifiers={[
-            font({ weight: "semibold", size: 13 }),
+            font({ weight: "semibold", size: 15 }),
             foregroundStyle(primary),
-            lineLimit(1),
+            lineLimit(2),
           ]}
         >
           {headline}
         </Text>
-        <Spacer minLength={2} />
-      </HStack>
+      </VStack>
     ),
     compactLeading: mark(14, tint),
     compactTrailing: glyph(14, tint),

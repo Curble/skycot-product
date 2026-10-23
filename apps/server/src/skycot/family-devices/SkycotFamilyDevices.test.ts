@@ -1,10 +1,13 @@
 // Test fixtures use loose stand-ins on purpose.
 // @effect-diagnostics anyUnknownInErrorContext:off
 // @effect-diagnostics unsafeEffectTypeAssertion:off
+// @effect-diagnostics nodeBuiltinImport:off
 // Who is who (Phase 1), end to end inside the engine: a child's iPad and a grown-up's phone
 // linked to people in a real Family profile, judged by the real gate, limits and visibility over
 // stand-in projections. The sign-in itself is T3's and has its own tests; here a session's
 // subject is what T3 would have given the device.
+import * as NodeCrypto from "node:crypto";
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -27,7 +30,7 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
-import { deviceSubject } from "@t3tools/skycot-rules/people";
+import { deviceSubject, watchSignedMessage } from "@t3tools/skycot-rules/people";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../../config.ts";
@@ -867,6 +870,207 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
           code: CODE,
         })) as { readonly rp: { readonly id: string } };
         assert.equal(options.rp.id, "localhost");
+      }),
+    ),
+  );
+
+  it.effect(
+    "Mum's Watch: set up once with the code, says yes once through her phone, logged as the Watch",
+    () =>
+      withDevices((world) =>
+        Effect.gen(function* () {
+          const { devices, recorded, limits, avaId } = world;
+          const watchKey = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+          const otherKey = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+          const publicKey = watchKey.publicKey
+            .export({ format: "der", type: "spki" })
+            .toString("base64url");
+          const sign = (key: NodeCrypto.KeyObject, message: string) =>
+            NodeCrypto.sign("sha256", Buffer.from(message), { key, dsaEncoding: "der" }).toString(
+              "base64url",
+            );
+
+          // Setting it up needs the parent code, and the Watch must hold the key it names.
+          assert.isTrue(
+            yield* refused(devices.watchKeyOptions({ who: mum(world), code: "000000" })),
+          );
+          const first = yield* devices.watchKeyOptions({ who: mum(world), code: CODE });
+          assert.isTrue(
+            yield* refused(
+              devices.watchKeyRegister({
+                who: mum(world),
+                challenge: first.challenge,
+                publicKey,
+                signature: sign(
+                  otherKey.privateKey,
+                  watchSignedMessage("register", first.challenge, first.action),
+                ),
+                name: "Mum's Apple Watch",
+                protection: "secure-enclave",
+              }),
+            ),
+          );
+          // That challenge is spent now: one try each.
+          const options = yield* devices.watchKeyOptions({ who: mum(world), code: CODE });
+          const { keyId } = yield* devices.watchKeyRegister({
+            who: mum(world),
+            challenge: options.challenge,
+            publicKey,
+            signature: sign(
+              watchKey.privateKey,
+              watchSignedMessage("register", options.challenge, options.action),
+            ),
+            name: "Mum's Apple Watch",
+            protection: "secure-enclave",
+          });
+          const listed = (yield* devices.list).find((device) => device.id === MUM_PHONE);
+          assert.equal(listed?.watch, "Mum's Apple Watch");
+
+          const [pending] = yield* devices.approvals;
+          const yes = (proof: SkycotFamilyDevices.Proof) =>
+            devices.answer({
+              who: mum(world),
+              sessionId: "mum-phone",
+              origin: "http://127.0.0.1:3790",
+              threadId: "thread-ava",
+              requestId: "req-1",
+              decision: "accept",
+              fingerprint: pending!.fingerprint,
+              proof,
+            });
+          // A signature for a different card doesn't fit this one, and a phone can't sign alone.
+          const swapped = yield* devices.watchChallenge({
+            who: mum(world),
+            threadId: "thread-ava",
+            requestId: "req-1",
+            fingerprint: pending!.fingerprint,
+          });
+          assert.isTrue(
+            yield* refused(
+              yes({
+                type: "watch",
+                keyId,
+                challenge: swapped.challenge,
+                signature: sign(
+                  watchKey.privateKey,
+                  watchSignedMessage("approve", swapped.challenge, "approve:thread-leo:req-9:x"),
+                ),
+              }),
+            ),
+          );
+          const issued = yield* devices.watchChallenge({
+            who: mum(world),
+            threadId: "thread-ava",
+            requestId: "req-1",
+            fingerprint: pending!.fingerprint,
+          });
+          assert.isTrue(
+            yield* refused(
+              yes({
+                type: "watch",
+                keyId,
+                challenge: issued.challenge,
+                signature: sign(
+                  otherKey.privateKey,
+                  watchSignedMessage("approve", issued.challenge, issued.action),
+                ),
+              }),
+            ),
+          );
+          assert.equal(recorded.dispatched.length, 0);
+          const good = yield* devices.watchChallenge({
+            who: mum(world),
+            threadId: "thread-ava",
+            requestId: "req-1",
+            fingerprint: pending!.fingerprint,
+          });
+          const proof = {
+            type: "watch",
+            keyId,
+            challenge: good.challenge,
+            signature: sign(
+              watchKey.privateKey,
+              watchSignedMessage("approve", good.challenge, good.action),
+            ),
+          } as const;
+          yield* yes(proof);
+          assert.equal(recorded.dispatched.length, 1);
+          assert.equal(recorded.dispatched[0]!["decision"], "accept");
+          // Once: the same signed yes again is refused.
+          assert.isTrue(yield* refused(yes(proof)));
+          assert.equal(recorded.dispatched.length, 1);
+          const logged = (yield* limits.snapshot)!.activity.events.find(
+            (event) => event.requestId === "req-1",
+          );
+          assert.equal(logged?.kind, "approved");
+          assert.equal(logged?.childId, avaId);
+          assert.equal(logged?.by?.deviceName, "Mum's phone");
+          assert.deepEqual(logged?.by?.via, { kind: "watch", name: "Mum's Apple Watch" });
+          // More time stays on the phone; forgetting the Watch ends its yes.
+          assert.isTrue(
+            yield* refused(
+              devices.moreTime({
+                who: mum(world),
+                sessionId: "mum-phone",
+                origin: "http://127.0.0.1:3790",
+                childId: avaId,
+                kind: "extra15",
+                proof,
+              }),
+            ),
+          );
+          yield* devices.watchKeyForget(mum(world));
+          assert.isTrue(
+            yield* refused(
+              devices.watchChallenge({
+                who: mum(world),
+                threadId: "thread-ava",
+                requestId: "req-1",
+                fingerprint: pending!.fingerprint,
+              }),
+            ),
+          );
+        }),
+      ),
+  );
+
+  it.effect("a no from the Watch needs no proof and is logged as the Watch's", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const { devices, recorded, limits, family } = world;
+        const [pending] = yield* devices.approvals;
+        const no = () =>
+          devices.answer({
+            who: mum(world),
+            sessionId: "mum-phone",
+            origin: "http://127.0.0.1:3790",
+            threadId: "thread-ava",
+            requestId: "req-1",
+            decision: "decline",
+            fingerprint: pending!.fingerprint,
+            proof: null,
+            via: "watch",
+          });
+        // The phone has a Watch set up, so its word that the no came from there is kept.
+        yield* family.setWatchKey({
+          deviceId: MUM_PHONE,
+          watch: {
+            id: "k1",
+            publicKey: "x",
+            name: "Mum's Apple Watch",
+            protection: "simulator",
+            createdAt: DateTime.formatIso(DateTime.makeUnsafe(EPOCH)),
+            lastUsedAt: null,
+          },
+        });
+        yield* no();
+        assert.equal(recorded.dispatched[0]!["decision"], "decline");
+        assert.isTrue(yield* refused(no()));
+        const logged = (yield* limits.snapshot)!.activity.events.find(
+          (event) => event.requestId === "req-1",
+        );
+        assert.equal(logged?.kind, "declined");
+        assert.equal(logged?.by?.via?.name, "Mum's Apple Watch");
       }),
     ),
   );

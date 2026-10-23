@@ -90,6 +90,8 @@ const FamilyEventBy = Schema.Struct({
   personId: Schema.String,
   deviceId: Schema.String,
   deviceName: Schema.String,
+  /** Said on the grown-up's Apple Watch and carried by that phone (Phase 4). */
+  via: Schema.optionalKey(Schema.Struct({ kind: Schema.Literal("watch"), name: Schema.String })),
 });
 export type FamilyEventBy = typeof FamilyEventBy.Type;
 const FamilyEvent = Schema.Struct({
