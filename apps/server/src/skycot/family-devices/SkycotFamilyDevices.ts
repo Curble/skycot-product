@@ -40,12 +40,18 @@ import * as Ref from "effect/Ref";
 
 import {
   APPROVAL_LAPSE_MS,
+  cleanName,
+  DEVICE_NAME_MAX,
   deviceSubject,
   LINK_TTL_MS,
   PASSKEY_CHALLENGE_TTL_MS,
+  watchRegisterAction,
+  watchSignedMessage,
   type ApproverDecision,
   type DeviceKind,
   type FamilyIdentity,
+  type WatchKeyProtection,
+  type WatchPurpose,
 } from "@t3tools/skycot-rules/people";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
@@ -66,6 +72,7 @@ import {
   verifyAssertion,
   verifyRegistration,
 } from "./passkeys.ts";
+import { readWatchPublicKey, verifyWatchSignature, watchKeyId } from "./watchKeys.ts";
 
 /**
  * What a child's own device may do in T3's terms: everything the plain client needs, and none of
@@ -99,6 +106,7 @@ export type DevicesFailureReason =
   | "changed"
   | "proof-needed"
   | "passkey"
+  | "watch"
   | "insecure"
   | "failed";
 
@@ -126,6 +134,8 @@ export interface DeviceRow {
   readonly lastSeenAt: string | null;
   readonly connected: boolean;
   readonly passkey: boolean;
+  /** The Apple Watch that may say yes through this phone, by name. */
+  readonly watch: string | null;
 }
 
 export interface LinkResult {
@@ -161,11 +171,27 @@ export type Proof =
       readonly response: unknown;
       /** The challenge the engine gave for this action (base64url). */
       readonly challenge: string;
+    }
+  | {
+      /** The grown-up's Apple Watch, through their phone (Phase 4). */
+      readonly type: "watch";
+      readonly keyId: string;
+      readonly challenge: string;
+      /** ECDSA P-256 over `watchSignedMessage("approve", challenge, action)`, DER, base64url. */
+      readonly signature: string;
     };
+
+/** Where an answer was given, when it wasn't the phone itself. */
+export interface AnswerVia {
+  readonly kind: "watch";
+  readonly name: string;
+}
 
 type GrownUpIdentity = Extract<FamilyIdentity, { kind: "grown-up" }>;
 
 interface ChallengeEntry {
+  /** A passkey's (bound to the address it was asked on) or a Watch's (any way to the Mac). */
+  readonly kind: "passkey" | "watch";
   readonly deviceId: string;
   readonly action: string;
   readonly origin: string;
@@ -227,6 +253,40 @@ export class SkycotFamilyDevices extends Context.Service<
       readonly response: unknown;
     }) => Effect.Effect<void, DevicesError | SkycotFamily.FamilyError>;
     readonly passkeyForget: (who: GrownUpIdentity) => Effect.Effect<void, SkycotFamily.FamilyError>;
+    /** Setting up "Say yes from my Apple Watch": the parent code once, then a challenge to sign. */
+    readonly watchKeyOptions: (input: {
+      readonly who: GrownUpIdentity;
+      readonly code: string;
+    }) => Effect.Effect<
+      { readonly challenge: string; readonly action: string; readonly purpose: WatchPurpose },
+      DevicesError | SkycotFamily.FamilyError
+    >;
+    readonly watchKeyRegister: (input: {
+      readonly who: GrownUpIdentity;
+      readonly challenge: string;
+      readonly publicKey: string;
+      readonly signature: string;
+      readonly name: string | null;
+      readonly protection: WatchKeyProtection;
+    }) => Effect.Effect<{ readonly keyId: string }, DevicesError | SkycotFamily.FamilyError>;
+    readonly watchKeyForget: (
+      who: GrownUpIdentity,
+    ) => Effect.Effect<void, SkycotFamily.FamilyError>;
+    /** A challenge for one yes from this phone's Apple Watch. */
+    readonly watchChallenge: (input: {
+      readonly who: GrownUpIdentity;
+      readonly threadId: string;
+      readonly requestId: string;
+      readonly fingerprint: string;
+    }) => Effect.Effect<
+      {
+        readonly challenge: string;
+        readonly action: string;
+        readonly purpose: WatchPurpose;
+        readonly keyId: string;
+      },
+      DevicesError
+    >;
     readonly approvals: Effect.Effect<ReadonlyArray<PendingApproval>>;
     /** A passkey challenge for one action of this grown-up's device. */
     readonly challenge: (input: {
@@ -250,6 +310,12 @@ export class SkycotFamilyDevices extends Context.Service<
       readonly decision: ApproverDecision;
       readonly fingerprint: string;
       readonly proof: Proof | null;
+      /**
+       * A no said on the grown-up's Watch and carried by their phone (a no needs no proof, so
+       * this is the phone's word for where it was said). A yes from the Watch is known by its
+       * proof instead.
+       */
+      readonly via?: "watch" | null;
     }) => Effect.Effect<void, DevicesError | SkycotFamily.FamilyError>;
     readonly moreTime: (input: {
       readonly who: GrownUpIdentity;
@@ -360,6 +426,7 @@ const make = Effect.gen(function* () {
         lastSeenAt: seen === undefined ? null : DateTime.formatIso(seen),
         connected: mine.some((session) => session.connected),
         passkey: view.passkeys > 0,
+        watch: view.watch,
       });
     }
     return rows;
@@ -422,6 +489,7 @@ const make = Effect.gen(function* () {
     yield* Ref.update(challenges, (book) => {
       const next = new Map([...book].filter(([, entry]) => entry.expiresAt > at));
       next.set(key, {
+        kind: "passkey",
         deviceId: who.deviceId,
         action,
         origin,
@@ -431,6 +499,32 @@ const make = Effect.gen(function* () {
       return next;
     });
     return { challenge: key, rpId };
+  });
+
+  /**
+   * A Watch's challenge: as a passkey's (this device, this action, two minutes, once), but not
+   * bound to a web address, since the Watch signs it in an app, not on a web page. The phone may
+   * reach the Mac one way for the challenge and another for the answer (relay, then home Wi-Fi).
+   */
+  const issueWatchChallenge = Effect.fn("SkycotFamilyDevices.issueWatchChallenge")(function* (
+    who: GrownUpIdentity,
+    action: string,
+  ) {
+    const key = toBase64Url(makeChallenge(action));
+    const at = yield* now;
+    yield* Ref.update(challenges, (book) => {
+      const next = new Map([...book].filter(([, entry]) => entry.expiresAt > at));
+      next.set(key, {
+        kind: "watch",
+        deviceId: who.deviceId,
+        action,
+        origin: "",
+        rpId: "",
+        expiresAt: at + PASSKEY_CHALLENGE_TTL_MS,
+      });
+      return next;
+    });
+    return key;
   });
 
   /** Takes a challenge out of the book (one use), if it was made for this device and action. */
@@ -449,6 +543,7 @@ const make = Effect.gen(function* () {
     });
     if (
       entry === undefined ||
+      entry.kind !== "passkey" ||
       entry.expiresAt <= at ||
       entry.deviceId !== who.deviceId ||
       entry.action !== action ||
@@ -458,6 +553,34 @@ const make = Effect.gen(function* () {
     }
     return entry;
   });
+
+  /** Takes a Watch's challenge out of the book (one use), if it was made for this action. */
+  const spendWatchChallenge = Effect.fn("SkycotFamilyDevices.spendWatchChallenge")(function* (
+    who: GrownUpIdentity,
+    key: string,
+    action: string,
+  ) {
+    const at = yield* now;
+    const entry = yield* Ref.modify(challenges, (book) => {
+      const found = book.get(key);
+      const next = new Map(book);
+      next.delete(key);
+      return [found, next] as const;
+    });
+    if (
+      entry === undefined ||
+      entry.kind !== "watch" ||
+      entry.expiresAt <= at ||
+      entry.deviceId !== who.deviceId ||
+      entry.action !== action
+    ) {
+      return yield* fail("watch", "That check on the Watch ran out. Try again.");
+    }
+    return entry;
+  });
+
+  const WATCH_DIDNT_CONFIRM =
+    "The Watch didn't confirm that. Answer on your iPhone instead, with the parent code.";
 
   const passkeyOptions: SkycotFamilyDevices["Service"]["passkeyOptions"] = Effect.fn(
     "SkycotFamilyDevices.passkeyOptions",
@@ -513,6 +636,68 @@ const make = Effect.gen(function* () {
 
   const passkeyForget: SkycotFamilyDevices["Service"]["passkeyForget"] = (who) =>
     family.removePasskeys({ deviceId: who.deviceId }).pipe(Effect.asVoid);
+
+  const watchKeyOptions: SkycotFamilyDevices["Service"]["watchKeyOptions"] = Effect.fn(
+    "SkycotFamilyDevices.watchKeyOptions",
+  )(function* (input) {
+    // The parent code once, so a Watch is only ever added by a grown-up (as a passkey is).
+    yield* family.checkCode({ code: input.code });
+    const action = watchRegisterAction(input.who.deviceId);
+    const challenge = yield* issueWatchChallenge(input.who, action);
+    return { challenge, action, purpose: "register" as const };
+  });
+
+  const watchKeyRegister: SkycotFamilyDevices["Service"]["watchKeyRegister"] = Effect.fn(
+    "SkycotFamilyDevices.watchKeyRegister",
+  )(function* (input) {
+    const action = watchRegisterAction(input.who.deviceId);
+    yield* spendWatchChallenge(input.who, input.challenge, action);
+    // The Watch proves it holds the key: it signed this phone's one-use registration challenge.
+    yield* Effect.try({
+      try: () => {
+        readWatchPublicKey(input.publicKey);
+        verifyWatchSignature({
+          publicKey: input.publicKey,
+          message: watchSignedMessage("register", input.challenge, action),
+          signature: input.signature,
+        });
+      },
+      catch: () => new DevicesError("watch", "The Watch didn't finish setting up. Try again."),
+    });
+    const at = yield* now;
+    const keyId = watchKeyId(input.publicKey);
+    yield* family.setWatchKey({
+      deviceId: input.who.deviceId,
+      watch: {
+        id: keyId,
+        publicKey: input.publicKey,
+        name: cleanName(input.name, DEVICE_NAME_MAX) ?? "Apple Watch",
+        protection: input.protection,
+        createdAt: DateTime.formatIso(DateTime.makeUnsafe(at)),
+        lastUsedAt: null,
+      },
+    });
+    yield* Effect.logInfo("skycot-family.watch-added", {
+      deviceId: input.who.deviceId,
+      protection: input.protection,
+    });
+    return { keyId };
+  });
+
+  const watchKeyForget: SkycotFamilyDevices["Service"]["watchKeyForget"] = (who) =>
+    family.removeWatchKey({ deviceId: who.deviceId }).pipe(Effect.asVoid);
+
+  const watchChallenge: SkycotFamilyDevices["Service"]["watchChallenge"] = Effect.fn(
+    "SkycotFamilyDevices.watchChallenge",
+  )(function* (input) {
+    const record = yield* family.device(input.who.deviceId);
+    if (record?.watch === undefined) {
+      return yield* fail("watch", "This phone's Apple Watch isn't set up to say yes.");
+    }
+    const action = approveAction(input.threadId, input.requestId, input.fingerprint);
+    const challenge = yield* issueWatchChallenge(input.who, action);
+    return { challenge, action, purpose: "approve" as const, keyId: record.watch.id };
+  });
 
   const approvals: SkycotFamilyDevices["Service"]["approvals"] = Effect.gen(function* () {
     if (!(yield* family.isEnabled)) return [];
@@ -593,7 +778,36 @@ const make = Effect.gen(function* () {
     }
     if (proof.type === "code") {
       yield* family.checkCode({ code: proof.code });
-      return "code" as const;
+      return { how: "code" as const, via: null };
+    }
+    if (proof.type === "watch") {
+      // Only a yes (approve:…) can be signed this way; more time stays on the phone.
+      if (!action.startsWith("approve:")) {
+        return yield* fail("watch", "Give more time on your iPhone, with the parent code.");
+      }
+      const entry = yield* spendWatchChallenge(who, proof.challenge, action);
+      const record = yield* family.device(who.deviceId);
+      if (record === null)
+        return yield* fail("not-allowed", SkycotFamilyGate.REMOVED_DEVICE_MESSAGE);
+      const watch = record.watch;
+      if (watch === undefined || watch.id !== proof.keyId) {
+        return yield* fail("watch", WATCH_DIDNT_CONFIRM);
+      }
+      yield* Effect.try({
+        try: () =>
+          verifyWatchSignature({
+            publicKey: watch.publicKey,
+            // Rebuilt from the engine's own record of the challenge, never from the phone's words.
+            message: watchSignedMessage("approve", proof.challenge, entry.action),
+            signature: proof.signature,
+          }),
+        catch: () => new DevicesError("watch", WATCH_DIDNT_CONFIRM),
+      });
+      yield* family.useWatchKey({ deviceId: who.deviceId, keyId: watch.id });
+      return {
+        how: "watch" as const,
+        via: { kind: "watch", name: watch.name } satisfies AnswerVia,
+      };
     }
     const entry = yield* spendChallenge(who, proof.challenge, action, origin);
     const record = yield* family.device(who.deviceId);
@@ -617,7 +831,7 @@ const make = Effect.gen(function* () {
         ),
     });
     yield* family.usePasskey({ deviceId: who.deviceId, ...used });
-    return "passkey" as const;
+    return { how: "passkey" as const, via: null };
   });
 
   const answer: SkycotFamilyDevices["Service"]["answer"] = Effect.fn("SkycotFamilyDevices.answer")(
@@ -649,8 +863,9 @@ const make = Effect.gen(function* () {
       if (fingerprint !== input.fingerprint) {
         return yield* fail("changed", "That request changed. Have another look before you answer.");
       }
-      // Saying no is free (the approval contract, rule 6); a yes needs Face ID or the code.
-      const how =
+      // Saying no is free (the approval contract, rule 6); a yes needs Face ID, the code or the
+      // grown-up's own Watch.
+      const proven =
         input.decision === "accept"
           ? yield* prove(
               input.who,
@@ -659,6 +874,21 @@ const make = Effect.gen(function* () {
               input.proof,
             )
           : null;
+      const how = proven?.how ?? null;
+      const via: AnswerVia | null =
+        proven !== null
+          ? proven.via
+          : input.via === "watch"
+            ? yield* family
+                .device(input.who.deviceId)
+                .pipe(
+                  Effect.map((record) =>
+                    record?.watch === undefined
+                      ? null
+                      : ({ kind: "watch", name: record.watch.name } satisfies AnswerVia),
+                  ),
+                )
+            : null;
       // One request, once: the engine resolves it, and a second answer finds it no longer pending.
       yield* engine
         .dispatch({
@@ -686,12 +916,14 @@ const make = Effect.gen(function* () {
           personId: input.who.personId,
           deviceId: input.who.deviceId,
           deviceName: input.who.deviceName,
+          ...(via === null ? {} : { via }),
         },
       });
       yield* Effect.logInfo("skycot-family.approver-answered", {
         deviceId: input.who.deviceId,
         decision: input.decision,
         how,
+        via: via?.kind ?? null,
       });
     },
   );
@@ -746,6 +978,10 @@ const make = Effect.gen(function* () {
     passkeyOptions,
     passkeyRegister,
     passkeyForget,
+    watchKeyOptions,
+    watchKeyRegister,
+    watchKeyForget,
+    watchChallenge,
     approvals,
     challenge,
     answer,

@@ -295,6 +295,33 @@ describe("buildRecap", () => {
     });
   });
 
+  it("names the Watch and the phone that carried a yes from the wrist", () => {
+    const yes = {
+      at: at("2026-10-22T15:20:00+11:00"),
+      childId: "ava",
+      kind: "approved" as const,
+      threadId: "thread:space",
+      requestId: "req-9",
+      by: {
+        personId: "mum",
+        deviceId: "d1",
+        deviceName: "Mum's iPhone",
+        via: { kind: "watch" as const, name: "Mum's Apple Watch" },
+      },
+    };
+    const today = buildRecap({
+      childId: "ava",
+      range: "session",
+      now: NOW,
+      timeZone: MELBOURNE,
+      activity: { ...activity, events: [...(activity.events ?? []), yes] },
+      threads,
+    });
+    expect(today.grownUp.fromDevices).toEqual([
+      { at: yes.at, device: "Mum's Apple Watch through Mum's iPhone" },
+    ]);
+  });
+
   it("keeps each child's recap to their own work", () => {
     const leo = buildRecap({
       childId: "leo",

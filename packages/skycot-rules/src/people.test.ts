@@ -8,7 +8,10 @@ import {
   deviceSubject,
   groupLinkCode,
   isApproverDecision,
+  isWatchKeyProtection,
   normaliseLinkCode,
+  watchRegisterAction,
+  watchSignedMessage,
 } from "./people.ts";
 
 const owners = {
@@ -54,5 +57,14 @@ describe("who is who", () => {
     expect(cleanName("  Mum's   phone ", 40)).toBe("Mum's phone");
     expect(cleanName("   ", 40)).toBeNull();
     expect(cleanName(42, 40)).toBeNull();
+  });
+
+  it("names exactly what a Watch signs, line by line", () => {
+    expect(watchSignedMessage("approve", "abc", "approve:t1:r1:f1")).toBe(
+      "SKYCOT Watch v1\napprove\nabc\napprove:t1:r1:f1",
+    );
+    expect(watchRegisterAction("d0a1b2c3")).toBe("watch-register:d0a1b2c3");
+    expect(isWatchKeyProtection("secure-enclave")).toBe(true);
+    expect(isWatchKeyProtection("trust-me")).toBe(false);
   });
 });

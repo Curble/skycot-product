@@ -323,7 +323,15 @@ export function buildRecap(input: {
       shieldAllowed: events.filter((event) => event.kind === "shield-allowed").length,
       fromDevices: events.flatMap((event) =>
         event.kind === "approved" && event.by !== undefined
-          ? [{ at: event.at, device: event.by.deviceName }]
+          ? [
+              {
+                at: event.at,
+                device:
+                  event.by.via === undefined
+                    ? event.by.deviceName
+                    : `${event.by.via.name} through ${event.by.deviceName}`,
+              },
+            ]
           : [],
       ),
     },

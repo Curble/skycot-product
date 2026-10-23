@@ -121,6 +121,19 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
     list: Effect.succeed([]),
     endVanished: () => Effect.void,
     endAll: Effect.void,
+    watchKeyOptions: () =>
+      Effect.succeed({ challenge: "c1", action: "watch-register:d", purpose: "register" as const }),
+    watchKeyRegister: (input) => {
+      answers.push(input);
+      return Effect.succeed({ keyId: "k1" });
+    },
+    watchChallenge: () =>
+      Effect.fail(
+        new SkycotFamilyDevices.DevicesError(
+          "watch",
+          "This phone's Apple Watch isn't set up to say yes.",
+        ),
+      ),
   });
   // T3's orchestration reads, standing in: the shell and one conversation.
   const layerOrchestration = Layer.mergeAll(
@@ -309,6 +322,41 @@ it.layer(
       });
       assert.equal(macWithoutCode.status, 403);
       assert.equal(macWithoutCode.json["requiredPermission"], SkycotFamilyGate.FAMILY_PERMISSION);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("only a grown-up's phone may set up its Watch or ask for a Watch's challenge", () =>
+    Effect.gen(function* () {
+      const { send, answers } = yield* makeServer();
+      const options = "/api/skycot/family/approver/watch/options";
+      const challenge = "/api/skycot/family/approver/watch/challenge";
+      const register = "/api/skycot/family/approver/watch/register";
+      const card = { threadId: "thread-ava", requestId: "req-1", fingerprint: "f" };
+      for (const who of ["ava", "mac"]) {
+        assert.equal((yield* send(who, "POST", options, { code: CODE })).status, 403, who);
+        assert.equal((yield* send(who, "POST", challenge, card)).status, 403, who);
+      }
+      const opened = yield* send("mum", "POST", options, { code: CODE });
+      assert.equal(opened.json["purpose"], "register");
+      assert.equal((yield* send("mum", "POST", challenge, card)).json["error"], "watch");
+      // Where the key lives is one of three labels, or the request isn't understood.
+      const unknown = yield* send("mum", "POST", register, {
+        challenge: "c1",
+        publicKey: "x",
+        signature: "y",
+        protection: "trust-me",
+      });
+      assert.equal(unknown.json["error"], "invalid-request");
+      assert.equal(answers.length, 0);
+      const added = yield* send("mum", "POST", register, {
+        challenge: "c1",
+        publicKey: "x",
+        signature: "y",
+        name: "Mum's Apple Watch",
+        protection: "secure-enclave",
+      });
+      assert.equal(added.json["keyId"], "k1");
+      assert.deepInclude(answers[0] as object, { name: "Mum's Apple Watch", challenge: "c1" });
     }).pipe(Effect.scoped),
   );
 
