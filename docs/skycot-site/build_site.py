@@ -342,7 +342,7 @@ TITLE = "SKYCOT · The family-friendly AI developer"
 DESC = ("Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI "
         "developer for families and small businesses, on your own Mac, with the AI you already pay for.")
 OG_ALT = ("SKYCOT. The family-friendly AI developer. Kids dream it up. SKYCOT builds it. Nothing goes online without a "
-          "grown-up's code. SKYCOT for Mac, early access. A smiling cloud waves hello beside Sam and Mo.")
+          "grown-up's code. SKYCOT for Mac. A smiling cloud waves hello beside Sam and Mo.")
 
 # Identity metadata for search engines. Never add an address here (standing rule: no street, postal
 # or registered address anywhere on skycot.com).
@@ -362,7 +362,8 @@ def attr(text):
     # Attribute-safe escaping that leaves apostrophes readable (attributes use double quotes).
     return html.escape(text, quote=False).replace('"', '&quot;')
 
-def head(title, desc, path="/", robots=None):
+def head(title, desc, path="/", robots=None, css=None, open_body=True):
+    css = CSS if css is None else css
     url = SITE + path
     robots_meta = f'\n<meta name="robots" content="{robots}">' if robots else ""
     return f'''<!doctype html>
@@ -398,10 +399,8 @@ def head(title, desc, path="/", robots=None):
 <link rel="mask-icon" href="/assets/brand/mask-icon.svg" color="#0071e3">
 <link rel="manifest" href="/site.webmanifest">
 <script>{DAYLIGHT}</script>
-<style>{CSS}</style>
-</head>
-<body>
-'''
+{('<style>' + css + '</style>') if css else ''}
+{'</head>' + chr(10) + '<body>' + chr(10) if open_body else ''}'''
 
 # Links are root-relative clean URLs (/privacy, /#how) as Cloudflare Pages serves them.
 # To preview the generated folder locally, serve it (e.g. `npx wrangler pages dev draft`), not file://.
@@ -409,15 +408,12 @@ def nav(grownup=False):
     return f'''<header class="nav"><div class="wrap">
   <a class="brand" href="/" aria-label="SKYCOT home">{lockup(grownup)}</a>
   <ul>
-    <li><a href="/#family">Family</a></li>
-    <li><a href="/#new">New</a></li>
-    <li><a href="/#ideas">What kids make</a></li>
+    <li><a href="/#new">Families</a></li>
     <li><a href="/#how">How it works</a></li>
     <li><a href="/#safety">Safety</a></li>
-    <li><a href="/#looks">Looks</a></li>
     <li><a href="/#faq">FAQ</a></li>
   </ul>
-  <a class="btn btn-primary btn-small cta" href="/#download">Get SKYCOT</a>
+  <a class="btn btn-primary btn-small cta" href="/#download">Download</a>
 </div></header>
 '''
 
@@ -428,9 +424,8 @@ FOOTER = '''<footer><div class="wrap">
   <div class="cols">
     <a class="brand" href="/" aria-label="SKYCOT home"><!--lockup--></a>
     <ul>
-      <li><a href="/#family">Family</a></li>
-      <li><a href="/#new">New</a></li>
-      <li><a href="/#ideas">What kids make</a></li>
+      <li><a href="/#new">Families</a></li>
+            <li><a href="/#make">What kids make</a></li>
       <li><a href="/#how">How it works</a></li>
       <li><a href="/#safety">Safety</a></li>
       <li><a href="/#looks">Looks</a></li>
@@ -792,7 +787,16 @@ def write(name, content):
         f.write(content)
     print("wrote", name, len(content))
 
-write("index.html", head(TITLE, DESC, "/") + nav() + home_body() + footer())
+# The home page (redesign, 23 October 2026) is docs/skycot-site/home.html: Option E from
+# design-explorations/2026-10-23 (A's keynote sky, D's day-to-bedtime sky, B's crayon rocket, C's cloud).
+# Its own <style> and <script> blocks are kept; the site's shared metadata, structured data and favicons
+# come from head(). Edit home.html for the page itself.
+import re as _re
+HOME = open(HERE + "home.html", encoding="utf-8").read()
+_home_head = HOME[HOME.index("<head>") + 6:HOME.index("</head>")]
+_home_extras = "\n".join(_re.findall(r"<style[\s\S]*?</style>|<script[\s\S]*?</script>", _home_head))
+_home_body = HOME[HOME.index("<body"):]
+write("index.html", head(TITLE, DESC, "/", css="", open_body=False) + _home_extras + "\n</head>\n" + _home_body)
 # Variant B is now the dark side of index.html; the separate file is retired.
 if os.path.exists(OUT + "index-b.html"):
     os.remove(OUT + "index-b.html")
@@ -979,7 +983,12 @@ for src in ["web/favicon-day.svg", "web/favicon-dusk.svg", "web/mask-icon.svg", 
             "web/icon-192-day.png", "web/icon-512-day.png", "web/icon-maskable-192-day.png", "web/icon-maskable-512-day.png",
             "svg/lockup-horizontal-day-light.svg", "svg/lockup-horizontal-dusk-dark.svg",
             "svg/lockup-horizontal-minimal-light.svg", "svg/lockup-horizontal-minimal-dark.svg",
-            "poses/day/mascot-hello-day.svg", "poses/dusk/mascot-hello-dusk.svg"]:
+            "poses/day/mascot-hello-day.svg", "poses/dusk/mascot-hello-dusk.svg",
+            "svg/app-icon-day.svg", "svg/wordmark.svg", "svg/wordmark-reversed.svg",
+            "poses/day/mascot-yay-day.svg", "poses/dusk/mascot-yay-dusk.svg",
+            "poses/day/mascot-thinking-day.svg", "poses/dusk/mascot-thinking-dusk.svg",
+            "poses/day/mascot-ask-a-grown-up-day.svg", "poses/dusk/mascot-ask-a-grown-up-dusk.svg",
+            "poses/dusk/mascot-night-night-dusk.svg"]:
     shutil.copyfile(BRAND + src, OUT + "assets/brand/" + os.path.basename(src))
 # Browsers ask for these at the site root.
 shutil.copyfile(BRAND + "web/favicon.ico", OUT + "favicon.ico")

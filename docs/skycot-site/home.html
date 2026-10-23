@@ -1,0 +1,5434 @@
+<!--
+Design language, Option E: "Apple keynote, through one living day". Option A's apple.com product-page treatment
+(big confident system type, generous whitespace, one accent blue, the cloud that floats in, waves and cheers as
+the headline sharpens word by word, a real Mac window rising, and a pinned Mac window that tells How it works as
+you scroll) set inside Option D's living sky: one fixed sky behind the whole page moves from morning in the hero
+through midday, a golden afternoon, sunset and dusk with stars to night, with a small clock label per section,
+text that switches between dark and light ink against the sky, content on frosted glass cards, and a "Good night
+from SKYCOT" footer where the cloud sleeps under the moon. From Option B comes the crayon rocket that draws itself
+and becomes the real page Ava built; from Option C, a hero cloud whose eyes follow your cursor and who cycles
+hello, yay and thinking when poked. Dark mode tells the evening story. prefers-reduced-motion gives a calm,
+complete still page with one sky colour per section.
+-->
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SKYCOT · The family-friendly AI developer</title>
+    <meta
+      name="description"
+      content="Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI developer for families, on your own Mac, with the AI you already pay for. Free beta for Mac, out now."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/assets/brand/app-icon-day.svg" />
+    <script>
+      /* Before first paint: which story to tell (day for light mode, evening for dark mode, or the visitor's
+         saved choice; ?sky=day|dusk forces one for testing) and whether the sky is live or still. */
+      (function () {
+        var r = document.documentElement,
+          t = null;
+        r.classList.add("js");
+        try {
+          t = localStorage.getItem("skycot-sky");
+        } catch (e) {}
+        var q = /[?&]sky=(day|dusk)\b/.exec(location.search);
+        if (q) t = q[1] === "dusk" ? "dark" : "light";
+        if (t === "light" || t === "dark") r.setAttribute("data-theme", t);
+        var dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        r.setAttribute("data-story", dark ? "evening" : "day");
+        r.classList.add(
+          matchMedia("(prefers-reduced-motion: reduce)").matches ? "still" : "motion",
+        );
+      })();
+    </script>
+    <style>
+      /* ---------- tokens ---------- */
+      :root {
+        --font:
+          -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue",
+          Helvetica, Arial, sans-serif;
+        --accent: #0071e3;
+        --accent-hi: #0077ed;
+        --h1-accent: #0066d6;
+        /* still sky (reduced motion, no script): one colour per time of day */
+        --b10: #c4e2fa;
+        --b16: #a9d5f8;
+        --b20: #8fc7f5;
+        --b25: #b9d6ec;
+        --b30: #f3d9ab;
+        --b34: #efc395;
+        --b40: #55438f;
+        --b45: #3d3482;
+        --b50: #2a2868;
+        --b56: #1d1e52;
+        --b61: #131641;
+        --b70: #070a24;
+        /* hero clouds and the hero mascot */
+        --cloud: #ffffff;
+        --cloud-shade: #dfeaf6;
+        --cloud-op: 0.92;
+        --m-belly: #ddebfa;
+        --m-shadow: #2b2420;
+        --m-shadow-op: 0.1;
+        --m-wave: #2b2420;
+        --m-wave-op: 0.45;
+        --m-star: none;
+        --day: block;
+        --dusk: none;
+        --day-i: inline;
+        --dusk-i: none;
+      }
+      :root[data-story="evening"] {
+        --h1-accent: #8cc8ff;
+        --b10: #3a3480;
+        --b16: #2e2b72;
+        --b20: #272768;
+        --b25: #21235e;
+        --b30: #1d1f56;
+        --b34: #191b4e;
+        --b40: #161846;
+        --b45: #131540;
+        --b50: #10133a;
+        --b56: #0d1034;
+        --b61: #0a0d2d;
+        --b70: #050720;
+        --cloud: #b7aee8;
+        --cloud-shade: #8b80c4;
+        --cloud-op: 0.2;
+        --m-belly: #eadff3;
+        --m-shadow: #1a1240;
+        --m-shadow-op: 0.25;
+        --m-wave: #b9a8e8;
+        --m-wave-op: 1;
+        --m-star: inline;
+        --day: none;
+        --dusk: block;
+        --day-i: none;
+        --dusk-i: inline;
+      }
+      @media (prefers-color-scheme: dark) {
+        /* no script: follow the system straight away */
+        :root:not([data-story]) {
+          --h1-accent: #8cc8ff;
+          --b10: #3a3480;
+          --b16: #2e2b72;
+          --b20: #272768;
+          --b25: #21235e;
+          --b30: #1d1f56;
+          --b34: #191b4e;
+          --b40: #161846;
+          --b45: #131540;
+          --b50: #10133a;
+          --b56: #0d1034;
+          --b61: #0a0d2d;
+          --b70: #050720;
+          --cloud: #b7aee8;
+          --cloud-shade: #8b80c4;
+          --cloud-op: 0.2;
+          --m-star: inline;
+          --m-wave: #b9a8e8;
+          --m-wave-op: 1;
+          --day: none;
+          --dusk: block;
+          --day-i: none;
+          --dusk-i: inline;
+        }
+      }
+
+      /* Two glass tones. Morning to late afternoon: light glass and dark ink. After sunset (and the whole
+         evening story): deep navy glass and light ink. */
+      .tone-light {
+        --ink: #15171c;
+        --ink2: #3a3d46;
+        --ink3: #55586a;
+        --glass: rgba(255, 255, 255, 0.74);
+        --glass-2: rgba(255, 255, 255, 0.92);
+        --edge: rgba(255, 255, 255, 0.85);
+        --hair: rgba(18, 32, 64, 0.1);
+        --link: #0062c4;
+        --chip: rgba(0, 113, 227, 0.1);
+        --chip-ink: #0060c0;
+        --shadow: 0 24px 60px rgba(28, 64, 120, 0.14), 0 2px 10px rgba(28, 64, 120, 0.07);
+        --mac-bar: linear-gradient(#f3f3f3, #e6e6e6);
+        --mac-edge: rgba(0, 0, 0, 0.14);
+        --mac-title: #4d4d4d;
+        --num: linear-gradient(135deg, #0a84ff 0%, #0060c0 50%, #6e4ed8 100%);
+        --bubble: #0071e3;
+        --seg-bg: rgba(118, 118, 128, 0.14);
+        --seg-on: #ffffff;
+      }
+      .tone-dark,
+      :root[data-story="evening"] .tone-light {
+        --ink: #f5f5f7;
+        --ink2: #d3d6e8;
+        --ink3: #b3b7d4;
+        --glass: rgba(17, 19, 58, 0.62);
+        --glass-2: rgba(24, 26, 70, 0.86);
+        --edge: rgba(255, 255, 255, 0.14);
+        --hair: rgba(255, 255, 255, 0.12);
+        --link: #9fd0ff;
+        --chip: rgba(159, 208, 255, 0.14);
+        --chip-ink: #b8dcff;
+        --shadow: 0 24px 60px rgba(2, 3, 20, 0.45), 0 2px 10px rgba(2, 3, 20, 0.3);
+        --mac-bar: linear-gradient(#3a3a3c, #2c2c2e);
+        --mac-edge: rgba(255, 255, 255, 0.14);
+        --mac-title: #c7c7cc;
+        --num: linear-gradient(135deg, #7cc4ff 0%, #2997ff 45%, #a78bfa 100%);
+        --bubble: #0a6fd8;
+        --seg-bg: rgba(255, 255, 255, 0.12);
+        --seg-on: rgba(255, 255, 255, 0.24);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-story]) .tone-light {
+          --ink: #f5f5f7;
+          --ink2: #d3d6e8;
+          --ink3: #b3b7d4;
+          --glass: rgba(17, 19, 58, 0.62);
+          --glass-2: rgba(24, 26, 70, 0.86);
+          --edge: rgba(255, 255, 255, 0.14);
+          --hair: rgba(255, 255, 255, 0.12);
+          --link: #9fd0ff;
+          --chip: rgba(159, 208, 255, 0.14);
+          --chip-ink: #b8dcff;
+          --mac-bar: linear-gradient(#3a3a3c, #2c2c2e);
+          --mac-title: #c7c7cc;
+          --num: linear-gradient(135deg, #7cc4ff 0%, #2997ff 45%, #a78bfa 100%);
+          --seg-bg: rgba(255, 255, 255, 0.12);
+          --seg-on: rgba(255, 255, 255, 0.24);
+        }
+      }
+
+      /* ---------- base ---------- */
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        scroll-padding-top: 60px;
+      }
+      html.motion {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font);
+        background: var(--b10);
+        color: #15171c;
+        font-size: 17px;
+        line-height: 1.47;
+        letter-spacing: -0.02em;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: clip;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      a {
+        color: var(--link, #0062c4);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        margin: 0;
+        font-weight: 700;
+      }
+      p {
+        margin: 0;
+      }
+      :focus-visible {
+        outline: 3px solid #0a84ff;
+        outline-offset: 3px;
+        border-radius: 10px;
+      }
+      .day-only {
+        display: var(--day);
+      }
+      .dusk-only {
+        display: var(--dusk);
+      }
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      .nw {
+        white-space: nowrap;
+      }
+      .skip {
+        position: fixed;
+        left: 12px;
+        top: -60px;
+        z-index: 100;
+        background: #fff;
+        color: #0062c4;
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-weight: 600;
+      }
+      .skip:focus {
+        top: 10px;
+      }
+
+      /* ---------- the sky: one fixed layer behind everything ---------- */
+      .layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        display: none;
+      }
+      .motion .layer,
+      .motion #sun,
+      .motion #moon {
+        display: block;
+      }
+      #sky {
+        z-index: 0;
+        background: var(--b10);
+      }
+      #sky i {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        visibility: hidden;
+      }
+      #stars {
+        z-index: 1;
+        opacity: 0;
+      }
+      #stars.off .star {
+        animation-play-state: paused;
+      }
+      .star {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        border-radius: 50%;
+        background: #fff;
+        animation: tw var(--d, 5s) ease-in-out var(--w, 0s) infinite;
+      }
+      .star.big {
+        width: 3px;
+        height: 3px;
+        box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.6);
+      }
+      @keyframes tw {
+        0%,
+        100% {
+          opacity: 0.85;
+        }
+        50% {
+          opacity: 0.25;
+        }
+      }
+      #glow {
+        z-index: 2;
+        opacity: 0;
+        background: radial-gradient(
+          120% 60% at 50% 105%,
+          rgba(255, 160, 96, 0.5),
+          rgba(255, 140, 110, 0.2) 45%,
+          rgba(255, 140, 110, 0) 70%
+        );
+      }
+      /* The sun and the moon live in the side margins on wide screens, so they never sit behind text. */
+      #sun,
+      #moon {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        z-index: 3;
+        pointer-events: none;
+        display: none;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .sun-in {
+        position: absolute;
+        left: -58px;
+        top: -58px;
+        width: 116px;
+        height: 116px;
+      }
+      .halo {
+        position: absolute;
+        inset: -70px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 238, 178, 0.55) 0%,
+          rgba(255, 232, 170, 0.18) 38%,
+          rgba(255, 232, 170, 0) 66%
+        );
+      }
+      .disc {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: radial-gradient(circle at 42% 38%, #fffdf0 0%, #ffeaa6 55%, #ffd36e 100%);
+        box-shadow: 0 0 50px rgba(255, 214, 120, 0.55);
+      }
+      .disc.warm {
+        background: radial-gradient(circle at 45% 40%, #ffe2b6 0%, #ffa064 60%, #f26e4c 100%);
+        box-shadow: 0 0 70px rgba(255, 130, 80, 0.6);
+        opacity: 0;
+      }
+      .moon-in {
+        position: absolute;
+        left: -36px;
+        top: -36px;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        box-shadow: inset -18px 9px 0 0 #f7f0d6;
+        filter: drop-shadow(0 0 16px rgba(247, 240, 214, 0.45));
+      }
+      #clouds {
+        z-index: 4;
+        overflow: hidden;
+      }
+      #clouds.off .sway {
+        animation-play-state: paused;
+      }
+      .gc {
+        position: absolute;
+        top: 0;
+        will-change: transform;
+      }
+      .gc .sway {
+        animation: drift var(--s, 70s) ease-in-out infinite alternate;
+      }
+      .gc svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .gc .tint {
+        position: absolute;
+        inset: 0;
+      }
+      .gc .tint:first-child {
+        position: relative;
+      }
+      .t-day {
+        --cb: #ffffff;
+        --cs: #d3e5f7;
+        opacity: 0.85;
+      }
+      .t-sun {
+        --cb: #ffd3c2;
+        --cs: #c886a8;
+        opacity: 0;
+      }
+      .t-night {
+        --cb: #2c3172;
+        --cs: #1b1f57;
+        opacity: 0;
+      }
+      @keyframes drift {
+        from {
+          transform: translateX(-3vw);
+        }
+        to {
+          transform: translateX(3vw);
+        }
+      }
+      .cloud-sh {
+        fill: var(--cs);
+      }
+      .cloud-bd {
+        fill: var(--cb);
+      }
+
+      /* still sky: each section paints its own time of day */
+      :root:not(.motion) .band {
+        background: linear-gradient(180deg, var(--from) 0%, var(--from) 62%, var(--to) 100%);
+      }
+      :root:not(.motion) .band.tone-dark,
+      :root[data-story="evening"]:not(.motion) .band {
+        background-image:
+          radial-gradient(1.5px 1.5px at 12% 18%, #fff 50%, transparent 51%),
+          radial-gradient(1px 1px at 31% 8%, #fff 50%, transparent 51%),
+          radial-gradient(1.5px 1.5px at 52% 26%, #fff 50%, transparent 51%),
+          radial-gradient(1px 1px at 74% 12%, #fff 50%, transparent 51%),
+          radial-gradient(2px 2px at 88% 30%, #fff 50%, transparent 51%),
+          radial-gradient(1px 1px at 20% 44%, #fff 50%, transparent 51%),
+          radial-gradient(1.5px 1.5px at 63% 52%, #fff 50%, transparent 51%),
+          radial-gradient(1px 1px at 92% 64%, #fff 50%, transparent 51%),
+          linear-gradient(180deg, var(--from) 0%, var(--from) 62%, var(--to) 100%);
+      }
+
+      main,
+      footer {
+        position: relative;
+        z-index: 5;
+      }
+
+      /* ---------- nav ---------- */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        height: 52px;
+        background: rgba(255, 255, 255, 0.6);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        transition:
+          background-color 0.6s,
+          border-color 0.6s;
+      }
+      .nav .wrap {
+        display: flex;
+        align-items: center;
+        height: 52px;
+        gap: 24px;
+      }
+      .brand {
+        position: relative;
+        display: block;
+        width: 65px;
+        height: 24px;
+        flex: none;
+      }
+      .brand img {
+        position: absolute;
+        inset: 0;
+        width: 65px;
+        height: 24px;
+        transition: opacity 0.6s;
+      }
+      .brand .rev {
+        opacity: 0;
+      }
+      .nav ul {
+        list-style: none;
+        display: flex;
+        gap: 28px;
+        margin: 0 0 0 auto;
+        padding: 0;
+        font-size: 13.5px;
+      }
+      .nav ul a {
+        color: #15171c;
+        opacity: 0.85;
+        transition: color 0.6s;
+      }
+      .nav ul a:hover {
+        opacity: 1;
+        text-decoration: none;
+      }
+      .nav .tools {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        border: 0;
+        background: transparent;
+        color: #15171c;
+        cursor: pointer;
+      }
+      .icon-btn:hover {
+        background: rgba(0, 113, 227, 0.1);
+      }
+      .icon-btn .moon {
+        display: var(--day-i);
+      }
+      .icon-btn .sun {
+        display: var(--dusk-i);
+      }
+      .nav.dark,
+      :root[data-story="evening"] .nav {
+        background: rgba(12, 14, 44, 0.5);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+      }
+      .nav.dark ul a,
+      .nav.dark .icon-btn,
+      :root[data-story="evening"] .nav ul a,
+      :root[data-story="evening"] .nav .icon-btn {
+        color: #f5f5f7;
+      }
+      .nav.dark .brand .day,
+      :root[data-story="evening"] .nav .brand .day {
+        opacity: 0;
+      }
+      .nav.dark .brand .rev,
+      :root[data-story="evening"] .nav .brand .rev {
+        opacity: 1;
+      }
+      @media (max-width: 900px) {
+        .nav ul {
+          display: none;
+        }
+        .nav .tools {
+          margin-left: auto;
+        }
+      }
+
+      /* ---------- buttons ---------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 50px;
+        padding: 0 26px;
+        border-radius: 980px;
+        font: 600 17px/1 var(--font);
+        letter-spacing: -0.01em;
+        border: 0;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background-color 0.2s,
+          transform 0.2s;
+      }
+      .btn:hover {
+        text-decoration: none;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 10px 24px -8px rgba(0, 113, 227, 0.55);
+      }
+      .btn-primary:hover {
+        background: var(--accent-hi);
+      }
+      .btn-primary:active {
+        transform: scale(0.98);
+      }
+      .btn-ghost {
+        background: var(--glass);
+        color: var(--ink);
+        box-shadow: inset 0 0 0 1px var(--edge);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .btn-small {
+        min-height: 32px;
+        padding: 0 15px;
+        font-size: 13.5px;
+        box-shadow: none;
+      }
+      .link-more {
+        font-size: 19px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--link);
+      }
+      .link-more svg {
+        transition: transform 0.2s;
+      }
+      .link-more:hover svg {
+        transform: translateX(3px);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        padding: 0 16px;
+        border-radius: 980px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        box-shadow: 0 8px 24px -8px rgba(0, 113, 227, 0.6);
+      }
+      .badge i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #7ef0a6;
+        box-shadow: 0 0 0 3px rgba(126, 240, 166, 0.3);
+      }
+
+      /* ---------- glass, clock labels, section heads ---------- */
+      .glass {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: saturate(160%) blur(22px);
+        -webkit-backdrop-filter: saturate(160%) blur(22px);
+        color: var(--ink);
+      }
+      .glass p {
+        color: var(--ink2);
+      }
+      .sec {
+        padding: 72px 0;
+      }
+      .head {
+        text-align: center;
+        max-width: 860px;
+        margin: 0 auto;
+        --i1: var(--ink);
+        --i2: var(--ink2);
+      }
+      .when {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--ink2);
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        padding: 6px 14px 6px 10px;
+        border-radius: 980px;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        margin-bottom: 18px;
+      }
+      .when svg {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      .when .clock {
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .when .sep {
+        opacity: 0.5;
+      }
+      .when .e,
+      .when .wi-e,
+      :root[data-story="evening"] .when .d,
+      :root[data-story="evening"] .when .wi-d {
+        display: none;
+      }
+      :root[data-story="evening"] .when .e {
+        display: inline;
+      }
+      :root[data-story="evening"] .when .wi-e {
+        display: block;
+      }
+      .title {
+        font-size: clamp(36px, 5vw, 64px);
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        color: var(--i1);
+        text-wrap: balance;
+      }
+      .sub {
+        font-size: clamp(18px, 1.7vw, 22px);
+        line-height: 1.4;
+        color: var(--i2);
+        max-width: 740px;
+        margin: 18px auto 0;
+        font-weight: 500;
+        letter-spacing: -0.015em;
+        text-wrap: pretty;
+      }
+      .fine {
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--i2, var(--ink2));
+        max-width: 760px;
+        margin: 20px auto 0;
+        text-align: center;
+      }
+      /* text on the open sky picks dark or light ink from the sky behind it */
+      .ink {
+        --i1: var(--ink);
+        --i2: var(--ink2);
+        transition: text-shadow 0.7s;
+      }
+      .motion .ink.on-light {
+        --i1: #111318;
+        --i2: #2c2f38;
+        text-shadow: 0 0 22px rgba(255, 255, 255, 0.45);
+      }
+      .motion .ink.on-dark {
+        --i1: #ffffff;
+        --i2: #e4e6f4;
+        text-shadow: 0 1px 22px rgba(6, 8, 36, 0.55);
+      }
+      .tag {
+        display: inline-block;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: var(--chip-ink);
+        background: var(--chip);
+        border-radius: 99px;
+        padding: 5px 11px;
+      }
+
+      /* soft sky placeholder behind every picture; pictures fade in when ready */
+      .ph {
+        background: linear-gradient(180deg, #d6e8fa 0%, #e9f1fa 60%, #f7efe4 100%);
+      }
+      .tone-dark .ph,
+      :root[data-story="evening"] .ph {
+        background: linear-gradient(180deg, #2a2d6e 0%, #3a3478 60%, #4b3a74 100%);
+      }
+      .js img.lz {
+        opacity: 0;
+        transition: opacity 0.6s ease;
+      }
+      .js img.lz.ld {
+        opacity: 1;
+      }
+
+      /* ---------- hero ---------- */
+      .hero {
+        position: relative;
+        overflow: clip;
+        padding: 30px 0 36px;
+        isolation: isolate;
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 55%;
+        background: radial-gradient(
+          60% 40% at 50% 100%,
+          rgba(255, 236, 214, 0.55),
+          rgba(255, 236, 214, 0)
+        );
+        z-index: -1;
+        pointer-events: none;
+      }
+      :root[data-story="evening"] .hero::after {
+        background: radial-gradient(
+          55% 35% at 50% 100%,
+          rgba(255, 150, 130, 0.22),
+          rgba(255, 150, 130, 0)
+        );
+      }
+      .hero.off * {
+        animation-play-state: paused !important;
+      }
+      .sky-layer {
+        position: absolute;
+        inset: -6% -6% 0;
+        pointer-events: none;
+        z-index: -1;
+        will-change: transform;
+      }
+      .cl {
+        position: absolute;
+        opacity: var(--cloud-op);
+      }
+      .cl svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .far .cl {
+        filter: blur(1.5px);
+      }
+      .motion .cl {
+        animation: sway var(--t, 70s) ease-in-out infinite alternate;
+        animation-delay: var(--dl, 0s);
+      }
+      @keyframes sway {
+        from {
+          transform: translate3d(calc(var(--sx, 60px) * -1), 0, 0);
+        }
+        to {
+          transform: translate3d(var(--sx, 60px), 0, 0);
+        }
+      }
+      .hero-copy {
+        position: relative;
+        text-align: center;
+        will-change: transform, opacity;
+        color: var(--ink);
+      }
+
+      /* the hero cloud: A's entrance, then C's eyes, lean and pokes */
+      .m-wrap {
+        position: relative;
+        width: 224px;
+        height: 224px;
+        margin: -10px auto -22px;
+      }
+      .m {
+        position: relative;
+        display: block;
+        width: 224px;
+        height: 224px;
+        padding: 0;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .m:focus-visible {
+        border-radius: 50%;
+      }
+      .m span {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .m-tilt {
+        transform-origin: 50% 80%;
+        will-change: transform;
+      }
+      .m-squash {
+        transform-origin: 50% 90%;
+      }
+      .mascot {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+      .mascot .arm-o {
+        stroke: #2b2420;
+        stroke-width: 19;
+        stroke-linecap: round;
+      }
+      .mascot .arm-f {
+        stroke: #fffdf8;
+        stroke-width: 10;
+        stroke-linecap: round;
+      }
+      .mascot .m-shadow {
+        fill: var(--m-shadow);
+        opacity: var(--m-shadow-op);
+      }
+      .mascot .belly-stop {
+        stop-color: var(--m-belly);
+      }
+      .mascot .wave-lines {
+        stroke: var(--m-wave);
+        opacity: var(--m-wave-op);
+      }
+      .mascot .dusk-star {
+        display: var(--m-star);
+      }
+      .mascot .arm-r,
+      .mascot .eyes,
+      .mascot .sp,
+      .mascot .tb circle {
+        transform-box: fill-box;
+      }
+      .mascot .arm-r {
+        transform-origin: 0% 100%;
+      }
+      .mascot .eyes,
+      .mascot .sp,
+      .mascot .tb circle {
+        transform-origin: 50% 50%;
+      }
+      .mascot .p-yay,
+      .mascot .p-think,
+      .mascot .sparkles {
+        opacity: 0;
+      }
+      .mascot .p-hello,
+      .mascot .p-open,
+      .mascot .p-yay,
+      .mascot .p-think,
+      .mascot .sparkles {
+        transition: opacity 0.18s;
+      }
+      .m[data-pose="yay"] .p-hello,
+      .m[data-pose="yay"] .p-open,
+      .m[data-pose="think"] .p-hello {
+        opacity: 0;
+      }
+      .m[data-pose="yay"] .p-yay,
+      .m[data-pose="yay"] .sparkles,
+      .m[data-pose="think"] .p-think {
+        opacity: 1;
+      }
+      .motion .m[data-pose="think"] .tb circle {
+        animation: thinkdot 1.6s ease-in-out infinite;
+      }
+      .mascot .tb circle:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .mascot .tb circle:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes thinkdot {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.18);
+        }
+      }
+      .m.blink .eyes {
+        animation: blink 0.22s ease-in-out;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        45%,
+        55% {
+          transform: scaleY(0.08);
+        }
+      }
+      .m.waving .arm-r {
+        animation: wave 1.1s ease-in-out;
+      }
+      .m.waving .wave-lines {
+        animation: waveLines 1.1s ease-in-out;
+      }
+      @keyframes wave {
+        0%,
+        100% {
+          transform: rotate(0);
+        }
+        20% {
+          transform: rotate(-24deg);
+        }
+        45% {
+          transform: rotate(10deg);
+        }
+        70% {
+          transform: rotate(-24deg);
+        }
+        88% {
+          transform: rotate(6deg);
+        }
+      }
+      @keyframes waveLines {
+        0%,
+        100% {
+          opacity: var(--m-wave-op);
+        }
+        30%,
+        70% {
+          opacity: 0;
+        }
+      }
+      .motion .m.cheer .m-jump {
+        animation: jump 0.8s cubic-bezier(0.3, 0.7, 0.3, 1);
+      }
+      @keyframes jump {
+        0% {
+          transform: translateY(0) scale(1);
+        }
+        12% {
+          transform: translateY(4px) scale(1.06, 0.92);
+        }
+        45% {
+          transform: translateY(-26px) scale(0.97, 1.04);
+        }
+        75% {
+          transform: translateY(2px) scale(1.04, 0.96);
+        }
+        100% {
+          transform: none;
+        }
+      }
+      .motion .m.cheer .sp {
+        animation: spark 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+        animation-delay: var(--sd, 0s);
+      }
+      @keyframes spark {
+        from {
+          transform: scale(0);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .burst {
+        position: absolute;
+        left: 50%;
+        top: 48%;
+        width: 0 !important;
+        height: 0 !important;
+        pointer-events: none;
+      }
+      .burst i {
+        position: absolute;
+        left: -4px;
+        top: -4px;
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        opacity: 0;
+        background: var(--c);
+      }
+      .burst i.dot {
+        border-radius: 50%;
+      }
+      .motion .cheer .burst i,
+      .motion .play .rk-burst i {
+        animation: confetti 1.3s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+        animation-delay: var(--bd, 0.05s);
+      }
+      @keyframes confetti {
+        0% {
+          opacity: 1;
+          transform: translate(0, 0) rotate(0) scale(0.6);
+        }
+        70% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(1);
+        }
+      }
+      .say {
+        position: absolute;
+        left: calc(100% - 30px);
+        top: 26px;
+        width: max-content;
+        max-width: 210px;
+        margin: 0;
+        padding: 9px 14px;
+        border-radius: 18px 18px 18px 5px;
+        background: var(--glass-2);
+        border: 1px solid var(--edge);
+        box-shadow: var(--shadow);
+        color: var(--ink);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+        text-align: left;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        transform-origin: 0% 100%;
+        pointer-events: none;
+      }
+      .motion .say {
+        opacity: 0;
+        transform: scale(0.5) translateY(6px);
+        transition:
+          opacity 0.3s ease,
+          transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
+      }
+      .motion .say.show {
+        opacity: 1;
+        transform: none;
+      }
+      .motion .say.pop {
+        animation: sayPop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+      }
+      @keyframes sayPop {
+        from {
+          transform: scale(0.82);
+        }
+        to {
+          transform: none;
+        }
+      }
+
+      .motion .hero.intro .badge {
+        animation: fadeUp 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both;
+      }
+      .motion .hero.intro .m-fly {
+        animation: flyIn 1.5s cubic-bezier(0.2, 0.75, 0.25, 1) 0.25s both;
+      }
+      @keyframes flyIn {
+        0% {
+          transform: translate3d(36vw, -34vh, 0) scale(0.5) rotate(14deg);
+          opacity: 0;
+        }
+        12% {
+          opacity: 1;
+        }
+        62% {
+          transform: translate3d(-8px, 12px, 0) scale(1.04) rotate(-4deg);
+        }
+        82% {
+          transform: translate3d(3px, -5px, 0) scale(0.99) rotate(1.5deg);
+        }
+        100% {
+          transform: none;
+          opacity: 1;
+        }
+      }
+      .motion .m-bob {
+        animation: bob 4.2s ease-in-out 1.8s infinite alternate;
+      }
+      @keyframes bob {
+        from {
+          transform: translateY(0);
+        }
+        to {
+          transform: translateY(-9px);
+        }
+      }
+      .hero h1 {
+        font-size: clamp(42px, 6.4vw, 92px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .hero h1 .l2 {
+        display: block;
+        color: var(--h1-accent);
+      }
+      .hero h1 .w {
+        display: inline-block;
+      }
+      .motion .hero.intro h1 .w {
+        animation: word 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        animation-delay: calc(0.75s + var(--i) * 0.3s);
+      }
+      @keyframes word {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 0.35em, 0) scale(0.96);
+          filter: blur(10px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+          filter: blur(0);
+        }
+      }
+      .promise {
+        font-size: clamp(20px, 2.1vw, 28px);
+        line-height: 1.3;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--ink2);
+        max-width: 820px;
+        margin: 22px auto 0;
+      }
+      .promise > span {
+        display: block;
+      }
+      .hero .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 26px;
+        justify-content: center;
+        align-items: center;
+        margin-top: 30px;
+      }
+      .hero .meta {
+        margin-top: 16px;
+        font-size: 14px;
+        color: var(--ink2);
+      }
+      .motion .hero.intro .promise {
+        animation: fadeUp 1s cubic-bezier(0.2, 0.7, 0.2, 1) 2.05s both;
+      }
+      .motion .hero.intro .actions {
+        animation: fadeUp 1s cubic-bezier(0.2, 0.7, 0.2, 1) 2.25s both;
+      }
+      .motion .hero.intro .meta {
+        animation: fadeUp 1s cubic-bezier(0.2, 0.7, 0.2, 1) 2.4s both;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 22px, 0);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .hero-mac {
+        margin: 50px auto 0;
+        width: min(920px, 100%);
+        padding: 0 24px;
+        will-change: transform;
+        transform-origin: 50% 0;
+      }
+      .motion .hero.intro .hero-mac .mac {
+        animation: rise 1.6s cubic-bezier(0.16, 0.8, 0.24, 1) 2.55s both;
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 160px, 0) scale(0.94);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .hero .caption {
+        margin: 20px auto 0;
+        text-align: center;
+        font-size: 13.5px;
+        color: var(--ink2);
+        max-width: 640px;
+        padding: 0 24px;
+      }
+
+      /* ---------- Mac window ---------- */
+      .mac {
+        border-radius: 14px;
+        overflow: hidden;
+        background: #f5f5f7;
+        box-shadow:
+          0 50px 100px -30px rgba(31, 64, 115, 0.36),
+          0 20px 44px -24px rgba(0, 0, 0, 0.28),
+          0 0 0 1px var(--mac-edge);
+      }
+      .mac-bar {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 13px;
+        background: var(--mac-bar);
+        border-bottom: 1px solid var(--mac-edge);
+        position: relative;
+      }
+      .mac-bar i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ff5f57;
+        box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+      }
+      .mac-bar i:nth-child(2) {
+        background: #febc2e;
+      }
+      .mac-bar i:nth-child(3) {
+        background: #28c840;
+      }
+      .mac-bar b {
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--mac-title);
+        pointer-events: none;
+        letter-spacing: 0;
+      }
+      .screen {
+        position: relative;
+        aspect-ratio: 1200/707;
+        overflow: hidden;
+      }
+      .screen img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      @media (max-width: 600px) {
+        .mac {
+          border-radius: 9px;
+        }
+        .mac-bar {
+          height: 20px;
+          padding: 0 8px;
+          gap: 5px;
+        }
+        .mac-bar i {
+          width: 8px;
+          height: 8px;
+        }
+        .mac-bar b {
+          font-size: 10px;
+        }
+      }
+
+      /* ---------- reveal ---------- */
+      .motion .reveal {
+        opacity: 0;
+        transform: translate3d(0, 34px, 0);
+        transition:
+          opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+          transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+        transition-delay: var(--d, 0s);
+      }
+      .motion .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
+
+      /* ---------- what kids make: the crayon rocket ---------- */
+      .rk {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: center;
+        margin-top: 44px;
+        padding: 28px 34px 28px 28px;
+        border-radius: 32px;
+      }
+      .rk-stage {
+        position: relative;
+      }
+      .rk-stage .screen {
+        background: #fffdf6;
+      }
+      .rk-stage img.built {
+        position: absolute;
+        inset: 0;
+        transform-origin: 50% 55.16%;
+      }
+      .rk-stage svg.drawing {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        opacity: 0;
+      }
+      .drawing .zoom {
+        transform-box: view-box;
+        transform-origin: 600px 390px;
+      }
+      .drawing path {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .drawing .o {
+        stroke-width: 7;
+      }
+      .drawing .z {
+        stroke-width: 4.2;
+        opacity: 0.85;
+      }
+      .rk-m {
+        position: absolute;
+        right: -34px;
+        top: -64px;
+        width: 128px;
+        height: 128px;
+        pointer-events: none;
+        z-index: 3;
+      }
+      .rk-m .jump,
+      .rk-m .poses {
+        position: absolute;
+        inset: 0;
+      }
+      .rk-m img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .rk-m .p-think {
+        opacity: 0;
+      }
+      .rk-burst {
+        position: absolute;
+        right: 30px;
+        top: 0;
+        width: 0;
+        height: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .rk-burst i {
+        position: absolute;
+        width: 12px;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--c);
+        opacity: 0;
+      }
+      .stk {
+        position: absolute;
+        right: -22px;
+        bottom: -26px;
+        width: 108px;
+        transform: rotate(12deg);
+        filter: drop-shadow(0 6px 8px rgba(60, 35, 10, 0.25));
+        z-index: 3;
+      }
+      .stk svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .rk-copy h3 {
+        font-size: clamp(28px, 2.9vw, 38px);
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        margin-top: 14px;
+      }
+      .rk-copy p {
+        font-size: 18px;
+        line-height: 1.45;
+        margin-top: 14px;
+      }
+      .rk-copy .small {
+        font-size: 14px;
+        color: var(--ink3);
+      }
+      .replay {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 20px;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: 980px;
+        border: 0;
+        background: var(--chip);
+        color: var(--chip-ink);
+        font: 600 15px/1 var(--font);
+        cursor: pointer;
+      }
+      .replay svg {
+        width: 16px;
+        height: 16px;
+      }
+      /* armed: blank paper, waiting to be drawn on */
+      .rk-stage.armed img.built {
+        opacity: 0;
+      }
+      .rk-stage.armed svg.drawing {
+        opacity: 1;
+      }
+      .rk-stage.armed .drawing :is(.o, .z) {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+      }
+      .rk-stage.armed .rk-m,
+      .rk-stage.armed .stk {
+        opacity: 0;
+      }
+      /* the show: about 3.6 seconds, transform, opacity and stroke-dashoffset only */
+      .rk-stage.play .drawing :is(.o, .z) {
+        animation: draw var(--du, 0.4s) cubic-bezier(0.45, 0.1, 0.4, 1) var(--t, 0s) both;
+      }
+      .rk-stage.play svg.drawing {
+        animation: out 0.35s ease 2.45s both;
+      }
+      .rk-stage.play .drawing .zoom {
+        animation: zoomout 0.95s cubic-bezier(0.65, 0, 0.25, 1) 1.85s both;
+      }
+      .rk-stage.play img.built {
+        animation:
+          zoomout 0.95s cubic-bezier(0.65, 0, 0.25, 1) 1.85s both,
+          in 0.7s ease 1.85s both;
+      }
+      .rk-stage.play .rk-m {
+        animation: popIn 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 0.1s both;
+      }
+      .rk-stage.play .rk-m .p-think {
+        animation: thinkVis 2.7s linear 0.1s both;
+      }
+      .rk-stage.play .rk-m .p-yay {
+        animation: in 0.12s linear 2.75s both;
+      }
+      .rk-stage.play .rk-m .jump {
+        animation: jump 0.75s cubic-bezier(0.3, 0.7, 0.3, 1) 2.75s both;
+      }
+      .rk-stage.play .rk-burst i {
+        animation-delay: calc(2.8s + var(--bd, 0s));
+      }
+      .rk-stage.play .stk {
+        animation: slap 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) 3.05s both;
+      }
+      @keyframes draw {
+        from {
+          stroke-dashoffset: 1;
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      @keyframes in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes out {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      @keyframes zoomout {
+        from {
+          transform: scale(1.65);
+        }
+        to {
+          transform: none;
+        }
+      }
+      @keyframes popIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.6);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes thinkVis {
+        0% {
+          opacity: 0;
+        }
+        6%,
+        96% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      @keyframes slap {
+        0% {
+          opacity: 0;
+          transform: scale(1.9) rotate(-12deg);
+        }
+        60% {
+          opacity: 1;
+          transform: scale(0.94) rotate(12deg);
+        }
+        100% {
+          opacity: 1;
+          transform: rotate(12deg);
+        }
+      }
+
+      .ideas {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+      }
+      .idea {
+        padding: 16px 16px 18px;
+        border-radius: 24px;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 0 10px;
+        align-content: start;
+        min-width: 0;
+      }
+      .idea .ic {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+      }
+      .idea .bubble {
+        grid-column: 1 / -1;
+      }
+      .idea h3 {
+        font-size: 16.5px;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        align-self: center;
+      }
+      .glass .bubble {
+        align-self: flex-start;
+        margin-top: 12px;
+        background: var(--bubble);
+        color: #fff;
+        padding: 9px 13px;
+        border-radius: 18px 18px 18px 6px;
+        font-size: 14.5px;
+        line-height: 1.35;
+        letter-spacing: -0.01em;
+      }
+
+      /* ---------- how it works: the pinned Mac window ---------- */
+      .story {
+        padding: 56px 0 40px;
+      }
+      .story-track {
+        position: relative;
+      }
+      .story-copy {
+        padding: 34px 32px;
+        border-radius: 30px;
+      }
+      .story-copy .when {
+        margin-bottom: 14px;
+      }
+      .story-copy h2 {
+        font-size: clamp(32px, 3.6vw, 46px);
+        line-height: 1.06;
+        letter-spacing: -0.035em;
+      }
+      .story-stage {
+        display: none;
+      }
+      .beats {
+        margin-top: 26px;
+      }
+      .beat {
+        border-top: 1px solid var(--hair);
+        padding-top: 22px;
+        margin-top: 22px;
+      }
+      .beat-pose {
+        display: none;
+      }
+      .beat .step-n {
+        display: inline-grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        letter-spacing: 0;
+      }
+      .beat h3 {
+        font-size: clamp(24px, 2.4vw, 30px);
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+      }
+      .beat p {
+        font-size: 17px;
+        line-height: 1.47;
+        margin-top: 10px;
+      }
+      .beat-shot {
+        margin-top: 20px;
+      }
+      .story-dots {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 22px;
+      }
+      .story-dots button {
+        width: 34px;
+        height: 22px;
+        border: 0;
+        padding: 0;
+        background: none;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+      }
+      .story-dots button span {
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 0 0 1px rgba(20, 40, 90, 0.2);
+        transition:
+          transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+          background 0.3s;
+      }
+      .story-dots button[aria-current="true"] span {
+        background: var(--accent);
+        transform: scaleX(3.2);
+      }
+      @media (min-width: 900px) {
+        html:not(.motion) .beat {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+          grid-template-rows: auto auto 1fr;
+          column-gap: 40px;
+          align-items: start;
+        }
+        html:not(.motion) .beat .beat-shot {
+          grid-column: 2;
+          grid-row: 1 / span 3;
+          margin-top: 0;
+        }
+        html:not(.motion) .beat .step-n {
+          justify-self: start;
+        }
+      }
+      @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
+        html.js .story {
+          padding: 0;
+        }
+        html.js .story-track {
+          height: calc(var(--n) * 30vh + 100vh);
+        }
+        html.js .story-sticky {
+          position: sticky;
+          top: 52px;
+          height: calc(100vh - 52px);
+          display: grid;
+          grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+          gap: 48px;
+          align-items: center;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 40px;
+        }
+        html.js .beats {
+          position: relative;
+          height: 250px;
+        }
+        html.js .beat {
+          position: absolute;
+          inset: 0;
+          margin: 0;
+          padding-top: 22px;
+          opacity: 0;
+          will-change: transform, opacity;
+        }
+        html.js .beat:first-child {
+          opacity: 1;
+        }
+        html.js .beat-pose {
+          display: block;
+          position: absolute;
+          right: -8px;
+          top: -10px;
+          width: 64px;
+          height: 64px;
+        }
+        html.js .beat-pose img {
+          width: 64px;
+          height: 64px;
+        }
+        html.js .beat-shot {
+          display: none;
+        }
+        html.js .story-stage {
+          display: block;
+        }
+        html.js .story-stage .screen img {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          will-change: opacity, transform;
+        }
+        html.js .story-stage .screen img:first-child {
+          opacity: 1;
+          transform-origin: 50% 38%;
+        }
+      }
+
+      /* ---------- grown-up in control ---------- */
+      .ctl {
+        display: grid;
+        grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+        gap: 16px;
+        margin-top: 44px;
+      }
+      .codecard {
+        padding: 32px 28px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      .codecard .lbl {
+        font-size: 15px;
+        color: var(--ink2);
+        font-weight: 500;
+      }
+      .codecard h3 {
+        font-size: 28px;
+        letter-spacing: -0.025em;
+        margin-top: 4px;
+      }
+      .dots {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin: 26px 0 22px;
+      }
+      .dots i {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 2px var(--ink3);
+        position: relative;
+      }
+      .dots i::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: var(--ink);
+        transform: scale(0);
+        transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+      }
+      .codecard.in .dots i::after,
+      :root:not(.motion) .dots i::after {
+        transform: scale(1);
+      }
+      .codecard.in .dots i:nth-child(2)::after {
+        transition-delay: 0.18s;
+      }
+      .codecard.in .dots i:nth-child(3)::after {
+        transition-delay: 0.36s;
+      }
+      .codecard.in .dots i:nth-child(4)::after {
+        transition-delay: 0.54s;
+      }
+      .codecard.in .dots i:nth-child(5)::after {
+        transition-delay: 0.72s;
+      }
+      .codecard.in .dots i:nth-child(6)::after {
+        transition-delay: 0.9s;
+      }
+      .ok {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 18px;
+        border-radius: 980px;
+        background: #30d158;
+        color: #04210d;
+        font-weight: 700;
+        font-size: 15px;
+        opacity: 0;
+        transform: scale(0.9);
+        transition:
+          opacity 0.4s 1.2s,
+          transform 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 1.2s;
+      }
+      .codecard.in .ok,
+      :root:not(.motion) .ok {
+        opacity: 1;
+        transform: none;
+      }
+      .codecard p {
+        font-size: 15px;
+        margin-top: 18px;
+        line-height: 1.45;
+      }
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .fact {
+        padding: 22px 24px;
+        border-radius: 24px;
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr);
+        gap: 4px 14px;
+        align-items: start;
+      }
+      .fact .n {
+        grid-row: span 2;
+        font-size: 56px;
+        font-weight: 800;
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+        font-variant-numeric: tabular-nums;
+        background: var(--num);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .fact .ico {
+        grid-row: span 2;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: var(--chip);
+        color: var(--chip-ink);
+      }
+      .fact h3 {
+        font-size: 18px;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+      .fact p {
+        font-size: 14.5px;
+        line-height: 1.45;
+      }
+      .honest {
+        margin: 16px 0 0;
+        padding: 20px 26px;
+        border-radius: 24px;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      .glass.honest {
+        color: var(--ink2);
+      }
+      .honest b {
+        color: var(--ink);
+      }
+
+      /* ---------- new for families ---------- */
+      .row-h {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 14px;
+        margin: 36px 0 14px;
+        color: var(--i1);
+      }
+      .row-h h3 {
+        white-space: nowrap;
+        font-size: 24px;
+        letter-spacing: -0.025em;
+      }
+      .row-h p {
+        font-size: 16px;
+        color: var(--i2);
+      }
+      .fam {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 16px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .fcard {
+        border-radius: 22px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .fcard .shot {
+        aspect-ratio: 16/9;
+        overflow: hidden;
+        border-bottom: 1px solid var(--hair);
+      }
+      .fcard .shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: var(--o, 50% 50%);
+        transform: scale(var(--z, 1));
+        transform-origin: var(--o, 50% 50%);
+      }
+      .fcard .t {
+        padding: 14px 16px 18px;
+      }
+      .fcard h4 {
+        font-size: 16.5px;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+      .fcard p {
+        font-size: 14px;
+        line-height: 1.42;
+        margin-top: 5px;
+      }
+
+      /* ---------- looks ---------- */
+      .looks {
+        display: grid;
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+        gap: 48px;
+        align-items: center;
+      }
+      .looks .head {
+        text-align: left;
+        margin: 0;
+      }
+      .looks .sub {
+        margin-left: 0;
+      }
+      .seg {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 12px;
+        background: var(--seg-bg);
+        margin-top: 28px;
+        max-width: 100%;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .seg button {
+        border: 0;
+        background: none;
+        font: 600 14px/1 var(--font);
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        padding: 10px 16px;
+        border-radius: 9px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .seg button[aria-selected="true"] {
+        background: var(--seg-on);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+      }
+      .look-cap {
+        margin-top: 18px;
+        min-height: 72px;
+        padding: 16px 18px;
+        border-radius: 18px;
+      }
+      .look-cap h3 {
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+      .look-cap p {
+        font-size: 15px;
+        margin-top: 3px;
+      }
+      .look-cap [hidden] {
+        display: none;
+      }
+      .looks-stage .screen img {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 0.6s ease;
+      }
+      .looks-stage .screen img.on {
+        opacity: 1;
+      }
+
+      /* ---------- bring your own AI ---------- */
+      .ais {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        margin: 32px auto 0;
+        max-width: 980px;
+      }
+      .ai {
+        min-width: 168px;
+        border-radius: 20px;
+        padding: 18px 22px;
+        text-align: center;
+      }
+      .ai b {
+        display: block;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+      .ai span {
+        display: block;
+        font-size: 14px;
+        color: var(--ink2);
+        margin-top: 2px;
+      }
+      .agebox {
+        margin: 20px auto 0;
+        max-width: 820px;
+        border-radius: 20px;
+        padding: 20px 24px;
+        font-size: 15.5px;
+        line-height: 1.5;
+        text-align: left;
+      }
+      .glass.agebox {
+        color: var(--ink2);
+      }
+      .agebox b {
+        color: var(--ink);
+      }
+
+      /* ---------- grown-ups and small business strip ---------- */
+      .biz {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: 32px;
+        align-items: center;
+        padding: 30px 34px;
+      }
+      .biz h2 {
+        font-size: clamp(26px, 2.6vw, 34px);
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        margin-top: 12px;
+      }
+      .biz p {
+        font-size: 16.5px;
+        margin-top: 10px;
+      }
+      .ticks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+      .ticks li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        font-size: 16px;
+        color: var(--ink2);
+        line-height: 1.4;
+      }
+      .ticks b {
+        color: var(--ink);
+      }
+      .ticks svg {
+        flex: none;
+        color: #30d158;
+        margin-top: 2px;
+      }
+
+      /* ---------- download ---------- */
+      .dl {
+        padding: 40px 40px 40px;
+        border-radius: 36px;
+        text-align: center;
+      }
+      .dl-m {
+        width: 120px;
+        height: 120px;
+        margin: -6px auto -2px;
+      }
+      .dl-m img {
+        width: 120px;
+        height: 120px;
+      }
+      .motion .dl-m {
+        animation: bob 4.2s ease-in-out infinite alternate;
+      }
+      .off .dl-m,
+      .off .sleep img {
+        animation-play-state: paused;
+      }
+      .dl h2 {
+        font-size: clamp(38px, 5vw, 60px);
+        letter-spacing: -0.04em;
+        line-height: 1.04;
+      }
+      .dl .lead {
+        font-size: clamp(18px, 1.7vw, 21px);
+        margin: 14px auto 0;
+        max-width: 640px;
+      }
+      .dl .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 30px;
+      }
+      .specs {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        max-width: 860px;
+        margin: 22px auto 0;
+        padding: 0;
+        list-style: none;
+      }
+      .specs li {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        background: var(--chip);
+        color: var(--ink);
+        border-radius: 980px;
+        padding: 7px 14px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .specs svg {
+        color: var(--chip-ink);
+        flex: none;
+      }
+      .install {
+        margin: 34px auto 0;
+        max-width: 880px;
+        text-align: left;
+      }
+      .install h3 {
+        font-size: 19px;
+        letter-spacing: -0.02em;
+        text-align: center;
+      }
+      .install ol {
+        list-style: none;
+        margin: 16px 0 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        counter-reset: s;
+      }
+      .install li {
+        counter-increment: s;
+        background: var(--glass-2);
+        border: 1px solid var(--edge);
+        border-radius: 18px;
+        padding: 16px 18px;
+        font-size: 15px;
+        line-height: 1.4;
+        color: var(--ink2);
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .install li::before {
+        content: counter(s);
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .install b {
+        color: var(--ink);
+      }
+      .dl .note {
+        margin: 24px auto 0;
+        font-size: 15px;
+        max-width: 620px;
+      }
+
+      /* ---------- FAQ ---------- */
+      .faq {
+        max-width: 860px;
+        margin: 44px auto 0;
+        padding: 6px 28px;
+      }
+      .faq details + details {
+        border-top: 1px solid var(--hair);
+      }
+      .faq summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 17px 2px;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+      .faq .pm {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        color: var(--ink2);
+        transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      .faq details[open] .pm {
+        transform: rotate(45deg);
+      }
+      .faq .a {
+        padding: 0 44px 22px 2px;
+        font-size: 16.5px;
+      }
+      .faq .a p + p {
+        margin-top: 10px;
+      }
+
+      /* ---------- good night (footer) ---------- */
+      .night {
+        padding: 64px 0 0;
+        overflow: hidden;
+        position: relative;
+      }
+      .goodnight {
+        text-align: center;
+        position: relative;
+      }
+      .fmoon {
+        position: absolute;
+        right: 12%;
+        top: 70px;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        box-shadow: inset -17px 8px 0 0 #f7f0d6;
+        filter: drop-shadow(0 0 16px rgba(247, 240, 214, 0.45));
+      }
+      .sleep {
+        position: relative;
+        width: 300px;
+        height: 226px;
+        margin: 0 auto 6px;
+      }
+      .sleep img {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        width: 210px;
+        height: 210px;
+        margin-left: -105px;
+        transform-origin: 50% 70%;
+      }
+      .motion .sleep img {
+        animation: breathe 4.5s ease-in-out infinite;
+      }
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.025) translateY(-2px);
+        }
+      }
+      .seat {
+        position: absolute;
+        left: 50%;
+        bottom: 0;
+        width: 300px;
+        margin-left: -150px;
+        --cb: #4b4596;
+        --cs: #2c2869;
+      }
+      .seat svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .goodnight h2 {
+        font-size: clamp(34px, 5vw, 56px);
+        letter-spacing: -0.035em;
+        color: var(--i1);
+      }
+      .goodnight .sub {
+        margin-top: 12px;
+      }
+      .moonbtn {
+        margin-top: 26px;
+        background: #f7f0d6;
+        color: #1b1f52;
+      }
+      .moonbtn:hover {
+        background: #fff8e2;
+      }
+      .foot {
+        margin-top: 64px;
+        padding: 30px 0 48px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        font-size: 13px;
+        color: #c3c6de;
+      }
+      .foot .cols {
+        display: flex;
+        gap: 24px;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .foot ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        gap: 8px 22px;
+        flex-wrap: wrap;
+      }
+      .foot a {
+        color: #e3e5f4;
+        font-size: 13.5px;
+      }
+      .foot .legal {
+        margin-top: 18px;
+        line-height: 1.6;
+        max-width: 920px;
+      }
+      .foot .legal + .legal {
+        margin-top: 8px;
+      }
+
+      /* ---------- tablets and phones ---------- */
+      @media (max-width: 1080px) {
+        .ideas {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .fam {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .rk {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 34px;
+        }
+        .looks,
+        .ctl {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .looks .head {
+          text-align: center;
+          margin: 0 auto;
+        }
+        .looks .sub {
+          margin-left: auto;
+        }
+        .looks .look-cap {
+          text-align: left;
+        }
+        .biz {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 760px) {
+        .wrap {
+          padding: 0 16px;
+        }
+        .sec {
+          padding: 64px 0;
+        }
+        .hero {
+          padding: 26px 0 40px;
+        }
+        .m-wrap,
+        .m {
+          width: 168px;
+          height: 168px;
+        }
+        .m-wrap {
+          margin: -6px auto -14px;
+        }
+        .say {
+          left: calc(100% - 22px);
+          top: 4px;
+          max-width: 112px;
+          font-size: 13.5px;
+          padding: 7px 11px;
+        }
+        .hero-mac {
+          margin-top: 40px;
+          padding: 0 16px;
+        }
+        .rk {
+          padding: 20px 16px 24px;
+          margin-top: 40px;
+        }
+        .rk-m {
+          width: 86px;
+          height: 86px;
+          right: -10px;
+          top: -46px;
+        }
+        .stk {
+          width: 76px;
+          right: -8px;
+          bottom: -22px;
+        }
+        /* short rows become swipeable rails on phones */
+        .ideas,
+        .fam {
+          display: flex;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          scrollbar-width: none;
+          margin-left: -16px;
+          margin-right: -16px;
+          padding: 4px 16px 20px;
+          scroll-padding: 0 16px;
+        }
+        .ideas::-webkit-scrollbar,
+        .fam::-webkit-scrollbar {
+          display: none;
+        }
+        .idea,
+        .fcard {
+          flex: 0 0 74%;
+          scroll-snap-align: start;
+        }
+        .story-copy {
+          padding: 26px 18px;
+        }
+        .facts {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .codecard {
+          padding: 30px 18px;
+        }
+        .dots {
+          gap: 12px;
+        }
+        .seg button {
+          padding: 9px 11px;
+          font-size: 13px;
+        }
+        .biz {
+          padding: 24px 20px;
+        }
+        .dl {
+          padding: 44px 18px 34px;
+          border-radius: 28px;
+        }
+        .install ol {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .faq {
+          padding: 2px 16px;
+        }
+        .faq summary {
+          font-size: 17px;
+          padding: 18px 0;
+        }
+        .faq .a {
+          padding: 0 0 20px;
+        }
+        .fmoon {
+          right: 16px;
+          top: 26px;
+          width: 44px;
+          height: 44px;
+          box-shadow: inset -12px 6px 0 0 #f7f0d6;
+        }
+        .foot {
+          margin-top: 72px;
+        }
+      }
+
+      /* ---------- reduced motion: a calm, complete still page ---------- */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <!-- shared drawings: clouds, crayon texture, SF-Symbols-style line icons (all decorative) -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="cloud" viewBox="0 0 240 110">
+          <path
+            style="fill: var(--cloud)"
+            d="M34 104C12 104 2 88 8 72 14 58 30 54 40 58 38 36 58 22 78 28 88 6 124 0 142 22 152 12 176 12 188 30 210 26 232 42 228 66 238 74 240 92 228 100 222 104 214 104 206 104Z"
+          />
+          <path
+            style="fill: var(--cloud-shade)"
+            opacity=".55"
+            d="M18 92C34 98 60 100 120 100 170 100 206 98 230 90 230 98 222 104 206 104H34C26 104 20 100 18 92Z"
+          />
+        </symbol>
+        <symbol id="cloudA" viewBox="0 0 240 124">
+          <ellipse cx="120" cy="96" rx="112" ry="24" />
+          <circle cx="72" cy="76" r="37" />
+          <circle cx="124" cy="58" r="48" />
+          <circle cx="178" cy="78" r="33" />
+          <circle cx="38" cy="93" r="22" />
+          <circle cx="206" cy="95" r="20" />
+        </symbol>
+        <symbol id="cloudB" viewBox="0 0 320 112">
+          <ellipse cx="160" cy="90" rx="152" ry="20" />
+          <circle cx="62" cy="76" r="30" />
+          <circle cx="116" cy="60" r="40" />
+          <circle cx="180" cy="52" r="44" />
+          <circle cx="238" cy="68" r="34" />
+          <circle cx="284" cy="84" r="22" />
+        </symbol>
+        <symbol id="cloudSeat" viewBox="0 0 320 96">
+          <ellipse cx="160" cy="72" rx="152" ry="22" />
+          <circle cx="62" cy="62" r="24" />
+          <circle cx="112" cy="50" r="32" />
+          <circle cx="176" cy="46" r="34" />
+          <circle cx="234" cy="56" r="28" />
+          <circle cx="280" cy="68" r="18" />
+        </symbol>
+        <filter id="crayon" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" />
+        </filter>
+        <clipPath id="c-body"><path d="M600 248 L645 318 L645 466 L555 466 L555 318 Z" /></clipPath>
+        <clipPath id="c-win"><circle cx="600" cy="355" r="26" /></clipPath>
+        <clipPath id="c-finl"><path d="M557 408 L511 472 L557 467 Z" /></clipPath>
+        <clipPath id="c-finr"><path d="M643 408 L689 472 L643 467 Z" /></clipPath>
+        <clipPath id="c-flame">
+          <path d="M570 466 L583 524 L598 492 L617 538 L630 466 Z" />
+        </clipPath>
+        <clipPath id="c-moon"><circle cx="795" cy="378" r="27" /></clipPath>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="i-chev" viewBox="0 0 24 24">
+          <path
+            d="M9 5l7 7-7 7"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path
+            d="M12 5v14M5 12h14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            />
+          </g>
+        </symbol>
+        <symbol id="i-sunset" viewBox="0 0 24 24">
+          <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 6v3M5.6 10.6 7 12M18.4 10.6 17 12M7 21h10" />
+          </g>
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path
+            d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <!-- the sky: colour, stars, sunset glow, sun, moon and drifting clouds (decorative) -->
+    <div class="layer" id="sky" aria-hidden="true"></div>
+    <div class="layer" id="stars" aria-hidden="true"></div>
+    <div class="layer" id="glow" aria-hidden="true"></div>
+    <div id="sun" aria-hidden="true">
+      <div class="sun-in">
+        <div class="halo"></div>
+        <div class="disc"></div>
+        <div class="disc warm"></div>
+      </div>
+    </div>
+    <div id="moon" aria-hidden="true"><div class="moon-in"></div></div>
+    <div class="layer" id="clouds" aria-hidden="true"></div>
+
+    <header class="nav" id="nav">
+      <div class="wrap">
+        <a class="brand" href="#top" aria-label="SKYCOT, back to the top"
+          ><img class="day" src="/assets/brand/wordmark.svg" width="65" height="24" alt="" /><img
+            class="rev"
+            src="/assets/brand/wordmark-reversed.svg"
+            width="65"
+            height="24"
+            alt=""
+        /></a>
+        <ul>
+          <li><a href="#new">Families</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#safety">Safety</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+        <div class="tools">
+          <button
+            class="icon-btn"
+            id="themeToggle"
+            type="button"
+            aria-label="Switch to the evening sky"
+          >
+            <svg class="moon" width="18" height="18" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="sun" width="18" height="18" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+          <a class="btn btn-primary btn-small" href="#download">Download</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ============ 7:00 am · Good morning ============ -->
+      <section
+        class="hero band tone-light intro"
+        id="top"
+        aria-labelledby="hero-title"
+        data-t="1"
+        style="--from: var(--b10); --to: var(--b10)"
+      >
+        <div class="sky-layer far" data-depth="0.35" aria-hidden="true">
+          <div class="cl" style="left: 4%; top: 13%; width: 220px; --t: 80s; --sx: 50px">
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+          <div
+            class="cl"
+            style="left: 66%; top: 6%; width: 180px; --t: 95s; --sx: 70px; --dl: -30s"
+          >
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+        </div>
+        <div class="sky-layer mid" data-depth="0.7" aria-hidden="true">
+          <div
+            class="cl"
+            style="left: -3%; top: 34%; width: 330px; --t: 64s; --sx: 60px; --dl: -20s"
+          >
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+          <div
+            class="cl"
+            style="left: 78%; top: 24%; width: 300px; --t: 72s; --sx: 55px; --dl: -40s"
+          >
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+        </div>
+        <div class="sky-layer near" data-depth="1.2" aria-hidden="true">
+          <div
+            class="cl"
+            style="left: -9%; top: 58%; width: 520px; --t: 58s; --sx: 70px; --dl: -8s"
+          >
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+          <div
+            class="cl"
+            style="left: 74%; top: 52%; width: 480px; --t: 66s; --sx: 80px; --dl: -33s"
+          >
+            <svg viewBox="0 0 240 110"><use href="#cloud" /></svg>
+          </div>
+        </div>
+
+        <div class="hero-copy" id="heroCopy">
+          <div class="wrap">
+            <span class="badge"><i aria-hidden="true"></i>Free beta · out now</span>
+
+            <div class="m-wrap">
+              <button
+                class="m"
+                id="heroMascot"
+                type="button"
+                data-pose="hello"
+                aria-label="SKYCOT the cloud, waving hello. Press to poke it."
+              >
+                <span class="m-fly"
+                  ><span class="m-bob"
+                    ><span class="m-tilt" id="mTilt"
+                      ><span class="m-squash" id="mSquash"
+                        ><span class="m-jump">
+                          <svg
+                            class="mascot"
+                            viewBox="-30 -50 192 184"
+                            aria-hidden="true"
+                            focusable="false"
+                          >
+                            <defs>
+                              <linearGradient
+                                id="mBelly"
+                                gradientUnits="userSpaceOnUse"
+                                x1="0"
+                                y1="62"
+                                x2="0"
+                                y2="86"
+                              >
+                                <stop offset="0" class="belly-stop" stop-opacity="0" />
+                                <stop offset="1" class="belly-stop" />
+                              </linearGradient>
+                              <clipPath id="mClip">
+                                <path
+                                  d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z"
+                                />
+                              </clipPath>
+                            </defs>
+                            <ellipse class="m-shadow" cx="62" cy="100" rx="40" ry="5" />
+                            <!-- arms behind the body -->
+                            <g class="p-hello">
+                              <path class="arm-o" d="M16 72L8 79" />
+                              <path class="arm-f" d="M16 72L8 79" />
+                              <g class="arm-r">
+                                <path class="arm-o" d="M106 54L115 43" />
+                                <path class="arm-f" d="M106 54L115 43" />
+                              </g>
+                            </g>
+                            <g class="p-think">
+                              <path class="arm-o" d="M16 72L8 79" />
+                              <path class="arm-f" d="M16 72L8 79" />
+                            </g>
+                            <g class="p-yay">
+                              <path class="arm-o" d="M20 57L10 44" />
+                              <path class="arm-f" d="M20 57L10 44" />
+                              <path class="arm-o" d="M104 52L114 39" />
+                              <path class="arm-f" d="M104 52L114 39" />
+                            </g>
+                            <!-- body -->
+                            <path
+                              d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z"
+                              fill="#FFFDF8"
+                            />
+                            <g clip-path="url(#mClip)">
+                              <rect x="0" y="60" width="124" height="30" fill="url(#mBelly)" />
+                              <ellipse
+                                cx="45"
+                                cy="30"
+                                rx="8"
+                                ry="4.2"
+                                fill="#fff"
+                                transform="rotate(-28 45 30)"
+                              />
+                            </g>
+                            <path
+                              d="M28.00 84.00A21 21 0 0 1 27.18 42.02A25 25 0 0 1 68.41 26.14A23 23 0 0 1 102.87 48.42A18 18 0 0 1 99.00 84.00Z"
+                              fill="none"
+                              stroke="#2B2420"
+                              stroke-width="4.5"
+                              stroke-linejoin="round"
+                            />
+                            <!-- face: open eyes follow you (hello and thinking) -->
+                            <g class="p-open">
+                              <g id="mLook">
+                                <g class="eyes">
+                                  <ellipse cx="49" cy="58" rx="6" ry="9" fill="#2B2420" />
+                                  <ellipse cx="75" cy="58" rx="6" ry="9" fill="#2B2420" />
+                                  <circle cx="51.3" cy="54" r="2.2" fill="#fff" />
+                                  <circle cx="77.3" cy="54" r="2.2" fill="#fff" />
+                                </g>
+                              </g>
+                            </g>
+                            <ellipse cx="37" cy="69" rx="6" ry="4" fill="#FFB4A2" opacity=".9" />
+                            <ellipse cx="87" cy="69" rx="6" ry="4" fill="#FFB4A2" opacity=".9" />
+                            <g class="p-hello">
+                              <path
+                                d="M56 68Q62 74 68 68"
+                                fill="none"
+                                stroke="#2B2420"
+                                stroke-width="4.5"
+                                stroke-linecap="round"
+                              />
+                              <path
+                                class="wave-lines"
+                                d="M124 30q6 5 5 13M131 19q10 8 8 22"
+                                fill="none"
+                                stroke-width="4"
+                                stroke-linecap="round"
+                              />
+                            </g>
+                            <g class="p-yay">
+                              <path
+                                d="M42 60Q49 50 56 60M68 60Q75 50 82 60"
+                                fill="none"
+                                stroke="#2B2420"
+                                stroke-width="4.5"
+                                stroke-linecap="round"
+                              />
+                              <path d="M53 65H71Q71 80 62 80Q53 80 53 65Z" fill="#2B2420" />
+                              <path
+                                d="M56.5 74.5Q62 71 67.5 74.5Q66 79 62 79Q58 79 56.5 74.5Z"
+                                fill="#F26B4E"
+                              />
+                            </g>
+                            <g class="p-think">
+                              <path
+                                d="M69 41Q76 36 83 40"
+                                fill="none"
+                                stroke="#2B2420"
+                                stroke-width="4.5"
+                                stroke-linecap="round"
+                              />
+                              <path
+                                d="M56 71Q61 69 66 70.5"
+                                fill="none"
+                                stroke="#2B2420"
+                                stroke-width="4.5"
+                                stroke-linecap="round"
+                              />
+                              <path class="arm-o" d="M99 91L80 83" />
+                              <path class="arm-f" d="M99 91L80 83" />
+                              <g class="tb" fill="#fff" stroke="#2B2420" stroke-width="3">
+                                <circle cx="106" cy="30" r="3.2" />
+                                <circle cx="115" cy="17" r="4.8" />
+                                <circle cx="128" cy="0" r="7.4" />
+                              </g>
+                            </g>
+                            <path
+                              class="dusk-star"
+                              d="M6.0 7.0L8.5 12.6L14.6 13.2L10.0 17.3L11.3 23.3L6.0 20.2L0.7 23.3L2.0 17.3L-2.6 13.2L3.5 12.6Z"
+                              fill="#FFD166"
+                              stroke="#FFD166"
+                              stroke-width="2.4"
+                              stroke-linejoin="round"
+                            />
+                            <g class="sparkles" stroke-width="4.5" stroke-linecap="round">
+                              <path
+                                class="sp"
+                                style="--sd: 0.02s"
+                                d="M-8 14l7-4"
+                                stroke="#FFD166"
+                              />
+                              <path class="sp" style="--sd: 0.1s" d="M22 -4l2 8" stroke="#3FA66F" />
+                              <path class="sp" style="--sd: 0s" d="M62 -14v7" stroke="#FFD166" />
+                              <path
+                                class="sp"
+                                style="--sd: 0.08s"
+                                d="M100 -8l-3 8"
+                                stroke="#0071E3"
+                              />
+                              <path
+                                class="sp"
+                                style="--sd: 0.14s"
+                                d="M136 8l-6-7"
+                                stroke="#F26B4E"
+                              />
+                              <circle
+                                class="sp"
+                                style="--sd: 0.18s"
+                                cx="140"
+                                cy="44"
+                                r="3.4"
+                                fill="#3FA66F"
+                                stroke="none"
+                              />
+                              <circle
+                                class="sp"
+                                style="--sd: 0.2s"
+                                cx="-14"
+                                cy="50"
+                                r="3.4"
+                                fill="#0071E3"
+                                stroke="none"
+                              />
+                            </g>
+                          </svg> </span></span></span></span
+                ></span>
+                <span class="burst" aria-hidden="true">
+                  <i style="--c: #ffd166; --x: -120px; --y: -90px; --r: 200deg"></i
+                  ><i
+                    class="dot"
+                    style="--c: #0071e3; --x: -150px; --y: -10px; --r: 0deg; --bd: 0.1s"
+                  ></i
+                  ><i style="--c: #f26b4e; --x: -90px; --y: -140px; --r: -160deg; --bd: 0.08s"></i
+                  ><i class="dot" style="--c: #3fa66f; --x: -20px; --y: -160px; --r: 0deg"></i
+                  ><i style="--c: #0071e3; --x: 60px; --y: -150px; --r: 260deg; --bd: 0.12s"></i
+                  ><i style="--c: #ffd166; --x: 130px; --y: -110px; --r: -220deg; --bd: 0.04s"></i
+                  ><i
+                    class="dot"
+                    style="--c: #f26b4e; --x: 160px; --y: -30px; --r: 0deg; --bd: 0.14s"
+                  ></i
+                  ><i style="--c: #3fa66f; --x: 120px; --y: 40px; --r: 180deg; --bd: 0.06s"></i
+                  ><i style="--c: #b9a8e8; --x: -130px; --y: 50px; --r: -140deg; --bd: 0.16s"></i
+                  ><i
+                    class="dot"
+                    style="--c: #ffd166; --x: 20px; --y: -120px; --r: 0deg; --bd: 0.2s"
+                  ></i
+                  ><i style="--c: #ff9f0a; --x: -190px; --y: -60px; --r: 120deg; --bd: 0.09s"></i
+                  ><i
+                    class="dot"
+                    style="--c: #af52de; --x: 190px; --y: -80px; --r: 0deg; --bd: 0.11s"
+                  ></i
+                  ><i style="--c: #0071e3; --x: -60px; --y: 80px; --r: -90deg; --bd: 0.18s"></i
+                  ><i style="--c: #ffd166; --x: 70px; --y: 90px; --r: 140deg; --bd: 0.07s"></i>
+                </span>
+              </button>
+              <p class="say" id="say" aria-live="polite">Hi! I’m SKYCOT.</p>
+            </div>
+
+            <h1 id="hero-title">
+              <span class="w" style="--i: 0">The</span>
+              <span class="w" style="--i: 1">family-friendly</span>
+              <span class="l2"
+                ><span class="w" style="--i: 2">AI</span>
+                <span class="w" id="lastWord" style="--i: 3">developer.</span></span
+              >
+            </h1>
+            <p class="promise">
+              <span>Kids dream it up. SKYCOT builds it.</span>
+              <span>Nothing goes online without a <span class="nw">grown-up’s</span> code.</span>
+            </p>
+            <div class="actions">
+              <a
+                class="btn btn-primary"
+                href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.1.beta-arm64.dmg"
+                >Download the beta for Mac</a
+              >
+              <a class="link-more" href="#how"
+                >See how it works<svg width="16" height="16" aria-hidden="true">
+                  <use href="#i-chev" /></svg
+              ></a>
+            </div>
+            <p class="meta">
+              Free during the beta · Apple silicon · macOS 13 or newer · Signed by Apple
+            </p>
+          </div>
+        </div>
+
+        <div class="hero-mac" id="heroMac">
+          <div class="mac">
+            <div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>SKYCOT</b></div>
+            <div class="screen ph">
+              <img
+                src="assets/fam-starters.jpg"
+                width="1200"
+                height="707"
+                fetchpriority="high"
+                alt="SKYCOT's Home in the Workshop look greeting Ava with Good afternoon, and eight colourful starter cards such as Make a game, A page about my pet, A birthday card and Draw it, then build it."
+              />
+            </div>
+          </div>
+        </div>
+        <p class="caption">
+          Early build: Home in the Workshop look, with the Family profile on for a sample child
+          called Ava. Plain English, on your own Mac, with the AI you already pay for.
+        </p>
+      </section>
+
+      <!-- ============ 9:00 am · What kids make ============ -->
+      <span id="ideas" class="anchor-alias" aria-hidden="true"></span>
+      <section
+        class="sec band tone-light"
+        id="make"
+        aria-labelledby="make-title"
+        data-t="1.6"
+        style="--from: var(--b16); --to: var(--b20)"
+      >
+        <div class="wrap">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #e8930c" aria-hidden="true"><use href="#i-sun" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">9:00 am</span><span class="e">6:15 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>What kids make
+            </p>
+            <h2 class="title" id="make-title">If they can say it, they can build it.</h2>
+            <p class="sub">
+              A game for a friend. A page about the family dog. A card for Nan. Real projects, made
+              by talking, or even by drawing.
+            </p>
+          </div>
+
+          <article class="rk glass reveal" aria-labelledby="rk-title">
+            <div class="rk-stage" id="rkStage">
+              <div class="mac">
+                <div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>SKYCOT</b></div>
+                <div class="screen">
+                  <img
+                    class="built"
+                    src="assets/fam-draw.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Ava's crayon rocket drawing, turned into a working page and opened inside SKYCOT, offline."
+                  />
+                  <svg class="drawing" viewBox="0 0 1200 707" aria-hidden="true">
+                    <g class="zoom">
+                      <g filter="url(#crayon)">
+                        <g clip-path="url(#c-body)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 0.55s; --du: 0.6s"
+                            stroke="#E98A7A"
+                            d="M551 249 L649 250 L552 264 L646 265 L550 278 L646 278 L552 293 L646 292 L553 307 L648 307 L554 319 L649 321 L551 333 L647 336 L551 348 L649 349 L552 361 L646 362 L553 376 L647 377 L552 390 L649 391 L551 404 L648 406 L553 418 L650 418 L552 433 L647 433 L550 446 L649 447 L554 460 L649 461"
+                          />
+                        </g>
+                        <g clip-path="url(#c-win)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 0.85s; --du: 0.22s"
+                            stroke="#8DB8EC"
+                            d="M572 330 L629 332 L572 340 L626 341 L573 351 L629 351 L572 360 L626 361 L571 369 L626 372 L571 379"
+                          />
+                        </g>
+                        <g clip-path="url(#c-finl)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 1s; --du: 0.2s"
+                            stroke="#7CC096"
+                            d="M508 409 L558 409 L508 419 L561 420 L507 428 L559 430 L510 437 L559 438 L507 448 L560 449 L506 458 L559 459 L510 468"
+                          />
+                        </g>
+                        <g clip-path="url(#c-finr)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 1.08s; --du: 0.2s"
+                            stroke="#7CC096"
+                            d="M640 408 L693 408 L642 419 L693 420 L640 428 L690 429 L638 437 L691 438 L639 447 L690 448 L638 458 L690 460 L640 467"
+                          />
+                        </g>
+                        <g clip-path="url(#c-flame)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 1.2s; --du: 0.22s"
+                            stroke="#FFC861"
+                            d="M567 470 L631 471 L569 481 L632 482 L566 489 L631 492 L569 499 L630 503 L568 509 L632 511 L568 521 L633 522 L567 530"
+                          />
+                        </g>
+                        <g clip-path="url(#c-moon)">
+                          <path
+                            class="z"
+                            pathLength="1"
+                            style="--t: 1.4s; --du: 0.22s"
+                            stroke="#C9C9C9"
+                            d="M765 351 L824 350 L765 358 L825 359 L767 369 L825 368 L765 377 L823 376 L764 386 L823 386 L768 395 L826 395 L768 404"
+                          />
+                        </g>
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 0.1s; --du: 0.55s"
+                          stroke="#D9493A"
+                          d="M556 466 L556 319 L600 247 L644 318 L644 466 Z M552 466 L648 466"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 0.6s; --du: 0.25s"
+                          stroke="#2F6FD0"
+                          d="M600 328 A27 27 0 1 1 600 382 A27 27 0 1 1 598 328"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 0.8s; --du: 0.2s"
+                          stroke="#2F9D5B"
+                          d="M556 409 L512 471 L556 466"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 0.92s; --du: 0.2s"
+                          stroke="#2F9D5B"
+                          d="M644 409 L688 472 L644 466"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.05s; --du: 0.25s"
+                          stroke="#F08A2C"
+                          d="M571 467 L583 523 L598 491 L617 537 L629 467"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.25s; --du: 0.22s"
+                          stroke="#9A9A9A"
+                          d="M795 350 A28 28 0 1 1 795 406 A28 28 0 1 1 793 350"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.35s; --du: 0.18s"
+                          stroke="#E8B820"
+                          d="M408.0 227.0 L414.9 243.5 L432.7 245.0 L419.1 256.6 L423.3 274.0 L408.0 264.7 L392.7 274.0 L396.9 256.6 L383.3 245.0 L401.1 243.5Z"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.45s; --du: 0.18s"
+                          stroke="#E8B820"
+                          d="M783.0 251.0 L788.6 264.4 L803.0 265.5 L792.0 274.9 L795.3 289.0 L783.0 281.4 L770.7 289.0 L774.0 274.9 L763.0 265.5 L777.4 264.4Z"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.55s; --du: 0.16s"
+                          stroke="#E8B820"
+                          d="M427.0 473.0 L432.0 485.1 L445.1 486.1 L435.1 494.6 L438.2 507.4 L427.0 500.6 L415.8 507.4 L418.9 494.6 L408.9 486.1 L422.0 485.1Z"
+                        />
+                        <path
+                          class="o"
+                          pathLength="1"
+                          style="--t: 1.62s; --du: 0.16s"
+                          stroke="#E8B820"
+                          d="M748.0 497.0 L752.8 508.4 L765.1 509.4 L755.7 517.5 L758.6 529.6 L748.0 523.1 L737.4 529.6 L740.3 517.5 L730.9 509.4 L743.2 508.4Z"
+                        />
+                      </g>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+              <div class="rk-m" aria-hidden="true">
+                <div class="jump">
+                  <div class="poses">
+                    <span class="p-think"
+                      ><img
+                        class="day-only"
+                        src="/assets/brand/mascot-thinking-day.svg"
+                        width="128"
+                        height="128"
+                        alt="" /><img
+                        class="dusk-only"
+                        src="/assets/brand/mascot-thinking-dusk.svg"
+                        width="128"
+                        height="128"
+                        alt=""
+                    /></span>
+                    <span class="p-yay"
+                      ><img
+                        class="day-only"
+                        src="/assets/brand/mascot-yay-day.svg"
+                        width="128"
+                        height="128"
+                        alt="" /><img
+                        class="dusk-only"
+                        src="/assets/brand/mascot-yay-dusk.svg"
+                        width="128"
+                        height="128"
+                        alt=""
+                    /></span>
+                  </div>
+                </div>
+              </div>
+              <div class="rk-burst" aria-hidden="true">
+                <i style="--c: #ffd166; --x: -150px; --y: -60px; --r: -220deg"></i
+                ><i style="--c: #e2553e; --x: -90px; --y: -130px; --r: 160deg; --bd: 0.04s"></i
+                ><i style="--c: #3fa66f; --x: -20px; --y: -150px; --r: 300deg"></i
+                ><i style="--c: #0071e3; --x: 60px; --y: -120px; --r: -140deg; --bd: 0.06s"></i
+                ><i style="--c: #8e6cd1; --x: 40px; --y: 60px; --r: 250deg"></i
+                ><i style="--c: #f59b3d; --x: -170px; --y: 40px; --r: 200deg; --bd: 0.03s"></i
+                ><i style="--c: #ffb4a2; --x: -120px; --y: 110px; --r: -300deg"></i
+                ><i style="--c: #ffd166; --x: 30px; --y: -40px; --r: 180deg; --bd: 0.08s"></i
+                ><i style="--c: #0071e3; --x: -60px; --y: 150px; --r: 120deg"></i
+                ><i style="--c: #e2553e; --x: -200px; --y: -10px; --r: 90deg"></i>
+              </div>
+              <div class="stk" aria-hidden="true">
+                <svg viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="56" fill="#fff" />
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r="49"
+                    fill="#FFE79A"
+                    stroke="#2B2420"
+                    stroke-width="3.5"
+                  />
+                  <rect
+                    x="34"
+                    y="30"
+                    width="46"
+                    height="40"
+                    rx="5"
+                    fill="#fff"
+                    stroke="#2B2420"
+                    stroke-width="3.5"
+                  />
+                  <path
+                    d="M40 62 L52 46 L60 56 L66 50 L76 62"
+                    fill="none"
+                    stroke="#3FA66F"
+                    stroke-width="3.5"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                  />
+                  <circle cx="70" cy="40" r="4.5" fill="#F59B3D" />
+                  <path
+                    d="M74 72 L92 50 L98 55 L80 77 L72 80 Z"
+                    fill="#0071E3"
+                    stroke="#2B2420"
+                    stroke-width="3"
+                    stroke-linejoin="round"
+                  />
+                  <path id="arc1" d="M14 62 A 46 46 0 0 0 106 62" fill="none" />
+                  <text
+                    font-family="-apple-system,Helvetica,Arial,sans-serif"
+                    font-weight="800"
+                    font-size="11.5"
+                    fill="#2B2420"
+                    letter-spacing="1"
+                  >
+                    <textPath href="#arc1" startOffset="50%" text-anchor="middle">
+                      DREW IT FIRST
+                    </textPath>
+                  </text>
+                </svg>
+              </div>
+            </div>
+            <div class="rk-copy">
+              <span class="tag">Draw it, then build it</span>
+              <h3 id="rk-title">A crayon drawing becomes a working page.</h3>
+              <p>
+                Ava drew a rocket on paper and added a photo of it to her message. SKYCOT built it
+                into a page that runs right inside SKYCOT, with no internet. She earned the “Drew it
+                first” sticker.
+              </p>
+              <p class="small">Early build, with a sample child called Ava.</p>
+              <button class="replay" type="button" id="rkReplay">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" /></svg
+                >Watch it again
+              </button>
+            </div>
+          </article>
+
+          <ul
+            class="ideas"
+            aria-label="More things kids make"
+            style="list-style: none; padding-left: 0"
+          >
+            <li class="idea glass reveal">
+              <div class="ic" style="background: #ff9f0a" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="2" y="7" width="20" height="11" rx="4" />
+                  <path d="M7 11v3M5.5 12.5h3" />
+                  <circle cx="15.5" cy="11.5" r="1" />
+                  <circle cx="18" cy="14" r="1" />
+                </svg>
+              </div>
+              <h3>A game for a friend</h3>
+              <p class="bubble">Make a game where you catch falling stars, and it gets faster.</p>
+            </li>
+            <li class="idea glass reveal" style="--d: 0.06s">
+              <div class="ic" style="background: #34c759" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="7" cy="10" r="1.8" />
+                  <circle cx="11" cy="6.5" r="1.8" />
+                  <circle cx="15.5" cy="7.5" r="1.8" />
+                  <circle cx="18" cy="11.5" r="1.8" />
+                  <path d="M8.5 17.5c0-2.5 2-5 4.5-5s4 2 4 4-1.5 3-3.5 3-2.5-1-5 0z" />
+                </svg>
+              </div>
+              <h3>A page about the family dog</h3>
+              <p class="bubble">
+                A page about Biscuit, with his tricks and a countdown to his birthday.
+              </p>
+            </li>
+            <li class="idea glass reveal" style="--d: 0.12s">
+              <div class="ic" style="background: #ff375f" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="10" width="18" height="11" rx="2" />
+                  <path d="M3 14h18M12 10v11" />
+                  <path d="M12 10c-2-4-6-4-6-1.5S10 10 12 10zM12 10c2-4 6-4 6-1.5S14 10 12 10z" />
+                </svg>
+              </div>
+              <h3>A birthday card for Nan</h3>
+              <p class="bubble">A birthday card for Nan’s 80th, with balloons and a big hello.</p>
+            </li>
+            <li class="idea glass reveal" style="--d: 0.18s">
+              <div class="ic" style="background: #5856d6" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14" />
+                  <path d="M12 17h.01" />
+                </svg>
+              </div>
+              <h3>A quiz for a little brother</h3>
+              <p class="bubble">A times-tables quiz that cheers when you get one right.</p>
+            </li>
+            <li class="idea glass reveal" style="--d: 0.24s">
+              <div class="ic" style="background: #af52de" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M12 3v18M3 12h18" />
+                </svg>
+              </div>
+              <h3>A comic strip</h3>
+              <p class="bubble">A comic about our cat, with four panels and speech bubbles.</p>
+            </li>
+          </ul>
+          <p class="fine ink">
+            Examples of what a child might ask for. What gets built depends on the AI service you
+            use, and a grown-up checks it before anything is shared.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 12:00 pm · How it works (pinned Mac window) ============ -->
+      <section
+        class="story band tone-light"
+        id="how"
+        aria-labelledby="how-title"
+        data-t="2.2"
+        style="--n: 3; --from: var(--b20); --to: var(--b25)"
+      >
+        <div class="story-track" id="storyTrack">
+          <div class="story-sticky wrap" id="storySticky">
+            <div class="story-copy glass">
+              <p class="when">
+                <svg class="wi-d" style="color: #e8930c" aria-hidden="true">
+                  <use href="#i-sun" /></svg
+                ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                  <use href="#i-moon" /></svg
+                ><span class="clock"
+                  ><span class="d">12:00 pm</span><span class="e">6:30 pm</span></span
+                ><span class="sep" aria-hidden="true">·</span>How it works
+              </p>
+              <h2 id="how-title">Three steps. No new vocabulary.</h2>
+              <div class="beats">
+                <article class="beat">
+                  <div class="beat-pose">
+                    <img
+                      class="day-only"
+                      src="/assets/brand/mascot-ask-a-grown-up-day.svg"
+                      alt=""
+                    /><img
+                      class="dusk-only"
+                      src="/assets/brand/mascot-ask-a-grown-up-dusk.svg"
+                      alt=""
+                    />
+                  </div>
+                  <span class="step-n" aria-hidden="true">1</span>
+                  <h3>A grown-up sets it up.</h3>
+                  <p>
+                    Install SKYCOT, sign in to the AI you already pay for, and turn on the Family
+                    profile. Your child doesn’t need an account of their own.
+                  </p>
+                  <div class="beat-shot">
+                    <div class="mac">
+                      <div class="mac-bar" aria-hidden="true">
+                        <i></i><i></i><i></i><b>SKYCOT</b>
+                      </div>
+                      <div class="screen ph">
+                        <img
+                          class="lz"
+                          src="assets/family-setup.jpg"
+                          width="1200"
+                          height="707"
+                          loading="lazy"
+                          alt="The Set up the Family profile sheet: a child's first name, a parent code typed twice, and plain lists of what this does and does not do."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+                <article class="beat">
+                  <div class="beat-pose">
+                    <img class="day-only" src="/assets/brand/mascot-thinking-day.svg" alt="" /><img
+                      class="dusk-only"
+                      src="/assets/brand/mascot-thinking-dusk.svg"
+                      alt=""
+                    />
+                  </div>
+                  <span class="step-n" aria-hidden="true">2</span>
+                  <h3>Kids say it in plain English.</h3>
+                  <p>
+                    Type it, tap a starter card or say it out loud. Sam shows a plan and asks before
+                    every change, so you can sit alongside and build it together.
+                  </p>
+                  <div class="beat-shot">
+                    <div class="mac">
+                      <div class="mac-bar" aria-hidden="true">
+                        <i></i><i></i><i></i><b>SKYCOT</b>
+                      </div>
+                      <div class="screen ph">
+                        <img
+                          class="lz"
+                          src="assets/fam-talk.jpg"
+                          width="1200"
+                          height="707"
+                          loading="lazy"
+                          alt="SKYCOT listening as Ava asks, Can Bubbles blow bubbles when I click her?, with her words appearing in the message box."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+                <article class="beat">
+                  <div class="beat-pose">
+                    <img class="day-only" src="/assets/brand/mascot-yay-day.svg" alt="" /><img
+                      class="dusk-only"
+                      src="/assets/brand/mascot-yay-dusk.svg"
+                      alt=""
+                    />
+                  </div>
+                  <span class="step-n" aria-hidden="true">3</span>
+                  <h3>Keep it, undo it, or share it.</h3>
+                  <p>
+                    Read what changed in plain words, keep it or undo all of it, and pin the best to
+                    the family fridge. Sharing it with the world waits for a grown-up’s yes.
+                  </p>
+                  <div class="beat-shot">
+                    <div class="mac">
+                      <div class="mac-bar" aria-hidden="true">
+                        <i></i><i></i><i></i><b>SKYCOT</b>
+                      </div>
+                      <div class="screen ph">
+                        <img
+                          class="lz"
+                          src="assets/fam-fridge.jpg"
+                          width="1200"
+                          height="707"
+                          loading="lazy"
+                          alt="Ava's fridge with three things she made: a rocket drawing page, a star-catching game and a page about her axolotl."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <div class="story-stage" aria-hidden="true">
+              <div class="mac">
+                <div class="mac-bar"><i></i><i></i><i></i><b>SKYCOT</b></div>
+                <div class="screen ph" id="storyScreen">
+                  <img
+                    src="assets/family-setup.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt=""
+                  />
+                  <img src="assets/fam-talk.jpg" width="1200" height="707" loading="lazy" alt="" />
+                  <img
+                    src="assets/fam-fridge.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt=""
+                  />
+                </div>
+              </div>
+              <div class="story-dots" id="storyDots"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 3:00 pm · Grown-up in control ============ -->
+      <section
+        class="sec band tone-light"
+        id="safety"
+        aria-labelledby="safety-title"
+        data-t="3"
+        style="--from: var(--b30); --to: var(--b30)"
+      >
+        <div class="wrap">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #e8930c" aria-hidden="true"><use href="#i-sun" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">3:00 pm</span><span class="e">6:45 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>Grown-up in control
+            </p>
+            <h2 class="title" id="safety-title">Nothing goes online without your code.</h2>
+            <p class="sub">
+              Putting work online needs the parent code, and so do new automations, the developer
+              tools and switching the Family profile off. The engine enforces it, not just the
+              screen.
+            </p>
+          </div>
+
+          <div class="ctl">
+            <div class="codecard glass reveal" id="codecard">
+              <p class="lbl">Putting a page live</p>
+              <h3>Parent code</h3>
+              <div class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <span class="ok"
+                ><svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>A
+                grown-up said yes</span
+              >
+              <p>
+                4 to 6 digits that only you know. Building, drafts and Undo work as normal without
+                it.
+              </p>
+            </div>
+            <div class="facts">
+              <div class="fact glass reveal">
+                <div class="n">1</div>
+                <h3>Big red Stop.</h3>
+                <p>Halts everything the moment it’s pressed. Nothing auto-confirms.</p>
+              </div>
+              <div class="fact glass reveal" style="--d: 0.06s">
+                <div class="n">6</div>
+                <h3>Hard rules that always ask.</h3>
+                <p>Deleting, going live, spending, signing up, bookings and customer details.</p>
+              </div>
+              <div class="fact glass reveal" style="--d: 0.12s">
+                <div class="n">5</div>
+                <h3>Wrong tries, then a pause.</h3>
+                <p>Five wrong codes lock every code prompt for five minutes.</p>
+              </div>
+              <div class="fact glass reveal">
+                <div class="ico" aria-hidden="true">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 3v10" />
+                    <path d="M8 7l4-4 4 4" />
+                    <rect x="4" y="13" width="16" height="8" rx="2" />
+                  </svg>
+                </div>
+                <h3>Ask me first. Plan first.</h3>
+                <p>A plan, then a question before every command and file change.</p>
+              </div>
+              <div class="fact glass reveal" style="--d: 0.06s">
+                <div class="ico" aria-hidden="true">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M9 14L4 9l5-5" />
+                    <path d="M4 9h11a5 5 0 0 1 0 10h-3" />
+                  </svg>
+                </div>
+                <h3>Undo, always.</h3>
+                <p>Every change is a version, and Restore is one click.</p>
+              </div>
+              <div class="fact glass reveal" style="--d: 0.12s">
+                <div class="ico" aria-hidden="true">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="3" y="4" width="18" height="12" rx="2" />
+                    <path d="M8 20h8M12 16v4" />
+                  </svg>
+                </div>
+                <h3>Files stay on your Mac.</h3>
+                <p>Only what each job needs goes to the AI you chose. No analytics.</p>
+              </div>
+            </div>
+          </div>
+          <p class="honest glass reveal">
+            <b>An honest note.</b> The Family profile is a set of guardrails inside SKYCOT, not web
+            filtering and not Screen Time. It doesn’t lock the Mac, its bedtime and limits apply
+            only inside SKYCOT, it can’t guarantee what an AI says, and a determined teenager could
+            get round it. It makes the first experience safe and kind. The rest is parenting.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 5:00 pm · New for families ============ -->
+      <span id="family" class="anchor-alias" aria-hidden="true"></span>
+      <section
+        class="sec band tone-light"
+        id="new"
+        aria-labelledby="new-title"
+        data-t="3.45"
+        style="--from: var(--b34); --to: var(--b34)"
+      >
+        <div class="wrap">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #e8930c" aria-hidden="true"><use href="#i-sun" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">5:00 pm</span><span class="e">7:00 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>New for families
+            </p>
+            <h2 class="title" id="new-title">
+              Made for kids. <span class="nw">Run by grown-ups.</span>
+            </h2>
+            <p class="sub">Ten things in the beta you can download today.</p>
+          </div>
+
+          <div class="ink famblock">
+            <div class="row-h">
+              <h3>For kids</h3>
+              <p>Say it, tap it or draw it.</p>
+            </div>
+            <ul class="fam" aria-label="Features for kids">
+              <li class="fcard glass reveal">
+                <div class="shot ph" style="--o: 62% 42%; --z: 1.7">
+                  <img
+                    class="lz"
+                    src="assets/fam-starters.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Eight colourful starter cards such as Make a game and A birthday card."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Tap a card to start</h4>
+                  <p>Eight one-tap ideas. Nothing is sent until they press Send.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.05s">
+                <div class="shot ph" style="--o: 40% 90%; --z: 1.7">
+                  <img
+                    class="lz"
+                    src="assets/fam-talk.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="SKYCOT listening, with Ava's spoken words appearing in the message box."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Talk to SKYCOT</h4>
+                  <p>Say it out loud. Voice stays off until a grown-up turns it on.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.1s">
+                <div class="shot ph" style="--o: 50% 52%; --z: 1.6">
+                  <img
+                    class="lz"
+                    src="assets/fam-draw.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Ava's crayon rocket drawing, running as a page inside SKYCOT."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Draw it, then build it</h4>
+                  <p>A photo of a drawing becomes a page that runs offline.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.15s">
+                <div class="shot ph" style="--o: 30% 22%; --z: 1.5">
+                  <img
+                    class="lz"
+                    src="assets/fam-explain.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Sam explains how he drew Bubbles the axolotl in simple words."
+                  />
+                </div>
+                <div class="t">
+                  <h4>“How did you do that?”</h4>
+                  <p>Each build explained in kid-sized words, with a peek at the code.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.2s">
+                <div class="shot ph" style="--o: 48% 36%; --z: 1.6">
+                  <img
+                    class="lz"
+                    src="assets/fam-stickers.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Ava's sticker book with First creation, Game maker, Animal friend and Drew it first."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Stickers and a certificate</h4>
+                  <p>Sixteen stickers for real moments. Nothing rewards time spent.</p>
+                </div>
+              </li>
+            </ul>
+            <div class="row-h">
+              <h3>For grown-ups</h3>
+              <p>See what they made, and decide when the workshop closes.</p>
+            </div>
+            <ul class="fam" aria-label="Features for grown-ups">
+              <li class="fcard glass reveal">
+                <div class="shot ph" style="--o: 66% 40%; --z: 1.7">
+                  <img
+                    class="lz"
+                    src="assets/fam-recap.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="The grown-up recap: Ava made 4 things this week, with 40 minutes on SKYCOT."
+                  />
+                </div>
+                <div class="t">
+                  <h4>The grown-up recap</h4>
+                  <p>Time spent, what they made and their proudest thing.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.05s">
+                <div class="shot ph" style="--o: 50% 46%; --z: 1.3">
+                  <img
+                    class="lz"
+                    src="assets/fam-shield.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Mo spots a full name and a school in Ava's message and suggests nicknames instead."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Personal details stay home</h4>
+                  <p>Spots a full name or school and suggests leaving it out.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.1s">
+                <div class="shot ph" style="--o: 50% 62%; --z: 1.25">
+                  <img
+                    class="lz"
+                    src="assets/fam-siblings.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="The Who's using SKYCOT? picker with big buttons for Ava and Leo."
+                  />
+                </div>
+                <div class="t">
+                  <h4>A profile for each child</h4>
+                  <p>Up to eight children, each with their own look and limits.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.15s">
+                <div class="shot ph" style="--o: 50% 40%; --z: 1.35">
+                  <img
+                    class="lz"
+                    src="assets/fam-bedtime.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="SKYCOT is asleep: it's bedtime, Leo. SKYCOT wakes up at 7:00 am."
+                  />
+                </div>
+                <div class="t">
+                  <h4>Bedtime and daily limits</h4>
+                  <p>A calm heads-up five minutes before. Inside SKYCOT only.</p>
+                </div>
+              </li>
+              <li class="fcard glass reveal" style="--d: 0.2s">
+                <div class="shot ph" style="--o: 72% 52%; --z: 1.6">
+                  <img
+                    class="lz"
+                    src="assets/fam-fridge.jpg"
+                    width="1200"
+                    height="707"
+                    loading="lazy"
+                    alt="Ava's fridge with a rocket page, a star-catching game and a page about her axolotl."
+                  />
+                </div>
+                <div class="t">
+                  <h4>The family fridge</h4>
+                  <p>Pin the best things where the whole family can open them.</p>
+                </div>
+              </li>
+            </ul>
+            <p class="fine">
+              Screens from SKYCOT’s beta build, with sample children called Ava and Leo.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 6:00 pm · Looks ============ -->
+      <section
+        class="sec band tone-dark"
+        id="looks"
+        aria-labelledby="looks-title"
+        data-t="4"
+        style="--from: var(--b40); --to: var(--b40)"
+      >
+        <div class="wrap looks">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #ff9a6b" aria-hidden="true">
+                <use href="#i-sunset" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">6:00 pm</span><span class="e">7:15 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>Looks
+            </p>
+            <h2 class="title" id="looks-title">Pick a look. Keep the same careful app.</h2>
+            <p class="sub">
+              A look changes how SKYCOT looks, never what it does. Every look has a light and a dark
+              side.
+            </p>
+            <div class="seg" role="tablist" aria-label="Choose a look" id="lookSeg">
+              <button
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="lookStage"
+                data-look="0"
+              >
+                Workshop
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="lookStage"
+                data-look="1"
+                tabindex="-1"
+              >
+                Classic
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="lookStage"
+                data-look="2"
+                tabindex="-1"
+              >
+                Paper
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="lookStage"
+                data-look="3"
+                tabindex="-1"
+              >
+                Night Ops
+              </button>
+            </div>
+            <div class="look-cap glass" aria-live="polite" id="lookCap">
+              <div data-cap="0">
+                <h3>Workshop, the default</h3>
+                <p>Cream paper, marker pens, sticky notes and a named crew.</p>
+              </div>
+              <div data-cap="1" hidden>
+                <h3>Classic</h3>
+                <p>The Apple Messages look. Calm, clean and familiar.</p>
+              </div>
+              <div data-cap="2" hidden>
+                <h3>Paper</h3>
+                <p>Warm paper and ink, serif headings and one vermilion accent.</p>
+              </div>
+              <div data-cap="3" hidden>
+                <h3>Night Ops</h3>
+                <p>Dark navy glass with cyan and amber. Mission control.</p>
+              </div>
+            </div>
+          </div>
+          <div
+            class="looks-stage reveal"
+            id="lookStage"
+            role="tabpanel"
+            aria-label="Look preview"
+            style="--d: 0.1s"
+          >
+            <div class="mac">
+              <div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>SKYCOT</b></div>
+              <div class="screen ph">
+                <img
+                  class="on"
+                  src="assets/workshop-tour.jpg"
+                  width="1200"
+                  height="707"
+                  loading="lazy"
+                  alt="A conversation in the Workshop look: the crew Sam and Mo in the sidebar, a handwritten Conversations heading and a sketched What changed card."
+                />
+                <img
+                  src="assets/look-classic.jpg"
+                  width="1200"
+                  height="707"
+                  loading="lazy"
+                  alt="SKYCOT in the Classic look: white panels, grey sidebar and one blue accent."
+                />
+                <img
+                  src="assets/look-paper.jpg"
+                  width="1200"
+                  height="707"
+                  loading="lazy"
+                  alt="SKYCOT in the Paper look: warm off-white background, serif headings and a vermilion accent."
+                />
+                <img
+                  src="assets/look-night-ops.jpg"
+                  width="1200"
+                  height="707"
+                  loading="lazy"
+                  alt="SKYCOT in the Night Ops look: dark navy panels with cyan highlights."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 6:30 pm · Bring your own AI ============ -->
+      <span id="works-with" class="anchor-alias" aria-hidden="true"></span>
+      <section
+        class="sec band tone-dark"
+        id="ai"
+        aria-labelledby="ai-title"
+        data-t="4.5"
+        style="--from: var(--b45); --to: var(--b45)"
+      >
+        <div class="wrap">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #ff9a6b" aria-hidden="true">
+                <use href="#i-sunset" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">6:30 pm</span><span class="e">7:30 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>Bring your own AI
+            </p>
+            <h2 class="title" id="ai-title">Works with the AI you already pay for.</h2>
+            <p class="sub">
+              SKYCOT doesn’t resell AI. A grown-up signs in through each assistant’s own sign-in, so
+              SKYCOT never sees the password.
+            </p>
+          </div>
+          <div class="ais reveal">
+            <div class="ai glass"><b>Claude Code</b><span>Anthropic</span></div>
+            <div class="ai glass"><b>Codex</b><span>OpenAI</span></div>
+            <div class="ai glass"><b>Cursor</b><span>Anysphere</span></div>
+            <div class="ai glass"><b>Gemini</b><span>Google · Antigravity</span></div>
+            <div class="ai glass"><b>And more</b><span>as they’re added</span></div>
+          </div>
+          <p class="agebox glass reveal">
+            <b>Each AI service sets its own age rules.</b> Some, including Anthropic’s Claude and
+            Cursor, are for adults only; others allow teenagers with a parent’s permission. SKYCOT
+            runs signed in with a grown-up’s own account, under the grown-up’s supervision, and
+            doesn’t change those rules, so check your service’s terms first. Product names belong to
+            their owners.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 7:30 pm · For grown-ups and small businesses ============ -->
+      <section
+        class="sec band tone-dark"
+        id="grown-ups"
+        aria-labelledby="biz-title"
+        data-t="5"
+        style="padding: 0; --from: var(--b50); --to: var(--b50)"
+      >
+        <div class="wrap">
+          <div class="biz glass reveal">
+            <div>
+              <p class="when" style="margin: 0">
+                <svg class="wi-d" style="color: #c9b8ff" aria-hidden="true">
+                  <use href="#i-moon" /></svg
+                ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                  <use href="#i-moon" /></svg
+                ><span class="clock"
+                  ><span class="d">7:30 pm</span><span class="e">7:45 pm</span></span
+                ><span class="sep" aria-hidden="true">·</span>After bedtime
+              </p>
+              <h2 id="biz-title">For grown-ups and small businesses too.</h2>
+              <p>
+                The same careful developer for your own website. Text it what you want, like “Add a
+                Christmas menu page”, and SKYCOT builds it on your Mac and waits for your yes.
+              </p>
+            </div>
+            <ul class="ticks">
+              <li>
+                <svg width="20" height="20" aria-hidden="true"><use href="#i-check" /></svg
+                ><span
+                  ><b>It asks before it acts.</b> What it wants, why, and what happens if you say
+                  no.</span
+                >
+              </li>
+              <li>
+                <svg width="20" height="20" aria-hidden="true"><use href="#i-check" /></svg
+                ><span><b>See what changed, in your words.</b> The code is one click away.</span>
+              </li>
+              <li>
+                <svg width="20" height="20" aria-hidden="true"><use href="#i-check" /></svg
+                ><span><b>Undo all of it. Really.</b> Restore puts every file back.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 8:00 pm · Download ============ -->
+      <section
+        class="sec band tone-dark"
+        id="download"
+        aria-labelledby="dl-title"
+        data-t="5.6"
+        data-anim
+        style="padding-top: 40px; --from: var(--b56); --to: var(--b56)"
+      >
+        <div class="wrap">
+          <div class="dl glass reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">8:00 pm</span><span class="e">8:00 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>Get SKYCOT
+            </p>
+            <div class="dl-m">
+              <img
+                src="/assets/brand/mascot-yay-dusk.svg"
+                width="150"
+                height="150"
+                alt="SKYCOT the cloud at dusk, cheering"
+              />
+            </div>
+            <h2 id="dl-title">Try the beta.</h2>
+            <p class="lead">
+              SKYCOT for Mac is free during the beta. A grown-up brings their own AI account.
+            </p>
+            <div class="actions">
+              <a
+                class="btn btn-primary"
+                href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.1.beta-arm64.dmg"
+                >Download the beta for Mac</a
+              >
+              <a
+                class="btn btn-ghost"
+                href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback"
+                >Tell us what you think</a
+              >
+            </div>
+            <ul class="specs">
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>Apple
+                silicon (M1 or later)
+              </li>
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>macOS 13
+                Ventura or newer
+              </li>
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>About
+                160 MB
+              </li>
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>Free
+                during the beta
+              </li>
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>Signed
+                and notarised by Apple
+              </li>
+              <li>
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-check" /></svg>Updates
+                itself
+              </li>
+            </ul>
+            <div class="install">
+              <h3>Install in a minute</h3>
+              <ol>
+                <li>
+                  <span><b>Open the file</b> you downloaded, SKYCOT’s disk image.</span>
+                </li>
+                <li>
+                  <span><b>Drag SKYCOT to Applications</b> in the window that opens.</span>
+                </li>
+                <li>
+                  <span><b>Open SKYCOT</b> and choose who it’s for: you, or your family.</span>
+                </li>
+              </ol>
+            </div>
+            <p class="note">
+              It’s a beta, so some things will be rough. Tell us what breaks by email or on
+              <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 8:30 pm · Questions ============ -->
+      <section
+        class="sec band tone-dark"
+        id="faq"
+        aria-labelledby="faq-title"
+        data-t="6.1"
+        style="padding-top: 24px; --from: var(--b61); --to: var(--b61)"
+      >
+        <div class="wrap">
+          <div class="head ink reveal">
+            <p class="when">
+              <svg class="wi-d" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><svg class="wi-e" style="color: #c9b8ff" aria-hidden="true">
+                <use href="#i-moon" /></svg
+              ><span class="clock"
+                ><span class="d">8:30 pm</span><span class="e">8:30 pm</span></span
+              ><span class="sep" aria-hidden="true">·</span>Questions
+            </p>
+            <h2 class="title" id="faq-title">Questions before bed.</h2>
+          </div>
+          <div class="faq glass reveal">
+            <details>
+              <summary>
+                Is it safe for kids?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  It’s designed to be a safe first workshop for a child using it with a grown-up
+                  nearby. With the Family profile on, the assistant shows a plan and asks before
+                  every change, the riskier modes and developer tools are hidden, Undo is always
+                  there, and nothing goes online without the parent code.
+                </p>
+                <p>
+                  These are guardrails inside the app, not a security product, and the AI service’s
+                  own safety settings and age rules still apply. Stay involved: build together, and
+                  look at what was made before it’s shared.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Does my child need an AI account?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  No. SKYCOT runs on a parent’s own Mac and the parent’s own AI account, and the
+                  parent sets it up and supervises. Your child doesn’t sign up for anything, with us
+                  or with an AI service, and SKYCOT has no account of its own.
+                </p>
+                <p>
+                  What your child types goes to the AI service you chose, under your account and
+                  that company’s terms, so check its rules on age and on who may use your account.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                What can the parent code lock?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  Putting work online (both “send for review” and “put it live”), creating an
+                  automation, opening the developer tools (Advanced mode), running the welcome steps
+                  again, changing the code, and turning the Family profile off. Five wrong tries
+                  locks every code prompt for five minutes.
+                </p>
+                <p>Everything else works as normal: building, drafts and Undo.</p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                What does SKYCOT not do?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  It isn’t a parental-control or security product. It doesn’t filter the web, lock
+                  the Mac or replace Screen Time. Its bedtime and daily limits apply only inside
+                  SKYCOT. It asks the AI to keep things child-friendly and spots personal details
+                  before a message goes, but it can’t guarantee what an AI says. The parent code is
+                  kept on your Mac, and a determined teenager could get round it.
+                </p>
+                <p>
+                  SKYCOT also doesn’t create AI accounts for anyone, sell AI time, or send anything
+                  to us: no analytics are switched on.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Which AI does it use?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  The one you already pay for. A grown-up signs in to at least one supported
+                  assistant: Claude Code (Anthropic), Codex (OpenAI), Cursor, or Gemini via
+                  Antigravity (Google).
+                </p>
+                <p>
+                  Each service sets its own age rules. As of October 2026, Anthropic’s Claude and
+                  Cursor require every user to be 18 or over, and OpenAI’s terms allow 13 to 17 year
+                  olds with a parent’s permission; Google sets its own rules for Gemini and
+                  Antigravity. Check your service’s current terms before your child uses SKYCOT with
+                  it.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                What does SKYCOT cost?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  Free during the beta. You pay your AI provider as you do today. Pricing for later
+                  will be announced before it applies to anyone.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Does it work on Windows or iPhone?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  Mac first. The beta is for Apple silicon Macs only. Windows and phones are on the
+                  list, and the dates will be honest ones.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Does voice typing send my child's voice anywhere?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  Voice typing starts off for every child, and a grown-up turns it on with the
+                  parent code. SKYCOT never records or keeps audio; it uses the browser's own speech
+                  service. In Safari that is Apple's dictation, which on recent Macs can stay on the
+                  Mac. In Chrome it is Google's, and in Edge Microsoft's, so the voice goes to that
+                  company under its terms. SKYCOT tells you which applies before you switch it on,
+                  and recommends Safari for children. Reading replies aloud uses the Mac's own
+                  voices, so nothing leaves the Mac.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Is it open source?<span class="pm" aria-hidden="true"
+                  ><svg width="20" height="20"><use href="#i-plus" /></svg
+                ></span>
+              </summary>
+              <div class="a">
+                <p>
+                  SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under
+                  the MIT licence. We say so in the app and on our
+                  <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3
+                  Tools.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============ 9:00 pm · Good night ============ -->
+    <footer
+      class="night band tone-dark"
+      id="goodnight"
+      data-t="7"
+      data-anim
+      style="--from: var(--b61); --to: var(--b70)"
+    >
+      <div class="fmoon" aria-hidden="true"></div>
+      <div class="wrap goodnight">
+        <div class="sleep" role="img" aria-label="SKYCOT the cloud, fast asleep on a cloud">
+          <div class="seat">
+            <svg viewBox="0 0 320 96" aria-hidden="true">
+              <use href="#cloudSeat" class="cloud-sh" y="6" />
+              <use href="#cloudSeat" class="cloud-bd" />
+            </svg>
+          </div>
+          <img src="/assets/brand/mascot-night-night-dusk.svg" width="210" height="210" alt="" />
+        </div>
+        <div class="head ink">
+          <h2>Good night from SKYCOT.</h2>
+          <p class="sub">Your work is saved, just as you left it. See you in the morning.</p>
+        </div>
+        <a class="btn moonbtn" href="#top" id="morning">Start a new day</a>
+      </div>
+      <div class="wrap">
+        <div class="foot">
+          <div class="cols">
+            <a class="brand" href="#top" aria-label="SKYCOT, back to the top"
+              ><img src="/assets/brand/wordmark-reversed.svg" width="65" height="24" alt=""
+            /></a>
+            <ul>
+              <li><a href="/privacy">Privacy</a></li>
+              <li><a href="/terms">Terms</a></li>
+              <li><a href="/open-source">Open source</a></li>
+              <li><a href="mailto:markhallam@skycot.com">Contact</a></li>
+              <li><a href="https://discord.gg/krA4DQgD27">Discord</a></li>
+            </ul>
+          </div>
+          <p class="legal">
+            SKYCOT is based on <a href="https://github.com/pingdotgg/t3code">T3 Code</a>, © T3 Tools
+            Inc., used under the MIT licence. SKYCOT is not affiliated with or endorsed by T3 Tools
+            Inc. Claude, Codex, Cursor and Gemini are products of their respective owners; SKYCOT is
+            not affiliated with Anthropic, OpenAI, Anysphere or Google.
+          </p>
+          <p class="legal">
+            SKYCOT is made by Curble Pty Ltd, Melbourne, Australia. © 2026 Curble Pty Ltd, trading
+            as SKYCOT · ABN 71 605 512 776.
+          </p>
+          <p class="legal">
+            Screenshots show the beta build with sample projects and sample children.
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        "use strict";
+        var root = document.documentElement;
+        var motion = root.classList.contains("motion");
+        var $ = function (s, c) {
+          return (c || document).querySelector(s);
+        };
+        var $$ = function (s, c) {
+          return Array.prototype.slice.call((c || document).querySelectorAll(s));
+        };
+        var clamp = function (v, a, b) {
+          return v < a ? a : v > b ? b : v;
+        };
+        var smooth = function (a, b, v) {
+          var k = clamp((v - a) / (b - a), 0, 1);
+          return k * k * (3 - 2 * k);
+        };
+        var ease = function (t) {
+          return t * t * (3 - 2 * t);
+        };
+        var FINE = matchMedia("(pointer: fine)").matches;
+        function story() {
+          return root.getAttribute("data-story") === "evening" ? "evening" : "day";
+        }
+
+        /* ---------- pictures fade in when ready ---------- */
+        $$("img.lz").forEach(function (im) {
+          if (im.complete && im.naturalWidth) im.classList.add("ld");
+          else {
+            im.addEventListener("load", function () {
+              im.classList.add("ld");
+            });
+            im.addEventListener("error", function () {
+              im.classList.add("ld");
+            });
+          }
+        });
+
+        /* ---------- the day, as sky colours: [time, top, middle, horizon] (from Option D) ---------- */
+        var PAL = {
+          day: [
+            [1, "#8ec8f5", "#c6e3fa", "#fbeee0"],
+            [1.6, "#6db8f3", "#a8d6f8", "#e9f4fd"],
+            [2, "#3f9cf0", "#86c3f5", "#d6ecfc"],
+            [2.5, "#5aa6e8", "#a9cfee", "#f3e6cf"],
+            [3, "#7fb1e0", "#f2d6a6", "#f7b977"],
+            [3.45, "#7c8fcb", "#ebb69a", "#f6a46c"],
+            [4, "#3d3f8f", "#a95f9c", "#f39468"],
+            [4.5, "#262a6e", "#5d468f", "#c4708f"],
+            [5, "#171a45", "#3c3486", "#7e55a2"],
+            [5.6, "#0f1238", "#252660", "#4f3f8c"],
+            [6.1, "#0a0d2c", "#151a4a", "#2a2a6a"],
+            [7, "#03051a", "#070a28", "#11164a"],
+          ],
+          evening: [
+            [1, "#1b1f52", "#4a3b8e", "#d77f86"],
+            [1.6, "#171b4c", "#36307e", "#8e5a9e"],
+            [2, "#13174a", "#2c2d78", "#6a4a9c"],
+            [3, "#0e1240", "#222466", "#4a3b8a"],
+            [4, "#0b0f36", "#1b1d58", "#362f78"],
+            [5, "#080b2c", "#13164a", "#262760"],
+            [6, "#060822", "#0d1140", "#1a1d55"],
+            [7, "#03051a", "#070a28", "#0f1440"],
+          ],
+        };
+        function hex(h) {
+          return [
+            parseInt(h.slice(1, 3), 16),
+            parseInt(h.slice(3, 5), 16),
+            parseInt(h.slice(5, 7), 16),
+          ];
+        }
+        var P = {};
+        Object.keys(PAL).forEach(function (k) {
+          P[k] = PAL[k].map(function (r) {
+            return [r[0], hex(r[1]), hex(r[2]), hex(r[3])];
+          });
+        });
+        function mix(a, b, k) {
+          return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+        }
+        /* where t sits in the palette: index of the stop below and how far to the next */
+        function slot(t) {
+          var a = P[story()];
+          if (t <= a[0][0]) return [0, 0];
+          for (var i = 1; i < a.length; i++)
+            if (t <= a[i][0]) return [i - 1, (t - a[i - 1][0]) / (a[i][0] - a[i - 1][0])];
+          return [a.length - 1, 0];
+        }
+        function skyAt(t) {
+          var a = P[story()],
+            s = slot(t),
+            lo = a[s[0]],
+            hi = a[Math.min(s[0] + 1, a.length - 1)];
+          return [mix(lo[1], hi[1], s[1]), mix(lo[2], hi[2], s[1]), mix(lo[3], hi[3], s[1])];
+        }
+        function at(cols, f) {
+          return f <= 0.55
+            ? mix(cols[0], cols[1], clamp(f / 0.55, 0, 1))
+            : mix(cols[1], cols[2], clamp((f - 0.55) / 0.45, 0, 1));
+        }
+        function lum(c) {
+          var v = c.map(function (x) {
+            x /= 255;
+            return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+        }
+        /* dark ink wins when its worst contrast over the samples beats white's */
+        function inkFor(ls) {
+          var dark = Infinity,
+            light = Infinity;
+          ls.forEach(function (L) {
+            dark = Math.min(dark, (L + 0.05) / 0.05);
+            light = Math.min(light, 1.05 / (L + 0.05));
+          });
+          return dark >= light ? "on-light" : "on-dark";
+        }
+
+        /* The sky is one fixed layer: a stack of pre-painted gradients, one per time of day. Only the two
+           around the current time are visible, and the upper one cross-fades, so scrolling changes opacity
+           and never repaints a gradient. */
+        var skyEl = $("#sky"),
+          skyLayers = [];
+        function buildSky() {
+          skyEl.innerHTML = "";
+          skyLayers = PAL[story()].map(function (r) {
+            var i = document.createElement("i");
+            i.style.background =
+              "linear-gradient(180deg," + r[1] + " 0%," + r[2] + " 55%," + r[3] + " 100%)";
+            skyEl.appendChild(i);
+            return i;
+          });
+          shownSky = [];
+        }
+        var shownSky = [];
+        function paintSky(t) {
+          var s = slot(t),
+            lo = s[0],
+            hi = Math.min(lo + 1, skyLayers.length - 1),
+            want = [lo, hi];
+          shownSky.forEach(function (k) {
+            if (want.indexOf(k) < 0) {
+              skyLayers[k].style.visibility = "hidden";
+              skyLayers[k].style.opacity = 0;
+            }
+          });
+          skyLayers[lo].style.visibility = "visible";
+          skyLayers[lo].style.opacity = 1;
+          if (hi !== lo) {
+            skyLayers[hi].style.visibility = "visible";
+            skyLayers[hi].style.opacity = s[1].toFixed(3);
+          }
+          shownSky = want;
+        }
+
+        /* ---------- stars and drifting clouds (from Option D) ---------- */
+        var seed = 7;
+        function rnd() {
+          seed = (seed * 16807) % 2147483647;
+          return (seed - 1) / 2147483646;
+        }
+        var starBox = $("#stars"),
+          small = innerWidth < 700;
+        for (var si = 0; si < (small ? 50 : 96); si++) {
+          var st = document.createElement("i");
+          st.className = "star" + (rnd() < 0.14 ? " big" : "");
+          st.style.left = (rnd() * 100).toFixed(2) + "%";
+          st.style.top = (Math.pow(rnd(), 1.3) * 82).toFixed(2) + "%";
+          st.style.setProperty("--d", (3 + rnd() * 5).toFixed(1) + "s");
+          st.style.setProperty("--w", (-rnd() * 8).toFixed(1) + "s");
+          starBox.appendChild(st);
+        }
+        /* left %, start top %, width px, symbol, parallax depth, sway seconds; kept to the edges */
+        var CLOUDS = [
+          [-12, 10, 300, "A", 0.6, 80],
+          [86, 4, 320, "B", 0.45, 100],
+          [-10, 46, 230, "B", 0.9, 70],
+          [88, 40, 250, "A", 0.75, 90],
+          [-13, 76, 300, "B", 1, 110],
+          [85, 72, 270, "A", 0.8, 76],
+        ];
+        var cloudBox = $("#clouds"),
+          drift = [];
+        CLOUDS.forEach(function (c, n) {
+          if (small && n % 2) return;
+          var vb = c[3] === "A" ? "0 0 240 124" : "0 0 320 112";
+          var one = function (cls) {
+            return (
+              '<div class="tint ' +
+              cls +
+              '"><svg viewBox="' +
+              vb +
+              '"><use href="#cloud' +
+              c[3] +
+              '" class="cloud-sh" y="6"/><use href="#cloud' +
+              c[3] +
+              '" class="cloud-bd"/></svg></div>'
+            );
+          };
+          var el = document.createElement("div");
+          el.className = "gc";
+          el.style.cssText = "left:" + c[0] + "%;width:" + (small ? c[2] * 0.55 : c[2]) + "px";
+          el.innerHTML =
+            '<div class="sway" style="--s:' +
+            c[5] +
+            "s;animation-delay:-" +
+            n * 13 +
+            's">' +
+            one("t-day") +
+            one("t-sun") +
+            one("t-night") +
+            "</div>";
+          cloudBox.appendChild(el);
+          drift.push([el, c[4], c[1] / 100]);
+        });
+        var tDay = $$(".t-day", cloudBox),
+          tSun = $$(".t-sun", cloudBox),
+          tNight = $$(".t-night", cloudBox);
+
+        /* ---------- measure the chapters ---------- */
+        var nav = $("#nav"),
+          sun = $("#sun"),
+          moon = $("#moon"),
+          warm = $(".disc.warm"),
+          stars = starBox,
+          glow = $("#glow"),
+          foot = $("#goodnight");
+        var chapters = $$("[data-t]"),
+          anchors = [],
+          inks = $$(".ink");
+        var vw = innerWidth,
+          vh = innerHeight,
+          footTop = 0;
+        function topOf(el) {
+          return el.getBoundingClientRect().top + scrollY;
+        }
+        function measure() {
+          vw = innerWidth;
+          vh = innerHeight;
+          var maxC = document.documentElement.scrollHeight - vh / 2,
+            n = chapters.length;
+          anchors = chapters.map(function (s, i) {
+            var y = i === 0 ? vh / 2 : topOf(s) + Math.min(s.offsetHeight, vh) / 2;
+            return {
+              y: Math.min(y, maxC - (n - 1 - i) * 30),
+              t: +s.getAttribute("data-t"),
+              el: s,
+              top: topOf(s),
+            };
+          });
+          anchors[n - 1].y = maxC;
+          inks.forEach(function (el) {
+            el._top = topOf(el);
+            el._h = el.offsetHeight;
+          });
+          footTop = topOf(foot);
+          measureStory();
+        }
+        function timeAt(c) {
+          if (c <= anchors[0].y) return anchors[0].t;
+          for (var i = 1; i < anchors.length; i++) {
+            if (c <= anchors[i].y)
+              return (
+                anchors[i - 1].t +
+                (anchors[i].t - anchors[i - 1].t) *
+                  clamp((c - anchors[i - 1].y) / Math.max(1, anchors[i].y - anchors[i - 1].y), 0, 1)
+              );
+          }
+          return anchors[anchors.length - 1].t;
+        }
+
+        /* ---------- story (Option A's sticky Mac window, now How it works) ---------- */
+        var track = $("#storyTrack"),
+          sticky = $("#storySticky");
+        var beats = $$(".beat", track),
+          shots = $$("#storyScreen img"),
+          dotsWrap = $("#storyDots");
+        var N = beats.length,
+          storyOn = false,
+          sTop = 0,
+          sSpan = 1,
+          lastActive = -1,
+          dots = [];
+        var mqStory = matchMedia("(min-width: 900px) and (prefers-reduced-motion: no-preference)");
+        beats.forEach(function (b, i) {
+          var d = document.createElement("button");
+          d.type = "button";
+          d.tabIndex = -1;
+          d.setAttribute("aria-label", "Go to step " + (i + 1));
+          d.appendChild(document.createElement("span"));
+          d.addEventListener("click", function () {
+            window.scrollTo({
+              top: sTop + ((i + 0.5) / N) * sSpan,
+              behavior: motion ? "smooth" : "auto",
+            });
+          });
+          dotsWrap.appendChild(d);
+          dots.push(d);
+        });
+        function measureStory() {
+          storyOn = mqStory.matches;
+          if (!storyOn) {
+            beats.concat(shots).forEach(function (b) {
+              b.style.opacity = "";
+              b.style.transform = "";
+              b.removeAttribute("aria-hidden");
+            });
+            return;
+          }
+          sTop = topOf(track) - 52;
+          sSpan = Math.max(1, track.offsetHeight - sticky.offsetHeight);
+        }
+        function updateStory(y) {
+          if (!storyOn) return;
+          var p = clamp((y - sTop) / sSpan, 0, 1),
+            b = p * N;
+          for (var i = 0; i < N; i++) {
+            var d = b - (i + 0.5);
+            if (i === 0 && d < 0) d = 0;
+            if (i === N - 1 && d > 0) d = 0;
+            var a = clamp(1 - (Math.abs(d) - 0.3) / 0.16, 0, 1);
+            beats[i].style.opacity = a.toFixed(3);
+            beats[i].style.transform = "translate3d(0," + (d * -60).toFixed(1) + "px,0)";
+            if (a < 0.05) beats[i].setAttribute("aria-hidden", "true");
+            else beats[i].removeAttribute("aria-hidden");
+            if (i > 0) shots[i].style.opacity = ease(clamp((b - i + 0.14) / 0.28, 0, 1)).toFixed(3);
+          }
+          shots[0].style.transform =
+            "scale(" + (1 + ease(clamp((b - 0.15) / 0.75, 0, 1)) * 0.22).toFixed(4) + ")";
+          var act = Math.min(N - 1, Math.floor(b));
+          if (act !== lastActive) {
+            dots.forEach(function (dt, k) {
+              dt.setAttribute("aria-current", k === act ? "true" : "false");
+            });
+            lastActive = act;
+          }
+        }
+
+        /* ---------- every frame the page scrolls ---------- */
+        var hero = $("#top"),
+          hlayers = $$(".sky-layer", hero),
+          heroCopy = $("#heroCopy"),
+          heroMac = $("#heroMac");
+        var mx = 0,
+          my = 0,
+          cx = 0,
+          cy = 0,
+          heroVisible = true,
+          raf = 0,
+          lastNav = "";
+        function frame() {
+          raf = 0;
+          var y = scrollY,
+            ev = story() === "evening";
+          if (motion) {
+            var t = timeAt(y + vh * 0.5),
+              cols = skyAt(t);
+            paintSky(t);
+
+            var so = ev ? 0.55 + 0.45 * smooth(1, 3, t) : smooth(4.15, 5.3, t);
+            stars.style.opacity = so.toFixed(3);
+            stars.classList.toggle("off", so < 0.02);
+            glow.style.opacity = (
+              ev ? 0.5 * (1 - smooth(1, 2, t)) : smooth(3.1, 3.9, t) * (1 - smooth(4.4, 5.2, t))
+            ).toFixed(3);
+
+            /* sun and moon: only in the side margins, never behind text */
+            var gutter = (vw - 1200) / 2,
+              roomy = gutter >= 110,
+              fade = 1 - smooth(footTop - vh * 1.1, footTop - vh * 0.5, y);
+            if (roomy && !ev && t < 4.6) {
+              var p = clamp((t - 1) / 3.3, 0, 1),
+                sc = Math.min(0.8, (gutter - 30) / 116),
+                sy =
+                  vh * (0.95 - Math.sin((0.35 + 0.65 * p) * Math.PI) * 0.8) +
+                  smooth(4, 4.5, t) * vh * 0.3;
+              sun.style.transform =
+                "translate3d(" +
+                (vw - gutter / 2).toFixed(1) +
+                "px," +
+                sy.toFixed(1) +
+                "px,0) scale(" +
+                sc.toFixed(3) +
+                ")";
+              sun.style.opacity = 1;
+              warm.style.opacity = smooth(2.8, 4, t).toFixed(3);
+            } else sun.style.opacity = 0;
+            var up = ev ? 1 : smooth(4.4, 5.4, t);
+            if (roomy && up > 0.01) {
+              moon.style.transform =
+                "translate3d(" +
+                (gutter / 2).toFixed(1) +
+                "px," +
+                (vh * 0.2 + (1 - up) * vh * 0.9).toFixed(1) +
+                "px,0) scale(" +
+                Math.min(0.9, (gutter - 20) / 80).toFixed(3) +
+                ")";
+              moon.style.opacity = fade.toFixed(3);
+            } else moon.style.opacity = 0;
+
+            /* clouds: white by day, sunset-lit, then faint navy at night */
+            var oDay = ev ? 0 : 0.85 * (1 - smooth(3.3, 4.1, t)),
+              oSun = ev
+                ? 0.7 * (1 - smooth(1, 1.8, t))
+                : 0.85 * smooth(3.2, 3.9, t) * (1 - smooth(4.5, 5.2, t)),
+              oNight = ev
+                ? 0.3 * smooth(1, 1.8, t) + 0.12
+                : 0.4 * smooth(4.5, 5.2, t) * (1 - 0.75 * smooth(6.1, 7, t));
+            for (var i = 0; i < tDay.length; i++) {
+              tDay[i].style.opacity = oDay;
+              tSun[i].style.opacity = oSun;
+              tNight[i].style.opacity = oNight;
+            }
+            var R = vh + 420;
+            drift.forEach(function (dct, n) {
+              var ty = ((((dct[2] * vh - y * 0.16 * dct[1]) % R) + R) % R) - 210,
+                tx = Math.sin(y / 1500 + n) * 30 * dct[1];
+              dct[0].style.transform =
+                "translate3d(" + tx.toFixed(1) + "px," + ty.toFixed(1) + "px,0)";
+            });
+            var co = smooth(0.45, 1, y / vh);
+            cloudBox.style.opacity = co.toFixed(3);
+            cloudBox.classList.toggle("off", co < 0.02);
+
+            /* text on the open sky: dark or light ink, whichever reads best */
+            inks.forEach(function (el) {
+              var tp = el._top - y;
+              if (tp > vh || tp + el._h < 0) return;
+              var ls = [];
+              for (var q = 0; q <= 4; q++)
+                ls.push(lum(at(cols, clamp((tp + (el._h * q) / 4) / vh, 0, 1))));
+              ls.push(lum(cols[1]));
+              if (tp / vh > 0.55 || (tp + el._h) / vh < 0.55) ls.pop();
+              var cls = inkFor(ls);
+              if (el._ink !== cls) {
+                el.classList.remove(el._ink || "x");
+                el.classList.add(cls);
+                el._ink = cls;
+              }
+            });
+            var navInk = inkFor([lum(cols[0])]);
+            if (navInk !== lastNav) {
+              nav.classList.toggle("dark", navInk === "on-dark");
+              lastNav = navInk;
+            }
+
+            /* Option A's hero parallax */
+            cx += (mx - cx) * 0.07;
+            cy += (my - cy) * 0.07;
+            if (heroVisible) {
+              for (var k = 0; k < hlayers.length; k++) {
+                var dp = +hlayers[k].getAttribute("data-depth");
+                hlayers[k].style.transform =
+                  "translate3d(" +
+                  (-cx * 44 * dp).toFixed(2) +
+                  "px," +
+                  (-cy * 26 * dp + y * dp * 0.28).toFixed(2) +
+                  "px,0)";
+              }
+              heroCopy.style.transform = "translate3d(0," + (y * 0.22).toFixed(1) + "px,0)";
+              heroCopy.style.opacity = clamp(1 - y / (vh * 0.62), 0, 1).toFixed(3);
+              heroMac.style.transform =
+                "scale(" + (0.955 + 0.045 * ease(clamp(y / (vh * 0.55), 0, 1))).toFixed(4) + ")";
+            }
+            if (Math.abs(mx - cx) > 0.0005 || Math.abs(my - cy) > 0.0005) kick();
+          } else {
+            /* still sky: the nav follows the band beneath it */
+            var under = anchors[0];
+            anchors.forEach(function (a) {
+              if (a.top <= y + 30) under = a;
+            });
+            nav.classList.toggle("dark", ev || under.el.classList.contains("tone-dark"));
+          }
+          updateStory(y);
+        }
+        function kick() {
+          if (!raf) raf = requestAnimationFrame(frame);
+        }
+        if (motion && FINE) {
+          addEventListener(
+            "pointermove",
+            function (e) {
+              if (vw < 900) return;
+              mx = e.clientX / vw - 0.5;
+              my = e.clientY / vh - 0.5;
+              kick();
+            },
+            { passive: true },
+          );
+        }
+
+        /* ---------- the hero cloud: A's entrance, then C's eyes, lean and pokes ---------- */
+        var m = $("#heroMascot"),
+          say = $("#say"),
+          look = $("#mLook"),
+          tiltEl = $("#mTilt"),
+          squash = $("#mSquash");
+        var LINES = {
+          hello: "Hi! I’m SKYCOT.",
+          yay: "Yay! Let’s make something!",
+          think: "Hmm. A game? A comic?",
+        };
+        var POSES = ["hello", "yay", "think"],
+          poseI = 0,
+          cheerT = 0,
+          sayT = 0,
+          introTimers = [],
+          awake = !motion;
+        function pose() {
+          return m.getAttribute("data-pose");
+        }
+        function setSay(text, later) {
+          clearTimeout(sayT);
+          say.textContent = text;
+          say.classList.add("show");
+          say.classList.remove("pop");
+          void say.offsetWidth;
+          say.classList.add("pop");
+          if (later)
+            sayT = setTimeout(function () {
+              if (pose() === "hello") setSay(later);
+            }, 3200);
+        }
+        function setPose(p, speak) {
+          m.setAttribute("data-pose", p);
+          var label = { hello: "waving hello", yay: "cheering", think: "thinking" }[p];
+          m.setAttribute("aria-label", "SKYCOT the cloud, " + label + ". Press to poke it.");
+          if (speak) setSay(LINES[p], p === "hello" ? "Poke me!" : null);
+        }
+        function restart(cls, ms) {
+          m.classList.remove(cls);
+          void m.offsetWidth;
+          m.classList.add(cls);
+          setTimeout(function () {
+            m.classList.remove(cls);
+          }, ms);
+        }
+        function blink() {
+          if (pose() !== "yay") restart("blink", 260);
+        }
+        function wave() {
+          if (pose() === "hello") restart("waving", 1150);
+        }
+        function cheer() {
+          clearTimeout(cheerT);
+          m.classList.remove("cheer");
+          void m.offsetWidth;
+          m.classList.add("cheer");
+          cheerT = setTimeout(function () {
+            m.classList.remove("cheer");
+          }, 1500);
+        }
+        m.addEventListener("click", function () {
+          introTimers.forEach(clearTimeout);
+          awake = true;
+          poseI = (POSES.indexOf(pose()) + 1) % POSES.length;
+          var p = POSES[poseI];
+          if (motion && squash.animate)
+            squash.animate(
+              [
+                { transform: "none" },
+                { transform: "translateY(4px) scale(1.12,.86)", offset: 0.18 },
+                { transform: "translateY(-10px) scale(.95,1.06)", offset: 0.5 },
+                { transform: "none" },
+              ],
+              { duration: 520, easing: "ease-out" },
+            );
+          setPose(p, true);
+          if (p === "yay" && motion) cheer();
+        });
+
+        function intro() {
+          introTimers.forEach(clearTimeout);
+          introTimers = [];
+          clearTimeout(sayT);
+          awake = false;
+          setPose("hello");
+          say.classList.remove("show");
+          var at = function (ms, fn) {
+            introTimers.push(setTimeout(fn, ms));
+          };
+          at(1500, blink);
+          at(1720, wave);
+          at(2900, function () {
+            setPose("yay");
+            cheer();
+          });
+          at(5300, function () {
+            setPose("hello", true);
+            awake = true;
+          });
+        }
+        if (motion) {
+          intro();
+          var tick = 0;
+          setInterval(function () {
+            if (document.hidden || !heroVisible) return;
+            tick++;
+            if (tick % 3 === 0) wave();
+            else blink();
+          }, 4200);
+        } else {
+          say.textContent = LINES.hello;
+        }
+
+        /* eyes follow the cursor on desktop and the scroll on phones; the body leans a little (Option C) */
+        var px = null,
+          py = null,
+          lastMove = -1e9,
+          ex = 0,
+          ey = 0,
+          tilt = 0,
+          glance = { x: 0, y: 0, until: 0 },
+          lastSY = scrollY,
+          scrollV = 0,
+          lastST = performance.now(),
+          eyeRaf = 0;
+        addEventListener(
+          "pointermove",
+          function (e) {
+            if (e.pointerType === "mouse" || e.pointerType === "pen") {
+              px = e.clientX;
+              py = e.clientY;
+              lastMove = performance.now();
+            }
+          },
+          { passive: true },
+        );
+        addEventListener(
+          "scroll",
+          function () {
+            var now = performance.now(),
+              dt = Math.max(16, now - lastST);
+            scrollV = clamp(((scrollY - lastSY) / dt) * 1000, -2400, 2400);
+            lastSY = scrollY;
+            lastST = now;
+          },
+          { passive: true },
+        );
+        function eyes(now) {
+          eyeRaf = 0;
+          if (!heroVisible) return;
+          var tx = 0,
+            ty = 0,
+            tt = 0,
+            p = pose();
+          if (awake || now > 1900) {
+            var r = m.getBoundingClientRect(),
+              ccx = r.left + r.width * 0.48,
+              ccy = r.top + r.height * 0.55;
+            if (p === "think") {
+              tx = 2.6;
+              ty = -2.6;
+              tt = -3;
+            } else if (FINE && px !== null && now - lastMove < 5000) {
+              var dx = px - ccx,
+                dy = py - ccy,
+                dist = Math.hypot(dx, dy) || 1,
+                k = Math.min(dist / 240, 1);
+              tx = (dx / dist) * k * 3.4;
+              ty = (dy / dist) * k * 3.8;
+              tt = clamp(dx / 70, -7, 7);
+            } else if (!FINE && Math.abs(scrollV) > 30) {
+              ty = clamp(scrollV / 500, -1, 1) * 3.6;
+              tx = clamp(scrollV / 900, -1, 1) * 1.6;
+              tt = clamp(-scrollV / 160, -6, 6);
+            } else {
+              if (now > glance.until)
+                glance =
+                  Math.random() < 0.35
+                    ? { x: 0, y: 0, until: now + 1400 + Math.random() * 1200 }
+                    : {
+                        x: Math.random() * 6 - 3,
+                        y: Math.random() * 5.5 - 2.5,
+                        until: now + 900 + Math.random() * 1100,
+                      };
+              tx = glance.x;
+              ty = glance.y;
+              tt = glance.x * 0.8;
+            }
+          }
+          scrollV *= 0.9;
+          ex += (tx - ex) * 0.16;
+          ey += (ty - ey) * 0.16;
+          tilt += (tt - tilt) * 0.1;
+          look.setAttribute("transform", "translate(" + ex.toFixed(2) + " " + ey.toFixed(2) + ")");
+          tiltEl.style.transform =
+            "rotate(" + tilt.toFixed(2) + "deg) translateX(" + (tilt * 0.9).toFixed(1) + "px)";
+          eyeRaf = requestAnimationFrame(eyes);
+        }
+        function startEyes() {
+          if (motion && !eyeRaf) eyeRaf = requestAnimationFrame(eyes);
+        }
+        if ("IntersectionObserver" in window) {
+          new IntersectionObserver(function (e) {
+            heroVisible = e[0].isIntersecting;
+            hero.classList.toggle("off", !heroVisible);
+            if (heroVisible) {
+              kick();
+              startEyes();
+            }
+          }).observe(hero);
+        }
+        startEyes();
+
+        /* ---------- the crayon rocket (Option B), played when it scrolls into view ---------- */
+        var rk = $("#rkStage"),
+          rkPlayed = false;
+        function playRocket() {
+          rk.classList.remove("play");
+          void rk.offsetWidth;
+          rk.classList.add("play");
+        }
+        if (motion && "IntersectionObserver" in window) {
+          rk.classList.add("armed");
+          var built = $("img.built", rk);
+          var rio = new IntersectionObserver(
+            function (es) {
+              if (!es[0].isIntersecting || rkPlayed) return;
+              var go = function () {
+                if (rkPlayed) return;
+                rkPlayed = true;
+                rio.disconnect();
+                playRocket();
+              };
+              if (built.complete) go();
+              else {
+                built.addEventListener("load", go);
+                built.loading = "eager";
+              }
+            },
+            { threshold: 0.55 },
+          );
+          rio.observe(rk);
+          $("#rkReplay").addEventListener("click", function () {
+            rkPlayed = true;
+            playRocket();
+          });
+        } else {
+          $("#rkReplay").hidden = true;
+        }
+
+        /* ---------- reveal on scroll, the parent-code card, pausing off-screen ---------- */
+        if ("IntersectionObserver" in window) {
+          var io = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                en.target.classList.add("in");
+                io.unobserve(en.target);
+              });
+            },
+            { threshold: 0.15, rootMargin: "0px 0px -6% 0px" },
+          );
+          $$(".reveal").forEach(function (el) {
+            io.observe(el);
+          });
+          var po = new IntersectionObserver(function (es) {
+            es.forEach(function (e) {
+              e.target.classList.toggle("off", !e.isIntersecting);
+            });
+          });
+          $$("[data-anim]").forEach(function (el) {
+            po.observe(el);
+          });
+        } else {
+          $$(".reveal").forEach(function (el) {
+            el.classList.add("in");
+          });
+        }
+
+        /* ---------- Looks: one segmented control ---------- */
+        var segBtns = $$("#lookSeg button"),
+          lookImgs = $$("#lookStage .screen img"),
+          caps = $$("#lookCap [data-cap]");
+        function pick(k, focus) {
+          segBtns.forEach(function (b, i) {
+            var on = i === k;
+            b.setAttribute("aria-selected", on);
+            b.tabIndex = on ? 0 : -1;
+            if (on && focus) b.focus();
+          });
+          lookImgs.forEach(function (im, i) {
+            im.classList.toggle("on", i === k);
+          });
+          caps.forEach(function (c, i) {
+            c.hidden = i !== k;
+          });
+        }
+        segBtns.forEach(function (b, i) {
+          b.addEventListener("click", function () {
+            pick(i);
+          });
+          b.addEventListener("keydown", function (e) {
+            if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+              e.preventDefault();
+              pick((i + (e.key === "ArrowRight" ? 1 : segBtns.length - 1)) % segBtns.length, true);
+            }
+          });
+        });
+
+        /* ---------- day or evening story (Option A's toggle, Option D's two stories) ---------- */
+        var tbtn = $("#themeToggle"),
+          mqDark = matchMedia("(prefers-color-scheme: dark)");
+        function syncToggle() {
+          var ev = story() === "evening";
+          tbtn.setAttribute(
+            "aria-label",
+            ev ? "Switch to the day sky" : "Switch to the evening sky",
+          );
+          tbtn.title = ev ? "Day" : "Evening";
+        }
+        function setStory(s) {
+          if (s === story()) return;
+          root.setAttribute("data-story", s);
+          if (motion) buildSky();
+          lastNav = "";
+          inks.forEach(function (el) {
+            el._ink = "";
+            el.classList.remove("on-light", "on-dark");
+          });
+          syncToggle();
+          measure();
+          frame();
+        }
+        tbtn.addEventListener("click", function () {
+          var next = story() === "evening" ? "light" : "dark";
+          root.setAttribute("data-theme", next);
+          try {
+            localStorage.setItem("skycot-sky", next);
+          } catch (e) {}
+          setStory(next === "dark" ? "evening" : "day");
+        });
+        var onScheme = function () {
+          if (!root.getAttribute("data-theme")) setStory(mqDark.matches ? "evening" : "day");
+        };
+        if (mqDark.addEventListener) mqDark.addEventListener("change", onScheme);
+        syncToggle();
+
+        /* ---------- Start a new day: back to the morning, and the hero plays again ---------- */
+        $("#morning").addEventListener("click", function (e) {
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: motion ? "smooth" : "auto" });
+          hero.setAttribute("tabindex", "-1");
+          if (motion) {
+            var waitTop = function () {
+              if (scrollY < 4) {
+                hero.classList.remove("intro");
+                void hero.offsetWidth;
+                hero.classList.add("intro");
+                intro();
+                hero.focus({ preventScroll: true });
+              } else setTimeout(waitTop, 120);
+            };
+            setTimeout(waitTop, 300);
+          } else hero.focus({ preventScroll: true });
+        });
+
+        /* ---------- go ---------- */
+        if (motion) buildSky();
+        measure();
+        frame();
+        addEventListener("scroll", kick, { passive: true });
+        addEventListener("resize", function () {
+          measure();
+          kick();
+        });
+        addEventListener("load", function () {
+          measure();
+          kick();
+        });
+        if ("ResizeObserver" in window)
+          new ResizeObserver(function () {
+            measure();
+            kick();
+          }).observe(document.body);
+        if (mqStory.addEventListener)
+          mqStory.addEventListener("change", function () {
+            measure();
+            kick();
+          });
+      })();
+    </script>
+  </body>
+</html>
