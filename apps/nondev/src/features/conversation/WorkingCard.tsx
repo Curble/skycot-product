@@ -27,6 +27,7 @@ import {
   summarizeRun,
   type NarrationContext,
 } from "../../plain/narration";
+import { isAssistantRefusal } from "../family/assistantAllowance";
 import { Bubble } from "../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { ProgressBar } from "../../ui/ProgressBar";
@@ -255,13 +256,27 @@ export function WorkingCard({
 
   const headerTone = active
     ? "blue"
-    : run?.status === "failed"
+    : run?.status === "failed" && !refusedByFamily(projection, run.id)
       ? "red"
-      : failed > 0 || refused
+      : failed > 0 || refused || run?.status === "failed"
         ? "orange"
         : "green";
-  const title = active ? "Working on it" : finishedTitle(run?.status, refused);
-  const icon = run?.status === "failed" && !active ? CircleAlert : refused ? HandMetal : Hammer;
+  // The Family profile turned the assistant away before it started (nobody allowed it): the
+  // grown-up card below says so, so this card is a calm note, not "something went wrong".
+  const awaitingGrownUp =
+    !active && run?.status === "failed" && refusedByFamily(projection, run.id);
+  const title = active
+    ? "Working on it"
+    : awaitingGrownUp
+      ? "Waiting for a grown-up"
+      : finishedTitle(run?.status, refused);
+  const icon = awaitingGrownUp
+    ? HandMetal
+    : run?.status === "failed" && !active
+      ? CircleAlert
+      : refused
+        ? HandMetal
+        : Hammer;
 
   return (
     <Bubble author="crew" full meta={active ? undefined : shortTime(run?.completedAt ?? null)}>
@@ -344,6 +359,14 @@ export function WorkingCard({
  * is a stop, not a success. Shared by the Working card, the header and (via
  * state/conversations) the list.
  */
+/** The run ended because the Family profile turned away an assistant nobody allowed. */
+function refusedByFamily(projection: OrchestrationV2ThreadProjection, runId: string): boolean {
+  return projection.turnItems.some(
+    (item) =>
+      item.type === "error" && item.runId === runId && isAssistantRefusal(item.failure.message),
+  );
+}
+
 export function endedOnRefusal(
   projection: OrchestrationV2ThreadProjection,
   latestRunId: string | null,
