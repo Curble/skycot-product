@@ -65,7 +65,9 @@ export function useActivityMirror(): FamilyActivity | null {
       } else {
         live.start(activity, undefined, stale);
       }
-    })().catch(() => undefined);
+    })().catch((cause: unknown) => {
+      if (__DEV__) console.warn("[skycot] Live Activity:", cause);
+    });
   }, [key, activity]);
   return activity;
 }
