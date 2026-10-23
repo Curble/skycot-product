@@ -161,6 +161,9 @@ export function NewConversationComposer({
         <div className="fm-composer__context">
           <Popover
             label="Project"
+            // The message box sits at the bottom of the window: open upwards so every
+            // project (and Just ask) stays on screen.
+            placement="top-start"
             trigger={
               <Button size="sm" disabled={nothingToPick}>
                 {asking ? (
