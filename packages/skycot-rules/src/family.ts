@@ -264,3 +264,10 @@ export function describeFamilyMatches(matches: ReadonlyArray<FamilyMatch>): stri
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
+
+/**
+ * The approval id a grown-up's parent code is recorded against when they let one conversation
+ * be deleted. Deleting cannot be undone, so the "yes" names that one conversation and is spent
+ * by the delete; it never opens anything else (unlike Advanced mode's grant).
+ */
+export const deleteConversationApprovalId = (threadId: string) => `delete-conversation:${threadId}`;

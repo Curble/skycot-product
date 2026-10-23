@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 export function SidebarSection({
   title,
@@ -36,6 +36,12 @@ interface SidebarItemProps {
   readonly muted?: boolean;
   readonly onClick?: () => void;
   readonly href?: string;
+  /** A small control at the row's end (a project's "…"), shown on hover like the Finder's. */
+  readonly trailing?: ReactNode;
+  /** Right-click: the row's menu. */
+  readonly onContextMenu?: (event: MouseEvent) => void;
+  /** Keeps the row highlighted while its menu is open. */
+  readonly menuOpen?: boolean;
 }
 
 export function SidebarItem({
@@ -48,11 +54,15 @@ export function SidebarItem({
   muted = false,
   onClick,
   href,
+  trailing,
+  onContextMenu,
+  menuOpen = false,
 }: SidebarItemProps) {
   const classes = [
     "fm-sidebar-item",
     selected ? "fm-sidebar-item--selected" : "",
     muted ? "fm-sidebar-item--muted" : "",
+    menuOpen ? "fm-sidebar-item--menu" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -71,7 +81,7 @@ export function SidebarItem({
     </>
   );
   return (
-    <li>
+    <li className={trailing ? "fm-sidebar-li--trailing" : undefined} onContextMenu={onContextMenu}>
       {href !== undefined ? (
         <a className={classes} href={href} aria-current={selected ? "page" : undefined}>
           {content}
@@ -86,6 +96,7 @@ export function SidebarItem({
           {content}
         </button>
       )}
+      {trailing ? <span className="fm-sidebar-item__trailing">{trailing}</span> : null}
     </li>
   );
 }

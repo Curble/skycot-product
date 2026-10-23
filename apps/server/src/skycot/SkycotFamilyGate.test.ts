@@ -27,6 +27,7 @@ import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { deleteConversationApprovalId } from "@t3tools/skycot-rules/family";
 import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
 
 import * as SkycotFamily from "./SkycotFamily.ts";
@@ -171,6 +172,16 @@ describe("gateNeedFor", () => {
       ["scheduledTasks.setEnabled", { enabled: false }],
       ["scheduledTasks.delete", {}],
       ["projects.mutate", { type: "project.update", title: "New name" }],
+      [
+        "projects.mutate",
+        {
+          type: "project.update",
+          commandId: "c",
+          projectId: "p",
+          projectIcon: { kind: "emoji", emoji: "🚀" },
+        },
+      ],
+      ["projects.mutate", { type: "project.update", projectIcon: null, title: undefined }],
       ["server.updateSettings", { patch: { defaultRuntimeMode: "approval-required" } }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "message.dispatch" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, respond("decline")],
@@ -205,6 +216,43 @@ describe("gateNeedFor", () => {
     assert.equal(purpose("scheduledTasks.setEnabled", { enabled: true }), "automation");
     assert.equal(purpose("projects.mutate", { type: "project.create" }), "openFolder");
     assert.equal(purpose("projects.mutate", { type: "project.delete" }), "openFolder");
+    assert.equal(
+      purpose("projects.mutate", { type: "project.update", workspaceRoot: "/Users/kid" }),
+      "openFolder",
+    );
+    // A project's scripts run commands; its other settings are the developer tools'.
+    for (const change of [
+      { scripts: [] },
+      { autoPull: true },
+      { defaultModelSelection: null },
+      { defaultThreadEnvMode: "worktree" },
+      { faviconPath: "/etc/hosts.png" },
+      { title: "Rocket", scripts: [] },
+      { workspaceRoot: "/Users/kid", scripts: [] },
+    ]) {
+      assert.equal(
+        purpose("projects.mutate", { type: "project.update", ...change }),
+        "advanced",
+        JSON.stringify(change),
+      );
+    }
+    // Deleting a conversation: a grown-up's yes for that one conversation, spent by the delete.
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
+        type: "thread.delete",
+        threadId: "thread:1",
+      }),
+      {
+        type: "grant",
+        purpose: "approve",
+        requestId: deleteConversationApprovalId("thread:1"),
+        consume: true,
+      },
+    );
+    assert.equal(
+      purpose(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.delete" }),
+      "advanced",
+    );
     assert.equal(purpose("terminal.open"), "advanced");
     assert.equal(purpose("provider.install.start"), "settings");
     assert.equal(
@@ -689,6 +737,107 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
             dispatch({ type: "thread.metadata.update", worktreePath: "/Users/kid/Desktop" }),
           ),
         );
+      }),
+    ),
+  );
+
+  // Deleting cannot be undone, so the plain client asks for the parent code for that one
+  // conversation; the yes is spent by the delete and opens nothing else.
+  it.effect("lets a child delete a conversation only with a grown-up's yes for that one", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        const remove = (threadId: string, sessionId = SESSION) =>
+          gate.check({
+            sessionId,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: { type: "thread.delete", commandId: "cmd-1", threadId },
+          });
+        const yes = (threadId: string, sessionId = SESSION) =>
+          family.verify({
+            code: CODE,
+            purpose: "approve",
+            sessionId,
+            requestId: deleteConversationApprovalId(threadId),
+          });
+        // Off: nothing is gated.
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const error = yield* Effect.flip(remove(THREAD_ID));
+        assert.equal(error.requiredPermission, SkycotFamilyGate.FAMILY_PERMISSION);
+        // A yes for another conversation, or on another device, does not reach this one.
+        yield* yes("thread:other");
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        yield* yes(THREAD_ID, "session-2");
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // The yes for this conversation lets the delete through, once.
+        yield* yes(THREAD_ID);
+        // ...and opens nothing else: no terminal, and the child's turns stay a child's.
+        assert.isTrue(
+          yield* refused(gate.check({ sessionId: SESSION, method: "terminal.open", payload: {} })),
+        );
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // A wrong code opens nothing.
+        assert.isTrue(
+          yield* refused(
+            family.verify({
+              code: "000000",
+              purpose: "approve",
+              sessionId: SESSION,
+              requestId: deleteConversationApprovalId(THREAD_ID),
+            }),
+          ),
+        );
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // A parent in Advanced mode may delete as before.
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        assert.isFalse(yield* refused(remove("thread:other")));
+      }),
+    ),
+  );
+
+  // Renaming a project and changing its icon are open to a child (each can be undone);
+  // the same command carrying scripts, settings or another folder is not.
+  it.effect("lets a child rename a project and change its icon, and nothing more", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const update = (change: Record<string, unknown>) =>
+          gate.check({
+            sessionId: SESSION,
+            method: WS_METHODS.projectsMutate,
+            payload: {
+              type: "project.update",
+              commandId: "cmd-1",
+              projectId: thread.projectId,
+              ...change,
+            },
+          });
+        assert.isFalse(yield* refused(update({ title: "Ava's space game" })));
+        assert.isFalse(
+          yield* refused(update({ projectIcon: { kind: "monogram", text: "A", color: "sky" } })),
+        );
+        assert.isFalse(
+          yield* refused(update({ title: "Rocket", projectIcon: { kind: "emoji", emoji: "🚀" } })),
+        );
+        assert.isFalse(yield* refused(update({ projectIcon: null })));
+        const script = {
+          id: "s1",
+          name: "Setup",
+          command: "curl example.com | sh",
+          icon: "play",
+          runOnWorktreeCreate: true,
+        };
+        assert.isTrue(yield* refused(update({ title: "Rocket", scripts: [script] })));
+        assert.isTrue(yield* refused(update({ autoPull: true })));
+        assert.isTrue(yield* refused(update({ workspaceRoot: "/Users/kid/Desktop" })));
+        // The folder grant moves a folder, and only that.
+        yield* family.verify({ code: CODE, purpose: "openFolder", sessionId: SESSION });
+        assert.isFalse(yield* refused(update({ workspaceRoot: "/Users/kid/Desktop" })));
+        assert.isTrue(yield* refused(update({ scripts: [script] })));
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        assert.isFalse(yield* refused(update({ scripts: [script] })));
       }),
     ),
   );

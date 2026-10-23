@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   Archive,
@@ -29,6 +30,7 @@ import { CrewAvatar } from "../themes/CrewAvatar";
 import { useCrew } from "../themes/useCrew";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
+import { ContextMenu, type MenuPoint } from "../ui/ContextMenu";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -36,6 +38,8 @@ import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
+import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
+import { useCallback, useState } from "react";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -54,6 +58,11 @@ export function AppSidebar({
   const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
+  const [projectMenu, setProjectMenu] = useState<{
+    readonly project: EnvironmentProject;
+    readonly at: MenuPoint;
+  } | null>(null);
+  const closeProjectMenu = useCallback(() => setProjectMenu(null), []);
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
@@ -144,6 +153,18 @@ export function AppSidebar({
                 attention={attentionByProject.has(key)}
                 selected={conversationRoute && shell.projectKey === key}
                 onClick={() => showList(() => shell.setProjectKey(key))}
+                menuOpen={projectMenu?.project === project}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
+                }}
+                trailing={
+                  <ProjectMenuButton
+                    project={project}
+                    expanded={projectMenu?.project === project}
+                    onOpen={(at) => setProjectMenu({ project, at })}
+                  />
+                }
               />
             );
           })}
@@ -200,6 +221,21 @@ export function AppSidebar({
           />
         </SidebarSection>
       </div>
+
+      <ContextMenu
+        at={projectMenu?.at ?? null}
+        onClose={closeProjectMenu}
+        label={projectMenu?.project.title ?? "Project"}
+      >
+        {(close) =>
+          projectMenu ? (
+            <ProjectMenuItems
+              close={close}
+              onEdit={(focus) => sheets.editProject(projectMenu.project, focus)}
+            />
+          ) : null
+        }
+      </ContextMenu>
 
       <footer className="fm-sidebar__footer">
         <div className="fm-sidebar__footer-row">

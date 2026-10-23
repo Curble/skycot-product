@@ -149,3 +149,157 @@ h1.fm-conv-header__name {
     transform: translateY(8px);
   }
 }
+
+/* Delete…: what stays, then the one plain warning. */
+.fm-delete-stays {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(13px * var(--fm-text-scale));
+  line-height: 1.35;
+  color: var(--fm-label);
+}
+.fm-delete-stays li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.fm-delete-stays svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--fm-green, var(--fm-label-2));
+}
+.fm-delete-alt {
+  margin: 10px 0 0;
+}
+.fm-delete-final {
+  margin: 12px 0 0;
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+
+/* A menu's destructive row, after a thin rule, like Delete in Mail and Notes. */
+.fm-menu-sep {
+  height: 0;
+  margin: 4px 6px;
+  border-top: 0.5px solid var(--fm-sep-2);
+}
+.fm-menu-item--destructive {
+  color: var(--fm-red-ink);
+}
+.fm-menu-item--destructive:hover,
+.fm-menu-item--destructive:focus-visible {
+  background: var(--fm-red);
+  color: var(--fm-on-status);
+}
+
+/* A project's letter icon: the six picture colours (styles/family-limits.css), white letters. */
+.fm-avatar--tone {
+  color: #fff;
+}
+.fm-avatar--tone-sky {
+  background: #2f7de1;
+}
+.fm-avatar--tone-sun {
+  background: #d98a00;
+}
+.fm-avatar--tone-leaf {
+  background: #2f9e57;
+}
+.fm-avatar--tone-berry {
+  background: #c2366b;
+}
+.fm-avatar--tone-grape {
+  background: #7a4fd0;
+}
+.fm-avatar--tone-coral {
+  background: #e0603f;
+}
+:root.dark .fm-avatar--tone-sky {
+  background: #3f8ef0;
+}
+:root.dark .fm-avatar--tone-sun {
+  background: #e09a1a;
+}
+:root.dark .fm-avatar--tone-leaf {
+  background: #36ad62;
+}
+:root.dark .fm-avatar--tone-berry {
+  background: #d84a80;
+}
+:root.dark .fm-avatar--tone-grape {
+  background: #8e66e0;
+}
+:root.dark .fm-avatar--tone-coral {
+  background: #ec7252;
+}
+
+/* A project's icon grid: the child picture picker's look (styles/family-limits.css). */
+.fm-project-icons__title {
+  margin: 16px 0 8px;
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label);
+}
+.fm-project-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fm-project-icons__choice {
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.fm-project-icons__choice[aria-checked="true"] {
+  border-color: var(--fm-accent);
+}
+.fm-project-icons__choice:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+
+/* A sidebar row with its own "…" (a project): the "…" takes the count's place on hover. */
+.fm-sidebar-li--trailing {
+  position: relative;
+}
+.fm-sidebar-item__trailing {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.fm-sidebar-li--trailing:hover .fm-sidebar-item__trailing,
+.fm-sidebar-li--trailing:focus-within .fm-sidebar-item__trailing,
+.fm-sidebar-li--trailing:has(.fm-sidebar-item--menu) .fm-sidebar-item__trailing {
+  opacity: 1;
+}
+.fm-sidebar-li--trailing:hover .fm-sidebar-item__count,
+.fm-sidebar-li--trailing:focus-within .fm-sidebar-item__count,
+.fm-sidebar-li--trailing:has(.fm-sidebar-item--menu) .fm-sidebar-item__count {
+  visibility: hidden;
+}
+.fm-sidebar-item--selected + .fm-sidebar-item__trailing .fm-btn--icon {
+  color: var(--fm-on-accent);
+}
+.fm-sidebar-item--menu:not(.fm-sidebar-item--selected) {
+  box-shadow: inset 0 0 0 2px var(--fm-accent);
+}
+/* Touch screens have no hover: the "…" stays, quietly, after the count. */
+@media (hover: none) {
+  .fm-sidebar-item__trailing {
+    opacity: 0.75;
+  }
+  .fm-sidebar-li--trailing .fm-sidebar-item {
+    padding-right: 36px;
+  }
+  .fm-sidebar-li--trailing .fm-sidebar-item__count {
+    visibility: visible !important;
+  }
+}
