@@ -152,22 +152,26 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
   });
 
   describe("the code's length (for taking it on the last digit)", () => {
-    it.effect("is recorded when the code is set and changed, never in the status", () =>
-      withFamily((family, filePath) =>
-        Effect.gen(function* () {
-          assert.isNull(yield* family.codeLength);
-          const status = yield* family.enable({ code: CODE, childName: null });
-          assert.notProperty(status, "codeLength");
-          assert.equal(yield* family.codeLength, CODE.length);
-          yield* family.changeCode({ oldCode: CODE, newCode: "7351" });
-          assert.equal(yield* family.codeLength, 4);
-          assert.notProperty(yield* family.status, "codeLength");
-          const raw = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
-          assert.notInclude(raw, "7351");
-          yield* family.disable({ code: "7351" });
-          assert.isNull(yield* family.codeLength);
-        }),
-      ),
+    it.effect(
+      "is recorded when the code is set and changed, never in the status",
+      () =>
+        withFamily((family, filePath) =>
+          Effect.gen(function* () {
+            assert.isNull(yield* family.codeLength);
+            const status = yield* family.enable({ code: CODE, childName: null });
+            assert.notProperty(status, "codeLength");
+            assert.equal(yield* family.codeLength, CODE.length);
+            yield* family.changeCode({ oldCode: CODE, newCode: "7351" });
+            assert.equal(yield* family.codeLength, 4);
+            assert.notProperty(yield* family.status, "codeLength");
+            const raw = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
+            assert.notInclude(raw, "7351");
+            yield* family.disable({ code: "7351" });
+            assert.isNull(yield* family.codeLength);
+          }),
+        ),
+      // Three deliberately slow code hashes: room for them when every suite runs at once.
+      30_000,
     );
 
     it.effect("an older code with no length learns it from the next right code only", () =>

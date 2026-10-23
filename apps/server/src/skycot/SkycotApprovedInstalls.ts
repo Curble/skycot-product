@@ -233,57 +233,56 @@ export const layerRuntimeRequests = Layer.effect(
     });
 
     return RuntimeRequestService.RuntimeRequestServiceV2.of({
-      respond: (input) =>
-        Effect.gen(function* () {
-          if (input.decision !== "accept") return yield* base.respond(input);
-          const plan = yield* planFor(input.threadId, input.requestId).pipe(
-            Effect.orElseSucceed(() => null),
-          );
-          if (plan === null) return yield* base.respond(input);
+      respond: Effect.fn("SkycotApprovedInstalls.respond")(function* (input) {
+        if (input.decision !== "accept") return yield* base.respond(input);
+        const plan = yield* planFor(input.threadId, input.requestId).pipe(
+          Effect.orElseSucceed(() => null),
+        );
+        if (plan === null) return yield* base.respond(input);
 
-          // The add-ons are not something the child made: keep them out of "What changed" and
-          // the versions, for a folder that started keeping versions before SKYCOT did this.
-          yield* keepAddOnsOutOfVersions(gitThroughRunner(runner, plan.folder), plan.folder, {
-            unlessIgnored: true,
-          });
+        // The add-ons are not something the child made: keep them out of "What changed" and
+        // the versions, for a folder that started keeping versions before SKYCOT did this.
+        yield* keepAddOnsOutOfVersions(gitThroughRunner(runner, plan.folder), plan.folder, {
+          unlessIgnored: true,
+        });
 
-          const command = [plan.install.manager, ...installArguments(plan.install)]
-            .map(quote)
-            .join(" ");
-          // A login shell, as the assistant's own commands get, so the person's PATH finds npm.
-          const outcome = yield* runner
-            .run({
-              command: "/bin/zsh",
-              args: ["-lc", command],
-              cwd: plan.folder,
-              timeout: INSTALL_TIMEOUT,
-              timeoutBehavior: "timedOutResult",
-              maxOutputBytes: 256 * 1024,
-              outputMode: "truncate",
-            })
-            .pipe(
-              Effect.map((output) =>
-                output.code === 0 && !output.timedOut
-                  ? ({ ok: true } as const)
-                  : ({ ok: false, reason: failureReason(output) } as const),
-              ),
-              Effect.orElseSucceed(
-                () => ({ ok: false, reason: "the install would not start." }) as const,
-              ),
-            );
-          yield* Effect.logInfo("skycot-installs.installed-for-assistant", {
-            manager: plan.install.manager,
-            packages: plan.install.packages,
-            ok: outcome.ok,
-          });
-          // The note first, so it is waiting when the assistant reads its declined command.
-          yield* tellAssistant(input, noteForAssistant(plan.install, outcome)).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
+        const command = [plan.install.manager, ...installArguments(plan.install)]
+          .map(quote)
+          .join(" ");
+        // A login shell, as the assistant's own commands get, so the person's PATH finds npm.
+        const outcome = yield* runner
+          .run({
+            command: "/bin/zsh",
+            args: ["-lc", command],
+            cwd: plan.folder,
+            timeout: INSTALL_TIMEOUT,
+            timeoutBehavior: "timedOutResult",
+            maxOutputBytes: 256 * 1024,
+            outputMode: "truncate",
+          })
+          .pipe(
+            Effect.map((output) =>
+              output.code === 0 && !output.timedOut
+                ? ({ ok: true } as const)
+                : ({ ok: false, reason: failureReason(output) } as const),
+            ),
+            Effect.orElseSucceed(
+              () => ({ ok: false, reason: "the install would not start." }) as const,
             ),
           );
-          return yield* base.respond({ ...input, decision: "decline" });
-        }),
+        yield* Effect.logInfo("skycot-installs.installed-for-assistant", {
+          manager: plan.install.manager,
+          packages: plan.install.packages,
+          ok: outcome.ok,
+        });
+        // The note first, so it is waiting when the assistant reads its declined command.
+        yield* tellAssistant(input, noteForAssistant(plan.install, outcome)).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
+          ),
+        );
+        return yield* base.respond({ ...input, decision: "decline" });
+      }),
     });
   }),
 ).pipe(Layer.provide(ProcessRunner.layer));
