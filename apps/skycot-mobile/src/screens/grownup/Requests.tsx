@@ -123,7 +123,7 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
       <ParentCodeSheet
         visible={asking}
         title="Allow this once?"
-        description={`${name}'s ${heading.toLowerCase()}. Enter the parent code to allow it, this once.`}
+        description={`${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}. Enter the parent code to allow it, this once.`}
         actionLabel="Allow once"
         onClose={() => setAsking(false)}
         onCode={async (code) => {

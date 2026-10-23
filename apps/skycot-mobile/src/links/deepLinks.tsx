@@ -24,7 +24,8 @@ import {
 export type DeepLink =
   | { readonly kind: "link"; readonly code: string; readonly address: string; readonly go: boolean }
   | { readonly kind: "section"; readonly id: string }
-  | { readonly kind: "conversation"; readonly macId: string; readonly threadId: string };
+  | { readonly kind: "conversation"; readonly macId: string; readonly threadId: string }
+  | { readonly kind: "demo"; readonly name: "plan" | "ask" | "made" };
 
 export function parseDeepLink(url: string, development: boolean): DeepLink | null {
   let parsed: URL;
@@ -48,6 +49,9 @@ export function parseDeepLink(url: string, development: boolean): DeepLink | nul
     };
   }
   if (head === "section" && a) return { kind: "section", id: a };
+  if (head === "demo" && development && (a === "plan" || a === "ask" || a === "made")) {
+    return { kind: "demo", name: a };
+  }
   if (head === "conversation" && a && b) {
     return { kind: "conversation", macId: decodeURIComponent(a), threadId: decodeURIComponent(b) };
   }

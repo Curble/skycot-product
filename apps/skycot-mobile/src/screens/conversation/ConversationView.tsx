@@ -21,6 +21,7 @@ import { familyApi } from "../../family/api";
 import { respondToRequest, sendMessage, stopConversation, undoTo } from "../../engine/engine";
 import { buildTimeline, isWorking, type TimelineEntry } from "../../engine/timeline";
 import { useThread } from "../../data/hooks";
+import type { ThreadProjection } from "../../engine/types";
 import type { Mac } from "../../links/store";
 import { BUILDER_NAME } from "../../ui/brand";
 import {
@@ -51,10 +52,12 @@ export function ConversationView(props: {
   readonly onOpenPage?: () => void;
   /** The conversation's own title, once it has loaded (a link may not know it). */
   readonly onTitle?: (title: string) => void;
+  /** Development builds: a demo conversation (src/dev) instead of the Mac's. */
+  readonly demo?: ThreadProjection;
 }) {
   const theme = useTheme();
-  const thread = useThread(props.mac, props.threadId);
-  const projection = thread.value;
+  const thread = useThread(props.demo ? null : props.mac, props.threadId);
+  const projection = props.demo ?? thread.value;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [draft, setDraft] = useState("");
@@ -96,6 +99,7 @@ export function ConversationView(props: {
   }, [timeline.length, working]);
 
   const run = async (key: string, job: () => Promise<unknown>) => {
+    if (props.demo) return;
     setBusyCard(key);
     setProblem(null);
     try {
@@ -110,7 +114,7 @@ export function ConversationView(props: {
 
   const send = async () => {
     const text = draft.trim();
-    if (text.length === 0 || sending) return;
+    if (text.length === 0 || sending || props.demo) return;
     setSending(true);
     setProblem(null);
     try {
@@ -210,6 +214,11 @@ export function ConversationView(props: {
             />
           ))}
           {working && !waitingAsk ? <WorkingLine /> : null}
+          {!working && timeline.at(-1)?.kind === "me" ? (
+            <Txt variant="footnote" tone="label2" center>
+              {`${BUILDER_NAME} finished without saying anything. Try asking again.`}
+            </Txt>
+          ) : null}
           {problem ? <Banner tone="warning" text={problem} /> : null}
         </View>
       </ScrollView>
@@ -435,12 +444,6 @@ function TimelineCard(props: {
     case "ask": {
       const waiting = entry.state === "waiting";
       const grownUp = entry.card.grownUp !== null;
-      const decline = entry.card.options.find(
-        (option) =>
-          option.decision.type === "runtime-request.respond" &&
-          "decision" in option.decision &&
-          option.decision.decision === "decline",
-      );
       const decided =
         entry.state === "allowed"
           ? "Allowed, this once."
@@ -491,7 +494,7 @@ function TimelineCard(props: {
                 ) : (
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     <Button
-                      title={decline?.label ?? "Don't allow"}
+                      title="Don't allow"
                       kind="grey"
                       onPress={() => props.onDecline(entry)}
                       style={{ flex: 1 }}

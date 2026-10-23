@@ -16,6 +16,8 @@ import { NewConversationScreen } from "../../screens/child/NewConversation";
 import { StickersScreen } from "../../screens/child/Stickers";
 import {
   AboutRoute,
+  DemoRoute,
+  demoOptions,
   ConversationRoute,
   MacsHeaderButton,
   MacsRoute,
@@ -57,6 +59,7 @@ const SCREENS: ReadonlyArray<ShellScreen> = [
   { name: "Page", component: PageRoute, options: pageOptions as never },
   { name: "Macs", component: MacsRoute, options: { title: "This device" } },
   { name: "About", component: AboutRoute, options: { title: "About SKYCOT" } },
+  ...(__DEV__ ? [{ name: "Demo" as const, component: DemoRoute, options: demoOptions }] : []),
 ];
 
 export function ChildApp() {

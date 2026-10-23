@@ -4,10 +4,11 @@
  */
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { View } from "react-native";
 
 import { friendlyTitle } from "../../../nondev/src/plain/titles";
+import { demoConversation } from "../dev/demoConversation";
 import { readFridge, useFamilyRead } from "../data/hooks";
 import { useOptionalChild } from "./child/ChildContext";
 import { useLinks } from "../links/store";
@@ -112,3 +113,22 @@ export function MacsHeaderButton() {
     />
   );
 }
+
+/** Development builds: a demo conversation (src/dev/demoConversation.ts). */
+export function DemoRoute() {
+  const route = useRoute<RouteProp<StackRoutes, "Demo">>();
+  const mac = useLinks().macs[0] ?? null;
+  const demo = useMemo(() => demoConversation(route.params.name), [route.params.name]);
+  if (mac === null) return <Gone />;
+  return (
+    <ConversationView
+      mac={mac}
+      threadId={demo.thread.id}
+      readOnly={mac.me.kind !== "child"}
+      demo={demo}
+      {...(route.params.name === "made" ? { onOpenPage: () => undefined } : {})}
+    />
+  );
+}
+
+export const demoOptions = () => ({ title: "Make a space game", headerLargeTitle: false });

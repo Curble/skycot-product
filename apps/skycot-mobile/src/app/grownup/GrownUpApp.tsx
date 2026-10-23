@@ -13,7 +13,14 @@ import {
 import { RecapScreen, recapOptions } from "../../screens/grownup/Recap";
 import { RequestsScreen } from "../../screens/grownup/Requests";
 import { ThisDeviceScreen } from "../../screens/grownup/ThisDevice";
-import { AboutRoute, ConversationRoute, MacsRoute, conversationOptions } from "../screens";
+import {
+  AboutRoute,
+  DemoRoute,
+  demoOptions,
+  ConversationRoute,
+  MacsRoute,
+  conversationOptions,
+} from "../screens";
 import { Shell, type ShellScreen, type ShellSection } from "../Shell";
 
 const SCREENS: ReadonlyArray<ShellScreen> = [
@@ -29,6 +36,7 @@ const SCREENS: ReadonlyArray<ShellScreen> = [
   { name: "Conversation", component: ConversationRoute, options: conversationOptions as never },
   { name: "Macs", component: MacsRoute, options: { title: "Linked Macs" } },
   { name: "About", component: AboutRoute, options: { title: "About SKYCOT" } },
+  ...(__DEV__ ? [{ name: "Demo" as const, component: DemoRoute, options: demoOptions }] : []),
 ];
 
 export function GrownUpApp() {

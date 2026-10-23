@@ -21,6 +21,7 @@ export type StackRoutes = {
   };
   ChildConversations: { readonly macId: string; readonly childId: string };
   Recap: { readonly macId: string; readonly childId: string };
+  Demo: { readonly name: "plan" | "ask" | "made" };
   About: undefined;
   Macs: undefined;
 };

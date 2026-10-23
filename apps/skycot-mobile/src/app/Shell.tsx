@@ -171,6 +171,29 @@ export function Shell(props: {
   );
   const sectionLink = useDeepLink("section");
   const conversationLink = useDeepLink("conversation");
+  const demoLink = useDeepLink("demo");
+  useEffect(() => {
+    const link = demoLink.link;
+    if (link === null || !props.screens.some((screen) => screen.name === "Demo")) return;
+    demoLink.consume();
+    const open = { name: "Demo" as const, params: { name: link.name }, title: "Make a space game" };
+    if (layout.usesSplitView) {
+      setOpened({
+        key: `demo:${link.name}`,
+        title: open.title,
+        subtitle: "",
+        symbol: "bubble.left",
+        open,
+      });
+      return;
+    }
+    const first = props.sections[0]!.id;
+    setSelected(first);
+    setTimeout(() => {
+      const ref = refs.get(first);
+      if (ref?.isReady()) ref.navigate("Demo", { name: link.name });
+    }, 300);
+  }, [demoLink, layout.usesSplitView, props.sections, props.screens, refs]);
   useEffect(() => {
     const link = sectionLink.link;
     if (link === null) return;
