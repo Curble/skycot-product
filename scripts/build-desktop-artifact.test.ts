@@ -543,7 +543,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.deepStrictEqual(
         (yield* build({ ...t3, T3CODE_SKYCOT_UPDATE_FEED: "https://skycot.com/downloads/mac/" }))
           .publish,
-        [{ provider: "generic", url: "https://skycot.com/downloads/mac/" }],
+        [{ provider: "generic", url: "https://skycot.com/downloads/mac/", channel: "latest" }],
       );
     }),
   );

@@ -91,6 +91,7 @@ describe("the build's publish entry", () => {
     expect(skycotPublishConfig(branded(SKYCOT_SITE), "latest")).toEqual({
       provider: "generic",
       url: SKYCOT_SITE,
+      channel: "latest",
     });
     expect(skycotPublishConfig(branded("github:mark-hallam/skycot-releases"), "nightly")).toEqual({
       provider: "github",
@@ -99,6 +100,14 @@ describe("the build's publish entry", () => {
       releaseType: "prerelease",
       channel: "nightly",
     });
+  });
+
+  it("always names its channel, so a pre-release version still writes latest-mac.yml", () => {
+    // electron-builder otherwise takes the channel from "0.1.1-nondev.1.beta" ("nondev").
+    expect(skycotPublishConfig(branded(SKYCOT_SITE), "latest")?.["channel"]).toBe("latest");
+    expect(
+      skycotPublishConfig(branded("github:mark-hallam/skycot-releases"), "latest")?.["channel"],
+    ).toBe("latest");
   });
 });
 

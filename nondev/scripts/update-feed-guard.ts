@@ -132,6 +132,11 @@ export function updateFeedProblems(root: string = ROOT): string[] {
       if (publish?.provider === "github" && isT3GitHubRepository(publish.owner!, publish.repo!)) {
         problems.push(`build: the ${channel} publish entry is T3 Code's GitHub repository`);
       }
+      if (publish !== null && publish["channel"] !== channel) {
+        problems.push(
+          `build: the ${channel} publish entry must name its channel; electron-builder otherwise names the feed file after the version's pre-release word (nondev-mac.yml), which no SKYCOT app reads`,
+        );
+      }
     }
   }
   for (const name of ["T3CODE_DESKTOP_UPDATE_REPOSITORY", "T3CODE_CLI_UPDATE_REPOSITORY"]) {
