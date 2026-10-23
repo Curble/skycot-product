@@ -11,10 +11,7 @@ import { CloseCode, decodeHostFrame, encodeHostFrame, HostFrameKind } from "./pr
 class FakeSocket implements WebSocketLike {
   binaryType = "blob";
   readyState = 0;
-  onopen: ((event: unknown) => void) | null = null;
-  onmessage: ((event: { readonly data: unknown }) => void) | null = null;
-  onclose: ((event: { readonly code: number; readonly reason: string }) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
+  private readonly listeners = new Map<string, Array<(event: never) => void>>();
   connectionId: string | null = null;
   deviceRelayId: string | null = null;
 
@@ -26,8 +23,17 @@ class FakeSocket implements WebSocketLike {
     this.homeId = homeId;
     queueMicrotask(() => {
       this.readyState = 1;
-      this.onopen?.({});
+      this.emit("open", {});
     });
+  }
+
+  addEventListener(type: string, listener: (event: never) => void): void {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+
+  private emit(type: string, event: unknown): void {
+    for (const listener of this.listeners.get(type) ?? [])
+      (listener as (event: unknown) => void)(event);
   }
 
   send(data: string | Uint8Array): void {
@@ -46,13 +52,13 @@ class FakeSocket implements WebSocketLike {
       typeof data === "string"
         ? data
         : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-    queueMicrotask(() => this.onmessage?.({ data: payload }));
+    queueMicrotask(() => this.emit("message", { data: payload }));
   }
 
   deliverClose(code: number, reason: string): void {
     if (this.readyState === 3) return;
     this.readyState = 3;
-    queueMicrotask(() => this.onclose?.({ code, reason }));
+    queueMicrotask(() => this.emit("close", { code, reason }));
   }
 }
 

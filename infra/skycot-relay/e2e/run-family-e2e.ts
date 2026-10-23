@@ -103,7 +103,7 @@ async function waitFor(what: string, probe: () => boolean | Promise<boolean>, tr
 }
 
 const stopAll = async () => {
-  for (const child of started.reverse()) {
+  for (const child of started.toReversed()) {
     if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
   }
   await Promise.all(

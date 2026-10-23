@@ -88,13 +88,16 @@ export type HomeStatus =
   | "refused"
   | "offline";
 
+/** The part of a WebSocket the tunnel uses: browsers, Node and React Native all have it. */
 export interface WebSocketLike {
   binaryType: string;
   readonly readyState: number;
-  onopen: ((event: unknown) => void) | null;
-  onmessage: ((event: { readonly data: unknown }) => void) | null;
-  onclose: ((event: { readonly code: number; readonly reason: string }) => void) | null;
-  onerror: ((event: unknown) => void) | null;
+  addEventListener(type: "open" | "error", listener: (event: unknown) => void): void;
+  addEventListener(type: "message", listener: (event: { readonly data: unknown }) => void): void;
+  addEventListener(
+    type: "close",
+    listener: (event: { readonly code: number; readonly reason: string }) => void,
+  ): void;
   send(data: string | Uint8Array): void;
   close(code?: number, reason?: string): void;
 }
@@ -327,7 +330,7 @@ export class RelayHome {
   }
 
   private settleWaiters(error: unknown | null): void {
-    for (const waiter of [...this.waiters]) {
+    for (const waiter of this.waiters) {
       this.timers.clearTimeout(waiter.timer);
       this.waiters.delete(waiter);
       if (error === null) waiter.resolve();
@@ -343,13 +346,13 @@ export class RelayHome {
     const socket = (this.options.connect ?? defaultConnect)(relay.toString());
     this.socket = socket;
     socket.binaryType = "arraybuffer";
-    socket.onopen = () => {
+    socket.addEventListener("open", () => {
       if (this.socket !== socket) return;
       socket.send(
         JSON.stringify({ t: "hello", pass: this.record.pass, hostKey: this.record.hostSigningKey }),
       );
-    };
-    socket.onmessage = (event) => {
+    });
+    socket.addEventListener("message", (event) => {
       if (this.socket !== socket) return;
       if (typeof event.data === "string") this.onRelayText(event.data);
       else if (event.data instanceof ArrayBuffer) this.onSealed(new Uint8Array(event.data));
@@ -357,8 +360,8 @@ export class RelayHome {
         const view = event.data;
         this.onSealed(new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice());
       }
-    };
-    socket.onclose = (event) => {
+    });
+    socket.addEventListener("close", (event) => {
       if (this.socket !== socket) return;
       this.socket = null;
       const refused =
@@ -369,8 +372,7 @@ export class RelayHome {
         refused ? "refused" : "offline",
         event.reason || "SKYCOT Relay closed the connection.",
       );
-    };
-    socket.onerror = () => undefined;
+    });
   }
 
   /** Ends the channel and everything on it. */
@@ -379,9 +381,8 @@ export class RelayHome {
     this.socket = null;
     this.pending = null;
     this.channel = null;
+    // Its listeners check `this.socket` first, so nothing it says from here on counts.
     if (socket !== null) {
-      socket.onclose = null;
-      socket.onmessage = null;
       try {
         socket.close(1000, "");
       } catch {
@@ -390,7 +391,7 @@ export class RelayHome {
     }
     this.setStatus(status);
     const error = networkError(reason);
-    for (const [stream, entry] of [...this.streams]) {
+    for (const [stream, entry] of this.streams) {
       this.streams.delete(stream);
       if (entry.kind === "socket") entry.socket.relayClosed(1006, reason, false);
       else entry.reject(error);
@@ -412,7 +413,7 @@ export class RelayHome {
         this.channel = null;
         this.setStatus("waiting-for-mac");
         const error = networkError("the Mac is not connected to SKYCOT Relay");
-        for (const [stream, entry] of [...this.streams]) {
+        for (const [stream, entry] of this.streams) {
           this.streams.delete(stream);
           if (entry.kind === "socket") entry.socket.relayClosed(1006, "", false);
           else entry.reject(error);
@@ -720,7 +721,7 @@ export abstract class RelayWebSocketBase {
     if (typeof handler === "function") handler.call(this, full);
     const set = this.listeners.get(type);
     if (set === undefined) return;
-    for (const entry of [...set]) {
+    for (const entry of set) {
       if (entry.once) set.delete(entry);
       (entry.listener as (event: unknown) => void).call(this, full);
     }

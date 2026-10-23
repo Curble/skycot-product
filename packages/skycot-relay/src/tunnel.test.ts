@@ -24,6 +24,10 @@ import {
 } from "./pass.ts";
 import { encodeHostFrame, HostFrameKind } from "./protocol.ts";
 
+/** A fixed clock: passes and hellos are judged against it, never the machine's time. */
+const NOW_MS = 1_800_000_000_000;
+const NOW_S = NOW_MS / 1000;
+
 const timers = {
   setTimeout: (run: () => void, ms: number) => setTimeout(run, ms),
   clearTimeout: (handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>),
@@ -105,7 +109,7 @@ function setup(options: { readonly passHome?: string } = {}) {
   const signingKey = generateSigningKeyPair();
   const noiseKey = generateKeyPair();
   const homeId = homeIdFor(signingKey.publicKey);
-  const relay = new MemoryRelay(homeId);
+  const relay = new MemoryRelay(homeId, () => NOW_S);
   const directory = new TestDirectory();
   const events: Array<HostEvent> = [];
   const watchers = new Set<{ match: (event: HostEvent) => boolean; resolve: () => void }>();
@@ -123,7 +127,7 @@ function setup(options: { readonly passHome?: string } = {}) {
     timers,
     onEvent: (event) => {
       events.push(event);
-      for (const watcher of [...watchers]) {
+      for (const watcher of watchers) {
         if (watcher.match(event)) {
           watchers.delete(watcher);
           watcher.resolve();
@@ -139,7 +143,7 @@ function setup(options: { readonly passHome?: string } = {}) {
     const pass = signPass(signingKey, {
       homeId: options.passHome ?? homeId,
       deviceRelayId,
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      expiresAt: NOW_S + 3600,
     });
     const fragment = new URLSearchParams([
       ["token", "ABCDEFGHJKLM"],
@@ -176,6 +180,7 @@ function setup(options: { readonly passHome?: string } = {}) {
         saved = next;
       },
       connect: relay.connect,
+      now: () => NOW_MS,
       timers,
       readyTimeoutMs: 2000,
       onStatus: (status) => statuses.push(status),
@@ -242,10 +247,10 @@ describe("SKYCOT Relay tunnel", () => {
     expect(socket.protocol).toBe("t3-rpc");
     const messages: Array<unknown> = [];
     const two = new Promise<void>((resolve) => {
-      socket.onmessage = (event) => {
+      socket.addEventListener("message", (event: { data: unknown }) => {
         messages.push(event.data);
         if (messages.length === 2) resolve();
-      };
+      });
     });
     const large = "x".repeat(MAX_CHUNK * 2 + 5);
     socket.send(large);
@@ -256,7 +261,7 @@ describe("SKYCOT Relay tunnel", () => {
 
     const refused = new home.WebSocket("wss://mac.invalid/elsewhere");
     const closed = await new Promise<{ code: number }>((resolve) => {
-      refused.onclose = resolve;
+      refused.addEventListener("close", resolve);
     });
     expect(closed.code).toBe(4401);
   });
@@ -311,7 +316,7 @@ describe("SKYCOT Relay tunnel", () => {
     const { home, deviceRelayId, statuses } = linkDevice();
     await home.fetch("https://mac.invalid/api/whoami");
     directory.removed.add(deviceRelayId);
-    host.revoke(deviceRelayId, Math.floor(Date.now() / 1000) + 3600);
+    host.revoke(deviceRelayId, NOW_S + 3600);
     await expect(home.fetch("https://mac.invalid/api/whoami")).rejects.toThrow(TypeError);
     expect(statuses).toContain("refused");
   });
@@ -374,9 +379,9 @@ describe("the browser shim", () => {
     const { linkDevice } = setup();
     const { home } = linkDevice();
     const originalFetch: typeof fetch = async () => new Response("page asset");
-    class OriginalSocket {
-      static readonly CONNECTING = 0;
-    }
+    const OriginalSocket = function () {
+      throw new Error("A page asset socket was not expected here.");
+    };
     const target = {
       fetch: originalFetch,
       WebSocket: OriginalSocket as unknown as typeof WebSocket,

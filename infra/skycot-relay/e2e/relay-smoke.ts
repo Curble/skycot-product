@@ -56,11 +56,13 @@ const ready = new Promise<void>((resolve, reject) => {
       if (event.type === "relay-error") reject(new Error(event.message));
     },
   });
-  hostSocket.onmessage = (event) => {
+  hostSocket.addEventListener("message", (event) => {
     if (typeof event.data === "string") tunnel.onText(event.data);
     else tunnel.onBinary(new Uint8Array(event.data as ArrayBuffer));
-  };
-  hostSocket.onclose = (event) => reject(new Error(`host closed ${event.code} ${event.reason}`));
+  });
+  hostSocket.addEventListener("close", (event) =>
+    reject(new Error(`host closed ${event.code} ${event.reason}`)),
+  );
 });
 await ready;
 
@@ -85,9 +87,11 @@ const answer = await home.fetch("https://home.invalid/api/hello?from=smoke");
 const text = await answer.text();
 const socket = new home.WebSocket("wss://home.invalid/ws");
 const echoed = await new Promise<string>((resolve, reject) => {
-  socket.onopen = () => socket.send("ping through the relay");
-  socket.onmessage = (event) => resolve(String(event.data));
-  socket.onclose = (event) => reject(new Error(`socket closed ${event.code}`));
+  socket.addEventListener("open", () => socket.send("ping through the relay"));
+  socket.addEventListener("message", (event: { data: unknown }) => resolve(String(event.data)));
+  socket.addEventListener("close", (event: { code: number }) =>
+    reject(new Error(`socket closed ${event.code}`)),
+  );
 });
 console.log(JSON.stringify({ homeId: homeId.slice(0, 6), status: answer.status, text, echoed }));
 socket.close();

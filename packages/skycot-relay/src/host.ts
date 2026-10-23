@@ -273,7 +273,7 @@ export class HostTunnel {
   /** The relay socket dropped: every channel is gone with it. */
   onDisconnected(): void {
     this.ready = false;
-    for (const channel of [...this.channels.values()]) this.teardown(channel, false);
+    for (const channel of this.channels.values()) this.teardown(channel, false);
     for (const [id, pending] of this.pushes) {
       this.options.timers.clearTimeout(pending.timer);
       pending.resolve({ ok: false, reason: "The relay connection dropped." });
@@ -283,7 +283,7 @@ export class HostTunnel {
 
   /** Ends every channel of one device now (it was removed on the Mac). */
   closeDevice(deviceRelayId: string): void {
-    for (const channel of [...this.channels.values()]) {
+    for (const channel of this.channels.values()) {
       if (channel.deviceRelayId === deviceRelayId) this.teardown(channel, true);
     }
   }
