@@ -4,6 +4,7 @@
  */
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback } from "react";
 import { View } from "react-native";
 
 import { friendlyTitle } from "../../../nondev/src/plain/titles";
@@ -44,6 +45,7 @@ export function ConversationRoute() {
     `fridge:${threadId}`,
   );
   const page = fridge.value?.find((item) => item.threadId === threadId) ?? null;
+  const setTitle = useCallback((title: string) => navigation.setOptions({ title }), [navigation]);
   if (mac === null) return <Gone />;
   const childId = mac.me.kind === "child" ? mac.me.childId : null;
   return (
@@ -52,6 +54,7 @@ export function ConversationRoute() {
       threadId={threadId}
       readOnly={readOnly === true || mode !== "child"}
       childId={childId}
+      onTitle={setTitle}
       voiceAllowed={child !== null && child.childOn(mac)?.voice.typing === true}
       {...(page
         ? {

@@ -9,6 +9,8 @@ import {
   DefaultTheme,
   NavigationContainer,
   NavigationIndependentTree,
+  createNavigationContainerRef,
+  type NavigationContainerRefWithCurrent,
   type Theme as NavigationTheme,
 } from "@react-navigation/native";
 import {
@@ -16,14 +18,16 @@ import {
   type NativeStackNavigationOptions,
 } from "@react-navigation/native-stack";
 import type { SymbolViewProps } from "expo-symbols";
-import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type NativeSyntheticEvent } from "react-native";
 import { Tabs, type TabSelectedEvent, type TabSelectionRejectedEvent } from "react-native-screens";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useDeepLink } from "../links/deepLinks";
 import type { StackRouteName, StackRoutes } from "./routes";
 import { Symbol, Txt, haptic } from "../ui/kit";
 import { useLayout } from "../ui/layout";
+import { RootHeaderContext } from "../ui/rootHeader";
 import { useTheme, type Theme } from "../ui/theme";
 
 export interface ShellSection {
@@ -74,6 +78,7 @@ function screenOptions(theme: Theme): NativeStackNavigationOptions {
 }
 
 function SectionStack(props: {
+  readonly navRef?: NavigationContainerRefWithCurrent<StackRoutes>;
   readonly section: ShellSection;
   readonly screens: ReadonlyArray<ShellScreen>;
   readonly headerRight?: () => ReactNode;
@@ -87,43 +92,48 @@ function SectionStack(props: {
   const navTheme = useMemo(() => navigationTheme(theme), [theme]);
   const rootName = props.initial?.name ?? props.section.route;
   return (
-    <NavigationIndependentTree>
-      <NavigationContainer theme={navTheme}>
-        <Stack.Navigator initialRouteName={rootName} screenOptions={screenOptions(theme)}>
-          {props.screens.map((screen) => {
-            const isRoot = screen.name === rootName;
-            return (
-              <Stack.Screen
-                key={screen.name}
-                name={screen.name}
-                component={screen.component}
-                {...(isRoot && props.initial?.params
-                  ? { initialParams: props.initial.params as never }
-                  : {})}
-                options={(route) => {
-                  const own =
-                    typeof screen.options === "function"
-                      ? (screen.options as (params: unknown) => NativeStackNavigationOptions)(
-                          route.route.params,
-                        )
-                      : (screen.options ?? {});
-                  return isRoot
-                    ? {
-                        ...own,
-                        ...(props.initial?.title ? { title: props.initial.title } : {}),
-                        ...(screen.name === props.section.route
-                          ? { title: props.section.title, headerLargeTitle: true }
-                          : {}),
-                        ...(props.headerRight ? { headerRight: props.headerRight } : {}),
-                      }
-                    : own;
-                }}
-              />
-            );
-          })}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </NavigationIndependentTree>
+    <RootHeaderContext
+      value={{ route: props.section.route, title: props.section.title, right: props.headerRight }}
+    >
+      <NavigationIndependentTree>
+        <NavigationContainer theme={navTheme} {...(props.navRef ? { ref: props.navRef } : {})}>
+          <Stack.Navigator initialRouteName={rootName} screenOptions={screenOptions(theme)}>
+            {props.screens.map((screen) => {
+              const isRoot = screen.name === rootName;
+              return (
+                <Stack.Screen
+                  key={screen.name}
+                  name={screen.name}
+                  component={screen.component}
+                  {...(isRoot && props.initial?.params
+                    ? { initialParams: props.initial.params as never }
+                    : {})}
+                  options={(route) => {
+                    const own =
+                      typeof screen.options === "function"
+                        ? (screen.options as (params: unknown) => NativeStackNavigationOptions)(
+                            route.route.params,
+                          )
+                        : (screen.options ?? {});
+                    return isRoot
+                      ? {
+                          ...own,
+                          ...(props.initial?.title ? { title: props.initial.title } : {}),
+                          ...(screen.name === props.section.route
+                            ? { title: props.section.title, headerShown: false }
+                            : props.headerRight
+                              ? { headerRight: props.headerRight }
+                              : {}),
+                        }
+                      : own;
+                  }}
+                />
+              );
+            })}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </NavigationIndependentTree>
+    </RootHeaderContext>
   );
 }
 
@@ -151,6 +161,46 @@ export function Shell(props: {
   const [selected, setSelected] = useState(props.sections[0]!.id);
   const [opened, setOpened] = useState<SidebarItem | null>(null);
   const [provenance, setProvenance] = useState(0);
+  const refs = useMemo(
+    () =>
+      new Map(
+        props.sections.map((section) => [section.id, createNavigationContainerRef<StackRoutes>()]),
+      ),
+    // One stack per section for the life of the shell.
+    [],
+  );
+  const sectionLink = useDeepLink("section");
+  const conversationLink = useDeepLink("conversation");
+  useEffect(() => {
+    const link = sectionLink.link;
+    if (link === null) return;
+    sectionLink.consume();
+    if (!props.sections.some((section) => section.id === link.id)) return;
+    setOpened(null);
+    setSelected(link.id);
+  }, [sectionLink, props.sections]);
+  useEffect(() => {
+    const link = conversationLink.link;
+    if (link === null) return;
+    conversationLink.consume();
+    const params = { macId: link.macId, threadId: link.threadId, title: "Conversation" };
+    if (layout.usesSplitView) {
+      setOpened({
+        key: `${link.macId}:${link.threadId}`,
+        title: "Conversation",
+        subtitle: "",
+        symbol: "bubble.left",
+        open: { name: "Conversation", params, title: "Conversation" },
+      });
+      return;
+    }
+    const first = props.sections[0]!.id;
+    setSelected(first);
+    const ref = refs.get(first);
+    setTimeout(() => {
+      if (ref?.isReady()) ref.navigate("Conversation", params);
+    }, 300);
+  }, [conversationLink, layout.usesSplitView, props.sections, refs]);
 
   if (!layout.usesSplitView) {
     return (
@@ -189,6 +239,7 @@ export function Shell(props: {
               }}
             >
               <SectionStack
+                navRef={refs.get(section.id)!}
                 section={section}
                 screens={props.screens}
                 {...(props.headerRight ? { headerRight: props.headerRight } : {})}

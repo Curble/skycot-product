@@ -5,7 +5,7 @@
  */
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import * as Haptics from "expo-haptics";
-import { Children, Fragment, useState, type ReactNode } from "react";
+import { Children, Fragment, use, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -22,11 +22,13 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { avatarLetter } from "../../../nondev/src/features/family/children";
 import type { ChildAvatar } from "../../../nondev/src/features/family/children";
 import { AVATAR_COLORS, mascotSource, skyPhaseNow, type MascotPose } from "./brand";
+import { RootHeaderContext } from "./rootHeader";
 import { TEXT, useTheme, type Theme } from "./theme";
 
 type TextVariant = keyof typeof TEXT;
@@ -89,6 +91,9 @@ export function Page(
   props: ScrollViewProps & { readonly children: ReactNode; readonly maxWidth?: number },
 ) {
   const theme = useTheme();
+  const route = useRoute();
+  const header = use(RootHeaderContext);
+  const large = header !== null && header.route === route.name ? header : null;
   const { children, maxWidth = 720, style, contentContainerStyle, ...rest } = props;
   return (
     <ScrollView
@@ -96,9 +101,30 @@ export function Page(
       keyboardDismissMode="interactive"
       {...rest}
       style={[{ flex: 1, backgroundColor: theme.color.background }, style]}
-      contentContainerStyle={[{ paddingBottom: 40 }, contentContainerStyle]}
+      contentContainerStyle={[
+        { paddingBottom: 40, ...(large ? { paddingTop: 8 } : {}) },
+        contentContainerStyle,
+      ]}
     >
-      <View style={{ width: "100%", maxWidth, alignSelf: "center" }}>{children}</View>
+      <View style={{ width: "100%", maxWidth, alignSelf: "center" }}>
+        {large ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 20,
+              paddingTop: 6,
+              paddingBottom: 6,
+            }}
+          >
+            <Txt variant="largeTitle" accessibilityRole="header" style={{ flex: 1 }}>
+              {large.title}
+            </Txt>
+            {large.right ? large.right() : null}
+          </View>
+        ) : null}
+        {children}
+      </View>
     </ScrollView>
   );
 }

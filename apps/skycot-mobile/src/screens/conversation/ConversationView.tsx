@@ -49,6 +49,8 @@ export function ConversationView(props: {
   readonly voiceAllowed?: boolean;
   readonly childId?: string | null;
   readonly onOpenPage?: () => void;
+  /** The conversation's own title, once it has loaded (a link may not know it). */
+  readonly onTitle?: (title: string) => void;
 }) {
   const theme = useTheme();
   const thread = useThread(props.mac, props.threadId);
@@ -69,6 +71,11 @@ export function ConversationView(props: {
   } | null>(null);
   const [busyCard, setBusyCard] = useState<string | null>(null);
 
+  const title = projection?.thread.title ?? null;
+  const onTitle = props.onTitle;
+  useEffect(() => {
+    if (title !== null) onTitle?.(title);
+  }, [title, onTitle]);
   const timeline = useMemo<Array<TimelineEntry>>(
     () =>
       projection === null

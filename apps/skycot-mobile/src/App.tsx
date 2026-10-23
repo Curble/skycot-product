@@ -10,6 +10,7 @@ import { ChildApp } from "./app/child/ChildApp";
 import { ChildProvider, useChild } from "./app/child/ChildContext";
 import { GrownUpApp } from "./app/grownup/GrownUpApp";
 import { MacDataProvider, useMacData } from "./data/MacData";
+import { DeepLinkProvider } from "./links/deepLinks";
 import { LinksProvider, useLinks } from "./links/store";
 import { WelcomeScreen } from "./screens/link/WelcomeScreen";
 import { SignedOut } from "./screens/shared/SignedOut";
@@ -80,11 +81,13 @@ function TouchArea(props: { readonly onTouch: () => void; readonly children: Rea
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LinksProvider>
-        <MacDataProvider>
-          <Root />
-        </MacDataProvider>
-      </LinksProvider>
+      <DeepLinkProvider>
+        <LinksProvider>
+          <MacDataProvider>
+            <Root />
+          </MacDataProvider>
+        </LinksProvider>
+      </DeepLinkProvider>
     </SafeAreaProvider>
   );
 }

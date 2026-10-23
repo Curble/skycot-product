@@ -3,7 +3,9 @@
  * device is there; "Link another Mac" for a family with two working Macs (their conversations
  * then show side by side, each labelled with its Mac); and About.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { useDeepLink } from "../../links/deepLinks";
 
 import { familyApi } from "../../family/api";
 import { useMacData } from "../../data/MacData";
@@ -27,6 +29,14 @@ export function MacsScreen() {
   const { byMac } = useMacData();
   const [sheet, setSheet] = useState<"scan" | "type" | "about" | null>(null);
   const [forgetting, setForgetting] = useState<Mac | null>(null);
+  const deep = useDeepLink("link");
+  const [prefill, setPrefill] = useState<typeof deep.link>(null);
+  useEffect(() => {
+    if (deep.link === null) return;
+    setPrefill(deep.link);
+    setSheet("type");
+    deep.consume();
+  }, [deep]);
   return (
     <Page>
       <Section
@@ -88,6 +98,7 @@ export function MacsScreen() {
         onType={() => setSheet("type")}
       />
       <TypeCodeSheet
+        prefill={prefill}
         visible={sheet === "type"}
         onClose={() => setSheet(null)}
         onLinked={() => setSheet(null)}

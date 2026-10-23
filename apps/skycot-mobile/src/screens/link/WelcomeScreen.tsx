@@ -2,7 +2,9 @@
  * First run: "Link to your family's Mac". Nothing else works until a grown-up has made a link
  * at the Mac; there are no accounts to sign in to, ever.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { useDeepLink } from "../../links/deepLinks";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,6 +17,14 @@ export function WelcomeScreen(props: { readonly onLinked?: (outcome: LinkOutcome
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<"scan" | "type" | "about" | null>(null);
+  const deep = useDeepLink("link");
+  const [prefill, setPrefill] = useState<typeof deep.link>(null);
+  useEffect(() => {
+    if (deep.link === null) return;
+    setPrefill(deep.link);
+    setSheet("type");
+    deep.consume();
+  }, [deep]);
   const linked = (outcome: LinkOutcome) => {
     setSheet(null);
     props.onLinked?.(outcome);
@@ -71,7 +81,12 @@ export function WelcomeScreen(props: { readonly onLinked?: (outcome: LinkOutcome
         onLinked={linked}
         onType={() => setSheet("type")}
       />
-      <TypeCodeSheet visible={sheet === "type"} onClose={() => setSheet(null)} onLinked={linked} />
+      <TypeCodeSheet
+        prefill={prefill}
+        visible={sheet === "type"}
+        onClose={() => setSheet(null)}
+        onLinked={linked}
+      />
       <AboutSheet visible={sheet === "about"} onClose={() => setSheet(null)} />
     </View>
   );

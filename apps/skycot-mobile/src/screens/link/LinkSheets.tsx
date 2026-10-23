@@ -3,7 +3,7 @@
  * link (src/links/pairing.ts), and the Mac decides what this device becomes.
  */
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Platform, TextInput, View } from "react-native";
 
 import {
@@ -66,18 +66,42 @@ export function TypeCodeSheet(props: {
   readonly visible: boolean;
   readonly onClose: () => void;
   readonly onLinked: (outcome: LinkOutcome) => void;
+  /** From a `skycot://link` link: fills the sheet in (and, in development builds, links). */
+  readonly prefill?: {
+    readonly code: string;
+    readonly address: string;
+    readonly go: boolean;
+  } | null;
 }) {
   const theme = useTheme();
   const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
   const action = useLinkAction(props.onLinked);
+  const prefill = props.prefill ?? null;
+  useEffect(() => {
+    if (prefill === null) return;
+    setCode(prefill.code);
+    setAddress(prefill.address);
+    if (prefill.go)
+      void action.run({ kind: "typed", code: prefill.code, address: prefill.address });
+    // Runs once per link handed in.
+  }, [prefill]);
   const addressRef = useRef<ComponentRef<typeof TextInput>>(null);
   const tidy = code
     .replace(/[^0-9A-Za-z]/gu, "")
     .toUpperCase()
     .slice(0, 12);
   return (
-    <Sheet visible={props.visible} title="Type the code" onClose={props.onClose}>
+    <Sheet
+      visible={props.visible}
+      title="Type the code"
+      onClose={() => {
+        setCode("");
+        setAddress("");
+        action.clear();
+        props.onClose();
+      }}
+    >
       <Txt tone="label2">
         On the Mac: Settings › Family › Phones and iPads › Link…. The code and the address are under
         the QR code. Each code works once, for five minutes.
@@ -87,10 +111,11 @@ export function TypeCodeSheet(props: {
           Code
         </Txt>
         <TextInput
-          value={groupLinkCode(tidy)}
+          value={code}
+          maxLength={16}
           onChangeText={(text) => {
             action.clear();
-            setCode(text);
+            setCode(text.toUpperCase());
           }}
           placeholder="7KQ3 M9XD 2HPA"
           placeholderTextColor={theme.color.label3}
