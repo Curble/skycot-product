@@ -116,6 +116,9 @@ export function GoBackSheet({
               ? `Sends your changed message as a new request. ${builder} shows a plan first.`
               : "Sends your changed message as a new request.",
             "Files only ever go back to a version SKYCOT saved. Nothing else is deleted.",
+            // The engine drops taken-back turns from the conversation it sends on the next
+            // load, so they are only folded in this window until then.
+            `Folds away the replaced replies. ${builder} won't remember them.`,
           ].map((line) => (
             <li key={line}>
               <Check
@@ -129,12 +132,7 @@ export function GoBackSheet({
           ))}
         </ul>
         <ul className="fm-restore-explainer__list" aria-label="Going back does not">
-          {[
-            // The engine drops taken-back turns from the conversation it sends on the next
-            // load, so they are only folded in this window until then.
-            `The replaced replies leave the chat, and ${builder} won't remember them.`,
-            "Doesn't change anything already sent for review or put live.",
-          ].map((line) => (
+          {["Doesn't change anything already sent for review or put live."].map((line) => (
             <li key={line}>
               <X size={13} strokeWidth={2.4} aria-hidden className="fm-restore-explainer__no" />
               <span>{line}</span>

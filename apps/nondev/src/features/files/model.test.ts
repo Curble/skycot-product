@@ -16,6 +16,7 @@ import {
   resolvePageRef,
   visibleEntries,
   type FilesEntry,
+  markdownForQuickLook,
 } from "./model";
 
 const NOW = new Date(2026, 9, 23, 15, 0, 0).getTime();
@@ -206,5 +207,18 @@ describe("the engine's answers", () => {
     });
     expect(file?.mode).toBe("picture");
     expect(parseFileRead({ name: "a", path: "a", mode: "explode", absolutePath: "/" })).toBeNull();
+  });
+});
+
+describe("markdownForQuickLook", () => {
+  it("leaves out a new project's icon line and keeps the rest", () => {
+    const readme =
+      '<img src="assets/icon.svg" width="64" height="64" alt="">\n\n# Games\n\nMade with SKYCOT.\n';
+    expect(markdownForQuickLook(readme)).toBe("\n# Games\n\nMade with SKYCOT.\n");
+  });
+
+  it("keeps text that only mentions a tag", () => {
+    const text = "Use <b>bold</b> for names.\n`<img>` is a picture tag.";
+    expect(markdownForQuickLook(text)).toBe(text);
   });
 });

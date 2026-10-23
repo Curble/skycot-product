@@ -334,3 +334,15 @@ export function inlinePageAssets(pagePath: string, html: string, assets: PageAss
       return tag.replace(/\ssrc\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i, ` src="${data}"`);
     });
 }
+
+/**
+ * Markdown as Quick Look shows it. The renderer never shows raw HTML, so a line that is only an
+ * HTML tag (a new project's README starts with its icon as `<img …>`) would appear as code.
+ * Those lines are left out; GitHub and other viewers still show them.
+ */
+export function markdownForQuickLook(source: string): string {
+  return source
+    .split("\n")
+    .filter((line) => !/^\s*<\/?[a-zA-Z][^<>]*>\s*$/.test(line))
+    .join("\n");
+}

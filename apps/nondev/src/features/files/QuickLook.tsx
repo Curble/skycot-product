@@ -25,13 +25,14 @@ import { KIND_ICON } from "./icons";
 import {
   codeNote,
   entryDetails,
+  type FileRead,
+  type FilesEntry,
   formatSize,
   inlinePageAssets,
   kindOfEntry,
+  markdownForQuickLook,
   pageAssetKey,
   pageAssetRefs,
-  type FileRead,
-  type FilesEntry,
 } from "./model";
 
 const shellCommands = createShellEnvironmentAtoms(connectionAtomRuntime);
@@ -268,7 +269,7 @@ function Body({
         <>
           {file.truncated ? <TruncatedNote /> : null}
           <div className="fm-ql__doc">
-            <Markdown text={file.contents ?? ""} />
+            <Markdown text={markdownForQuickLook(file.contents ?? "")} />
           </div>
         </>
       );
