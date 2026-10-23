@@ -83,10 +83,20 @@ parent code stays the root secret, and a passkey is only ever a per-device stand
 - **Visibility is the engine's.** A child's app must not filter on its own: it receives only what
   the engine sends.
 
+## Phase 2 (SKYCOT Relay), as built
+
+[RELAY.md](RELAY.md). The relay carries the same T3 sessions end to end: the Mac's end
+(`skycot/relay/tunnelHandler.ts`) hands each request to the engine's own server with the
+device's own sign-in, so the gate, the HTTP API gate and the visibility filters judge it as a
+local one. On top, a relay connection only carries the sign-in of the device it was linked for
+(its relay id is recorded against the Family device id when the link is made), and a sign-in
+made through it for another device is revoked. The QR link is the same one with the relay part
+after the `#`. Removing a device also revokes its relay pass and closes its tunnel.
+
 ## Honest limits in Phase 1
 
 - The engine listens on the Mac, so links only open on this Mac (or the LAN or Tailscale when
-  SKYCOT is set to listen there) until the relay.
+  SKYCOT is set to listen there), unless SKYCOT Relay is on (Phase 2).
 - Passkeys need `localhost` or `https`; over plain LAN the code is used.
 - Conversations with no recorded child (older ones, a grown-up's) stay off children's devices.
 - A sign-in lasts 30 days (T3's session lifetime), then the device is linked again.

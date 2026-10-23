@@ -256,10 +256,12 @@ How the engine enforces it:
 
 Honest limits:
 
-- **Other devices need to reach the Mac.** In this phase the engine listens on the Mac itself,
-  so a link only opens in another browser on this Mac, or from another device on the same Wi-Fi
-  or Tailscale when SKYCOT is set to listen there. Reaching the Mac from anywhere, and phone
-  notifications, come with SKYCOT Relay (Phase 2).
+- **Other devices need to reach the Mac.** The engine listens on the Mac itself, so a link only
+  opens in another browser on this Mac, or from another device on the same Wi-Fi or Tailscale
+  when SKYCOT is set to listen there. **Away from home** (Settings › Family, the parent code)
+  turns on SKYCOT Relay: links made after that work from anywhere, sealed so the relay can't
+  read them, with the same rules as at home. It needs a SKYCOT version that names a relay, and
+  none does yet ([RELAY.md](RELAY.md)).
 - **Face ID needs a secure address.** Browsers only allow passkeys on the Mac's own address
   (`localhost`) or an `https` address. Over plain home Wi-Fi (`http://192.168.…`) the phone uses
   the parent code. A passkey also belongs to the address it was made on: a phone that later
