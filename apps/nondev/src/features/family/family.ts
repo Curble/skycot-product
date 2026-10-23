@@ -429,6 +429,8 @@ export function parseCachedView(raw: string | null, legacy: boolean): FamilyView
       currentChildId,
       timeZone: typeof record["timeZone"] === "string" ? record["timeZone"] : null,
       allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
+      // First paint only: which screens to draw. The engine decides again on its first answer.
+      me: parseMe(record["me"]),
     };
   } catch {
     return base;
@@ -444,6 +446,7 @@ export function serializeCachedView(view: FamilyView): string {
     currentChildId: view.currentChildId,
     timeZone: view.timeZone,
     allowedAssistants: view.allowedAssistants,
+    me: view.me,
   });
 }
 

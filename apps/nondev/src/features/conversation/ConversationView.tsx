@@ -283,13 +283,13 @@ export function ConversationView({
             />
           ) : null}
           {project && !archived ? <PreviewButton threadId={threadId} /> : null}
-          {shell ? (
+          {shell && family.profile.me.kind !== "grown-up" ? (
             <FilesButton
               onClick={() => navigate(filesHref(environmentId, shell.projectId, threadId))}
             />
           ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
-          {archived || question ? null : (
+          {archived || question || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
           {shell && canOperate ? (

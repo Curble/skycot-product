@@ -12,6 +12,8 @@ import {
 import { readDesktopPrimaryBearerToken } from "~/environments/primary/desktopAuth";
 import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target";
 
+import { readFamilyView } from "../family/store";
+
 export const BADGES_API_PATH = "/api/skycot/badges";
 
 export interface BadgeAnswer {
@@ -30,6 +32,8 @@ function parseAnswer(body: unknown): BadgeAnswer | null {
 }
 
 async function call(method: "GET" | "POST", path: string, body?: unknown) {
+  // A grown-up's device earns no stickers (and the engine would refuse it): ask nothing.
+  if (readFamilyView().me.kind === "grown-up") return null;
   try {
     const url = resolvePrimaryEnvironmentHttpUrl(`${BADGES_API_PATH}${path}`);
     const sameOrigin =

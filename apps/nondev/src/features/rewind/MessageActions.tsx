@@ -6,6 +6,7 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 
 import { ContextMenu, type MenuPoint } from "../../ui/ContextMenu";
 import { MenuItem } from "../../ui/Popover";
+import { useFamily } from "../family/FamilyProvider";
 import { askToEdit } from "./store";
 
 export function EditActions({
@@ -21,7 +22,10 @@ export function EditActions({
   }) => ReactNode;
 }) {
   const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
+  // A grown-up's device only reads: no Edit there (the engine would refuse going back).
+  const readOnly = useFamily().profile.me.kind === "grown-up";
   const edit = () => askToEdit(threadId, itemId);
+  if (readOnly) return <>{children({ actions: null, onContextMenu: () => undefined })}</>;
   return (
     <>
       {children({

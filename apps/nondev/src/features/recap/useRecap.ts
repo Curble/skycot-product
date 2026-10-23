@@ -24,7 +24,11 @@ export function useRecap(childId: string | null, range: RecapRange) {
     state: { kind: "loading" },
   });
   const askForCode = useEffectEvent(() => family.requireParentCode("seeRecap"));
-  const openOnThisDevice = useEffectEvent(() => recapOpenOn(family.profile.openUntil, Date.now()));
+  // A grown-up's own device is the grown-up: the engine opens the recap to it without the code.
+  const openOnThisDevice = useEffectEvent(
+    () =>
+      family.profile.me.kind === "grown-up" || recapOpenOn(family.profile.openUntil, Date.now()),
+  );
 
   useEffect(() => {
     if (childId === null) return;

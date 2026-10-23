@@ -198,7 +198,7 @@ export function App() {
  */
 function WhoIsWho({ children }: { readonly children: React.ReactNode }) {
   const family = useFamily();
-  if (family.profile.source === "engine" && family.profile.me.kind === "grown-up") {
+  if (family.profile.me.kind === "grown-up") {
     return <GrownUpApp />;
   }
   return <>{children}</>;
