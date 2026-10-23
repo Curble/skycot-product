@@ -109,6 +109,16 @@ const config: ExpoConfig = {
       NSSupportsLiveActivities: true,
       ITSAppUsesNonExemptEncryption: false,
     },
+    // The iPhone app's own privacy manifest, made at prebuild (React Native's pod install adds
+    // the reasons its libraries need). Declared here so it exists before the Watch app's own
+    // manifest (watch/SkycotWatch/PrivacyInfo.xcprivacy) joins the project; otherwise React
+    // Native's tooling would pick the Watch's file for the iPhone app.
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyCollectedDataTypes: [],
+      NSPrivacyAccessedAPITypes: [],
+    },
   },
   plugins: [
     "expo-asset",
