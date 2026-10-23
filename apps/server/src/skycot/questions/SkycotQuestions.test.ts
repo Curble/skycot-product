@@ -356,12 +356,17 @@ describe("keepVersions", () => {
         SkycotQuestions.keepVersions(fakeGit(calls), folder),
       );
       assert.deepEqual(kept, folder);
-      assert.deepEqual(calls, [["init", "--quiet", "--initial-branch=main"]]);
+      // Then it asks Git where the folder's own exclude file is, to keep add-ons out
+      // (SkycotKeepOutOfVersions.test.ts shows that with a real Git).
+      assert.deepEqual(calls, [
+        ["init", "--quiet", "--initial-branch=main"],
+        ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"],
+      ]);
       // T3's own Scratch (no SKYCOT policy) stays a plain folder.
       yield* withPolicy(undefined, () => SkycotQuestions.keepVersions(fakeGit(calls), folder));
-      assert.equal(calls.length, 1);
+      assert.equal(calls.length, 2);
       yield* withPolicy("1", () => SkycotQuestions.keepVersions(fakeGit(calls), Option.none()));
-      assert.equal(calls.length, 1);
+      assert.equal(calls.length, 2);
     }),
   );
 
@@ -372,6 +377,8 @@ describe("keepVersions", () => {
         SkycotQuestions.keepVersions(fakeGit(calls, true), Option.some(MINE)),
       );
       assert.deepEqual(kept, Option.some(MINE));
+      // No versions, so no exclude file to write either.
+      assert.equal(calls.length, 1);
     }),
   );
 });

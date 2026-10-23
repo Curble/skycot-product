@@ -3,7 +3,8 @@
 // (ManagedProjectFolders.folderForThread). SKYCOT adds three things on top:
 //
 //   - each question's folder keeps versions (`git init`), so the engine's checkpoints work
-//     there: "What changed", Undo, the fridge and the recap see what a question made;
+//     there: "What changed", Undo, the fridge and the recap see what a question made; installed
+//     add-ons and tool caches are kept out of them (SkycotKeepOutOfVersions);
 //   - the Family gate and the policy reactor treat a question as its own small project
 //     (`workRootsFor`): its folder is open to the child, every other folder, a sibling's
 //     question included, is outside;
@@ -23,6 +24,7 @@ import { questionsSpaceOf } from "@t3tools/skycot-rules/questions";
 import * as ServerConfig from "../../config.ts";
 import type * as GitVcsDriver from "../../vcs/GitVcsDriver.ts";
 import { isSkycotPolicyEnabled } from "../SkycotPolicy.ts";
+import { keepAddOnsOutOfVersions, type RunGit } from "./SkycotKeepOutOfVersions.ts";
 
 export class SkycotQuestions extends Context.Service<
   SkycotQuestions,
@@ -62,20 +64,40 @@ export const keepVersions = (
 ): Effect.Effect<Option.Option<string>> =>
   Option.isNone(folder) || !isSkycotPolicyEnabled(process.env)
     ? Effect.succeed(folder)
-    : git
-        .execute({
-          operation: "SkycotQuestions.keepVersions",
-          cwd: folder.value,
-          args: ["init", "--quiet", "--initial-branch=main"],
-          timeoutMs: 10_000,
-        })
-        .pipe(
-          Effect.tapError((error) =>
-            Effect.logWarning("skycot-questions.init-failed", { reason: error.message }),
-          ),
-          Effect.ignore,
-          Effect.as(folder),
-        );
+    : Effect.gen(function* () {
+        const cwd = folder.value;
+        const started = yield* git
+          .execute({
+            operation: "SkycotQuestions.keepVersions",
+            cwd,
+            args: ["init", "--quiet", "--initial-branch=main"],
+            timeoutMs: 10_000,
+          })
+          .pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning("skycot-questions.init-failed", { reason: error.message }),
+            ),
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+          );
+        // Installed add-ons and tool caches are never part of what the question made.
+        if (started) yield* keepAddOnsOutOfVersions(runGitWith(git, cwd), cwd);
+        return folder;
+      });
+
+/** `git <args>` in `cwd` through the engine's own Git, for keepAddOnsOutOfVersions. */
+export const runGitWith =
+  (git: GitVcsDriver.GitVcsDriver["Service"], cwd: string): RunGit =>
+  (args) =>
+    git
+      .execute({
+        operation: "SkycotQuestions.keepAddOnsOutOfVersions",
+        cwd,
+        args,
+        allowNonZeroExit: true,
+        timeoutMs: 10_000,
+      })
+      .pipe(Effect.map((result) => ({ exitCode: Number(result.exitCode), stdout: result.stdout })));
 
 /**
  * Called by ManagedProjectFolders.folderForThread (seam `skycot-questions-per-child`): the
