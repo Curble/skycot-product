@@ -7,6 +7,7 @@ import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target"
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
 import type { ChildAvatar, ChildLimits, ChildVoice } from "./children";
 import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
+import { parseRelayStatus } from "./relay";
 import {
   ENGINE_UNREACHABLE,
   parseServerStatus,
@@ -165,6 +166,10 @@ export const familyApi = {
   }) => request("POST", "/devices/link", input, parseDeviceLink),
   removeDevice: (input: { readonly deviceId: string }) =>
     request("POST", "/devices/remove", input, parseDeviceRows),
+  // SKYCOT Relay: reach this Mac from anywhere (the Mac only; the code to change it).
+  relay: () => request("GET", "/relay", undefined, parseRelayStatus),
+  setRelay: (input: { readonly enabled: boolean }) =>
+    request("POST", "/relay", input, parseRelayStatus),
   addGrownUp: (person: { readonly name: string | null; readonly avatar?: ChildAvatar }) =>
     request("POST", "/people/add", { person }, parseServerStatus),
   updateGrownUp: (input: {

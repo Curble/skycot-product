@@ -44,6 +44,7 @@ import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
 import { useFamily } from "../../family/FamilyProvider";
 import { DevicesGroup, GrownUpsGroup, ThisDeviceRow } from "../../family/PeopleAndDevices";
+import { RelayGroup } from "../../family/RelayGroup";
 import { ParentCodeEntry, useParentCodeEntry } from "../../family/ParentCodeEntry";
 import { changeParentCode, lockFamilyGrants, moveLegacyProfile } from "../../family/store";
 import { speechService } from "../../voice/browser";
@@ -165,6 +166,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
         <>
           <GrownUpsGroup />
           <DevicesGroup />
+          <RelayGroup />
         </>
       ) : null}
 
