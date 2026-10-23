@@ -18,5 +18,6 @@
       }
     ]
   },
-  "include": ["src/**/*.ts", "e2e/**/*.ts"]
+  // The browser end-to-end scripts run under plain Node with a Playwright found at run time.
+  "include": ["src/**/*.ts", "e2e/relay-smoke.ts"]
 }

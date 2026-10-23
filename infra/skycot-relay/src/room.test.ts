@@ -200,7 +200,7 @@ describe("a home on the relay", () => {
     const device = await connectDevice(deviceRelayId);
     await room.message(host, JSON.stringify({ t: "revoke", deviceRelayId, until: 9_999_999_999 }));
     expect(device.closed?.code).toBe(CloseCode.revoked);
-    expect(store.has(`revoked:${deviceRelayId}`)).toBe(true);
+    expect(Object.keys(store.get("revoked") as object)).toEqual([deviceRelayId]);
     expect((await connectDevice(deviceRelayId)).closed?.code).toBe(CloseCode.revoked);
     expect((await connectDevice()).closed).toBeNull();
   });

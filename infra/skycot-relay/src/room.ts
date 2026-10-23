@@ -309,7 +309,7 @@ export class Room {
       safeClose(socket, CloseCode.unauthorized, "This device's relay pass is not valid.");
       return;
     }
-    const revokedUntil = await this.host.storage.get<number>(`revoked:${pass.deviceRelayId}`);
+    const revokedUntil = (await this.revocations())[pass.deviceRelayId];
     if (revokedUntil !== undefined && revokedUntil > this.host.now() / 1000) {
       this.host.log("device-refused", { home: tag(attachment.homeId), why: "revoked" });
       safeClose(socket, CloseCode.revoked, "This device was removed on the Mac.");
@@ -415,7 +415,12 @@ export class Room {
       if (typeof deviceRelayId !== "string" || typeof until !== "number") return;
       // Passes last at most about a month, so a revocation never needs to outlive that.
       const capped = Math.min(until, Math.floor(this.host.now() / 1000) + 40 * 24 * 3600);
-      await this.host.storage.put(`revoked:${deviceRelayId}`, capped);
+      // One small record per home; entries past their date are dropped on every write.
+      const nowSeconds = this.host.now() / 1000;
+      const kept = Object.fromEntries(
+        Object.entries(await this.revocations()).filter(([, until]) => until > nowSeconds),
+      );
+      await this.host.storage.put(REVOKED_KEY, { ...kept, [deviceRelayId]: capped });
       for (const device of this.devices()) {
         if (device.attachment.deviceRelayId === deviceRelayId) {
           retire(device.socket, CloseCode.revoked, "This device was removed on the Mac.");
@@ -488,6 +493,10 @@ export class Room {
     answer(await sealPushRef(this.env, attachment.homeId, { token, type, environment }));
   }
 
+  private async revocations(): Promise<Readonly<Record<string, number>>> {
+    return (await this.host.storage.get<Record<string, number>>(REVOKED_KEY)) ?? {};
+  }
+
   /** A socket closed or failed. */
   closed(socket: RoomSocket): void {
     const attachment = attachmentOf(socket);
@@ -515,6 +524,9 @@ const openFrame = (connectionId: string, deviceRelayId: string) =>
     connectionId,
     payload: utf8(JSON.stringify({ d: deviceRelayId })),
   });
+
+/** Removed devices' relay ids, with the time their passes would have run out anyway. */
+const REVOKED_KEY = "revoked";
 
 /** Logs name a home by its first characters only. */
 const tag = (homeId: string) => homeId.slice(0, 6);
