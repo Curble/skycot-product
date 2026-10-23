@@ -14,6 +14,12 @@
 // such on the next change. Daily counters and who-is-using-which-device live beside it in the
 // activity file (family-limits/SkycotFamilyLimits.ts), which changes every minute.
 //
+// Grown-ups and linked devices (Phase 1, "who is who") live here too, as optional keys so a
+// file from before them reads unchanged: a profile without grown-ups is read with one, the person
+// who set it up, and written that way at its next change. Each linked device names its person
+// and kind (a child's device, a grown-up's device) and keeps its passkeys (WebAuthn public keys,
+// never anything secret). The sign-in itself stays T3's (family-devices/SkycotFamilyDevices.ts).
+//
 // Honesty: the file sits in the user's own data directory. Anyone who can use a terminal or
 // Finder on this Mac account can delete it, which turns the profile off. That is outside the
 // threat model (a curious child, not a determined one) and the docs say so.
@@ -35,6 +41,13 @@ import * as Semaphore from "effect/Semaphore";
 
 import { formatClockTime, knownTimeZone, parseClockTime } from "@t3tools/skycot-brand/bedtime";
 import { canAllowAssistant, MAX_ALLOWED_ASSISTANTS } from "@t3tools/skycot-rules/assistants";
+import {
+  cleanName,
+  DEVICE_NAME_MAX,
+  MAX_DEVICES,
+  MAX_GROWN_UPS,
+  PERSON_NAME_MAX,
+} from "@t3tools/skycot-rules/people";
 
 import * as ServerConfig from "../config.ts";
 
@@ -150,6 +163,50 @@ const Child = Schema.Struct({
 });
 export type FamilyChild = typeof Child.Type;
 
+/** A grown-up in the family: the person who set the profile up, and anyone they add. */
+const GrownUp = Schema.Struct({
+  id: Schema.String,
+  name: Schema.NullOr(Schema.String),
+  avatar: ChildAvatar,
+  createdAt: Schema.String,
+});
+export type FamilyGrownUp = typeof GrownUp.Type;
+
+/**
+ * A passkey a grown-up's device registered (WebAuthn): the public key only, as a JWK, with the
+ * relying party (the address the device used) it is bound to, and the authenticator's counter.
+ */
+const Passkey = Schema.Struct({
+  /** The credential id, base64url. */
+  id: Schema.String,
+  /** COSE algorithm: -7 (ES256) or -257 (RS256). */
+  algorithm: Schema.Number,
+  publicKey: Schema.Record(Schema.String, Schema.String),
+  rpId: Schema.String,
+  signCount: Schema.Number,
+  createdAt: Schema.String,
+  lastUsedAt: Schema.NullOr(Schema.String),
+});
+export type FamilyPasskey = typeof Passkey.Type;
+
+/**
+ * A device linked to one person. Its sign-in is T3's (a session whose subject names this id);
+ * this record is what makes it a child's or a grown-up's, and removing it ends that at once.
+ */
+const Device = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(["child", "grown-up"]),
+  /** A child's id or a grown-up's id, by `kind`. */
+  personId: Schema.String,
+  name: Schema.String,
+  createdAt: Schema.String,
+  /** The one-time pairing link that links it, until it is used or runs out. */
+  linkId: Schema.NullOr(Schema.String),
+  linkExpiresAt: Schema.Number,
+  passkeys: Schema.Array(Passkey),
+});
+export type FamilyDevice = typeof Device.Type;
+
 const FamilyFileV1 = Schema.Struct({
   version: Schema.Literal(1),
   enabled: Schema.Boolean,
@@ -184,6 +241,10 @@ const FamilyFile = Schema.Struct({
    * parent code (driver ids, "cursor"). Optional so files written before it read unchanged.
    */
   allowedAssistants: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** The grown-ups. Optional so a file from before them reads unchanged (see `withPeople`). */
+  grownUps: Schema.optionalKey(Schema.Array(GrownUp)),
+  /** Devices linked to a person (a child's iPad, a grown-up's phone). */
+  devices: Schema.optionalKey(Schema.Array(Device)),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -237,13 +298,48 @@ export function migrateFamilyFileV1(file: FamilyFileV1): FamilyFile {
   };
 }
 
-/** Either version on disk, as version 2; null when it is neither (treated as "off"). */
+/**
+ * A profile from before grown-ups were people gets one: the person who set it up. Its id comes
+ * from the file's own salt, so every read before the first write names the same grown-up.
+ * Children, the code and everything else stay exactly as they were.
+ */
+export function withPeople(file: FamilyFile): FamilyFile {
+  if (file.grownUps !== undefined && file.grownUps.length > 0) return file;
+  const id = `g${NodeCrypto.createHash("sha256").update(`grown-up:${file.salt}`).digest("hex").slice(0, 10)}`;
+  return {
+    ...file,
+    grownUps: [
+      { id, name: null, avatar: { kind: "mascot", pose: "hello" }, createdAt: file.createdAt },
+    ],
+  };
+}
+
+/** Either version on disk, as version 2 with its people; null when it is neither (treated as "off"). */
 export function decodeFamilyFile(raw: string): FamilyFile | null {
   const current = decodeFamilyFileV2(raw);
-  if (current._tag === "Some") return current.value;
+  if (current._tag === "Some") return withPeople(current.value);
   const legacy = decodeFamilyFileV1(raw);
-  return legacy._tag === "Some" ? migrateFamilyFileV1(legacy.value) : null;
+  return legacy._tag === "Some" ? withPeople(migrateFamilyFileV1(legacy.value)) : null;
 }
+
+/** A linked device as any signed-in client may see it: never its passkeys' keys. */
+export interface FamilyDeviceView {
+  readonly id: string;
+  readonly kind: FamilyDevice["kind"];
+  readonly personId: string;
+  readonly name: string;
+  readonly createdAt: string;
+  readonly passkeys: number;
+}
+
+const deviceView = (device: FamilyDevice): FamilyDeviceView => ({
+  id: device.id,
+  kind: device.kind,
+  personId: device.personId,
+  name: device.name,
+  createdAt: device.createdAt,
+  passkeys: device.passkeys.length,
+});
 
 /** What any signed-in client may read. Never the hash, salt or secret. */
 export interface FamilyStatus {
@@ -259,6 +355,10 @@ export interface FamilyStatus {
   readonly timeZone: string;
   /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
   readonly allowedAssistants: ReadonlyArray<string>;
+  /** The grown-ups (at least one while the profile is on). */
+  readonly grownUps: ReadonlyArray<FamilyGrownUp>;
+  /** Devices linked to a person, linked or still waiting for their link. */
+  readonly devices: ReadonlyArray<FamilyDeviceView>;
 }
 
 /** What a parent sets for a child; anything left out keeps its value (or the default). */
@@ -429,8 +529,64 @@ export class SkycotFamily extends Context.Service<
       token: string | undefined,
       purpose: FamilyPurpose,
     ) => Effect.Effect<boolean>;
+    /** Ends every grant on every device (a grown-up's "Lock everything"). No code: it only takes away. */
+    readonly lockAll: Effect.Effect<void, FamilyError>;
+    readonly addGrownUp: (
+      input: PersonInput,
+    ) => Effect.Effect<{ readonly status: FamilyStatus; readonly personId: string }, FamilyError>;
+    readonly updateGrownUp: (input: {
+      readonly personId: string;
+      readonly patch: PersonInput;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** The last grown-up stays: turning the profile off is the way out. Their devices go with them. */
+    readonly removeGrownUp: (input: {
+      readonly personId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** The full device record, passkeys included (engine only; never sent to a client). */
+    readonly device: (deviceId: string) => Effect.Effect<FamilyDevice | null>;
+    /** A device waiting for its one-time link; the link itself is T3's (the caller makes it). */
+    readonly addDevice: (input: {
+      readonly id: string;
+      readonly kind: FamilyDevice["kind"];
+      readonly personId: string;
+      readonly name: string | null;
+      readonly linkId: string;
+      readonly linkExpiresAt: number;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Forgets a device and its passkeys; the caller ends its sign-in. */
+    readonly removeDevice: (input: {
+      readonly deviceId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** A child's device moved to another child (the parent code, on that device or the Mac). */
+    readonly reassignDevice: (input: {
+      readonly deviceId: string;
+      readonly childId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** A grown-up's device registered a passkey (one per device is kept: a new one replaces it). */
+    readonly addPasskey: (input: {
+      readonly deviceId: string;
+      readonly passkey: FamilyPasskey;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** A passkey was used: its counter and last use are kept, so a cloned key shows up. */
+    readonly usePasskey: (input: {
+      readonly deviceId: string;
+      readonly passkeyId: string;
+      readonly signCount: number;
+    }) => Effect.Effect<void, FamilyError>;
+    readonly removePasskeys: (input: {
+      readonly deviceId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
   }
 >()("t3/skycot/SkycotFamily") {}
+
+/** What a parent sets for a grown-up; anything left out keeps its value. */
+export interface PersonInput {
+  readonly name?: string | null | undefined;
+  readonly avatar?: unknown;
+}
+
+/** A new device id: `d` and ten hex digits (people.ts `deviceIdFromSubject` reads the same shape). */
+export const newDeviceId = () => `d${NodeCrypto.randomBytes(5).toString("hex")}`;
 
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
 
@@ -534,6 +690,8 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       children: [],
       timeZone: familyTimeZone(null),
       allowedAssistants: [],
+      grownUps: [],
+      devices: [],
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
@@ -547,6 +705,8 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     children: file.children,
     timeZone: familyTimeZone(file),
     allowedAssistants: allowedAssistantsOf(file),
+    grownUps: file.grownUps ?? [],
+    devices: (file.devices ?? []).map(deviceView),
   };
 }
 
@@ -660,6 +820,30 @@ function newChild(input: ChildInput, siblings: number, createdAt: string): Famil
     input,
   );
 }
+
+function applyPersonInput(person: FamilyGrownUp, input: PersonInput): FamilyGrownUp {
+  return {
+    ...person,
+    name: input.name === undefined ? person.name : cleanName(input.name, PERSON_NAME_MAX),
+    avatar: input.avatar === undefined ? person.avatar : cleanAvatar(input.avatar, person.avatar),
+  };
+}
+
+function newGrownUp(input: PersonInput, others: number, createdAt: string): FamilyGrownUp {
+  return applyPersonInput(
+    {
+      id: `g${hex(NodeCrypto.randomBytes(5))}`,
+      name: null,
+      avatar: { kind: "initial", color: AVATAR_COLORS[(others + 3) % AVATAR_COLORS.length]! },
+      createdAt,
+    },
+    input,
+  );
+}
+
+/** A grown-up's device is only as trusted as the code that linked it: a new code unlinks them. */
+const childDevicesOnly = (devices: ReadonlyArray<FamilyDevice> | undefined) =>
+  (devices ?? []).filter((device) => device.kind === "child");
 
 const liveGrants = (grants: ReadonlyArray<Grant>, now: number) =>
   grants.filter((grant) => grant.expiresAt > now);
@@ -779,6 +963,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       grants: [],
       timeZone: input.timeZone ? knownTimeZone(input.timeZone) : null,
       children: [newChild({ name: input.childName }, 0, createdAt)],
+      // The person setting the profile up is its first grown-up.
+      grownUps: [newGrownUp({}, 0, createdAt)],
+      devices: [],
     };
     yield* save(file);
     return toStatus(file, at);
@@ -839,9 +1026,12 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
         ...cleared,
         salt,
         codeHash: yield* hashCode(input.newCode, salt),
-        // A new code ends every grant and token issued under the old one.
+        // A new code ends every grant and token issued under the old one, and unlinks every
+        // grown-up's device (it may have been linked by whoever learned the old code). Children's
+        // devices stay: they can do nothing a grown-up's code is needed for.
         tokenSecret: hex(NodeCrypto.randomBytes(32)),
         grants: [],
+        devices: childDevicesOnly(cleared.devices),
       };
       yield* save(next);
       return toStatus(next, at);
@@ -909,6 +1099,10 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       const next: FamilyFile = {
         ...file,
         children: file.children.filter((child) => child.id !== input.childId),
+        // That child's devices go with them.
+        devices: (file.devices ?? []).filter(
+          (device) => !(device.kind === "child" && device.personId === input.childId),
+        ),
       };
       yield* save(next);
       return toStatus(next, yield* now);
@@ -1047,7 +1241,181 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     },
   );
 
+  const lockAll: SkycotFamily["Service"]["lockAll"] = Effect.gen(function* () {
+    const file = yield* load;
+    if (file === null || !file.enabled || file.grants.length === 0) return;
+    yield* save({ ...file, grants: [] });
+  }).pipe(lock.withPermits(1), Effect.withSpan("SkycotFamily.lockAll"));
+
+  /** One change to the people or devices, under the lock, with the profile on. */
+  const change = <A>(
+    name: string,
+    run: (file: FamilyFile, at: number) => Effect.Effect<readonly [FamilyFile, A], FamilyError>,
+  ) =>
+    Effect.gen(function* () {
+      const file = yield* requireEnabled(yield* load);
+      const at = yield* now;
+      const [next, result] = yield* run(file, at);
+      if (next !== file) yield* save(next);
+      return { status: toStatus(next, at), result };
+    }).pipe(lock.withPermits(1), Effect.withSpan(`SkycotFamily.${name}`));
+
+  const invalid = () => Effect.fail(new FamilyError({ reason: "invalid-request" }));
+
+  const addGrownUp: SkycotFamily["Service"]["addGrownUp"] = (input) =>
+    change("addGrownUp", (file, at) => {
+      const people = file.grownUps ?? [];
+      if (people.length >= MAX_GROWN_UPS) return invalid();
+      const person = newGrownUp(input, people.length, DateTime.formatIso(DateTime.makeUnsafe(at)));
+      return Effect.succeed([{ ...file, grownUps: [...people, person] }, person.id] as const);
+    }).pipe(Effect.map(({ status, result }) => ({ status, personId: result })));
+
+  const updateGrownUp: SkycotFamily["Service"]["updateGrownUp"] = (input) =>
+    change("updateGrownUp", (file) => {
+      const people = file.grownUps ?? [];
+      if (!people.some((person) => person.id === input.personId)) return invalid();
+      return Effect.succeed([
+        {
+          ...file,
+          grownUps: people.map((person) =>
+            person.id === input.personId ? applyPersonInput(person, input.patch) : person,
+          ),
+        },
+        null,
+      ] as const);
+    }).pipe(Effect.map(({ status }) => status));
+
+  const removeGrownUp: SkycotFamily["Service"]["removeGrownUp"] = (input) =>
+    change("removeGrownUp", (file) => {
+      const people = file.grownUps ?? [];
+      if (people.length <= 1 || !people.some((person) => person.id === input.personId)) {
+        return invalid();
+      }
+      return Effect.succeed([
+        {
+          ...file,
+          grownUps: people.filter((person) => person.id !== input.personId),
+          devices: (file.devices ?? []).filter(
+            (device) => !(device.kind === "grown-up" && device.personId === input.personId),
+          ),
+        },
+        null,
+      ] as const);
+    }).pipe(Effect.map(({ status }) => status));
+
+  const device: SkycotFamily["Service"]["device"] = (deviceId) =>
+    load.pipe(
+      Effect.map((file) =>
+        file === null || !file.enabled
+          ? null
+          : ((file.devices ?? []).find((candidate) => candidate.id === deviceId) ?? null),
+      ),
+    );
+
+  const addDevice: SkycotFamily["Service"]["addDevice"] = (input) =>
+    change("addDevice", (file, at) => {
+      const devices = file.devices ?? [];
+      const personKnown =
+        input.kind === "child"
+          ? file.children.some((child) => child.id === input.personId)
+          : (file.grownUps ?? []).some((person) => person.id === input.personId);
+      if (
+        !personKnown ||
+        devices.length >= MAX_DEVICES ||
+        devices.some((existing) => existing.id === input.id)
+      ) {
+        return invalid();
+      }
+      const added: FamilyDevice = {
+        id: input.id,
+        kind: input.kind,
+        personId: input.personId,
+        name: cleanName(input.name, DEVICE_NAME_MAX) ?? "A device",
+        createdAt: DateTime.formatIso(DateTime.makeUnsafe(at)),
+        linkId: input.linkId,
+        linkExpiresAt: input.linkExpiresAt,
+        passkeys: [],
+      };
+      return Effect.succeed([{ ...file, devices: [...devices, added] }, null] as const);
+    }).pipe(Effect.map(({ status }) => status));
+
+  const removeDevice: SkycotFamily["Service"]["removeDevice"] = (input) =>
+    change("removeDevice", (file) => {
+      const devices = file.devices ?? [];
+      if (!devices.some((existing) => existing.id === input.deviceId)) {
+        return Effect.succeed([file, null] as const);
+      }
+      return Effect.succeed([
+        { ...file, devices: devices.filter((existing) => existing.id !== input.deviceId) },
+        null,
+      ] as const);
+    }).pipe(Effect.map(({ status }) => status));
+
+  const updateDevice = (
+    name: string,
+    deviceId: string,
+    update: (device: FamilyDevice, file: FamilyFile, at: number) => FamilyDevice | null,
+  ) =>
+    change(name, (file, at) => {
+      const devices = file.devices ?? [];
+      const current = devices.find((existing) => existing.id === deviceId);
+      if (current === undefined) return invalid();
+      const next = update(current, file, at);
+      if (next === null) return invalid();
+      return Effect.succeed([
+        {
+          ...file,
+          devices: devices.map((existing) => (existing.id === deviceId ? next : existing)),
+        },
+        null,
+      ] as const);
+    }).pipe(Effect.map(({ status }) => status));
+
+  const reassignDevice: SkycotFamily["Service"]["reassignDevice"] = (input) =>
+    updateDevice("reassignDevice", input.deviceId, (current, file) =>
+      current.kind === "child" && file.children.some((child) => child.id === input.childId)
+        ? { ...current, personId: input.childId }
+        : null,
+    );
+
+  const addPasskey: SkycotFamily["Service"]["addPasskey"] = (input) =>
+    updateDevice("addPasskey", input.deviceId, (current) =>
+      current.kind === "grown-up" ? { ...current, passkeys: [input.passkey] } : null,
+    );
+
+  const usePasskey: SkycotFamily["Service"]["usePasskey"] = (input) =>
+    updateDevice("usePasskey", input.deviceId, (current, _file, at) =>
+      current.passkeys.some((passkey) => passkey.id === input.passkeyId)
+        ? {
+            ...current,
+            passkeys: current.passkeys.map((passkey) =>
+              passkey.id === input.passkeyId
+                ? {
+                    ...passkey,
+                    signCount: input.signCount,
+                    lastUsedAt: DateTime.formatIso(DateTime.makeUnsafe(at)),
+                  }
+                : passkey,
+            ),
+          }
+        : null,
+    ).pipe(Effect.asVoid);
+
+  const removePasskeys: SkycotFamily["Service"]["removePasskeys"] = (input) =>
+    updateDevice("removePasskeys", input.deviceId, (current) => ({ ...current, passkeys: [] }));
+
   return SkycotFamily.of({
+    lockAll,
+    addGrownUp,
+    updateGrownUp,
+    removeGrownUp,
+    device,
+    addDevice,
+    removeDevice,
+    reassignDevice,
+    addPasskey,
+    usePasskey,
+    removePasskeys,
     status,
     openGrants,
     isEnabled,

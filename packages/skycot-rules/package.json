@@ -55,6 +55,10 @@
     "./assistants": {
       "types": "./src/assistants.ts",
       "import": "./src/assistants.ts"
+    },
+    "./people": {
+      "types": "./src/people.ts",
+      "import": "./src/people.ts"
     }
   },
   "scripts": {

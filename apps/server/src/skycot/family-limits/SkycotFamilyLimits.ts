@@ -30,6 +30,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as ServerConfig from "../../config.ts";
 import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
+import * as SkycotFamilyIdentity from "../family-devices/SkycotFamilyIdentity.ts";
 import {
   allowanceReading,
   applyMoreTime,
@@ -83,13 +84,23 @@ export type PastDay = typeof PastDay.Type;
  * detail the shield caught (kinds only, never the words), and a message a grown-up let go as
  * typed.
  */
-export const FAMILY_EVENT_KINDS = ["approved", "shield", "shield-allowed"] as const;
+export const FAMILY_EVENT_KINDS = ["approved", "shield", "shield-allowed", "declined"] as const;
+/** A grown-up's device that answered a request: who and which device, by name as it was then. */
+const FamilyEventBy = Schema.Struct({
+  personId: Schema.String,
+  deviceId: Schema.String,
+  deviceName: Schema.String,
+});
+export type FamilyEventBy = typeof FamilyEventBy.Type;
 const FamilyEvent = Schema.Struct({
   at: Schema.Number,
   childId: Schema.String,
   kind: Schema.Literals(FAMILY_EVENT_KINDS),
   categories: Schema.optionalKey(Schema.Array(Schema.String)),
   threadId: Schema.optionalKey(Schema.String),
+  /** The one request a grown-up answered from their own device. */
+  requestId: Schema.optionalKey(Schema.String),
+  by: Schema.optionalKey(FamilyEventBy),
 });
 export type FamilyEvent = typeof FamilyEvent.Type;
 export type FamilyEventKind = FamilyEvent["kind"];
@@ -154,13 +165,16 @@ const emptyActivity = (profileCreatedAt: string): ActivityFile => ({
   log: [],
 });
 
-/** Why a turn (or switching away) was refused; "who" means no child is chosen on this device. */
-export type RefusalReason = LimitReason | "who";
+/**
+ * Why a turn (or switching away) was refused; "who" means no child is chosen on this device, and
+ * "device" that this is a child's own device and someone else was picked without a grown-up.
+ */
+export type RefusalReason = LimitReason | "who" | "device";
 
 export class FamilyLimitRefusal extends Schema.TaggedError<FamilyLimitRefusal>()(
   "SkycotFamilyLimitRefusal",
   {
-    reason: Schema.Literals(["bedtime", "time", "turns", "allowance", "who"]),
+    reason: Schema.Literals(["bedtime", "time", "turns", "allowance", "who", "device"]),
     sentence: Schema.String,
   },
 ) {
@@ -193,6 +207,8 @@ export function asleepSentence(
   switch (reason) {
     case "who":
       return "Choose who's using SKYCOT first.";
+    case "device":
+      return "This device belongs to one child. A grown-up can change whose it is with the parent code.";
     case "bedtime":
       return `It's bedtime, so SKYCOT is asleep${wakes}. A grown-up can give more time.`;
     case "time":
@@ -216,6 +232,11 @@ export interface SessionLimits {
   readonly childId: string | null;
   /** More than one child and none chosen here yet. */
   readonly needsChoice: boolean;
+  /**
+   * What kind of device this is: the family's Mac ("shared", with the picker), a child's own
+   * device (always that child), or a grown-up's device (never a child, so no picker and no limits).
+   */
+  readonly device: "shared" | "child" | "grown-up";
   readonly limits: LimitState | null;
   /** The engine's sentence while asleep; null while awake. */
   readonly sentence: string | null;
@@ -264,12 +285,27 @@ export class SkycotFamilyLimits extends Context.Service<
       readonly code: string;
       readonly more: MoreTime;
     }) => Effect.Effect<SessionLimits, SkycotFamily.FamilyError>;
+    /**
+     * The same "more time", for a grown-up the engine already knows said yes (their own phone,
+     * with its passkey or the code checked by the caller). Logged for the recap.
+     */
+    readonly grantMoreTime: (input: {
+      readonly sessionId: string;
+      readonly childId: string;
+      readonly more: MoreTime;
+    }) => Effect.Effect<SessionLimits, SkycotFamily.FamilyError>;
     /** Notes something that needed a grown-up for the session's child (the recap reads it). */
     readonly recordEvent: (input: {
       readonly sessionId: string;
       readonly kind: FamilyEventKind;
       readonly categories?: ReadonlyArray<string> | undefined;
       readonly threadId?: string | undefined;
+      /** The child it is about, when that is not the session's (a grown-up's phone said yes). */
+      readonly childId?: string | undefined;
+      /** The one request a grown-up answered. */
+      readonly requestId?: string | undefined;
+      /** Who said yes, from which device (a grown-up's phone). */
+      readonly by?: FamilyEventBy | undefined;
     }) => Effect.Effect<void>;
     /** The profile and its activity as kept, for the recap; null while the profile is off. */
     readonly snapshot: Effect.Effect<{
@@ -294,6 +330,12 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
   // Optional: without provider snapshots (tests, a stripped-down server) the allowance guard
   // simply has no reading, and the other limits still apply.
   const registry = yield* Effect.serviceOption(ProviderRegistry.ProviderRegistry);
+  // Optional: without it (older tests, tools) every session is the family's Mac, as before.
+  const identities = yield* Effect.serviceOption(SkycotFamilyIdentity.SkycotFamilyIdentity);
+  const identityOf = (sessionId: string) =>
+    identities._tag === "Some"
+      ? identities.value.identify(sessionId)
+      : Effect.succeed<SkycotFamilyIdentity.FamilyIdentity>({ kind: "shared" });
   const lock = yield* Semaphore.make(1);
   const cache = yield* Ref.make<{ readonly stamp: string; readonly file: ActivityFile | null }>({
     stamp: "",
@@ -340,13 +382,29 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
 
   const profileStatus = family.status.pipe(Effect.orElseSucceed(() => null));
 
-  const childFor = (profile: Profile, activity: ActivityFile, sessionId: string) => {
+  /**
+   * The child using SKYCOT on this session: a child's own device is always that child, a
+   * grown-up's device (or a removed one) is nobody's, and the Mac is whoever was picked.
+   */
+  const childFor = Effect.fnUntraced(function* (
+    profile: Profile,
+    activity: ActivityFile,
+    sessionId: string,
+  ) {
+    const who = yield* identityOf(sessionId);
+    if (who.kind === "child") {
+      return profile.children.find((candidate) => candidate.id === who.childId) ?? null;
+    }
+    if (who.kind !== "shared") return null;
     const chosen = activity.sessions[sessionId];
     const child =
       profile.children.find((candidate) => candidate.id === chosen) ??
       (profile.children.length === 1 ? profile.children[0] : undefined);
     return child ?? null;
-  };
+  });
+
+  const deviceKindOf = (who: SkycotFamilyIdentity.FamilyIdentity): SessionLimits["device"] =>
+    who.kind === "child" ? "child" : who.kind === "shared" ? "shared" : "grown-up";
 
   const readingFor = Effect.fnUntraced(function* (instanceId: string | undefined, at: number) {
     if (Option.isNone(registry)) return null;
@@ -394,19 +452,24 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     sessionId: string,
     at: number,
   ) {
+    const who = yield* identityOf(sessionId);
+    const device = deviceKindOf(who);
     if (profile === null || !profile.enabled || activity === null) {
       return {
         childId: null,
         needsChoice: false,
+        device,
         limits: null,
         sentence: null,
       } satisfies SessionLimits;
     }
-    const child = childFor(profile, activity, sessionId);
+    const child = yield* childFor(profile, activity, sessionId);
     if (child === null) {
       return {
         childId: null,
-        needsChoice: true,
+        // A grown-up's device is never asked "Who's using SKYCOT?".
+        needsChoice: device === "shared",
+        device,
         limits: null,
         sentence: null,
       } satisfies SessionLimits;
@@ -415,6 +478,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     return {
       childId: child.id,
       needsChoice: false,
+      device,
       limits,
       sentence:
         limits.asleep && limits.reason !== null
@@ -448,7 +512,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     const at = yield* now;
     if (loaded === null) return yield* sessionView(null, null, input.sessionId, at);
     let { activity } = loaded;
-    const child = childFor(loaded.profile, activity, input.sessionId);
+    const child = yield* childFor(loaded.profile, activity, input.sessionId);
     if (input.active && child !== null) {
       const before = activity.days[child.id];
       const after = countMinute(before, at, loaded.profile.timeZone);
@@ -470,7 +534,26 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
         return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
       }
       const at = yield* now;
-      const from = childFor(profile, activity, input.sessionId);
+      const who = yield* identityOf(input.sessionId);
+      if (who.kind === "grown-up" || who.kind === "removed") {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      if (who.kind === "child") {
+        // A child's own device is that child's. A grown-up (the parent code) can give it to
+        // another child; nobody else can, whatever SKYCOT is doing for either of them.
+        if (target.id !== who.childId) {
+          if (!input.grownUp) {
+            return yield* new FamilyLimitRefusal({
+              reason: "device",
+              sentence: asleepSentence("device", null, null, profile.timeZone),
+            });
+          }
+          yield* family.reassignDevice({ deviceId: who.deviceId, childId: target.id });
+          yield* Effect.logInfo("skycot-family.device-reassigned", { deviceId: who.deviceId });
+        }
+        return yield* sessionView(profile, activity, input.sessionId, at);
+      }
+      const from = yield* childFor(profile, activity, input.sessionId);
       if (from !== null && from.id !== target.id && !input.grownUp) {
         const state = yield* stateFor(profile, activity, from, at);
         if (state.asleep && state.reason !== null) {
@@ -511,7 +594,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     const loaded = yield* current;
     if (loaded === null) return;
     const { profile, activity } = loaded;
-    const child = childFor(profile, activity, input.sessionId);
+    const child = yield* childFor(profile, activity, input.sessionId);
     if (child === null) return yield* refuse(profile, null, null);
     const at = yield* now;
     const state = yield* stateFor(profile, activity, child, at, input.instanceId);
@@ -533,7 +616,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
   )(function* (input) {
     const loaded = yield* current;
     if (loaded === null) return;
-    const child = childFor(loaded.profile, loaded.activity, input.sessionId);
+    const child = yield* childFor(loaded.profile, loaded.activity, input.sessionId);
     // No child chosen: the step belongs to a turn someone already started; let it be judged as usual.
     if (child === null) return;
     const state = yield* stateFor(loaded.profile, loaded.activity, child, yield* now);
@@ -546,7 +629,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     const loaded = yield* current;
     if (loaded === null) return;
     const { activity } = loaded;
-    const child = childFor(loaded.profile, activity, input.sessionId);
+    const child = yield* childFor(loaded.profile, activity, input.sessionId);
     if (child === null) return;
     const newThread =
       input.threadId !== undefined && activity.threads[input.threadId] === undefined;
@@ -562,16 +645,19 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     });
   }, lock.withPermits(1));
 
-  const moreTime: SkycotFamilyLimits["Service"]["moreTime"] = Effect.fn(
-    "SkycotFamilyLimits.moreTime",
-  )(function* (input) {
+  const giveMoreTime = Effect.fn("SkycotFamilyLimits.giveMoreTime")(function* (input: {
+    readonly sessionId: string;
+    readonly childId: string;
+    readonly code: string | null;
+    readonly more: MoreTime;
+  }) {
     const loaded = yield* current;
     if (loaded === null) return yield* new SkycotFamily.FamilyError({ reason: "not-enabled" });
     const child = loaded.profile.children.find((candidate) => candidate.id === input.childId);
     if (child === undefined) {
       return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
     }
-    yield* family.checkCode({ code: input.code });
+    if (input.code !== null) yield* family.checkCode({ code: input.code });
     const at = yield* now;
     const { profile, activity } = loaded;
     const before = yield* stateFor(profile, activity, child, at);
@@ -600,13 +686,20 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     return yield* sessionView(profile, next, input.sessionId, at);
   }, lock.withPermits(1));
 
+  const moreTime: SkycotFamilyLimits["Service"]["moreTime"] = (input) => giveMoreTime(input);
+  const grantMoreTime: SkycotFamilyLimits["Service"]["grantMoreTime"] = (input) =>
+    giveMoreTime({ ...input, code: null });
+
   const recordEvent: SkycotFamilyLimits["Service"]["recordEvent"] = Effect.fn(
     "SkycotFamilyLimits.recordEvent",
   )(function* (input) {
     const loaded = yield* current;
     if (loaded === null) return;
     const { activity } = loaded;
-    const child = childFor(loaded.profile, activity, input.sessionId);
+    const child =
+      input.childId !== undefined
+        ? (loaded.profile.children.find((candidate) => candidate.id === input.childId) ?? null)
+        : yield* childFor(loaded.profile, activity, input.sessionId);
     if (child === null) return;
     const at = yield* now;
     const event: FamilyEvent = {
@@ -617,6 +710,8 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
         ? { categories: [...input.categories] }
         : {}),
       ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.requestId ? { requestId: input.requestId } : {}),
+      ...(input.by ? { by: input.by } : {}),
     };
     yield* save({
       ...activity,
@@ -673,6 +768,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     admitStep,
     recordStart,
     moreTime,
+    grantMoreTime,
     recordEvent,
     snapshot,
     today,

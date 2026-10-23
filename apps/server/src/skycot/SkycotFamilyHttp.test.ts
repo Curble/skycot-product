@@ -508,7 +508,7 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
                   return { sequence: dispatched };
                 }),
             }),
-            SkycotFamilyGate.layerRpcAuthorization(gate, "session-parent").pipe(
+            SkycotFamilyGate.layerRpcAuthorization(gate, "session-parent", "parent").pipe(
               Layer.provide(Layer.succeed(RpcScopeAuthorization)((effect) => effect)),
             ),
             RpcSerialization.layerJson,

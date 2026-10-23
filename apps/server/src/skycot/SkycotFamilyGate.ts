@@ -21,6 +21,13 @@
 // secret files (`.env`, `.git`, keys) need a grown-up's `files` yes. The plain client's own
 // Files routes apply the same rule, and also hold add-ons and build output (skycot/files).
 //
+// Who is who (Phase 1): every call is first judged by who the device is (family-devices/
+// SkycotFamilyIdentity). A removed device is refused everything. A grown-up's device may only
+// read (T3 gives it the read scope alone; this checks it again, so a wrong grant cannot widen
+// it) and answers requests through SKYCOT's own approver routes. A child's own device may only
+// name its own conversations, projects and folders (family-devices/SkycotFamilyVisibility), and
+// cross-conversation searches are closed to it; its shell lists arrive filtered.
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
 // those are closed separately: while the profile is on, ProviderSessionManager issues a thread no
 // MCP credential at all (seam skycot-family-mcp), so the agent is given no engine tool server and
@@ -52,9 +59,11 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { cleanBrowsePath, pathIsHiddenOrSecret } from "@t3tools/skycot-rules/browse";
 import {
   deleteConversationApprovalId,
+  describeFamilyMatches,
   evaluateFamilyRequest,
   type FamilyEvaluation,
 } from "@t3tools/skycot-rules/family";
+import { describeMatches } from "@t3tools/skycot-rules/rules";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import { isInQuestionsSpace, workRootsFor } from "@t3tools/skycot-rules/questions";
 import {
@@ -63,8 +72,14 @@ import {
   shieldApprovalId,
 } from "@t3tools/skycot-rules/personal";
 
+import { AuthOrchestrationReadScope } from "@t3tools/contracts";
+
+import { requiredScopeForRpcMethod } from "../auth/RpcAuthorization.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
+import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
+import { filterArchivedSnapshot } from "./family-devices/visibility.ts";
 import { isInsideRoot } from "./files/SkycotFiles.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
@@ -80,6 +95,59 @@ export const FAMILY_ASLEEP_PERMISSION = "skycot:family-asleep";
 
 export const FAMILY_REFUSAL_MESSAGE =
   "The Family profile is on, so a grown-up needs to enter the parent code first.";
+
+/** `requiredPermission` when a device may not do this at all (whose it is decides, not a code). */
+export const FAMILY_DEVICE_PERMISSION = "skycot:family-device";
+
+export const REMOVED_DEVICE_MESSAGE =
+  "This device was removed from the Family profile. Link it again from the family's Mac.";
+export const GROWN_UP_DEVICE_MESSAGE =
+  "A grown-up's device can read and say yes or no, but not change anything.";
+export const CHILD_DEVICE_MESSAGE = "That belongs to someone else in the family.";
+
+/**
+ * Calls a child's own device may not make at all: searches across every conversation (they would
+ * list a brother's or sister's), and the parent's other AI sessions on this Mac.
+ */
+export const CHILD_DEVICE_CLOSED_METHODS: ReadonlySet<string> = new Set([
+  ORCHESTRATION_V2_WS_METHODS.searchThreads,
+  ORCHESTRATION_V2_WS_METHODS.searchThreadStream,
+  "agentSessions.scan",
+  "agentSessions.import",
+  "server.listAcpRegistrySessions",
+  "pullRequests.linkedThreads",
+]);
+
+/** Calls that only read a file, where a page pinned to the fridge stays open to every child. */
+const READ_ONLY_METHODS: ReadonlySet<string> = new Set([
+  "projects.readFile",
+  "projects.listEntries",
+  "projects.listIgnoredFiles",
+  "projects.searchEntries",
+  "projects.searchContents",
+  "assets.createUrl",
+  "filesystem.getMetadata",
+]);
+
+/** Whether a grown-up's device may make this call: only what T3's read scope covers. */
+export function grownUpDeviceMayCall(method: string): boolean {
+  try {
+    return requiredScopeForRpcMethod(method) === AuthOrchestrationReadScope;
+  } catch {
+    return false;
+  }
+}
+
+export const deviceRefusal = (message: string) =>
+  new EnvironmentAuthorizationError({
+    message,
+    ...authScopeResponseFor(),
+    requiredPermission: FAMILY_DEVICE_PERMISSION,
+  });
+
+function authScopeResponseFor() {
+  return authScopeRequiredResponse(AuthOrchestrationOperateScope);
+}
 
 type Purpose = SkycotFamily.FamilyPurpose;
 
@@ -577,9 +645,31 @@ export class SkycotFamilyGate extends Context.Service<
     /** Fails with a plain refusal when the Family profile needs a grown-up for this call. */
     readonly check: (input: {
       readonly sessionId: string;
+      /** The session's sign-in subject, when the caller holds it: says which device this is. */
+      readonly subject?: string | undefined;
       readonly method: string;
       readonly payload: unknown;
     }) => Effect.Effect<void, EnvironmentAuthorizationError>;
+    /** A call's answer as this session may see it (a child's device gets its own work only). */
+    readonly filterResult: (input: {
+      readonly sessionId: string;
+      readonly method: string;
+      readonly result: unknown;
+    }) => Effect.Effect<unknown>;
+    /**
+     * What a pending request is, in plain words, and whether only a grown-up may allow it, for a
+     * grown-up's phone. Null when it is not a pending approval the gate can read.
+     */
+    readonly describeRequest: (input: {
+      readonly threadId: ThreadId;
+      readonly requestId: RuntimeRequestId;
+    }) => Effect.Effect<RequestDescription | null>;
+    /**
+     * Hands a call the visibility service this gate was built with, so the shell streams it
+     * returns can filter themselves (ws.ts seam skycot-family-visibility). RPC handlers only see
+     * the server's top-level services, so the gate carries it in, as it carries the check.
+     */
+    readonly withVisibility: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
     /** The same check for an HTTP API route (`isGatedHttpRoute`). */
     readonly checkHttp: (input: {
       readonly sessionId: string;
@@ -597,6 +687,16 @@ export class SkycotFamilyGate extends Context.Service<
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 
+/** A pending request as a grown-up's phone shows it. */
+export interface RequestDescription {
+  readonly needsGrownUp: boolean;
+  /** "It uses the internet." */
+  readonly why: string | null;
+  /** What it wants to do: the command, or the files, as the assistant asked. */
+  readonly what: string;
+  readonly kind: ApprovalItem["requestKind"];
+}
+
 const make = Effect.gen(function* () {
   const family = yield* SkycotFamily.SkycotFamily;
   const fs = yield* FileSystem.FileSystem;
@@ -606,6 +706,9 @@ const make = Effect.gen(function* () {
   // Optional so a gate built without the limits (older tests, tools) keeps its old behaviour.
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+  // Optional: without them (older tests, tools) every session is the family's Mac, as before.
+  const identities = yield* Effect.serviceOption(SkycotFamilyIdentity.SkycotFamilyIdentity);
+  const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
 
   /**
    * Where the thread works (its private copy, else the folder), and the project's folder. A
@@ -672,6 +775,46 @@ const make = Effect.gen(function* () {
           : Effect.succeed(false),
       ),
     );
+
+  const describeRequest: SkycotFamilyGate["Service"]["describeRequest"] = Effect.fn(
+    "SkycotFamilyGate.describeRequest",
+  )(
+    function* (input) {
+      const thread = yield* projections.getThread(input.threadId);
+      const approval = yield* projections.getTurnItem({
+        threadId: input.threadId,
+        itemId: IdAllocator.derive.approvalTurnItem({ requestId: input.requestId }),
+      });
+      if (approval === null || approval.type !== "approval_request") return null;
+      const driver = approval.nativeItemRef?.driver;
+      const toolCall = yield* toolCallFor(input.threadId, approval, driver);
+      const facts = requestFacts(approval, toolCall, driver);
+      const what =
+        facts?.kind === "command" && facts.command
+          ? facts.command
+          : facts !== null && "files" in facts && facts.files && facts.files.length > 0
+            ? facts.files.map((file) => file.path).join(", ")
+            : (approval.prompt ?? approval.title ?? "");
+      if (facts === null) {
+        return { needsGrownUp: true, why: null, what, kind: approval.requestKind };
+      }
+      const evaluation = evaluateFamilyRequest(
+        { ...facts, toolItemType: toolCall?.type },
+        yield* projectRootsFor(thread),
+      );
+      const parts = [
+        describeFamilyMatches(evaluation.family),
+        describeMatches(evaluation.base.matches),
+      ].filter((part) => part.length > 0);
+      return {
+        needsGrownUp: evaluation.needsGrownUp,
+        why: parts.length > 0 ? `It ${parts.join(", and ")}.` : null,
+        what: what.slice(0, 400),
+        kind: approval.requestKind,
+      } satisfies RequestDescription;
+    },
+    Effect.orElseSucceed(() => null),
+  );
 
   // A question's own folder is SKYCOT's space, not the person's: open like a project's.
   const isProjectFolder = (cwd: string) =>
@@ -891,14 +1034,81 @@ const make = Effect.gen(function* () {
     }
   });
 
+  /** Who the device is decides first: a removed one gets nothing, a grown-up's only reads. */
+  const judgeDevice = Effect.fn("SkycotFamilyGate.judgeDevice")(function* (input: {
+    readonly sessionId: string;
+    readonly subject?: string | undefined;
+    readonly method: string;
+    readonly payload: unknown;
+  }) {
+    if (Option.isNone(identities)) return;
+    const who =
+      input.subject === undefined
+        ? yield* identities.value.identify(input.sessionId)
+        : yield* identities.value.identifySession({
+            sessionId: input.sessionId,
+            subject: input.subject,
+          });
+    if (who.kind === "shared") return;
+    if (who.kind === "removed") {
+      yield* Effect.logInfo("skycot-family.device-refused", {
+        method: input.method,
+        why: "removed",
+      });
+      return yield* deviceRefusal(REMOVED_DEVICE_MESSAGE);
+    }
+    if (who.kind === "grown-up") {
+      if (grownUpDeviceMayCall(input.method)) return;
+      yield* Effect.logInfo("skycot-family.device-refused", {
+        method: input.method,
+        why: "grown-up",
+      });
+      return yield* deviceRefusal(GROWN_UP_DEVICE_MESSAGE);
+    }
+    if (CHILD_DEVICE_CLOSED_METHODS.has(input.method)) {
+      yield* Effect.logInfo("skycot-family.device-refused", { method: input.method, why: "child" });
+      return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+    }
+    if (Option.isNone(visibility)) {
+      // No way to filter what a child's device would receive: the lists stay closed to it.
+      return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+    }
+    const view = yield* visibility.value.childViewFor(input.sessionId);
+    if (view === null) return;
+    const allowed = yield* visibility.value.allows(
+      view,
+      SkycotFamilyVisibility.referencedBy(input.payload),
+      READ_ONLY_METHODS.has(input.method) ? "read" : "use",
+    );
+    if (allowed) return;
+    yield* Effect.logInfo("skycot-family.device-refused", {
+      method: input.method,
+      why: "not-theirs",
+    });
+    return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+  });
+
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
     Effect.suspend(() =>
-      enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)).pipe(
+      judgeDevice(input).pipe(
+        Effect.andThen(
+          enforce(input.sessionId, input.method, gateNeedFor(input.method, input.payload)),
+        ),
         Effect.andThen(admit(input.sessionId, input.method, input.payload)),
         Effect.andThen(passShield(input.sessionId, input.method, input.payload)),
         Effect.andThen(passPlan(input.sessionId, input.method, input.payload)),
       ),
     );
+
+  const filterResult: SkycotFamilyGate["Service"]["filterResult"] = Effect.fn(
+    "SkycotFamilyGate.filterResult",
+  )(function* (input) {
+    if (input.method !== ORCHESTRATION_V2_WS_METHODS.getArchivedShellSnapshot) return input.result;
+    if (Option.isNone(visibility)) return input.result;
+    const view = yield* visibility.value.childViewFor(input.sessionId);
+    if (view === null) return input.result;
+    return filterArchivedSnapshot(view, input.result as never);
+  });
 
   const checkHttp: SkycotFamilyGate["Service"]["checkHttp"] = (input) =>
     Effect.suspend(() =>
@@ -909,29 +1119,72 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  return SkycotFamilyGate.of({ check, checkHttp, requestNeedsGrownUp });
+  const withVisibility: SkycotFamilyGate["Service"]["withVisibility"] = (effect) =>
+    Option.isSome(visibility)
+      ? Effect.provideService(
+          effect,
+          SkycotFamilyVisibility.SkycotFamilyVisibility,
+          visibility.value,
+        )
+      : effect;
+
+  return SkycotFamilyGate.of({
+    check,
+    checkHttp,
+    requestNeedsGrownUp,
+    filterResult,
+    describeRequest,
+    withVisibility,
+  });
 });
 
 /** The gate alone; the Family limits apply when `SkycotFamilyLimits` is provided beside it. */
 export const layerCore = Layer.effect(SkycotFamilyGate, make);
 
-/** The gate with the engine's limits under it (both are exported: the HTTP routes use the limits too). */
-export const layer = layerCore.pipe(Layer.provideMerge(SkycotFamilyLimits.layer));
+/**
+ * The gate with the engine's limits, who-is-who and per-person visibility under it (all are
+ * exported: the HTTP routes use them too).
+ */
+export const layer = layerCore.pipe(
+  Layer.provideMerge(SkycotFamilyVisibility.layer),
+  Layer.provideMerge(SkycotFamilyLimits.layer),
+  Layer.provideMerge(SkycotFamilyIdentity.layer),
+);
 
 /**
  * The scope middleware with the Family check in front of it, for ws.ts. Provided inside the
  * scope middleware's own `Effect.provide`, so it wraps that instance; the check runs before
  * the scope check's `onAuthorized` hook so a refused call records nothing.
  */
-export const layerRpcAuthorization = (gate: SkycotFamilyGate["Service"], sessionId: string) =>
+export const layerRpcAuthorization = (
+  gate: SkycotFamilyGate["Service"],
+  sessionId: string,
+  /** The session's sign-in subject: which linked device this is (optional for older callers). */
+  subject?: string,
+) =>
   Layer.effect(
     RpcScopeAuthorization,
     Effect.gen(function* () {
       const authorize = yield* RpcScopeAuthorization;
       return RpcScopeAuthorization.of((effect, options) =>
         gate
-          .check({ sessionId, method: options.rpc._tag, payload: options.payload })
-          .pipe(Effect.andThen(Effect.suspend(() => authorize(effect, options)))),
+          .check({ sessionId, subject, method: options.rpc._tag, payload: options.payload })
+          .pipe(
+            Effect.andThen(
+              Effect.suspend(() =>
+                authorize(
+                  gate.withVisibility(
+                    options.rpc._tag === ORCHESTRATION_V2_WS_METHODS.getArchivedShellSnapshot
+                      ? (Effect.flatMap(effect, (result) =>
+                          gate.filterResult({ sessionId, method: options.rpc._tag, result }),
+                        ) as typeof effect)
+                      : effect,
+                  ),
+                  options,
+                ),
+              ),
+            ),
+          ),
       );
     }),
   );

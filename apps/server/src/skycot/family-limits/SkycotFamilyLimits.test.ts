@@ -149,6 +149,7 @@ it.layer(NodeServices.layer)("SkycotFamilyLimits", (it) => {
         assert.deepEqual(yield* limits.heartbeat({ sessionId: SESSION, active: true }), {
           childId: null,
           needsChoice: false,
+          device: "shared",
           limits: null,
           sentence: null,
         });

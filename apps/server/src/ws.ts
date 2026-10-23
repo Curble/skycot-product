@@ -2,6 +2,7 @@ import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as SkycotPolicy from "./skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-config
 import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts"; // nondev-seam: skycot-family-rpc
+import * as SkycotFamilyVisibility from "./skycot/family-devices/SkycotFamilyVisibility.ts"; // nondev-seam: skycot-family-visibility
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 
 import * as DateTime from "effect/DateTime";
@@ -2031,9 +2032,17 @@ export const layerWsRpc = (
             ),
           ),
         [ORCHESTRATION_V2_WS_METHODS.subscribeArchivedShell]: (_input) =>
-          Stream.unwrap(subscribeOrchestrationV2ArchivedShell()),
+          // nondev-seam: skycot-family-visibility (a child's own device gets only its own work)
+          SkycotFamilyVisibility.archivedStreamFor(
+            currentSessionId,
+            Stream.unwrap(subscribeOrchestrationV2ArchivedShell()),
+          ),
         [ORCHESTRATION_V2_WS_METHODS.subscribeShell]: (input) =>
-          Stream.unwrap(subscribeOrchestrationV2Shell(input)),
+          // nondev-seam: skycot-family-visibility (a child's own device gets only its own work)
+          SkycotFamilyVisibility.shellStreamFor(
+            currentSessionId,
+            Stream.unwrap(subscribeOrchestrationV2Shell(input)),
+          ),
         [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: (input) =>
           Stream.unwrap(
             Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
@@ -3186,7 +3195,11 @@ export const layer = Layer.unwrap(
             // nondev-seam: skycot-family-rpc (Family-profile check in front of the scope check below; two provides on purpose: the outer one is the scope check this wraps)
             // @effect-diagnostics-next-line multipleEffectProvide:off
             Effect.provide(
-              SkycotFamilyGate.layerRpcAuthorization(skycotFamilyGate, session.sessionId),
+              SkycotFamilyGate.layerRpcAuthorization(
+                skycotFamilyGate,
+                session.sessionId,
+                session.subject,
+              ),
             ),
             Effect.provide(
               Layer.merge(
