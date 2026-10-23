@@ -759,7 +759,7 @@ def home_body():
       <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.1.beta-arm64.dmg">Download the beta for Mac</a>
       <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
     </div>
-    <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking.</p>
+    <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/38gtBbywq6">Discord</a>. No newsletter, and the app sends us nothing.</p>
     <div class="status">
       <div class="done"><b>In the beta</b><p>Plain-English conversations, plans and permission cards, Undo and Versions, the Family profile with a parent code, bedtimes and limits, stickers, the fridge, the grown-up recap, the live preview, notifications and themes.</p></div>
       <div class="now"><b>Testing now</b><p>This first public beta on real family Macs, automatic updates, and "send for review" and "put it live" with a connected GitHub account.</p></div>
