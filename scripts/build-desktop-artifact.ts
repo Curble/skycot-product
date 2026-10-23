@@ -53,6 +53,8 @@ import {
   rebrandMacInfoStrings,
   resolveSkycotMacSigning,
 } from "../packages/skycot-brand/src/macBuild.ts";
+// nondev-seam: skycot-mac-dmg-notarize
+import { finishSkycotMacDmgs, resolveSkycotDmgRelease } from "../nondev/scripts/mac-dmg-release.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -3894,6 +3896,14 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
           catch: MacPasskeySigningConfigurationResolutionError.fromCause,
         })
       : undefined;
+  // nondev-seam: skycot-mac-dmg-notarize — checked before packaging, so a missing CSC_NAME fails fast.
+  const skycotDmgRelease =
+    skycotMacSigning && options.target === "dmg"
+      ? yield* Effect.try({
+          try: () => resolveSkycotDmgRelease(process.env),
+          catch: MacPasskeySigningConfigurationResolutionError.fromCause,
+        })
+      : undefined;
   const configuredMacPasskeySigning =
     options.platform === "mac" && options.signed && !skycotMacSigning
       ? yield* Effect.try({
@@ -4152,6 +4162,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       platform: options.platform,
       arch: options.arch,
     });
+  }
+
+  // nondev-seam: skycot-mac-dmg-notarize — SKYCOT signs, notarises and staples the DMG too.
+  if (skycotDmgRelease) {
+    yield* Effect.promise(() =>
+      finishSkycotMacDmgs({ distDir: stageDistDir, repoRoot, plan: skycotDmgRelease }),
+    );
   }
 
   if (options.platform === "win") {
