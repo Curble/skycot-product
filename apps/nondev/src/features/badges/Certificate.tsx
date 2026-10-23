@@ -22,6 +22,7 @@ import { useFamily } from "../family/FamilyProvider";
 import { firstName } from "./catalog";
 import { Mo, Sam } from "./stickers/parts";
 import { Sticker } from "./stickers/Sticker";
+import { displayTitle } from "../tidy/renamedTitles";
 import { useBadges } from "./store";
 
 export type CertificateKind = "first" | "tenth";
@@ -60,7 +61,7 @@ function useWorkTitle(earned: EarnedBadge | null): string | null {
       ? undefined
       : [...rows, ...oldRows].find((row) => row.shell.id === earned.threadId)?.title;
   const title = live ?? earned.title;
-  return title ? clampTitle(title) : null;
+  return title ? clampTitle(displayTitle(earned.threadId, title)) : null;
 }
 
 export function CertificateScreen({ kind }: { readonly kind: CertificateKind }) {

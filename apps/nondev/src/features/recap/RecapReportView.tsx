@@ -24,6 +24,7 @@ import {
   type RecapReport,
 } from "./recap";
 import "./recap.css";
+import { displayTitle } from "../tidy/renamedTitles";
 
 const timeOf = (at: number, timeZone: string, withDay: boolean) =>
   new Intl.DateTimeFormat("en-AU", {
@@ -58,7 +59,10 @@ export function RecapReportView({
   const made = compact ? report.made.slice(0, 3) : report.made;
   const asks = compact ? report.asks.slice(0, 3) : report.asks;
   const span = week ? "this week" : "today";
-  const proud = report.proudOf;
+  const proud =
+    report.proudOf === null
+      ? null
+      : { ...report.proudOf, title: displayTitle(report.proudOf.threadId, report.proudOf.title) };
 
   return (
     <div className={`fm-recap${compact ? " fm-recap--compact" : ""}`} data-range={report.range}>
@@ -149,7 +153,7 @@ export function RecapReportView({
               {made.map((entry) => (
                 <ListRow
                   key={entry.threadId}
-                  title={entry.title}
+                  title={displayTitle(entry.threadId, entry.title)}
                   subtitle={[
                     entry.projectTitle,
                     // The sentence's own full stop would clash with the separators.

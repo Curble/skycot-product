@@ -7,6 +7,7 @@ import type { CSSProperties } from "react";
 
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { Button } from "../../ui/Button";
+import { displayTitle } from "../tidy/renamedTitles";
 import { madeLabel, type FridgeItem } from "./fridge";
 import { MagnetThumb } from "./MagnetThumb";
 
@@ -39,30 +40,26 @@ export function FridgeMagnet({
   readonly onPin?: (pinned: boolean) => void;
 }) {
   const pinned = item.pinnedAt !== null;
+  const title = displayTitle(item.threadId, item.title);
   return (
     <article
       className={`fm-magnet${compact ? " fm-magnet--compact" : ""}`}
       data-pinned={pinned ? "" : undefined}
       data-note={index % 4}
       style={{ "--fm-magnet-tilt": `${tiltOf(item.threadId)}deg` } as CSSProperties}
-      aria-label={item.title}
+      aria-label={title}
     >
       <span className="fm-magnet__magnet" aria-hidden />
       <button
         type="button"
         className="fm-magnet__open"
         onClick={onOpen}
-        aria-label={`Open ${item.title}`}
+        aria-label={`Open ${title}`}
       >
-        <MagnetThumb
-          environmentId={environmentId}
-          cwd={item.cwd}
-          page={item.page}
-          title={item.title}
-        />
+        <MagnetThumb environmentId={environmentId} cwd={item.cwd} page={item.page} title={title} />
       </button>
       <div className="fm-magnet__meta">
-        <b className="fm-magnet__title">{item.title}</b>
+        <b className="fm-magnet__title">{title}</b>
         <small className="fm-magnet__when">
           {madeLabel(item.madeAt, now)}
           {maker ? ` · by ${maker}` : ""}

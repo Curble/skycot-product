@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vite-plus/test";
+
+import { friendlyTitle } from "./titles";
+
+describe("friendlyTitle", () => {
+  // Real titles the assistant wrote in the beta walkthrough (Ava and Leo).
+  it.each([
+    ["Create an Offline Bubbles Pet Page", "Bubbles pet page"],
+    ["Build Twinkling Rocket Drawing Page", "Twinkling rocket"],
+    ["Build Offline Rocket Star Catcher", "Rocket star catcher"],
+    ["Create an Offline Dinosaur Quiz", "Dinosaur quiz"],
+    ["Create Nan’s 80th Birthday Card", "Nan’s 80th birthday card"],
+    ["Add Button to Make Dog Wag", "Button to make dog wag"],
+    ["Make a Birthday Card for Mum", "Birthday card for Mum"],
+    ["Design Simple Space Invaders Game App", "Space invaders game"],
+    ["Create Interactive Volcano School Project Page", "Volcano school project"],
+    ["Build a Quiz App", "Quiz app"],
+  ])("%s → %s", (title, friendly) => {
+    expect(friendlyTitle(title)).toBe(friendly);
+  });
+
+  it("leaves titles a person wrote or chose alone", () => {
+    expect(friendlyTitle("my bubbles page")).toBe("my bubbles page");
+    expect(friendlyTitle("Make a rocket go zoom")).toBe("Make a rocket go zoom");
+    expect(friendlyTitle("Create Nan’s Card", { renamed: true })).toBe("Create Nan’s Card");
+    expect(friendlyTitle("  Bubbles!  ")).toBe("Bubbles!");
+  });
+
+  it("keeps the original when stripping would leave nothing", () => {
+    expect(friendlyTitle("Create Page")).toBe("Create Page");
+    expect(friendlyTitle("")).toBe("");
+  });
+});
