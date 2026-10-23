@@ -149,6 +149,7 @@ import {
 } from "@t3tools/provider-core/server/subagentProjection";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as SkycotPolicy from "../../skycot/SkycotPolicy.ts"; // nondev-seam: skycot-codex-mode
 
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 export const CODEX_DRIVER_KIND = CODEX_PROVIDER;
@@ -774,7 +775,11 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
         ? undefined
         : { ...t3Context, ...appContext };
     const collaborationMode: CodexSchema.ClientRequest__CollaborationMode | undefined =
-      input.runtimePolicy.interactionMode !== "plan" && developerInstructions === undefined
+      input.runtimePolicy.interactionMode !== "plan" &&
+      developerInstructions === undefined &&
+      // nondev-seam: skycot-codex-mode (Codex keeps a thread's last mode: without T3's tools, as
+      // in the Family profile, Build it after a plan must still say "default")
+      !SkycotPolicy.isSkycotPolicyEnabled(process.env)
         ? undefined
         : {
             mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "default",
