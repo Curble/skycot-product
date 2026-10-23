@@ -28,6 +28,11 @@
 // name its own conversations, projects and folders (family-devices/SkycotFamilyVisibility), and
 // cross-conversation searches are closed to it; its shell lists arrive filtered.
 //
+// Just ask, one space per child: "open Questions" (`projects.ensureScratch`) is answered with the
+// Questions space of the child using SKYCOT on that session (questions/SkycotQuestionSpaces), and
+// a child's own device may start a new question only in their own space: a brother's or
+// sister's is theirs, and the shared space (questions from before) is the grown-ups'.
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
 // those are closed separately: while the profile is on, ProviderSessionManager issues a thread no
 // MCP credential at all (seam skycot-family-mcp), so the agent is given no engine tool server and
@@ -37,8 +42,10 @@
 import {
   AuthOrchestrationOperateScope,
   EnvironmentAuthorizationError,
+  OrchestrationDispatchCommandError,
   ORCHESTRATION_V2_WS_METHODS,
   RpcScopeAuthorization,
+  WS_METHODS,
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
   type PlanId,
@@ -65,7 +72,13 @@ import {
 } from "@t3tools/skycot-rules/family";
 import { describeMatches } from "@t3tools/skycot-rules/rules";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
-import { isInQuestionsSpace, workRootsFor } from "@t3tools/skycot-rules/questions";
+import {
+  childMayStartQuestionIn,
+  isInQuestionsSpace,
+  isQuestionsSpace,
+  questionsSpaceOf,
+  workRootsFor,
+} from "@t3tools/skycot-rules/questions";
 import {
   findPersonalDetails,
   personalCategories,
@@ -86,6 +99,7 @@ import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
+import * as SkycotQuestionSpaces from "./questions/SkycotQuestionSpaces.ts";
 
 /** `requiredPermission` on the refusal, so a client can tell "ask a grown-up" from a scope error. */
 export const FAMILY_PERMISSION = "skycot:family-parent-code";
@@ -525,6 +539,22 @@ export function startedBy(
   return null;
 }
 
+/**
+ * Pure: the project a call starts a new conversation in, if it starts one (a launch that is not
+ * a reuse of an existing conversation, or `thread.create`). Exported for tests.
+ */
+export function newThreadProject(method: string, payload: unknown): string | null {
+  const input = record(payload);
+  const projectId = typeof input["projectId"] === "string" ? input["projectId"] : null;
+  if (method === ORCHESTRATION_V2_WS_METHODS.launchThread) {
+    return input["reuseExistingThread"] === true ? null : projectId;
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input["type"] === "thread.create") {
+    return projectId;
+  }
+  return null;
+}
+
 /** Pure: the child's message a call sends, if it sends one. Exported for tests. */
 export function sentMessage(
   method: string,
@@ -682,6 +712,17 @@ export class SkycotFamilyGate extends Context.Service<
       readonly threadId: ThreadId;
       readonly requestId: RuntimeRequestId;
     }) => Effect.Effect<boolean>;
+    /**
+     * "Open Questions" for this session: the Questions space of the child using SKYCOT here (made
+     * on first use). None leaves the answer to T3 (its Scratch project): the profile is off,
+     * nobody is picked on the Mac, or the engine was built without spaces (older tests, tools).
+     */
+    readonly questionsSpaceFor: (
+      sessionId: string,
+    ) => Effect.Effect<
+      Option.Option<{ readonly projectId: ProjectId }>,
+      EnvironmentAuthorizationError | OrchestrationDispatchCommandError
+    >;
   }
 >()("t3/skycot/SkycotFamilyGate") {}
 
@@ -709,6 +750,8 @@ const make = Effect.gen(function* () {
   // Optional: without them (older tests, tools) every session is the family's Mac, as before.
   const identities = yield* Effect.serviceOption(SkycotFamilyIdentity.SkycotFamilyIdentity);
   const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
+  // Optional: without it (older tests, tools) "open Questions" stays T3's own shared space.
+  const questionSpaces = yield* Effect.serviceOption(SkycotQuestionSpaces.SkycotQuestionSpaces);
 
   /**
    * Where the thread works (its private copy, else the folder), and the project's folder. A
@@ -825,14 +868,31 @@ const make = Effect.gen(function* () {
           Effect.orElseSucceed(() => false),
         );
 
+  // A question made into a project (Undo takes it off the list again); never a whole space.
   const isQuestionProject = (projectId: ProjectId) =>
     projects.get(projectId).pipe(
       Effect.map(
         (project) =>
-          Option.isSome(project) && isInQuestionsSpace(project.value.workspaceRoot, questionsRoot),
+          Option.isSome(project) &&
+          isInQuestionsSpace(project.value.workspaceRoot, questionsRoot) &&
+          !isQuestionsSpace(project.value.workspaceRoot, questionsRoot),
       ),
       Effect.orElseSucceed(() => false),
     );
+
+  /**
+   * Whether a child may start a new conversation in this project: anywhere the other rules
+   * allow, except a Questions space that is not their own (a sibling's, or the shared one).
+   * A project the gate cannot read is no space, and the visibility rules judge it as before.
+   */
+  const childMayStartIn = Effect.fnUntraced(function* (childId: string, projectId: string) {
+    const project = yield* projects
+      .get(projectId as ProjectId)
+      .pipe(Effect.orElseSucceed(() => Option.none()));
+    if (Option.isNone(project)) return true;
+    const space = questionsSpaceOf(project.value.workspaceRoot, questionsRoot);
+    return space === null || childMayStartQuestionIn(childId, space);
+  });
 
   const isKnownProject = (projectId: ProjectId) =>
     projects.get(projectId).pipe(
@@ -1080,12 +1140,38 @@ const make = Effect.gen(function* () {
       SkycotFamilyVisibility.referencedBy(input.payload),
       READ_ONLY_METHODS.has(input.method) ? "read" : "use",
     );
-    if (allowed) return;
+    const startsIn = newThreadProject(input.method, input.payload);
+    if (allowed && (startsIn === null || (yield* childMayStartIn(view.childId, startsIn)))) return;
     yield* Effect.logInfo("skycot-family.device-refused", {
       method: input.method,
-      why: "not-theirs",
+      why: allowed ? "not-their-questions" : "not-theirs",
     });
     return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+  });
+
+  const questionsSpaceFor: SkycotFamilyGate["Service"]["questionsSpaceFor"] = Effect.fn(
+    "SkycotFamilyGate.questionsSpaceFor",
+  )(function* (sessionId) {
+    if (Option.isNone(questionSpaces) || Option.isNone(limits)) return Option.none();
+    if (!(yield* family.isEnabled)) return Option.none();
+    const session = yield* limits.value.forSession({ sessionId });
+    if (session.childId === null) {
+      // A child's own device always has its child; one without is refused, never handed the
+      // shared space.
+      if (session.device === "child") return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+      return Option.none();
+    }
+    const childId = session.childId;
+    const status = yield* family.status.pipe(Effect.orElseSucceed(() => null));
+    const childName = status?.children.find((child) => child.id === childId)?.name ?? null;
+    return yield* questionSpaces.value.ensureChildSpace({ childId, childName }).pipe(
+      Effect.tapError((cause) =>
+        Effect.logWarning("skycot-questions.space-failed", { reason: cause.message }),
+      ),
+      Effect.mapError(
+        (cause) => new OrchestrationDispatchCommandError({ message: cause.message, cause }),
+      ),
+    );
   });
 
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
@@ -1135,6 +1221,7 @@ const make = Effect.gen(function* () {
     filterResult,
     describeRequest,
     withVisibility,
+    questionsSpaceFor,
   });
 });
 
@@ -1142,14 +1229,34 @@ const make = Effect.gen(function* () {
 export const layerCore = Layer.effect(SkycotFamilyGate, make);
 
 /**
- * The gate with the engine's limits, who-is-who and per-person visibility under it (all are
- * exported: the HTTP routes use them too).
+ * The gate with the engine's limits, who-is-who, per-person visibility and the children's
+ * Questions spaces under it (all are exported: the HTTP routes use them too).
  */
 export const layer = layerCore.pipe(
+  Layer.provideMerge(SkycotQuestionSpaces.layer),
   Layer.provideMerge(SkycotFamilyVisibility.layer),
   Layer.provideMerge(SkycotFamilyLimits.layer),
   Layer.provideMerge(SkycotFamilyIdentity.layer),
 );
+
+/**
+ * "Open Questions" (`projects.ensureScratch`, whose answer is `{ projectId }`): the space of the
+ * child using SKYCOT on this session, else T3's own answer (its Scratch project). Its refusals
+ * are the ones that call already has: the device's, or "couldn't open" (a dispatch error).
+ */
+const questionsSpaceFirst = <A, E, R>(
+  gate: SkycotFamilyGate["Service"],
+  sessionId: string,
+  upstream: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off
+  gate
+    .questionsSpaceFor(sessionId)
+    .pipe(
+      Effect.flatMap((space) =>
+        Option.isSome(space) ? Effect.succeed(space.value as A) : upstream,
+      ),
+    ) as Effect.Effect<A, E, R>;
 
 /**
  * The scope middleware with the Family check in front of it, for ws.ts. Provided inside the
@@ -1178,7 +1285,9 @@ export const layerRpcAuthorization = (
                       ? (Effect.flatMap(effect, (result) =>
                           gate.filterResult({ sessionId, method: options.rpc._tag, result }),
                         ) as typeof effect)
-                      : effect,
+                      : options.rpc._tag === WS_METHODS.projectsEnsureScratch
+                        ? questionsSpaceFirst(gate, sessionId, effect)
+                        : effect,
                   ),
                   options,
                 ),

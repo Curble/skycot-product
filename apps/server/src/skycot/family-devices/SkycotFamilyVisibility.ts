@@ -10,9 +10,14 @@
 //   and the HTTP lists, whose answers are filtered (SkycotFamilyHttp.layerApiGate).
 //
 // What counts as the child's: a conversation the engine recorded them starting, and a project
-// they started or that nobody owns (a family project, Questions). A conversation with no recorded
-// owner that already exists (older ones, a grown-up's) stays off the child's device; a brand-new
-// id is the child's own new conversation, recorded as theirs when it starts.
+// they started or that nobody owns (a family project). A conversation with no recorded owner
+// that already exists (older ones, a grown-up's) stays off the child's device; a brand-new id is
+// the child's own new conversation, recorded as theirs when it starts.
+//
+// Questions spaces are judged by their folder, whatever was recorded (Just ask per child): a
+// child's space (`<scratch>/children/<childId>`) is that child's, and the shared space (T3's
+// Scratch, the questions from before) is the grown-ups', so a child's device lists it only while
+// it holds questions of their own.
 
 // The fridge's pins are read as plain JSON of any shape (only their keys matter here).
 // @effect-diagnostics preferSchemaOverJson:off
@@ -30,12 +35,14 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 
 import { childSeesProject } from "@t3tools/skycot-rules/people";
+import { questionsSpaceOwners } from "@t3tools/skycot-rules/questions";
 
 import * as ServerConfig from "../../config.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import { FRIDGE_FILE_NAME } from "../family-fridge/SkycotFridge.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
+import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
 import {
   archivedItemVisible,
@@ -98,6 +105,21 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+
+  /** Who owns each project: as recorded, with every Questions space's owner read from its folder. */
+  const projectOwners = Effect.fnUntraced(function* (recorded: Readonly<Record<string, string>>) {
+    if (questionsRoot === null) return recorded;
+    const list = yield* projects.list().pipe(Effect.orElseSucceed(() => []));
+    const spaces = questionsSpaceOwners(
+      list.map((project) => ({
+        projectId: String(project.projectId),
+        workspaceRoot: project.workspaceRoot,
+      })),
+      questionsRoot,
+    );
+    return Object.keys(spaces).length === 0 ? recorded : { ...recorded, ...spaces };
+  });
 
   const childViewFor: SkycotFamilyVisibility["Service"]["childViewFor"] = Effect.fn(
     "SkycotFamilyVisibility.childViewFor",
@@ -107,7 +129,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
     const today = yield* limits.today;
     return {
       childId: who.childId,
-      owners: { threads: today.threads, projects: today.projects },
+      owners: { threads: today.threads, projects: yield* projectOwners(today.projects) },
       pinned: yield* readPins(fs, pinsFile),
     } satisfies ChildView;
   });
