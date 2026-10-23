@@ -200,9 +200,34 @@ export type PreviewStatus =
       readonly command: PreviewCommand;
       readonly reason: "exited" | "no-address";
       readonly output: string;
-    };
+    }
+  /**
+   * It was showing the site, then the site's program ended (it crashed, something stopped it,
+   * or its terminal was closed in Advanced mode). Not a start that failed: "Start it again".
+   */
+  | { readonly state: "stopped"; readonly command: PreviewCommand; readonly output: string };
 
 /** How long a start may take to answer on an address before it counts as failed. */
 export const START_TIMEOUT_MS = 90_000;
 /** A preview nobody has looked at for this long is stopped. */
 export const IDLE_STOP_MS = 15 * 60_000;
+/** How often the engine looks for idle previews. */
+export const IDLE_CHECK_MS = 60_000;
+/**
+ * A gap this long between two idle checks means the Mac was asleep (timers stop, the wall clock
+ * does not): that time is not "nobody looked", so the previews are not stopped for it.
+ */
+export const ASLEEP_GAP_MS = 3 * IDLE_CHECK_MS;
+
+/**
+ * One idle check for one preview: stop it, keep it, or (the first check after the Mac slept)
+ * count it as just seen. Wall-clock times in milliseconds; `lastCheck` is null on the first check.
+ */
+export function idleVerdict(input: {
+  readonly now: number;
+  readonly lastCheck: number | null;
+  readonly lastSeen: number;
+}): "stop" | "keep" | "woke" {
+  if (input.lastCheck !== null && input.now - input.lastCheck > ASLEEP_GAP_MS) return "woke";
+  return input.now - input.lastSeen > IDLE_STOP_MS ? "stop" : "keep";
+}

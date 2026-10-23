@@ -40,6 +40,11 @@ describe("parsePreviewStatus", () => {
         frameable: false,
       }),
     ).toEqual({ state: "running", command, url: "http://localhost:5173/", frameable: false });
+    expect(parsePreviewStatus({ state: "stopped", command, output: "Killed" })).toEqual({
+      state: "stopped",
+      command,
+      output: "Killed",
+    });
   });
 
   it("never draws an address that is not on this Mac, whatever the answer says", () => {
@@ -70,6 +75,7 @@ describe("startApproval (M3)", () => {
     // A start that needs no question needs no yes either.
     expect(startApproval({ ...ask, decision: { kind: "start" } })).toBeNull();
     expect(startApproval({ state: "running", command, url: SITE, frameable: true })).toBeNull();
+    expect(startApproval({ state: "stopped", command, output: "" })).toBeNull();
     expect(startApproval(null)).toBeNull();
   });
 });
@@ -132,6 +138,13 @@ describe("words", () => {
     expect(message).toContain("The preview didn't start.");
     expect(message).toContain("`npm run dev`");
     expect(message).toContain("Error: Cannot find module 'server.js'");
+  });
+
+  it("tells Sam a preview that stopped had been working, not that it didn't start (M4)", () => {
+    const message = fixItMessage({ state: "stopped", command, output: "Killed: 9" });
+    expect(message).toContain("was working, then it stopped by itself");
+    expect(message).not.toContain("didn't start");
+    expect(message).toContain("Killed: 9");
   });
 });
 

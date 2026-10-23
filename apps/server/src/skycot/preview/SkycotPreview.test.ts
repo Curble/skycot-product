@@ -258,6 +258,42 @@ it.layer(NodeServices.layer)("SkycotPreview", (it) => {
       ),
     );
 
+    it.effect(
+      "says a site that was showing and then ended stopped, not that it didn't start (M4)",
+      () =>
+        withPreview({ packageJson: SITE }, ({ preview, calls, emit, serving }) =>
+          Effect.gen(function* () {
+            yield* preview.start({ threadId: THREAD, sessionId: SESSION, approved: true });
+            yield* emit(output("listening on http://127.0.0.1:4321\n"));
+            serving.set("http://127.0.0.1:4321/", {});
+            assert.equal((yield* preview.status(THREAD)).state, "running");
+
+            yield* emit(output("Error: something broke\r\n"));
+            yield* emit({
+              type: "exited",
+              threadId: THREAD,
+              terminalId: SkycotPreview.PREVIEW_TERMINAL_ID,
+              exitCode: 1,
+              exitSignal: null,
+            });
+            const stopped = yield* preview.status(THREAD);
+            assert.equal(stopped.state, "stopped");
+            assert.include(stopped.state === "stopped" ? stopped.output : "", "something broke");
+
+            const again = yield* preview.start({
+              threadId: THREAD,
+              sessionId: SESSION,
+              approved: true,
+            });
+            assert.equal(again.state, "starting");
+            assert.deepEqual(
+              calls.map((call) => call.split(" ")[0]),
+              ["open", "write", "close", "open", "write"],
+            );
+          }),
+        ),
+    );
+
     it.effect("asks again when the start command changed since the person said yes (M3)", () =>
       withPreview({ packageJson: SITE }, ({ preview, folder, calls, emit }) =>
         Effect.gen(function* () {
