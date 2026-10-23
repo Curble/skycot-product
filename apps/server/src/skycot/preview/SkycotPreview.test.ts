@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeHttp from "node:http";
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -72,6 +75,8 @@ interface World {
 const withPreview = <A, E>(
   options: {
     readonly packageJson?: string;
+    /** Files written into the project folder: { "index.html": "<h1>hi</h1>" }. */
+    readonly files?: Readonly<Record<string, string>>;
     readonly runtimeMode?: OrchestrationV2AppThread["runtimeMode"];
   },
   use: (world: World) => Effect.Effect<A, E>,
@@ -84,6 +89,10 @@ const withPreview = <A, E>(
     yield* fs.makeDirectory(folder);
     if (options.packageJson !== undefined) {
       yield* fs.writeFileString(path.join(folder, "package.json"), options.packageJson);
+    }
+    for (const [name, text] of Object.entries(options.files ?? {})) {
+      yield* fs.makeDirectory(path.dirname(path.join(folder, name)), { recursive: true });
+      yield* fs.writeFileString(path.join(folder, name), text);
     }
     const calls: Array<string> = [];
     const listeners: Array<(event: TerminalEvent) => Effect.Effect<void>> = [];
@@ -146,6 +155,24 @@ const withPreview = <A, E>(
       ),
     );
   }).pipe(Effect.scoped);
+
+/** A plain page from the preview's own server, read with Node's http as a browser would. */
+function getPage(url: string) {
+  return new Promise<{ status: number; type: string | null; body: string }>((resolve, reject) => {
+    NodeHttp.get(url, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk: string) => (body += chunk));
+      response.on("end", () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          type: response.headers["content-type"] ?? null,
+          body,
+        }),
+      );
+    }).on("error", reject);
+  });
+}
 
 const SITE = JSON.stringify({ scripts: { dev: "node server.js" } });
 const output = (data: string): TerminalEvent => ({
@@ -385,6 +412,74 @@ it.layer(NodeServices.layer)("SkycotPreview", (it) => {
           yield* preview.start({ threadId: THREAD, sessionId: SESSION, approved: true });
           yield* TestClock.adjust(IDLE_STOP_MS + 2 * 60_000);
           assert.deepEqual(calls.at(-1), `close ${THREAD}`);
+        }),
+      ),
+    );
+  });
+
+  describe("a plain web page", () => {
+    const KID_SITE = {
+      packageJson: JSON.stringify({ dependencies: { three: "^0.186.1" } }),
+      files: {
+        "index.html": '<script type="module" src="app.mjs"></script>',
+        "app.mjs": "await import('./node_modules/three/build/three.module.js');",
+        "node_modules/three/build/three.module.js": "export const REVISION = '186';",
+        ".env": "SECRET=1",
+      },
+    };
+    const get = (url: string) => Effect.promise(() => getPage(url));
+
+    it.effect("shows index.html itself when nothing starts, with no question and no terminal", () =>
+      withPreview({ ...KID_SITE, runtimeMode: "approval-required" }, ({ preview, family, calls }) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          const ready = yield* preview.status(THREAD);
+          assert.equal(ready.state, "ready");
+          assert.equal(ready.state === "ready" ? ready.command.source : null, "static");
+          assert.deepEqual(ready.state === "ready" ? ready.decision : null, { kind: "start" });
+
+          const running = yield* preview.start({
+            threadId: THREAD,
+            sessionId: SESSION,
+            approved: false,
+          });
+          assert.equal(running.state, "running");
+          const url = running.state === "running" ? running.url : "";
+          assert.match(url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
+          assert.deepEqual(calls, []);
+
+          const page = yield* get(url);
+          assert.equal(page.status, 200);
+          assert.include(page.body, "app.mjs");
+          const three = yield* get(`${url}node_modules/three/build/three.module.js`);
+          assert.equal(three.type, "text/javascript; charset=utf-8");
+          assert.equal((yield* get(`${url}.env`)).status, 404);
+          assert.equal((yield* preview.status(SIBLING)).state, "running");
+
+          // Stopping the preview stops the page server too.
+          assert.equal((yield* preview.stop(THREAD)).state, "ready");
+          const after = yield* Effect.promise(() =>
+            getPage(url).then(
+              () => "answered",
+              () => "closed",
+            ),
+          );
+          assert.equal(after, "closed");
+        }),
+      ),
+    );
+
+    it.effect("serves public/index.html when that is where the page is", () =>
+      withPreview({ files: { "public/index.html": "<h1>hi</h1>" } }, ({ preview }) =>
+        Effect.gen(function* () {
+          const running = yield* preview.start({
+            threadId: THREAD,
+            sessionId: SESSION,
+            approved: false,
+          });
+          const url = running.state === "running" ? running.url : "";
+          assert.equal((yield* get(url)).body, "<h1>hi</h1>");
+          yield* preview.stop(THREAD);
         }),
       ),
     );

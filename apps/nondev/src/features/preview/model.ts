@@ -6,6 +6,8 @@ import { isLocalPreviewAddress, type Pointer } from "@t3tools/skycot-rules/previ
 export interface PreviewCommandView {
   readonly runner: string;
   readonly script: string;
+  /** A plain web page SKYCOT shows itself (an index.html, no start script): nothing runs. */
+  readonly page?: true;
 }
 
 export type StartDecisionView =
@@ -46,7 +48,9 @@ const text = (value: unknown) => (typeof value === "string" ? value : null);
 function parseCommand(value: unknown): PreviewCommandView | null {
   const command = record(value);
   const runner = text(command?.["runner"]);
-  return command && runner ? { runner, script: text(command["script"]) ?? runner } : null;
+  if (!command || !runner) return null;
+  const script = text(command["script"]) ?? runner;
+  return command["source"] === "static" ? { runner, script, page: true } : { runner, script };
 }
 
 function parseDecision(value: unknown): StartDecisionView | null {
@@ -149,14 +153,17 @@ export function fixItMessage(
         ? "The preview didn't start: it ran but never opened a page I could see."
         : "The preview didn't start.";
   const said = status.output.trim();
+  const how = status.command.page
+    ? `It shows \`${status.command.script}\` as a plain page.`
+    : `It runs \`${status.command.runner}\`.`;
   return [
-    `${what} Can you fix it so the preview works? It runs \`${status.command.runner}\`.`,
+    `${what} Can you fix it so the preview works? ${how}`,
     ...(said.length > 0 ? ["", "Here's what it said:", "```", said, "```"] : []),
   ].join("\n");
 }
 
 export const SET_UP_MESSAGE =
-  "Can you set this project up so I can see it in the Preview? Add a start script that runs a small web server on this Mac, without installing anything.";
+  "Can you set this project up so I can see it in the Preview? An index.html page in the project folder is enough, without installing anything.";
 
 /** The parts of T3's picked element (PickedElementPayload) the chip is made from. */
 export interface PickedElement {
