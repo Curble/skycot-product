@@ -35,3 +35,52 @@ export function putAwayBlocked(
     ? null
     : `${crewName} is still working. Wait until ${crewName} finishes, or press Stop.`;
 }
+
+/** Deleting waits for the same reason putting away does: the crew is still working on it. */
+export const deleteBlocked = putAwayBlocked;
+
+/** The quoted name in the sheet's title, short enough for one line on a phone. */
+export function quotedName(title: string, max = 40): string {
+  const name = title.replace(/\s+/g, " ").trim();
+  if (name.length === 0) return "this conversation";
+  return `“${name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name}”`;
+}
+
+export interface DeleteSheetCopy {
+  readonly title: string;
+  readonly goes: string;
+  readonly stays: ReadonlyArray<string>;
+  readonly alternative: string | null;
+  readonly final: string;
+  readonly button: string;
+}
+
+/**
+ * What the delete sheet says. Deleting is the engine's `thread.delete`: the conversation, every
+ * message, plan and picture sent in it, and its restore points go. The project's folder, its
+ * files as they are now and its kept versions (Git history) are not touched. Stickers are
+ * never taken away.
+ */
+export function deleteSheetCopy(input: {
+  readonly title: string;
+  readonly archived: boolean;
+  /** The Family profile is on: the red button asks for the parent code first. */
+  readonly family: boolean;
+}): DeleteSheetCopy {
+  return {
+    title: `Delete ${quotedName(input.title)}?`,
+    goes: "The conversation goes: every message, plan and picture in it, and its restore points.",
+    stays: [
+      "The project's files stay on this Mac as they are now, with their kept versions.",
+      "A page it made stays in the project as a file. Its magnet comes off the fridge.",
+      "Stickers stay. They are never taken away.",
+    ],
+    alternative: input.archived
+      ? null
+      : "To keep it but tidy the list, put it away instead. That can be undone.",
+    final: input.family
+      ? "This can't be undone, so a grown-up enters the parent code."
+      : "This can't be undone.",
+    button: input.family ? "Enter parent code…" : "Delete",
+  };
+}

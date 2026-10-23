@@ -26,7 +26,9 @@ export type FamilyAction =
   | "manageChildren"
   | "switchChild"
   | "seeRecap"
-  | "restartToUpdate";
+  | "restartToUpdate"
+  /** One conversation, for good: the yes names it (`deleteConversationApprovalId`). */
+  | "deleteConversation";
 
 /** The browser-only record from before the engine kept the profile. */
 export const FAMILY_KEY = "skycot:family";
@@ -54,6 +56,7 @@ export const LOCKED_ACTIONS: ReadonlySet<FamilyAction> = new Set<FamilyAction>([
   "switchChild",
   "seeRecap",
   "restartToUpdate",
+  "deleteConversation",
 ]);
 
 /** What a grown-up's "yes" opens on the engine (SkycotFamily.FAMILY_PURPOSES). */
@@ -82,6 +85,7 @@ export function purposeFor(action: FamilyAction): FamilyPurpose | null {
     case "openFolder":
       return "openFolder";
     case "approve":
+    case "deleteConversation":
       return "approve";
     case "seeRecap":
       return "recap";

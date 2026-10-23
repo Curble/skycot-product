@@ -52,6 +52,7 @@ import { useFamily } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { ConversationMenuButton } from "../tidy/ConversationMenu";
+import { DeleteSheet } from "../tidy/DeleteSheet";
 import { RenameSheet } from "../tidy/RenameSheet";
 import { useTidy } from "../tidy/useTidy";
 import { PointerChips } from "../preview/PointerChips";
@@ -192,6 +193,7 @@ export function ConversationView({
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
@@ -249,6 +251,7 @@ export function ConversationView({
               shell={shell}
               archived={archived}
               onRename={() => setRenameOpen(true)}
+              onDelete={() => setDeleteOpen(true)}
             />
           ) : null}
           {project ? <ProjectAvatar project={project} size="md" /> : null}
@@ -372,6 +375,12 @@ export function ConversationView({
         currentTitle={title ?? ""}
         archived={archived}
         onClose={() => setRenameOpen(false)}
+      />
+      <DeleteSheet
+        shell={deleteOpen ? shell : null}
+        currentTitle={title ?? ""}
+        archived={archived}
+        onClose={() => setDeleteOpen(false)}
       />
 
       <PublishSheet

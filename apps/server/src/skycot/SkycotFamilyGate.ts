@@ -39,7 +39,11 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
+import {
+  deleteConversationApprovalId,
+  evaluateFamilyRequest,
+  type FamilyEvaluation,
+} from "@t3tools/skycot-rules/family";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import {
   findPersonalDetails,
@@ -67,7 +71,14 @@ type Purpose = SkycotFamily.FamilyPurpose;
 
 /** What a gated call needs, or null when it is open to the child. */
 export type GateNeed =
-  | { readonly type: "grant"; readonly purpose: Purpose }
+  | {
+      readonly type: "grant";
+      readonly purpose: Purpose;
+      /** For "approve": the one thing the grown-up said yes to (Advanced mode's grant also opens it). */
+      readonly requestId?: string;
+      /** For "approve": the yes is spent by this call. */
+      readonly consume?: boolean;
+    }
   /** Open inside a project SKYCOT already has; anywhere else is opening another folder. */
   | { readonly type: "projectFolder"; readonly cwd: string }
   /**
@@ -193,6 +204,11 @@ function isChildSafeSettingsPatch(payload: unknown): boolean {
   return keys.every((key) => key === "defaultRuntimeMode" && patch[key] === "approval-required");
 }
 
+/** What every project change carries besides the change itself. */
+const PROJECT_UPDATE_ENVELOPE: ReadonlySet<string> = new Set(["type", "commandId", "projectId"]);
+/** The project changes a child may make: its name and its icon. */
+const CHILD_PROJECT_CHANGES: ReadonlySet<string> = new Set(["title", "projectIcon"]);
+
 /** Pure: which grown-up check a call needs. Exported for tests. */
 export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
   const input = record(payload);
@@ -210,8 +226,20 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
         ? { type: "projectFolder", cwd: input["worktreePath"] }
         : null;
     }
-    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's call.
-    if (input["type"] === "thread.delete") return { type: "grant", purpose: "advanced" };
+    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's
+    // call: a parent code for this one conversation (spent by the delete), or Advanced mode.
+    // Not the Advanced grant itself: that would also lift plan first and the limits for the
+    // child's session while it lasts.
+    if (input["type"] === "thread.delete") {
+      return typeof input["threadId"] === "string"
+        ? {
+            type: "grant",
+            purpose: "approve",
+            requestId: deleteConversationApprovalId(input["threadId"]),
+            consume: true,
+          }
+        : { type: "grant", purpose: "advanced" };
+    }
     if (input["type"] !== "runtime-request.respond") return null;
     const decision = input["decision"];
     if (decision !== "accept" && decision !== "acceptForSession" && decision !== "acceptAlways") {
@@ -249,9 +277,20 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
     return input["enabled"] === false ? null : { type: "grant", purpose: "automation" };
   }
   if (method === "projects.mutate") {
-    // Renaming stays open; adding a folder, moving a project's folder or removing it does not.
-    if (input["type"] === "project.update" && input["workspaceRoot"] === undefined) return null;
-    return { type: "grant", purpose: "openFolder" };
+    if (input["type"] !== "project.update") return { type: "grant", purpose: "openFolder" };
+    const changed = Object.keys(input).filter(
+      (key) => !PROJECT_UPDATE_ENVELOPE.has(key) && input[key] !== undefined,
+    );
+    // A project's scripts run commands, and its other settings pick the assistant, pull from
+    // the internet or change where conversations work: the developer tools' business.
+    if (changed.some((key) => !CHILD_PROJECT_CHANGES.has(key) && key !== "workspaceRoot")) {
+      return { type: "grant", purpose: "advanced" };
+    }
+    // Moving a project's folder is opening another folder.
+    if (changed.includes("workspaceRoot")) return { type: "grant", purpose: "openFolder" };
+    // Renaming and changing the icon stay open (each can be undone); adding a folder or
+    // removing a project does not.
+    return null;
   }
   if (OPEN_FOLDER_METHODS.has(method)) return { type: "grant", purpose: "openFolder" };
   if (method === "projects.writeFile") {
@@ -546,7 +585,15 @@ const make = Effect.gen(function* () {
       return yield* familyRefusal();
     }
     if (need.type === "grant") {
-      if (yield* family.allows({ sessionId, purpose: need.purpose })) return;
+      if (
+        yield* family.allows({
+          sessionId,
+          purpose: need.purpose,
+          ...(need.requestId === undefined ? {} : { requestId: need.requestId }),
+          ...(need.consume === true ? { consume: true } : {}),
+        })
+      )
+        return;
       yield* Effect.logInfo("skycot-family.refused", { method, purpose: need.purpose });
       return yield* familyRefusal();
     }

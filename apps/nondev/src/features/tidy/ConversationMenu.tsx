@@ -4,23 +4,26 @@ import type { ReactElement } from "react";
 
 import { useCrew } from "../../themes/useCrew";
 import { IconButton } from "../../ui/Button";
-import { MenuItem, Popover, type PopoverTriggerProps } from "../../ui/Popover";
+import { MenuItem, MenuSeparator, Popover, type PopoverTriggerProps } from "../../ui/Popover";
 import { putAwayBlocked } from "./tidy";
 import { useTidy } from "./useTidy";
 
 /**
  * The rows every conversation menu shows (the list's "…", right-click, the header's "…"):
- * Rename…, then Put away or Bring back. Putting away waits while the crew is working.
+ * Rename…, then Put away or Bring back, then Delete… on its own after a rule. Putting away
+ * and deleting wait while the crew is working.
  */
 export function ConversationMenuItems({
   shell,
   archived,
   onRename,
+  onDelete,
   close,
 }: {
   readonly shell: EnvironmentThreadShell;
   readonly archived: boolean;
   readonly onRename: () => void;
+  readonly onDelete: () => void;
   readonly close: () => void;
 }) {
   const tidy = useTidy();
@@ -57,6 +60,17 @@ export function ConversationMenuItems({
         </MenuItem>
       )}
       {blocked !== null ? <p className="fm-menu-note">{blocked}</p> : null}
+      <MenuSeparator />
+      <MenuItem
+        destructive
+        disabled={blocked !== null}
+        onSelect={() => {
+          close();
+          onDelete();
+        }}
+      >
+        Delete…
+      </MenuItem>
     </>
   );
 }
@@ -66,6 +80,7 @@ export function ConversationMenuButton({
   shell,
   archived,
   onRename,
+  onDelete,
   size = "md",
   placement = "bottom-end",
   trigger,
@@ -73,6 +88,7 @@ export function ConversationMenuButton({
   readonly shell: EnvironmentThreadShell;
   readonly archived: boolean;
   readonly onRename: () => void;
+  readonly onDelete: () => void;
   readonly size?: "sm" | "md";
   readonly placement?: "bottom-start" | "bottom-end";
   readonly trigger?: ReactElement<PopoverTriggerProps>;
@@ -92,6 +108,7 @@ export function ConversationMenuButton({
           shell={shell}
           archived={archived}
           onRename={onRename}
+          onDelete={onDelete}
           close={close}
         />
       )}

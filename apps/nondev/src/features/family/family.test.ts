@@ -12,6 +12,7 @@ import {
   digitsOnly,
   hashCode,
   isFamilyLocked,
+  LOCKED_ACTIONS,
   isValidCode,
   lockoutSentence,
   parseCachedView,
@@ -201,6 +202,10 @@ describe("isFamilyLocked", () => {
     expect(purposeFor("openFolder")).toBe("openFolder");
     expect(purposeFor("approve")).toBe("approve");
     expect(purposeFor("aiSettings")).toBe("settings");
+    // Deleting a conversation: a yes for that one conversation, never Advanced mode's grant
+    // (which would also lift plan first and the limits while it lasts).
+    expect(purposeFor("deleteConversation")).toBe("approve");
+    expect(LOCKED_ACTIONS.has("deleteConversation")).toBe(true);
     // The code goes with the request itself for these.
     expect(purposeFor("disableFamily")).toBeNull();
     expect(purposeFor("changeCode")).toBeNull();

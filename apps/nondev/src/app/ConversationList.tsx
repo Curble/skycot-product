@@ -23,6 +23,7 @@ import {
 import { startOneHint } from "../features/home/tip";
 import { useStarters } from "../features/starters/StarterCards";
 import { ConversationMenuButton, ConversationMenuItems } from "../features/tidy/ConversationMenu";
+import { DeleteSheet } from "../features/tidy/DeleteSheet";
 import { RenameSheet } from "../features/tidy/RenameSheet";
 import { useTidy } from "../features/tidy/useTidy";
 import { useCrew } from "../themes/useCrew";
@@ -55,6 +56,7 @@ export function ConversationList({
   const projectCount = useAtomValue(environmentProjects.projectsAtom).length;
   const visible = filterRows(rows, old ? "all" : shell.filter, shell.projectKey, shell.search);
   const [renaming, setRenaming] = useState<ConversationRow | null>(null);
+  const [deleting, setDeleting] = useState<ConversationRow | null>(null);
   const now = new Date();
   // With siblings, the child using SKYCOT sees their own conversations first.
   const split = useChildFirst(visible, (row) => row.shell.id);
@@ -167,6 +169,7 @@ export function ConversationList({
                           selected={row.shell.id === selectedThreadId}
                           now={now}
                           onRename={() => setRenaming(row)}
+                          onDelete={() => setDeleting(row)}
                         />
                       ))}
                     </div>
@@ -183,6 +186,12 @@ export function ConversationList({
         archived={old}
         onClose={() => setRenaming(null)}
       />
+      <DeleteSheet
+        shell={deleting?.shell ?? null}
+        currentTitle={deleting?.title ?? ""}
+        archived={old}
+        onClose={() => setDeleting(null)}
+      />
     </section>
   );
 }
@@ -193,8 +202,8 @@ const EMPTY_ROWS_ATOM = Atom.make<ReadonlyArray<ConversationRow>>([]).pipe(
 const NOT_LOADING_ATOM = Atom.make(false).pipe(Atom.withLabel("nondev-not-loading"));
 
 /**
- * One row with its menu: "…" (or a right-click) for Rename… and Put away; an old
- * conversation's row has Bring back beside it instead.
+ * One row with its menu: "…" (or a right-click) for Rename…, Put away and Delete…; an old
+ * conversation's row has Bring back under its words, and its "…" has Bring back and Delete….
  */
 function ConversationRowItem({
   row,
@@ -203,6 +212,7 @@ function ConversationRowItem({
   selected,
   now,
   onRename,
+  onDelete,
 }: {
   readonly row: ConversationRow;
   readonly archived: boolean;
@@ -210,6 +220,7 @@ function ConversationRowItem({
   readonly selected: boolean;
   readonly now: Date;
   readonly onRename: () => void;
+  readonly onDelete: () => void;
 }) {
   const tidy = useTidy();
   const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
@@ -240,22 +251,23 @@ function ConversationRowItem({
             {bringing ? "Bringing back…" : "Bring back"}
           </Button>
         </span>
-      ) : (
-        <span className="fm-convrow-item__more">
-          <ConversationMenuButton
-            shell={row.shell}
-            archived={false}
-            onRename={onRename}
-            size="sm"
-          />
-        </span>
-      )}
+      ) : null}
+      <span className="fm-convrow-item__more">
+        <ConversationMenuButton
+          shell={row.shell}
+          archived={archived}
+          onRename={onRename}
+          onDelete={onDelete}
+          size="sm"
+        />
+      </span>
       <ContextMenu at={menuAt} onClose={() => setMenuAt(null)} label={`${row.title}`}>
         {(close) => (
           <ConversationMenuItems
             shell={row.shell}
             archived={archived}
             onRename={onRename}
+            onDelete={onDelete}
             close={close}
           />
         )}

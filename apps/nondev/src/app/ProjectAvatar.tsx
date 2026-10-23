@@ -1,8 +1,12 @@
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 
+import { pictureColorOf } from "../features/projects/projectIcons";
 import { Avatar, type AvatarSize } from "../ui/Avatar";
 
-/** The project's contact picture: its emoji or monogram if set, else initials of its title. */
+/**
+ * The project's contact picture: its emoji, or its letter on its colour, if one was chosen
+ * (here or in Advanced mode), else the initials of its name on grey.
+ */
 export function ProjectAvatar({
   project,
   size = "xl",
@@ -17,7 +21,15 @@ export function ProjectAvatar({
     return <Avatar kind="emoji" value={icon.emoji} size={size} label={project.title} />;
   }
   if (icon?.kind === "monogram") {
-    return <Avatar kind="initials" value={icon.text} size={size} label={project.title} />;
+    return (
+      <Avatar
+        kind="monogram"
+        value={icon.text}
+        size={size}
+        label={project.title}
+        tone={pictureColorOf(icon.color)}
+      />
+    );
   }
   return <Avatar kind="initials" value={project.title} size={size} label={project.title} />;
 }
