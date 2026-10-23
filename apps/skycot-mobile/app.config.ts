@@ -125,13 +125,13 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        // Day on cream in light mode, dusk on midnight in dark mode, like skycot.com.
-        image: brandAsset("ios-android/ios/AppIcon.appiconset/AppIcon-day-1024.png"),
+        // SKYCOT waving: the day pose on cream in light mode, dusk on midnight in dark mode.
+        image: brandAsset("poses/day/mascot-hello-day-512.png"),
         resizeMode: "contain",
         backgroundColor: "#FFF6E6",
-        imageWidth: 160,
+        imageWidth: 180,
         dark: {
-          image: brandAsset("ios-android/ios/AppIcon.appiconset/AppIcon-dark-1024.png"),
+          image: brandAsset("poses/dusk/mascot-hello-dusk-512.png"),
           backgroundColor: "#171A45",
         },
       },
