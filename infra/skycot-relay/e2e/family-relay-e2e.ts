@@ -426,6 +426,29 @@ try {
   await mumPage.waitForTimeout(1500);
   await mumPage.screenshot({ path: NodePath.join(OUT, "mums-phone-after.png") });
 
+  // Off and on again on the Mac: phones stop reaching it, then reconnect by themselves.
+  await api(macPage, "POST", "/api/skycot/family/verify", { code: CODE, purpose: "settings" });
+  await api(macPage, "POST", "/api/skycot/family/relay", { enabled: false });
+  const whileOff = await api(mumPage, "GET", "/api/skycot/family").catch(() => ({
+    status: 0,
+    body: {},
+  }));
+  check(
+    whileOff.status !== 200,
+    "with the relay switched off on the Mac, Mum's phone can't reach it",
+  );
+  await api(macPage, "POST", "/api/skycot/family/relay", { enabled: true });
+  await until(
+    "the relay to reconnect",
+    async () =>
+      (await api(macPage, "GET", "/api/skycot/family/relay")).body["state"] === "connected",
+  );
+  const back = await until("Mum's phone to reach the Mac again", async () => {
+    const answer = await api(mumPage, "GET", "/api/skycot/family").catch(() => null);
+    return answer?.status === 200 ? answer : null;
+  });
+  check(back.status === 200, "switched on again, Mum's phone reaches the Mac with no new link");
+
   // Ava's iPad sees only her own work, through the relay.
   const macShell = (await api(macPage, "GET", "/api/orchestration/shell")).body;
   const avaShell = (await api(avaPage, "GET", "/api/orchestration/shell")).body;

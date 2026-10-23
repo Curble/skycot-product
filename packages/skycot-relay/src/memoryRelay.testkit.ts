@@ -108,6 +108,12 @@ export class MemoryRelay {
   }
 
   attachHost(host: { onBinary(bytes: Uint8Array): void; onText(text: string): void }): void {
+    // As the Worker does: devices sealed with an earlier Mac connection start again.
+    if (this.host !== null) {
+      for (const device of this.devices.values())
+        device.deliverClose(CloseCode.macGone, "The Mac went away.");
+      this.devices.clear();
+    }
     this.host = host;
     host.onText(JSON.stringify({ t: "ready" }));
     for (const device of this.devices.values())

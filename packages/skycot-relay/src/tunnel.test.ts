@@ -173,6 +173,9 @@ function setup(options: { readonly passHome?: string } = {}) {
       ...overrides,
     };
     const statuses: Array<HomeStatus> = [];
+    const statusWaiters = new Set<{ status: HomeStatus; resolve: () => void }>();
+    const waitForStatus = (status: HomeStatus) =>
+      new Promise<void>((resolve) => statusWaiters.add({ status, resolve }));
     let saved = record;
     const home = new RelayHome({
       record,
@@ -183,9 +186,16 @@ function setup(options: { readonly passHome?: string } = {}) {
       now: () => NOW_MS,
       timers,
       readyTimeoutMs: 2000,
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status);
+        for (const waiter of statusWaiters) {
+          if (waiter.status !== status) continue;
+          statusWaiters.delete(waiter);
+          waiter.resolve();
+        }
+      },
     });
-    return { home, deviceRelayId, link, statuses, saved: () => saved };
+    return { home, deviceRelayId, link, statuses, waitForStatus, saved: () => saved };
   };
 
   return { signingKey, noiseKey, homeId, relay, directory, host, events, waitForEvent, linkDevice };
@@ -319,6 +329,27 @@ describe("SKYCOT Relay tunnel", () => {
     host.revoke(deviceRelayId, NOW_S + 3600);
     await expect(home.fetch("https://mac.invalid/api/whoami")).rejects.toThrow(TypeError);
     expect(statuses).toContain("refused");
+  });
+
+  it("carries on after the Mac reconnects to the relay, with a fresh channel", async () => {
+    const { linkDevice, relay, noiseKey, signingKey, homeId, directory } = setup();
+    const { home, statuses, waitForStatus } = linkDevice();
+    expect((await home.fetch("https://mac.invalid/api/whoami")).status).toBe(200);
+    const dropped = waitForStatus("offline");
+    const restarted = new HostTunnel({
+      homeId,
+      noiseKey,
+      signingKey,
+      directory,
+      handler: engine,
+      transport: relay.hostTransport(),
+      timers,
+    });
+    relay.attachHost(restarted);
+    await dropped;
+    const again = await home.fetch("https://mac.invalid/api/whoami");
+    expect(again.status).toBe(200);
+    expect(statuses.filter((status) => status === "ready").length).toBeGreaterThanOrEqual(2);
   });
 
   it("answers the tunnel's own control requests", async () => {

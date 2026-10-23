@@ -188,9 +188,17 @@ describe("a home on the relay", () => {
     const host = await connectHost();
     expect(device.texts().at(-1)).toEqual({ t: "status", mac: true });
     expect(host.frames().some((frame) => frame?.kind === HostFrameKind.open)).toBe(true);
+    // When the Mac goes (or reconnects), devices sealed with it start again on a new connection.
     host.close();
     room.closed(host);
-    expect(device.texts().at(-1)).toEqual({ t: "status", mac: false });
+    expect(device.closed?.code).toBe(CloseCode.macGone);
+    const again = await connectDevice();
+    expect(again.texts().at(-1)).toEqual({ t: "status", mac: false });
+    await connectHost();
+    expect(again.closed).toBeNull();
+    expect(again.texts().at(-1)).toEqual({ t: "status", mac: true });
+    await connectHost();
+    expect(again.closed?.code).toBe(CloseCode.macGone);
   });
 
   it("refuses a removed device until its passes would have run out", async () => {

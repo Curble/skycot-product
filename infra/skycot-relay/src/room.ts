@@ -266,11 +266,16 @@ export class Room {
       return;
     }
     // A newer connection from the same Mac replaces the old one (a restart, a new network).
+    // Each device connection belongs to one Mac connection: its sealed channel was made with
+    // that one, so devices connected through the old one start again with a fresh connection.
+    let replaced = false;
     for (const { socket: other, attachment: otherAttachment } of this.all()) {
       if (otherAttachment.role === "host" && other !== socket) {
         retire(other, CloseCode.replaced, "Replaced by a newer connection from the Mac.");
+        replaced = true;
       }
     }
+    if (replaced) this.endDeviceConnections();
     socket.serializeAttachment({
       role: "host",
       homeId: attachment.homeId,
@@ -493,6 +498,13 @@ export class Room {
     answer(await sealPushRef(this.env, attachment.homeId, { token, type, environment }));
   }
 
+  /** The Mac connection they were sealed with is gone: devices reconnect and seal anew. */
+  private endDeviceConnections(): void {
+    for (const device of this.devices()) {
+      retire(device.socket, CloseCode.macGone, "The Mac went away; connect again.");
+    }
+  }
+
   private async revocations(): Promise<Readonly<Record<string, number>>> {
     return (await this.host.storage.get<Record<string, number>>(REVOKED_KEY)) ?? {};
   }
@@ -503,8 +515,7 @@ export class Room {
     if (attachment === null) return;
     if (attachment.role === "host") {
       if (this.hostSocket() !== null && this.hostSocket() !== socket) return;
-      for (const device of this.devices())
-        safeSend(device.socket, JSON.stringify({ t: "status", mac: false }));
+      this.endDeviceConnections();
       this.host.log("host-gone", { home: tag(attachment.homeId) });
     } else if (attachment.role === "device") {
       this.notifyHostClosed(attachment.connectionId);
