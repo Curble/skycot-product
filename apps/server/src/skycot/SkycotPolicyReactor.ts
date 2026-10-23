@@ -28,6 +28,7 @@ import * as Stream from "effect/Stream";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { policyDecisionAnswers } from "@t3tools/skycot-rules/decision";
+import { workRootsFor } from "@t3tools/skycot-rules/questions";
 import {
   evaluateRequest,
   type RuleContext,
@@ -38,6 +39,7 @@ import {
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
@@ -102,6 +104,7 @@ const make = Effect.gen(function* () {
   // Optional so the layer's type is unchanged; server.ts provides it at the top.
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
   const familyOn = Option.isNone(family) ? Effect.succeed(false) : family.value.isEnabled;
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
   /**
    * The branch the push would send and the branch everyone sees. A thread with a private
@@ -146,14 +149,17 @@ const make = Effect.gen(function* () {
     });
   });
 
-  /** Where the thread works (its private copy, else the folder), and the project's folder. */
+  /**
+   * Where the thread works (its private copy, else the folder), and the project's folder. A
+   * question works in its own folder only (`workRootsFor`).
+   */
   const projectRootsFor = Effect.fnUntraced(function* (thread: {
     readonly projectId: ProjectId;
     readonly worktreePath: string | null;
   }) {
     const project = yield* projects.get(thread.projectId);
     const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
-    return { projectRoot: thread.worktreePath ?? projectFolder, projectFolder };
+    return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
   });
 
   /** False once the person asked to stop the run, or the run has already settled. */

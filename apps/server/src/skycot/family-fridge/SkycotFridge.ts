@@ -25,6 +25,7 @@ import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import { pageOf } from "../family-recap/recap.ts";
 import { loadThread } from "../family-recap/threads.ts";
+import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import { fridgeItems, type FridgeItem } from "./fridge.ts";
 import { MAX_ASSET_BYTES, selfContainedPage } from "./thumbnail.ts";
 
@@ -70,6 +71,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const diffs = Option.getOrUndefined(
     yield* Effect.serviceOption(CheckpointDiffQuery.CheckpointDiffQuery),
   );
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
 
@@ -106,6 +108,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
       const loaded = yield* loadThread(projections, projects, thread.id as ThreadId, {
         messages: false,
         ...(diffs === undefined ? {} : { diffs }),
+        questionsRoot,
       });
       if (loaded !== null) threads.push(loaded);
     }

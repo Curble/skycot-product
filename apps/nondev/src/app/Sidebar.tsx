@@ -39,7 +39,7 @@ import { useFamily } from "../features/family/FamilyProvider";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -68,7 +68,7 @@ export function AppSidebar({
   const countsByProject = new Map<string, number>();
   const attentionByProject = new Set<string>();
   for (const row of rows) {
-    const key = projectKeyOf(row.shell);
+    const key = row.projectKey;
     countsByProject.set(key, (countsByProject.get(key) ?? 0) + 1);
     if (row.status.attention === "waiting") attentionByProject.add(key);
   }
@@ -137,35 +137,43 @@ export function AppSidebar({
         </SidebarSection>
 
         <SidebarSection title="Projects">
-          {projects.map((project) => {
-            const key = projectKeyOf({
-              environmentId: project.environmentId,
-              projectId: project.id,
-            });
-            return (
-              <SidebarItem
-                key={key}
-                glyph={<ProjectAvatar project={project} size="sm" />}
-                label={project.title}
-                count={countsByProject.get(key) ?? 0}
-                attention={attentionByProject.has(key)}
-                selected={conversationRoute && shell.projectKey === key}
-                onClick={() => showList(() => shell.setProjectKey(key))}
-                menuOpen={projectMenu?.project === project}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
-                }}
-                trailing={
-                  <ProjectMenuButton
-                    project={project}
-                    expanded={projectMenu?.project === project}
-                    onOpen={(at) => setProjectMenu({ project, at })}
-                  />
-                }
-              />
-            );
-          })}
+          {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
+          {[...projects]
+            .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
+            .map((project) => {
+              const key = projectKeyOf({
+                environmentId: project.environmentId,
+                projectId: project.id,
+              });
+              return (
+                <SidebarItem
+                  key={key}
+                  glyph={<ProjectAvatar project={project} size="sm" />}
+                  label={project.title}
+                  count={countsByProject.get(key) ?? 0}
+                  attention={attentionByProject.has(key)}
+                  selected={conversationRoute && shell.projectKey === key}
+                  onClick={() => showList(() => shell.setProjectKey(key))}
+                  // Questions is SKYCOT's own space: nothing to rename or re-icon.
+                  {...(project.isScratch === true
+                    ? {}
+                    : {
+                        menuOpen: projectMenu?.project === project,
+                        onContextMenu: (event: MouseEvent) => {
+                          event.preventDefault();
+                          setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
+                        },
+                        trailing: (
+                          <ProjectMenuButton
+                            project={project}
+                            expanded={projectMenu?.project === project}
+                            onOpen={(at) => setProjectMenu({ project, at })}
+                          />
+                        ),
+                      })}
+                />
+              );
+            })}
           <SidebarItem
             icon={FolderPlus}
             label="Open a folder…"

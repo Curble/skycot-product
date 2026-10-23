@@ -231,6 +231,44 @@ for people, so a project never looks like a child in the sidebar.
   settings (which assistant, pulling from the internet, where conversations work) or a favicon
   needs Advanced mode; moving its folder needs the "another folder" yes.
 
+## Just ask (Questions)
+
+**Just ask** sits beside the project picker on Home: a question, or a quick job, without
+choosing a folder first. It works the same with the profile on or off.
+
+- **Where it works.** SKYCOT's engine keeps one space for questions, shown as **Questions** in the
+  sidebar and the list (T3's "Scratch" folder, `~/.skycot/scratch` in the Mac app). Every question
+  gets a private folder of its own inside it, so nothing in the family's own folders is touched,
+  and the engine keeps versions there: **What changed**, **Undo**, **Open it** and the fridge work
+  as in a project.
+- **The child's own.** The engine treats a question's folder as the child's own project: writing
+  and running things there is open (still **Ask me first**), and everything else, including a
+  brother's or sister's question next to it, is outside the project and shows **Ask a grown-up**.
+  Plan first, the shield, bedtime and daily limits, and the code for installs and the internet
+  all apply exactly as in a project.
+- **Make this a project.** When a question made something, a strip offers **Make this a project…**:
+  give it a name, and the question's folder becomes a project of that name (nothing is moved or
+  copied), with a first saved version. The conversation keeps its history and Undo, and is listed
+  with the new project from then on. No code is needed; the toast's **Undo** takes the project off
+  the list again (its files stay), and the conversation goes back to Questions.
+- **The recap** counts a question's messages like any other, and lists it under **What they
+  made** only once it made a file.
+- **Tidying.** Questions are put away, brought back and renamed like any conversation.
+
+Honest limits:
+
+- **A plain question still arrives as a plan.** Plan first holds every child's turn, so "Why is the
+  sky blue?" comes back as a plan card whose steps are the answer; **Build it** has nothing to
+  build. Telling plain questions apart reliably would need a guess, and a wrong guess would let a
+  build through without a plan.
+- **The folder is SKYCOT's, not a project folder you chose.** A question made into a project stays
+  where SKYCOT keeps questions (`~/.skycot/scratch/<date-and-words>`), because moving it would
+  break its Undo history.
+- **The cards say "this project".** Inside a question, "Only this project" on a card means the
+  question's own folder.
+- **Not offered** when SKYCOT's data folder is inside a Git checkout (a developer's setup): the
+  engine then has no Questions space and the picker shows projects only.
+
 ## Bedtime and daily limits
 
 Per child, all optional, set in the child's card (parent code):
@@ -393,6 +431,7 @@ stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode cover
 | `server.updateSettings` (anything but "Ask me first"), `server.updateProvider`, `provider.install.start`/`remove`, `provider.auth.start`/`complete`/`respond`/`logout`, `provider.chatgpt.reconnect-profile`/`import-profile`, `provider.consumeResetCredit`, `provider.uploadFeedback`, `server.upsertKeybinding`/`removeKeybinding`, `secrets.answerRequest` (save)                                                                                                                                                                                                                            | Grown-up: AI assistants                                                                                                              | the parent's accounts, sign-ins, settings and keys; feedback sends conversations away    |
 | `projects.mutate` changing a project's scripts, assistant, auto-pull, conversation folder mode or favicon, `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                                                                                              | developer tools, outside agents, other devices, the internet                             |
 | HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                                                                                                                                     | as the call it mirrors; otherwise Advanced mode                                                                                      | letting another device or an outside agent in                                            |
+| Just ask: `projects.ensureScratch`, `launchThread` into Questions, `projects.writeFile` or `thread.create` inside a question's folder; **Make this a project** (`projects.mutate` `project.create` of a question's folder) and its Undo (`project.delete`, without `force`, of a project made from a question)                                                                                                                                                                                                                                               | Open; any other folder, or removing any other project, Grown-up: another folder                                                      | the question's folder is SKYCOT's own space, not the family's folders; taking a project off the list keeps its files |
 | Deleting a conversation (`thread.delete`; putting it away stays open)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: that one conversation, spent by the delete                                                                                 | it can't be undone                                                                       |
 | Putting a conversation away or bringing it back (`thread.archive`, `thread.unarchive`); renaming it (`thread.metadata.update` with a title); renaming a project or changing its icon (`projects.mutate` with only `title` and `projectIcon`)                                                                                                                                                                                                                                                                                                                                                     | Open; with a folder (`worktreePath`), Grown-up: another folder                                                                       | each can be undone; a folder is where the assistant works                                |
 | `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Grown-up: AI assistants                                                                                                              | the children are part of the profile                                                     |

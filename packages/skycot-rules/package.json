@@ -43,6 +43,10 @@
     "./checkpoints": {
       "types": "./src/checkpoints.ts",
       "import": "./src/checkpoints.ts"
+    },
+    "./questions": {
+      "types": "./src/questions.ts",
+      "import": "./src/questions.ts"
     }
   },
   "scripts": {

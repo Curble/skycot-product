@@ -11,7 +11,16 @@ import { withPointing } from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
-import { AppWindow, Archive, ChevronLeft, Clock, Receipt, ShieldAlert, Square } from "lucide-react";
+import {
+  AppWindow,
+  Archive,
+  ChevronLeft,
+  Clock,
+  FolderPlus,
+  Receipt,
+  ShieldAlert,
+  Square,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -22,7 +31,7 @@ import { useElapsedLabel } from "../../app/useElapsed";
 import { HOME_HREF } from "../../router";
 import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
 import { useConversationShell } from "../../state/oldConversations";
-import { projectAtomOrEmpty } from "../../state/projects";
+import { environmentProjects, projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
 import { environmentThreads, threadEnvironment } from "../../state/threads";
 import { CrewAvatar } from "../../themes/CrewAvatar";
@@ -64,6 +73,13 @@ import {
   usePreviewOpen,
   useSuggestedMessage,
 } from "../preview/store";
+import { MakeProjectSheet } from "../questions/MakeProjectSheet";
+import {
+  isQuestionsProject,
+  JUST_ASK_COPY,
+  makeProjectOffer,
+  projectForConversation,
+} from "../questions/questions";
 import { conversationTitle, describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
@@ -98,7 +114,14 @@ export function ConversationView({
   const result = useAtomValue(environmentThreads.stateAtom(environmentId, threadId));
   // A put-away conversation is not in the live list; the archive's own query has its shell.
   const { shell, archived } = useConversationShell(environmentId, threadId);
-  const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }));
+  const ownProject = useAtomValue(
+    projectAtomOrEmpty({ environmentId, projectId: shell?.projectId }),
+  );
+  const allProjects = useAtomValue(environmentProjects.projectsAtom);
+  // A question that became a project ("Make this a project") belongs with that project now.
+  const project =
+    shell === null ? ownProject : projectForConversation(shell, ownProject, allProjects);
+  const question = isQuestionsProject(project);
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
@@ -194,6 +217,7 @@ export function ConversationView({
   const [publishOpen, setPublishOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [makeProjectOpen, setMakeProjectOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
@@ -227,11 +251,13 @@ export function ConversationView({
               ? "Connecting…"
               : archived
                 ? "Put away in Old conversations"
-                : shell?.worktreePath
-                  ? // The private copy is the reassurance that matters; keep the
-                    // first clause ("Working", "Waiting for you") and drop the rest.
-                    `${status.presence.split(" · ")[0]} · in a private copy of your project`
-                  : status.presence}
+                : question
+                  ? `${status.presence.split(" · ")[0]} · ${JUST_ASK_COPY.presence}`
+                  : shell?.worktreePath && project === ownProject
+                    ? // The private copy is the reassurance that matters; keep the
+                      // first clause ("Working", "Waiting for you") and drop the rest.
+                      `${status.presence.split(" · ")[0]} · in a private copy of your project`
+                    : status.presence}
           </span>
         </div>
         <div className="fm-conv-header__tools">
@@ -243,7 +269,8 @@ export function ConversationView({
             />
           ) : null}
           {project && !archived ? <PreviewButton threadId={threadId} /> : null}
-          {archived ? null : (
+          {/* A question has nowhere to go live; making it a project comes first. */}
+          {archived || question ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
           {shell && canOperate ? (
@@ -289,7 +316,7 @@ export function ConversationView({
           <span>{autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}</span>
           <span className="fm-strip__dot">·</span>
           <ExplainToggle threadId={threadId} />
-          {publish.status ? (
+          {publish.status && !question ? (
             <>
               <span className="fm-strip__dot">·</span>
               <PublishStatusPill status={publish.status} />
@@ -300,6 +327,27 @@ export function ConversationView({
               <ProgressBar value={1} max={1} thin label="Working" tone="accent" />
             </span>
           ) : null}
+        </div>
+      ) : null}
+
+      {shell !== null &&
+      latestId !== null &&
+      canOperate &&
+      makeProjectOffer({
+        ownProject,
+        adopted: project !== ownProject,
+        worktreePath: shell.worktreePath,
+        archived,
+        working: active,
+      }) === "offer" ? (
+        <div className="fm-question-offer" role="status">
+          <span className="fm-question-offer__icon" aria-hidden>
+            <FolderPlus size={16} strokeWidth={1.8} />
+          </span>
+          <span className="fm-question-offer__text">{JUST_ASK_COPY.offer(true)}</span>
+          <Button size="sm" variant="primary" onClick={() => setMakeProjectOpen(true)}>
+            {JUST_ASK_COPY.makeProject}…
+          </Button>
         </div>
       ) : null}
 
@@ -381,6 +429,12 @@ export function ConversationView({
         currentTitle={title ?? ""}
         archived={archived}
         onClose={() => setDeleteOpen(false)}
+      />
+
+      <MakeProjectSheet
+        shell={makeProjectOpen ? shell : null}
+        title={title ?? ""}
+        onClose={() => setMakeProjectOpen(false)}
       />
 
       <PublishSheet

@@ -7,6 +7,7 @@
 // conversation pings at most once per kind every few minutes, and a ping held back meanwhile goes
 // out at the window's end only if it is still news (./decide.ts `throttle`, `stillNews`).
 import { useAtomValue } from "@effect/atom-react";
+import { workRootsFor } from "@t3tools/skycot-rules/questions";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
@@ -259,10 +260,13 @@ function GrownUpProbe({
       report(true);
       return;
     }
-    const projectFolder = project?.workspaceRoot ?? null;
+    const roots = workRootsFor({
+      projectFolder: project?.workspaceRoot ?? null,
+      worktreePath: shell?.worktreePath ?? null,
+      questionsRoot: project?.isScratch ? project.workspaceRoot : null,
+    });
     const hold = familyHoldFor(item, {
-      projectRoot: shell?.worktreePath ?? projectFolder,
-      projectFolder,
+      ...roots,
       toolCallInput: toolCallInputFor(item, projection.turnItems),
       toolItemType: toolItemTypeFor(item, projection.turnItems),
     });

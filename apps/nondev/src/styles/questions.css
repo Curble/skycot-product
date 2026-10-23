@@ -1,0 +1,53 @@
+/* "Just ask": the compose box's choice and the "Make this a project" offer. */
+
+.fm-menu-item__two {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+}
+.fm-menu-item__two small {
+  font-size: calc(11px * var(--fm-text-scale));
+  color: var(--fm-label-3);
+}
+.fm-menu-item:hover .fm-menu-item__two small,
+.fm-menu-item:focus-visible .fm-menu-item__two small {
+  color: inherit;
+  opacity: 0.85;
+}
+.fm-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fm-sep);
+}
+
+.fm-question-offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--fm-sep-2);
+  background: var(--fm-accent-soft);
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-label);
+}
+.fm-question-offer__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--fm-accent);
+}
+.fm-question-offer__text {
+  flex: 1;
+  min-width: 0;
+}
+.fm-question-offer__text b {
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .fm-question-offer {
+    flex-wrap: wrap;
+  }
+  .fm-question-offer__text {
+    flex-basis: calc(100% - 30px);
+  }
+}
