@@ -585,14 +585,14 @@ def new_for_families():
   <div class="fgrid">
     {feature_cards(FEATURES_GROWNUPS)}
   </div></div>
-  <p class="fine center" style="margin:28px auto 0">Screens from SKYCOT’s early-access build, with sample children called Ava and Leo. The Mac download is coming soon.</p>
+  <p class="fine center" style="margin:28px auto 0">Screens from SKYCOT’s early-access build, with sample children called Ava and Leo. The free Mac beta is ready to download.</p>
 </div></section>
 '''
 
 def home_body():
     hero = f'''<section class="hero"><div class="wrap">
   {mascot("sky-hero", "SKYCOT the cloud, waving hello")}
-  <span class="eyebrow">SKYCOT for Mac · early access</span>
+  <span class="eyebrow">SKYCOT for Mac · free beta</span>
   <h1>{html.escape(H1, quote=False).replace("family-friendly", '<span class="nw">family-friendly</span>')}</h1>
   <p class="lede">{html.escape(LEDE, quote=False)}</p>
   <p class="lede2">{html.escape(LEDE2, quote=False)} <a href="#grown-ups">See how</a></p>
@@ -746,19 +746,19 @@ def home_body():
 
 <section id="download"><div class="wrap">
   <div class="center"><p class="kicker">Get SKYCOT</p><h2 class="title">SKYCOT for Mac.</h2>
-  <p class="sub">Free during early access. A grown-up brings their own AI account. A signed, notarised Mac download is being prepared; leave your email and you'll be first to know.</p></div>
+  <p class="sub">Free during the beta. A grown-up brings their own AI account. The app is signed and notarised by Apple, and updates itself when a new version is ready.</p></div>
   <div class="dl">
-    <h3>Be first to try it.</h3>
-    <p>Apple silicon Macs recommended. You'll need an account with at least one supported assistant.</p>
+    <h3>Try the beta.</h3>
+    <p>For Apple silicon Macs (M1 or later) with macOS 13 Ventura or newer. About 160 MB. You'll need an account with at least one supported assistant.</p>
     <div class="actions">
-      <span class="btn btn-primary" aria-disabled="true" title="A signed, notarised Mac download is being prepared">Download for Mac · coming soon</span>
-      <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20early%20access">Notify me</a>
+      <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.1.beta-arm64.dmg">Download the beta for Mac</a>
+      <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
     </div>
-    <p class="hero-note">Or join the conversation on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking; we email you once when it's ready.</p>
+    <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/krA4DQgD27">Discord</a>. No newsletter, no tracking.</p>
     <div class="status">
-      <div class="done"><b>Built</b><p>Conversation, permission cards, What changed, Keep and Undo, Versions, Publish to a draft line, Settings, themes, scheduled jobs. Exercised end to end on a real project with Codex.</p></div>
-      <div class="now"><b>Testing now</b><p>The Family profile and parent code, the signed Mac installer, one-click Claude sign-in, and "send for review" and "put it live" with a connected GitHub account.</p></div>
-      <div class="next"><b>Next</b><p>First invites, a proper app icon, and a Windows build. We'd rather tell you where things stand than oversell it.</p></div>
+      <div class="done"><b>In the beta</b><p>Plain-English conversations, plans and permission cards, Undo and Versions, the Family profile with a parent code, bedtimes and limits, stickers, the fridge, the grown-up recap, the live preview, notifications and themes.</p></div>
+      <div class="now"><b>Testing now</b><p>This first public beta on real family Macs, automatic updates, and "send for review" and "put it live" with a connected GitHub account.</p></div>
+      <div class="next"><b>Next</b><p>A Windows build and more for families. We'd rather tell you where things stand than oversell it.</p></div>
     </div>
   </div>
 </div></section>
@@ -774,7 +774,7 @@ def home_body():
     <details><summary>Do I need to know how to code?</summary><p>No. You describe what you want in plain English, read what changed in plain English, and decide. If you have a developer, they can flip on Advanced mode and see everything in their language, in the same window.</p></details>
     <details><summary>Can I change how it looks?</summary><p>Yes. SKYCOT ships with a <a href="#looks">library of themes</a>: Workshop, the default, plus Classic for anyone who prefers calm, Paper and Night Ops, each with a light and a dark side. Themes are plain data files you can import, export and share, and you can duplicate one and edit the colours, the flavour and your crew's names. A theme changes how things look, never what they do.</p></details>
     <details><summary>Who is the little cloud?</summary><p>That's SKYCOT. It greets you by day and wears its dusk colours after sunset where you live.</p></details>
-    <details><summary>What does SKYCOT cost?</summary><p>Free during early access. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
+    <details><summary>What does SKYCOT cost?</summary><p>Free during the beta. You pay your AI provider as you do today. Pricing for later will be announced before it applies to anyone.</p></details>
     <details><summary>Where do my files go?</summary><p>They stay on your Mac. When you send a message, the assistant you chose receives what it needs for that task, under that company's terms. SKYCOT has no analytics switched on and no account of its own to send things to.</p></details>
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
     <details><summary>Does voice typing send my child's voice anywhere?</summary><p>Voice typing starts off for every child, and a grown-up turns it on with the parent code. SKYCOT never records or keeps audio; it uses the browser's own speech service. In Safari that is Apple's dictation, which on recent Macs can stay on the Mac. In Chrome it is Google's, and in Edge Microsoft's, so the voice goes to that company under its terms. SKYCOT tells you which applies before you switch it on, and recommends Safari for children. Reading replies aloud uses the Mac's own voices, so nothing leaves the Mac.</p></details>
@@ -832,7 +832,7 @@ PRIVACY = f'''{nav(True)}
   <h3>What is sent to us</h3>
   <p>Nothing. SKYCOT has no usage analytics, crash reporting or diagnostics switched on, and in our builds the parts of the engine that could send them point nowhere. The online account and phone-pairing service that T3 Code offers is switched off in SKYCOT, so the app does not talk to T3 Tools Inc.'s servers either. If a future version offers optional diagnostics, it will be off until you switch it on, this page will be updated first, and it will never include your project files or conversations.</p>
   <h3>Background downloads</h3>
-  <p>Like most apps, SKYCOT fetches a few public files on its own: it checks GitHub for new versions of SKYCOT, and it downloads public lists of AI models and their prices, also hosted on GitHub. If you add Gemini through Antigravity, it downloads Google's connector from Google. Like any web request, these reveal your IP address and the app's version to the host. Nothing about you or your projects is included.</p>
+  <p>Like most apps, SKYCOT fetches a few public files on its own. The Mac app checks downloads.skycot.com, SKYCOT's own download site, for a new version of SKYCOT. If update checks for your AI assistants are on, it asks npm, the public software registry, whether a newer version of each assistant you installed exists. When a grown-up opens the Usage page in Advanced mode, it downloads a public list of AI prices from GitHub, at most once a day. The first time the assistant looks at a page it built, it downloads a small browser from Google (about 200 MB) and says so first; this is off in a Family profile. If you add Gemini through Antigravity, it downloads Google's connector from Google. Like any web request, these reveal your IP address and the app's version to the host. Nothing about you or your projects is included, and SKYCOT fetches nothing from T3 Code's servers.</p>
   <h3>Permissions your Mac may ask for</h3>
   <p>macOS may ask you to let SKYCOT open the folders you choose, show notifications and, if you use voice typing, use the microphone. If you turn on sharing so that another of your devices can connect to SKYCOT, that device connects to your Mac directly over your own network, with no SKYCOT or T3 server in between. You can change these at any time in System Settings and in SKYCOT's Settings.</p>
   <h3>Publishing</h3>
