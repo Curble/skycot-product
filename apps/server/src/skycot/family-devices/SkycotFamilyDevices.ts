@@ -154,6 +154,7 @@ export interface PendingApproval {
   readonly createdAt: number;
   /** Older than ten minutes: it waits on the Mac now (the approval contract, rule 4). */
   readonly lapsed: boolean;
+  /** Always true in `approvals` (kept on the wire for older phones, which filter on it). */
   readonly needsGrownUp: boolean;
   readonly why: string | null;
   readonly what: string;
@@ -287,6 +288,10 @@ export class SkycotFamilyDevices extends Context.Service<
       },
       DevicesError
     >;
+    /**
+     * What a grown-up's device lists, counts, mirrors and is told about: only the requests that
+     * need a grown-up. A child's own "Ask me first" steps are theirs to answer at the Mac.
+     */
     readonly approvals: Effect.Effect<ReadonlyArray<PendingApproval>>;
     /** A passkey challenge for one action of this grown-up's device. */
     readonly challenge: (input: {
@@ -721,6 +726,10 @@ const make = Effect.gen(function* () {
         requestId: pending.id,
       });
       if (described === null) continue;
+      // A grown-up's device is for what needs a grown-up. A request the child may allow at the
+      // Mac themselves ("Ask me first": list files, read, change project files, run a short
+      // program) never reaches it: noise there trains a grown-up to tap yes.
+      if (!described.needsGrownUp) continue;
       const createdAt = pending.createdAt.epochMilliseconds;
       found.push({
         threadId: thread.id,

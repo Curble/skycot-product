@@ -388,9 +388,14 @@ export function RequestCard({
           {decided || item.type !== "approval_request" ? null : family.profile.me.kind ===
             "grown-up" ? (
             // A grown-up's phone answers on its Requests page (Allow once or Decline, checked
-            // there by the engine); this page only reads.
+            // there by the engine); this page only reads. A step the child may allow themselves
+            // is never listed there: it is answered at the Mac.
             <CardFooter>
-              <p className="fm-help">Answer this on the Requests page.</p>
+              <p className="fm-help">
+                {grownUp !== null
+                  ? "Answer this on the Requests page."
+                  : "This one doesn't need a grown-up. It's answered at the Mac."}
+              </p>
             </CardFooter>
           ) : (
             <CardFooter>

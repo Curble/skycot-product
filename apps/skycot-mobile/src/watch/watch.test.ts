@@ -87,6 +87,37 @@ const state = (watch: string | null): MacState => ({
 });
 
 describe("what the Watch is sent", () => {
+  it("leaves out the child's own steps: only what needs a grown-up reaches this phone", () => {
+    const step = (requestId: string, needsGrownUp: boolean | undefined) => ({
+      threadId: "thread-ava",
+      requestId,
+      childId: "ava",
+      threadTitle: "Space game",
+      createdAt: NOW - 60_000,
+      lapsed: false,
+      ...(needsGrownUp === undefined ? {} : { needsGrownUp }),
+      what: "ls",
+      kind: "command",
+      fingerprint: `fp-${requestId}`,
+    });
+    // An older Mac also sent "list the files", "run a short node program" (needsGrownUp: false).
+    const mixed = parsePendingRequests({
+      requests: [step("req-ls", false), step("req-install", true), step("req-older", undefined)],
+    });
+    expect(mixed?.map((request) => request.requestId)).toEqual(["req-install", "req-older"]);
+    const snapshot = buildWatchSnapshot({
+      mode: "grown-up",
+      macs: [mac],
+      byMac: { [mac.macId]: { ...state("Mum's Watch"), requests: mixed } },
+      lockedAt: null,
+      now: NOW,
+    });
+    expect(snapshot.requests.map((request) => request.requestId)).toEqual([
+      "req-install",
+      "req-older",
+    ]);
+  });
+
   it("lists who needs a grown-up, with the phone's words, and each child's day", () => {
     const snapshot = buildWatchSnapshot({
       mode: "grown-up",

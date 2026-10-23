@@ -497,7 +497,9 @@ function TimelineCard(props: {
                 )}
                 {props.readOnly ? (
                   <Txt variant="footnote" tone="label2">
-                    Answer this on the Requests page.
+                    {grownUp
+                      ? "Answer this on the Requests page."
+                      : "This one doesn't need a grown-up. It's answered at the Mac."}
                   </Txt>
                 ) : (
                   <ButtonRow>

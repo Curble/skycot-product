@@ -600,7 +600,11 @@ const withDevices = <A, E>(
     input: World & {
       readonly devices: SkycotFamilyDevices.SkycotFamilyDevices["Service"];
       readonly recorded: Recorded;
-      readonly request: { status: "pending" | "resolved"; createdAt: DateTime.Utc };
+      readonly request: {
+        status: "pending" | "resolved";
+        createdAt: DateTime.Utc;
+        needsGrownUp: boolean;
+      };
     },
   ) => Effect.Effect<A, E>,
 ) =>
@@ -609,6 +613,7 @@ const withDevices = <A, E>(
     const request = {
       status: "pending" as "pending" | "resolved",
       createdAt: DateTime.makeUnsafe(EPOCH),
+      needsGrownUp: true,
     };
     return yield* withWorld((world) =>
       Effect.gen(function* () {
@@ -620,7 +625,7 @@ const withDevices = <A, E>(
                 ...world.gate,
                 describeRequest: () =>
                   Effect.succeed({
-                    needsGrownUp: true,
+                    needsGrownUp: request.needsGrownUp,
                     why: "It uses the internet.",
                     what: "npm install three",
                     kind: "command" as const,
@@ -813,6 +818,21 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
           assert.equal(logged?.by?.deviceName, "Mum's phone");
         }),
       ),
+  );
+
+  it.effect("a grown-up's device never lists a step the child may allow at the Mac", () =>
+    withDevices(({ devices, request }) =>
+      Effect.gen(function* () {
+        // "List the project's files", "run a short node program": the child's own "Ask me first".
+        request.needsGrownUp = false;
+        assert.deepEqual(yield* devices.approvals, []);
+        // The same thread's next step that does need a grown-up (an install) is listed again.
+        request.needsGrownUp = true;
+        const listed = yield* devices.approvals;
+        assert.equal(listed.length, 1);
+        assert.isTrue(listed[0]!.needsGrownUp);
+      }),
+    ),
   );
 
   it.effect("saying no needs no proof; a request older than ten minutes waits on the Mac", () =>

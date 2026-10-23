@@ -199,6 +199,12 @@ export interface PendingRequest {
   readonly fingerprint: string;
 }
 
+/**
+ * The approver route's list, as a grown-up's device keeps it: only what needs a grown-up. The
+ * Mac already leaves out a child's own "Ask me first" steps; an older Mac sent them marked
+ * `needsGrownUp: false`, and they are dropped here too, so nothing a grown-up's device lists,
+ * counts, mirrors or notifies about is the child's to answer at the Mac.
+ */
 export function parsePendingRequests(body: unknown): ReadonlyArray<PendingRequest> | null {
   const requests = record(body)["requests"];
   if (!Array.isArray(requests)) return null;
@@ -208,6 +214,7 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
     const requestId = text(input["requestId"]);
     const fingerprint = text(input["fingerprint"]);
     if (threadId === null || requestId === null || fingerprint === null) return [];
+    if (input["needsGrownUp"] === false) return [];
     return [
       {
         threadId,
