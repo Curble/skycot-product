@@ -1,10 +1,11 @@
-// Loads one recap. The engine refuses until a grown-up's "yes" is open on this device; then
-// the code sheet asks once and the recap loads. A parent who cancels sees a calm locked state.
+// Loads one recap. The engine refuses until a grown-up's "yes" is open on this device, so the
+// code sheet asks first (unless one is already open) and the recap loads after it; the engine is
+// not asked before the code. A parent who cancels sees a calm locked state.
 import { useEffect, useEffectEvent, useState } from "react";
 
 import { useFamily } from "../family/FamilyProvider";
 import { fetchRecap } from "./api";
-import type { RecapRange, RecapReport } from "./recap";
+import { recapOpenOn, type RecapRange, type RecapReport } from "./recap";
 
 export type RecapState =
   | { readonly kind: "loading" }
@@ -23,20 +24,23 @@ export function useRecap(childId: string | null, range: RecapRange) {
     state: { kind: "loading" },
   });
   const askForCode = useEffectEvent(() => family.requireParentCode("seeRecap"));
+  const openOnThisDevice = useEffectEvent(() => recapOpenOn(family.profile.openUntil, Date.now()));
 
   useEffect(() => {
     if (childId === null) return;
     let cancelled = false;
     const setState = (state: RecapState) => setAnswer({ key, state });
+    const codeFirst = async () => {
+      const ok = await askForCode();
+      if (!cancelled && !ok) setState({ kind: "locked" });
+      return ok && !cancelled;
+    };
     void (async () => {
+      if (!openOnThisDevice() && !(await codeFirst())) return;
       let result = await fetchRecap(childId, range);
+      // The "yes" ran out between the check and the answer: ask once more.
       if (!result.ok && result.reason === "forbidden") {
-        const ok = await askForCode();
-        if (cancelled) return;
-        if (!ok) {
-          setState({ kind: "locked" });
-          return;
-        }
+        if (cancelled || !(await codeFirst())) return;
         result = await fetchRecap(childId, range);
       }
       if (cancelled) return;

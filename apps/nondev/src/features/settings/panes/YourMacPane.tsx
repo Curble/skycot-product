@@ -12,6 +12,7 @@ import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
 import { Pill } from "../../../ui/Pill";
 import { StepBadge } from "../../../ui/StepBadge";
+import { useFamily } from "../../family/FamilyProvider";
 import { SettingsGroup } from "../SettingsGroup";
 
 const OS_NAMES = {
@@ -24,8 +25,11 @@ const OS_NAMES = {
 export function YourMacPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
-  const label =
-    catalog.entries.get(environmentId)?.target.label ?? config?.environment.label ?? "This Mac";
+  const family = useFamily();
+  // In a Family profile the computer's own name (often a person's nickname) stays hidden.
+  const label = family.enabled
+    ? "This Mac"
+    : (catalog.entries.get(environmentId)?.target.label ?? config?.environment.label ?? "This Mac");
   const [exposure, setExposure] = useState<DesktopServerExposureState | null>(null);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
 

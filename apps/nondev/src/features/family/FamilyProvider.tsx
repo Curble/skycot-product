@@ -146,7 +146,13 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
       onClose={cancel}
       icon={KeyRound}
       iconTone="grey"
-      title={pending.action === "approve" ? "Ask a grown-up" : "Parent code"}
+      title={
+        pending.action === "approve"
+          ? "Ask a grown-up"
+          : pending.action === "deleteConversation"
+            ? "Delete with the parent code"
+            : "Parent code"
+      }
       description={actionReason(pending.action, pending.options.reason)}
       sober
       initialFocus="first"
@@ -155,9 +161,24 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
           <Button onClick={cancel} disabled={entry.busy}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!entry.canSubmit} onClick={() => void entry.submit()}>
-            {entry.busy ? "Checking…" : pending.action === "approve" ? "Allow" : "Continue"}
-          </Button>
+          {pending.action === "deleteConversation" ? (
+            <Button
+              variant="destructive"
+              filled
+              disabled={!entry.canSubmit}
+              onClick={() => void entry.submit()}
+            >
+              {entry.busy ? "Checking…" : "Delete"}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              disabled={!entry.canSubmit}
+              onClick={() => void entry.submit()}
+            >
+              {entry.busy ? "Checking…" : pending.action === "approve" ? "Allow" : "Continue"}
+            </Button>
+          )}
         </>
       }
     >

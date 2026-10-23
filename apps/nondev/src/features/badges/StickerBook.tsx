@@ -15,6 +15,7 @@ import { useFamily } from "../family/FamilyProvider";
 import { BADGE_COPY, earnedDate, firstName } from "./catalog";
 import { Sticker } from "./stickers/Sticker";
 import { markBadgesSeen, refreshBadges, unseenBadges, useBadges } from "./store";
+import { displayTitle } from "../tidy/renamedTitles";
 
 export function StickerBook({ showBack }: { readonly showBack: boolean }) {
   const family = useFamily();
@@ -140,7 +141,11 @@ function Certificates({ badges }: { readonly badges: ReadonlyArray<BadgeView> })
         {first ? (
           <CertificateCard
             title="My first app"
-            line={first.title ? `“${first.title}”` : "Your very first creation"}
+            line={
+              first.title
+                ? `“${displayTitle(first.threadId, first.title)}”`
+                : "Your very first creation"
+            }
             href={certificateHref("first")}
             sticker="first-creation"
           />
@@ -148,7 +153,7 @@ function Certificates({ badges }: { readonly badges: ReadonlyArray<BadgeView> })
         {ten ? (
           <CertificateCard
             title="My 10th creation"
-            line={ten.title ? `“${ten.title}”` : "Ten things made"}
+            line={ten.title ? `“${displayTitle(ten.threadId, ten.title)}”` : "Ten things made"}
             href={certificateHref("tenth")}
             sticker="ten"
           />

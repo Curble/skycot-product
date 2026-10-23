@@ -224,3 +224,17 @@ export function rangeLabel(report: Pick<RecapReport, "range" | "days">): string 
   }
   return `${day(first, { day: "numeric", month: "short" })} – ${day(last, { day: "numeric", month: "short", year: "numeric" })}`;
 }
+
+/**
+ * Whether this device already holds a grown-up's "yes" the engine accepts for the recap: the
+ * recap's own, the Family settings' (which can already change the child) or Advanced mode's.
+ * Asked before loading, so the code comes first and the engine is never asked in vain.
+ */
+export function recapOpenOn(
+  openUntil: Partial<Readonly<Record<"recap" | "settings" | "advanced", number>>>,
+  now: number,
+): boolean {
+  return [openUntil.recap, openUntil.settings, openUntil.advanced].some(
+    (until) => until !== undefined && until > now,
+  );
+}

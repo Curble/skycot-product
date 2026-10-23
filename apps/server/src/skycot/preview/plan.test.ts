@@ -1,6 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import {
+  ASLEEP_GAP_MS,
+  IDLE_STOP_MS,
+  idleVerdict,
   findPreviewCommand,
   frameableFromHeaders,
   outputTail,
@@ -179,5 +182,24 @@ describe("outputTail", () => {
     expect(tail.split("\n")).toHaveLength(12);
     expect(tail.endsWith("Error: Cannot find module '~/site/server.js'")).toBe(true);
     expect(tail).not.toContain("\u001b");
+  });
+});
+
+describe("idleVerdict", () => {
+  const minute = 60_000;
+  it("stops a preview nobody has looked at for a while", () => {
+    expect(idleVerdict({ now: 20 * minute, lastCheck: 19 * minute, lastSeen: 0 })).toBe("stop");
+    expect(idleVerdict({ now: 10 * minute, lastCheck: 9 * minute, lastSeen: 0 })).toBe("keep");
+    expect(idleVerdict({ now: IDLE_STOP_MS + 1, lastCheck: null, lastSeen: 0 })).toBe("stop");
+  });
+
+  it("does not count the time the Mac was asleep, so an open preview survives the wake (M4)", () => {
+    // Looked at a moment before the lid closed; the first check after half an hour asleep.
+    const lastCheck = 10 * minute;
+    const now = lastCheck + 30 * minute;
+    expect(now - lastCheck).toBeGreaterThan(ASLEEP_GAP_MS);
+    expect(idleVerdict({ now, lastCheck, lastSeen: lastCheck - 5_000 })).toBe("woke");
+    // The next check, a minute later, sees it as just looked at.
+    expect(idleVerdict({ now: now + minute, lastCheck: now, lastSeen: now })).toBe("keep");
   });
 });

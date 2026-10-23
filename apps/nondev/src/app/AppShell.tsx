@@ -31,7 +31,8 @@ import {
 } from "../features/versions";
 import { HOME_HREF, NEW_HREF, navigate, type Route } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
-import { projectAtomOrEmpty } from "../state/projects";
+import { environmentProjects, projectAtomOrEmpty } from "../state/projects";
+import { projectForConversation } from "../features/questions/questions";
 import { resolveDefaultModelSelection, providerForSelection } from "../state/providers";
 import { serverEnvironment } from "../state/server";
 import { environmentThreadShells } from "../state/threads";
@@ -212,7 +213,13 @@ function useTitleDetail(
       : environmentThreadShells.environmentThreadIndexAtom(environmentId),
   );
   const thread = threadId ? shellIndex.get(threadId) : undefined;
-  const project = useAtomValue(projectAtomOrEmpty({ environmentId, projectId: thread?.projectId }));
+  const ownProject = useAtomValue(
+    projectAtomOrEmpty({ environmentId, projectId: thread?.projectId }),
+  );
+  const projects = useAtomValue(environmentProjects.projectsAtom);
+  // A question that became a project shows that project's name.
+  const project =
+    thread === undefined ? ownProject : projectForConversation(thread, ownProject, projects);
   switch (route.name) {
     case "automations":
       return "Automations";
@@ -220,6 +227,8 @@ function useTitleDetail(
       return "People";
     case "fridge":
       return "The fridge";
+    case "files":
+      return "Files";
     case "stickers":
       return "Sticker book";
     case "certificate":

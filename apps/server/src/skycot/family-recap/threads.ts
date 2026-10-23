@@ -2,13 +2,17 @@
 // a person would see (one per turn, plus manual saves), how each run ended, and where its
 // files are. Read straight from the projections, so nothing new is stored for either.
 import type { ProjectId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
+import { parseUnifiedDiff, retrySpan } from "@t3tools/skycot-rules/checkpoints";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import type * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
+import type * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts";
 import type * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
-import type { RecapThreadInput } from "./recap.ts";
+import { isQuestionsSpace, QUESTIONS_LABEL } from "@t3tools/skycot-rules/questions";
+
+import type { RecapFile, RecapThreadInput } from "./recap.ts";
 
 const ROOT_SCOPES: ReadonlySet<string> = new Set(["root_run", "manual"]);
 
@@ -24,7 +28,17 @@ export const loadThread = Effect.fn("SkycotFamilyRecap.loadThread")(function* (
   projections: ProjectionStore.ProjectionStoreV2["Service"],
   projects: ProjectStore.ProjectStoreV2["Service"],
   threadId: ThreadId,
-  options: { readonly messages: boolean },
+  options: {
+    readonly messages: boolean;
+    /**
+     * Reads a retry's changes when the turn before it failed part-way (no checkpoint of its
+     * own): the retry's summary is empty, yet the page is there. Without it such a turn
+     * counts as nothing made.
+     */
+    readonly diffs?: CheckpointDiffQuery.CheckpointDiffQuery["Service"];
+    /** SKYCOT's Questions space, so a question is labelled and counted as one. */
+    readonly questionsRoot?: string | null;
+  },
 ) {
   const records = yield* projections
     .getThreadRecords(
@@ -39,9 +53,21 @@ export const loadThread = Effect.fn("SkycotFamilyRecap.loadThread")(function* (
     .pipe(Effect.orElseSucceed(() => null));
   if (records === null) return null;
   const { thread } = records;
-  const project = yield* projects
+  const own = yield* projects
     .get(thread.projectId as ProjectId)
     .pipe(Effect.orElseSucceed(() => Option.none()));
+  const inQuestions =
+    Option.isSome(own) && isQuestionsSpace(own.value.workspaceRoot, options.questionsRoot);
+  // "Make this a project" turns the question's own folder into a project; the conversation
+  // stays the engine's Scratch thread but belongs with that project from then on.
+  const adopted =
+    inQuestions && thread.worktreePath !== null
+      ? yield* projects
+          .findActiveByWorkspaceRoot(thread.worktreePath)
+          .pipe(Effect.orElseSucceed(() => Option.none()))
+      : Option.none();
+  const project = Option.isSome(adopted) ? adopted : own;
+  const question = inQuestions && Option.isNone(adopted);
   const roots = new Set(
     records.checkpointScopes
       .filter((scope) => ROOT_SCOPES.has(scope.kind))
@@ -53,10 +79,43 @@ export const loadThread = Effect.fn("SkycotFamilyRecap.loadThread")(function* (
     readonly messages?: ProjectionStore.ProjectionRecords<"messages">["messages"];
     readonly turnItems?: ProjectionStore.ProjectionRecords<"turnItems">["turnItems"];
   };
+  const rootCheckpoints = records.checkpoints.filter((checkpoint) => roots.has(checkpoint.scopeId));
+  const checkpoints = [];
+  for (const checkpoint of rootCheckpoints) {
+    let files: ReadonlyArray<RecapFile> = checkpoint.files;
+    const span =
+      files.length === 0 && options.diffs !== undefined && checkpoint.appRunOrdinal !== null
+        ? retrySpan(rootCheckpoints, records.runs, checkpoint)
+        : null;
+    if (span !== null && options.diffs !== undefined && checkpoint.appRunOrdinal !== null) {
+      const diff = yield* options.diffs
+        .getTurnDiff({
+          threadId,
+          fromTurnCount: span.fromTurnCount,
+          toTurnCount: checkpoint.appRunOrdinal,
+        })
+        .pipe(Effect.orElseSucceed(() => null));
+      if (diff !== null) {
+        files = parseUnifiedDiff(diff.diff).map((file) => ({
+          path: file.path,
+          kind: file.operation,
+          additions: file.additions,
+          deletions: file.deletions,
+        }));
+      }
+    }
+    checkpoints.push({
+      id: checkpoint.id,
+      runId: checkpoint.runId,
+      capturedAt: DateTime.toEpochMillis(checkpoint.capturedAt),
+      files,
+    });
+  }
   return {
     threadId: thread.id,
-    projectId: thread.projectId,
-    projectTitle: Option.isSome(project) ? project.value.title : null,
+    projectId: Option.isSome(project) ? project.value.projectId : thread.projectId,
+    projectTitle: question ? QUESTIONS_LABEL : Option.isSome(project) ? project.value.title : null,
+    question,
     title: thread.title,
     createdAt: DateTime.toEpochMillis(thread.createdAt),
     updatedAt: DateTime.toEpochMillis(thread.updatedAt),
@@ -68,14 +127,7 @@ export const loadThread = Effect.fn("SkycotFamilyRecap.loadThread")(function* (
       text: message.text,
       createdAt: DateTime.toEpochMillis(message.createdAt),
     })),
-    checkpoints: records.checkpoints
-      .filter((checkpoint) => roots.has(checkpoint.scopeId))
-      .map((checkpoint) => ({
-        id: checkpoint.id,
-        runId: checkpoint.runId,
-        capturedAt: DateTime.toEpochMillis(checkpoint.capturedAt),
-        files: checkpoint.files,
-      })),
+    checkpoints,
     runs: records.runs.map((run) => ({ id: run.id, status: run.status })),
     approvals: (fields.turnItems ?? []).flatMap((item) =>
       item.type === "approval_request"

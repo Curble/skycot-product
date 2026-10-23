@@ -380,6 +380,35 @@ const moreTimeRoute = route(
     }),
 );
 
+/**
+ * "Allow Cursor for the Family profile": an assistant SKYCOT can't lock down starts for a child
+ * once a grown-up allowed it. The code goes with the one request (counted like every other try);
+ * no grant is left open. Codex and Claude are refused: they are locked down already.
+ */
+const allowAssistantRoute = route(
+  "POST",
+  "/assistants/allow",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .allowAssistant({ code: text(body["code"]), driver: text(body["driver"]) })
+      .pipe(Effect.map((status) => json(status))),
+);
+
+/**
+ * "Stop allowing": no code, since it only makes the profile stricter (a child pressing it
+ * loses nothing a grown-up cannot give back). That assistant's next Family turn is refused.
+ */
+const stopAllowingAssistantRoute = route(
+  "POST",
+  "/assistants/stop",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .stopAllowingAssistant({ driver: text(body["driver"]) })
+      .pipe(Effect.map((status) => json(status))),
+);
+
 const lockRoute = route("POST", "/lock", AuthOrchestrationOperateScope, ({ family, sessionId }) =>
   family.lock({ sessionId }).pipe(
     Effect.andThen(family.status),
@@ -521,8 +550,29 @@ const fridgePinRoute = madeRoute("POST", "/fridge/pin", ({ fridge, body }) =>
   }),
 );
 
+/**
+ * One magnet's page for its thumbnail, with the project's own stylesheets and pictures inside it
+ * (the thumbnail frame may not load anything). Only a page that conversation made.
+ */
+const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query }) =>
+  Effect.gen(function* () {
+    const threadId = query.get("threadId") ?? "";
+    const page = query.get("page") ?? "";
+    if (threadId.length === 0 || page.length === 0) {
+      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    }
+    // `html: null`: that conversation never made the page, or it is not there any more.
+    return json({ html: yield* fridge.page({ threadId, page }) });
+  }),
+);
+
 /** The recap and fridge routes, without their services (tests provide stand-ins). */
-export const layerMadeRoutes = Layer.mergeAll(recapRoute, fridgeRoute, fridgePinRoute);
+export const layerMadeRoutes = Layer.mergeAll(
+  recapRoute,
+  fridgeRoute,
+  fridgePinRoute,
+  fridgePageRoute,
+);
 
 /** The profile's own routes. */
 export const layerCore = Layer.mergeAll(
@@ -541,6 +591,8 @@ export const layerCore = Layer.mergeAll(
   heartbeatRoute,
   todayRoute,
   moreTimeRoute,
+  allowAssistantRoute,
+  stopAllowingAssistantRoute,
   lockRoute,
 );
 

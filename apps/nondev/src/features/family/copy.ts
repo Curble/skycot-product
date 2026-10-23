@@ -16,6 +16,7 @@ export const familyCopy = {
     "Anything that uses the internet, installs something, deletes files or reaches outside the project waits for a grown-up's parent code.",
     "Publishing, automations, opening another folder, changing the AI assistants and the developer tools all ask for the parent code.",
     "The assistant is told it is helping a child: kind, simple, age-appropriate, and never asking for personal details.",
+    "Codex and Claude start without this Mac's own AI add-ons. Any other assistant waits until a grown-up allows it with the parent code, after reading its age rules.",
     "Uses the Workshop look and larger text (both can be changed).",
   ],
   doesNot: [
@@ -76,8 +77,12 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "SKYCOT is asleep for this child, so a grown-up switches to someone else.";
     case "seeRecap":
       return "The recap shows what a child made, asked for and needed help with, so it's for grown-ups. The code opens it on this device for 10 minutes.";
+    case "deleteConversation":
+      return "Deleting a conversation can't be undone, so a grown-up says yes with the parent code. It opens nothing else.";
     case "restartToUpdate":
       return `Restarting puts a new version of ${PRODUCT_NAME} in place, so a grown-up says when.`;
+    case "seeAllFiles":
+      return "Hidden files can hold passwords and keys, and Finder shows the rest of this Mac, so a grown-up opens them. The code shows everything on this device for 10 minutes.";
     case "changeTheme":
       return "";
   }

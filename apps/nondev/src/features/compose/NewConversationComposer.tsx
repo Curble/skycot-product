@@ -3,8 +3,8 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { ProviderInteractionMode, ServerConfig, ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { AlertCircle, ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { AlertCircle, ChevronDown, Info, MessageCircleQuestion } from "lucide-react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import { newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -30,6 +30,7 @@ import { MenuItem, Popover } from "../../ui/Popover";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
+import { useShortWindow } from "../../app/useShortWindow";
 import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
@@ -60,13 +61,22 @@ import {
   STARTER_GITIGNORE,
 } from "./privateCopy";
 import { rememberStartNote } from "./startNotes";
+import {
+  composeTargetFor,
+  isQuestionsProject,
+  JUST_ASK_COPY,
+  keyOf,
+  QUESTION_KEY,
+  realProjects,
+} from "../questions/questions";
 import { TrackingSheet, type TrackingChoice } from "./TrackingSheet";
 
 /**
  * The Home compose box: project chip, autonomy choice, message. Sending creates
  * a thread in the chosen project inside its own private copy (a Git worktree,
  * which is what lets the engine undo and restore), starts the first turn and
- * opens it.
+ * opens it. "Just ask" sends it to the Questions space instead: the engine gives
+ * the question a private folder of its own, outside the person's folders.
  */
 export function NewConversationComposer({
   preferredProjectKey,
@@ -119,19 +129,31 @@ export function NewConversationComposer({
     field.scrollIntoView({ block: "nearest" });
   }, [appliedSeed]);
 
-  const keyOf = (project: EnvironmentProject) => `${project.environmentId}:${project.id}`;
+  // Only an engine whose data folder is outside any Git checkout offers Questions.
+  const questionsAvailable =
+    Boolean(config?.scratchWorkspaceRoot) && environmentIds[0] !== undefined;
+  const ownProjects = realProjects(projects);
+  const questionsProject = projects.find((candidate) => isQuestionsProject(candidate)) ?? null;
   // Nothing chosen, nothing remembered and several projects: ask, rather than
   // aim the first message at whichever project happens to be listed first.
-  const project =
-    projects.find((candidate) => keyOf(candidate) === (chosenKey ?? preferredProjectKey)) ??
-    projects.find(
-      (candidate) =>
-        lastProject !== null &&
-        candidate.environmentId === lastProject.environmentId &&
-        candidate.id === lastProject.projectId,
-    ) ??
-    (projects.length === 1 ? projects[0]! : null);
+  const target = composeTargetFor({
+    projects,
+    questionsAvailable,
+    chosen: chosenKey,
+    preferredKey: preferredProjectKey,
+    last: lastProject,
+  });
+  const project = target?.kind === "project" ? target.project : null;
+  const asking = target?.kind === "question";
   const phone = columns === 1;
+  // On a phone or a laptop-height window the explanation folds away (F8): the pills already
+  // say what is on, and the message box and the Home screen get the room.
+  const shortWindow = useShortWindow();
+  const foldNotes = phone || shortWindow;
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesId = useId();
+  const showNotes = !foldNotes || notesOpen;
+  const nothingToPick = ownProjects.length === 0 && !questionsAvailable;
 
   return (
     <div className="fm-composer">
@@ -139,39 +161,74 @@ export function NewConversationComposer({
         <div className="fm-composer__context">
           <Popover
             label="Project"
+            // The message box sits at the bottom of the window: open upwards so every
+            // project (and Just ask) stays on screen.
+            placement="top-start"
             trigger={
-              <Button size="sm" disabled={projects.length === 0}>
-                {project ? <ProjectAvatar project={project} size="sm" /> : null}
-                {project
-                  ? project.title
-                  : projects.length === 0
-                    ? connected
-                      ? "No project yet"
-                      : "Waiting for your Mac…"
-                    : "Choose a project"}
+              <Button size="sm" disabled={nothingToPick}>
+                {asking ? (
+                  <MessageCircleQuestion size={14} strokeWidth={1.8} aria-hidden />
+                ) : project ? (
+                  <ProjectAvatar project={project} size="sm" />
+                ) : null}
+                {asking
+                  ? JUST_ASK_COPY.choice
+                  : project
+                    ? project.title
+                    : nothingToPick
+                      ? connected
+                        ? "No project yet"
+                        : "Waiting for your Mac…"
+                      : "Choose a project"}
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
               </Button>
             }
           >
-            {(close) =>
-              projects.map((candidate) => (
-                <MenuItem
-                  key={keyOf(candidate)}
-                  checked={project !== null && keyOf(candidate) === keyOf(project)}
-                  onSelect={() => {
-                    setChosenKey(keyOf(candidate));
-                    // Remembered at once, so a detour through Settings does not reset it.
-                    writeLastProject({
-                      environmentId: candidate.environmentId,
-                      projectId: candidate.id,
-                    });
-                    close();
-                  }}
-                >
-                  {candidate.title}
-                </MenuItem>
-              ))
-            }
+            {(close) => (
+              <>
+                {questionsAvailable ? (
+                  <MenuItem
+                    checked={asking}
+                    onSelect={() => {
+                      setChosenKey(QUESTION_KEY);
+                      // Remembered once the space exists (after the first question).
+                      if (questionsProject) {
+                        writeLastProject({
+                          environmentId: questionsProject.environmentId,
+                          projectId: questionsProject.id,
+                        });
+                      }
+                      close();
+                    }}
+                  >
+                    <span className="fm-menu-item__two">
+                      <span>{JUST_ASK_COPY.choice}</span>
+                      <small>{JUST_ASK_COPY.choiceHint}</small>
+                    </span>
+                  </MenuItem>
+                ) : null}
+                {questionsAvailable && ownProjects.length > 0 ? (
+                  <div className="fm-menu-sep" role="separator" />
+                ) : null}
+                {ownProjects.map((candidate) => (
+                  <MenuItem
+                    key={keyOf(candidate)}
+                    checked={project !== null && keyOf(candidate) === keyOf(project)}
+                    onSelect={() => {
+                      setChosenKey(keyOf(candidate));
+                      // Remembered at once, so a detour through Settings does not reset it.
+                      writeLastProject({
+                        environmentId: candidate.environmentId,
+                        projectId: candidate.id,
+                      });
+                      close();
+                    }}
+                  >
+                    {candidate.title}
+                  </MenuItem>
+                ))}
+              </>
+            )}
           </Popover>
           {family.enabled ? (
             <FamilyAutonomyLock planFirst />
@@ -199,33 +256,48 @@ export function NewConversationComposer({
               <PlanFirstSwitch />
             </>
           )}
-        </div>
-        {/* One sentence for the chosen level, not a paragraph about every level. */}
-        <p className="fm-help" style={{ marginBottom: 6 }}>
-          <b>{autonomyLabel(autonomy)}.</b>{" "}
-          {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
-          {planFirst.on ? (
-            <>
-              {" "}
-              <b>Plan first.</b> You'll see the plan before anything changes.
-            </>
+          {foldNotes ? (
+            <Button
+              size="sm"
+              variant="plain"
+              icon={Info}
+              aria-expanded={notesOpen}
+              aria-controls={notesId}
+              onClick={() => setNotesOpen((open) => !open)}
+            >
+              {notesOpen ? "Hide" : phone ? "What's this?" : "What does this mean?"}
+            </Button>
           ) : null}
-        </p>
-        {!phone ? (
-          <p className="fm-rule" style={{ marginBottom: 10 }}>
-            <span className="fm-rule__icon">
-              <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
-            </span>
-            <span>{hardRulesStatement(policyEnforced, undefined, family.enabled)}</span>
-          </p>
+        </div>
+        {showNotes ? (
+          <div id={notesId}>
+            {/* One sentence for the chosen level, not a paragraph about every level. */}
+            <p className="fm-help" style={{ marginBottom: 6 }}>
+              <b>{autonomyLabel(autonomy)}.</b>{" "}
+              {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
+              {planFirst.on ? (
+                <>
+                  {" "}
+                  <b>Plan first.</b> You'll see the plan before anything changes.
+                </>
+              ) : null}
+            </p>
+            <p className="fm-rule" style={{ marginBottom: 10 }}>
+              <span className="fm-rule__icon">
+                <AlertCircle size={14} strokeWidth={1.8} aria-hidden />
+              </span>
+              <span>{hardRulesStatement(policyEnforced, undefined, family.enabled)}</span>
+            </p>
+          </div>
         ) : null}
         {problem ? (
           <div style={{ marginBottom: 10 }}>
             <Banner tone="warning">{problem}</Banner>
           </div>
         ) : null}
-        {project ? (
+        {target !== null && environmentIds[0] !== undefined ? (
           <ComposerField
+            environmentId={project?.environmentId ?? environmentIds[0]}
             project={project}
             autonomy={autonomy}
             interactionMode={requestMode(planFirst)}
@@ -254,11 +326,13 @@ export function NewConversationComposer({
             canSend={false}
             disabled
             placeholder={
-              projects.length === 0
+              nothingToPick
                 ? connected
                   ? "Open a folder in the sidebar first, then say what you'd like done"
                   : "Waiting for your Mac…"
-                : "Choose a project above, then say what you'd like done"
+                : questionsAvailable
+                  ? "Choose a project above, or Just ask"
+                  : "Choose a project above, then say what you'd like done"
             }
           />
         )}
@@ -277,6 +351,7 @@ type SendOutcome =
   | { readonly kind: "failed"; readonly message: string };
 
 function ComposerField({
+  environmentId,
   project,
   autonomy,
   interactionMode,
@@ -289,7 +364,9 @@ function ComposerField({
   wantsPicture,
   onSend,
 }: {
-  readonly project: EnvironmentProject;
+  readonly environmentId: EnvironmentProject["environmentId"];
+  /** Null for "Just ask": the question goes to the Questions space. */
+  readonly project: EnvironmentProject | null;
   readonly autonomy: Autonomy;
   /** "plan" while plan first is on. */
   readonly interactionMode: ProviderInteractionMode;
@@ -303,14 +380,15 @@ function ComposerField({
   readonly wantsPicture: boolean;
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
-  const environmentId = project.environmentId;
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const modelSelection = resolveDefaultModelSelection(providers, project);
   const provider = providerForSelection(providers, modelSelection);
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
-  const cwd = project.workspaceRoot;
+  // A question has no folder until the engine makes one; no Git calls run for it.
+  const cwd = project?.workspaceRoot ?? "";
+  const openScratch = useAtomCommand(projectEnvironment.openScratch, { reportFailure: false });
   const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, { reportFailure: false });
   const initRepository = useAtomCommand(vcsEnvironment.init, { reportFailure: false });
   const writeFile = useAtomCommand(projectEnvironment.writeFile, { reportFailure: false });
@@ -347,7 +425,9 @@ function ComposerField({
    * writing a `.git` folder and a version of every file into someone's folder
    * is not something to do silently.
    */
-  const prepareFolder = async (): Promise<
+  const prepareFolder = async (
+    project: EnvironmentProject,
+  ): Promise<
     { readonly baseBranch: string } | { readonly reason: string } | { readonly cancelled: true }
   > => {
     const first = await refreshStatus({ environmentId, input: { cwd } });
@@ -407,7 +487,19 @@ function ComposerField({
       attachments: pictures.uploads(),
     } as const;
     const labels = firstMessageLabels(cleared.text, randomUUID(), family.enabled);
-    const folder = await prepareFolder();
+    // Just ask: find or make the Questions space; the engine gives this question its own
+    // folder inside it, so there is no private copy to make and nothing to set up.
+    let destination = project;
+    if (destination === null) {
+      const opened = await openScratch({ environmentId, input: {} });
+      if (opened._tag === "Failure") {
+        console.warn("[skycot] opening Questions failed:", squashAtomCommandFailure(opened));
+        return { kind: "failed", message: "SKYCOT couldn't open Questions just now. Try again." };
+      }
+      destination = opened.value;
+    }
+    const folder =
+      project === null ? ({ question: true } as const) : await prepareFolder(destination);
     if ("cancelled" in folder) {
       setPhase(null);
       return { kind: "cancelled" };
@@ -428,7 +520,7 @@ function ComposerField({
           createdAt,
           bootstrap: {
             createThread: {
-              projectId: project.id,
+              projectId: destination.id,
               // The engine requires a non-empty title; the server regenerates a better one later.
               title: labels.title,
               modelSelection,
@@ -456,7 +548,7 @@ function ComposerField({
     let threadId = newThreadId();
     setPhase(privateCopy ? PRIVATE_COPY_COPY.makingCopy : null);
     let started = await start(threadId, privateCopy);
-    let note = "baseBranch" in folder ? null : folder.reason;
+    let note = "reason" in folder ? folder.reason : null;
     if (started._tag === "Failure" && privateCopy) {
       // The copy couldn't be made (an empty repository, a clashing branch…):
       // still start the conversation, straight in the folder, and say so.
@@ -475,7 +567,7 @@ function ComposerField({
     if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
     // Family with siblings: list it under this child's conversations straight away.
     noteStartedHere(threadId);
-    writeLastProject({ environmentId, projectId: project.id });
+    writeLastProject({ environmentId, projectId: destination.id });
     navigate(threadHref(environmentId, threadId));
     return { kind: "started" };
   };
@@ -501,7 +593,9 @@ function ComposerField({
       ? "This connection can read conversations but not start them"
       : modelSelection === null
         ? "No assistant is set up yet — connect one in Settings → AI assistants"
-        : `Say what you'd like done in ${project.title}…`;
+        : project === null
+          ? JUST_ASK_COPY.placeholder
+          : `Say what you'd like done in ${project.title}…`;
 
   return (
     <>
@@ -529,10 +623,17 @@ function ComposerField({
         label="New conversation"
         foot={{
           left: phone ? (
-            <>Starts a new conversation in {project.title}</>
+            <>
+              {project === null
+                ? JUST_ASK_COPY.footPhone
+                : `Starts a new conversation in ${project.title}`}
+            </>
           ) : (
             <>
-              Starts a new conversation in {project.title} · <Kbd>⇧</Kbd>
+              {project === null
+                ? JUST_ASK_COPY.foot
+                : `Starts a new conversation in ${project.title}`}{" "}
+              · <Kbd>⇧</Kbd>
               <Kbd>Return</Kbd> for a new line
             </>
           ),
@@ -543,7 +644,9 @@ function ComposerField({
               : "",
         }}
       />
-      {tracking ? <TrackingSheet projectTitle={project.title} onChoose={tracking.resolve} /> : null}
+      {tracking && project ? (
+        <TrackingSheet projectTitle={project.title} onChoose={tracking.resolve} />
+      ) : null}
     </>
   );
 }

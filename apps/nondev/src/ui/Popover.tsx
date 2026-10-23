@@ -135,18 +135,21 @@ export function MenuItem({
   onSelect,
   checked,
   disabled = false,
+  destructive = false,
 }: {
   readonly children: ReactNode;
   readonly onSelect: () => void;
   readonly checked?: boolean;
   readonly disabled?: boolean;
+  /** Red, like Delete in Mail and Notes. */
+  readonly destructive?: boolean;
 }) {
   return (
     <button
       type="button"
       role={checked === undefined ? "menuitem" : "menuitemradio"}
       aria-checked={checked}
-      className="fm-menu-item"
+      className={destructive ? "fm-menu-item fm-menu-item--destructive" : "fm-menu-item"}
       onClick={onSelect}
       disabled={disabled}
       tabIndex={-1}
@@ -154,4 +157,9 @@ export function MenuItem({
       {children}
     </button>
   );
+}
+
+/** A thin rule between groups of menu rows. */
+export function MenuSeparator() {
+  return <div className="fm-menu-sep" role="separator" />;
 }

@@ -13,16 +13,21 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
 import * as ServerConfig from "../../config.ts";
+import * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
+import { pageOf } from "../family-recap/recap.ts";
 import { loadThread } from "../family-recap/threads.ts";
+import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import { fridgeItems, type FridgeItem } from "./fridge.ts";
+import { MAX_ASSET_BYTES, selfContainedPage } from "./thumbnail.ts";
 
 export const FRIDGE_FILE_NAME = "skycot-fridge.json";
 const PINS_KEEP = 500;
@@ -46,6 +51,14 @@ export class SkycotFridge extends Context.Service<
       readonly threadId: string;
       readonly pinned: boolean;
     }) => Effect.Effect<ReadonlyArray<FridgeItem>>;
+    /**
+     * A page this conversation made, with its own stylesheets, pictures and fonts inside it, for
+     * the thumbnail frame (./thumbnail.ts). Null when the conversation never made that page.
+     */
+    readonly page: (input: {
+      readonly threadId: string;
+      readonly page: string;
+    }) => Effect.Effect<string | null>;
   }
 >()("t3/skycot/family-fridge/SkycotFridge") {}
 
@@ -54,6 +67,11 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  // Optional so the tests and tools that build this alone still work; the server provides it.
+  const diffs = Option.getOrUndefined(
+    yield* Effect.serviceOption(CheckpointDiffQuery.CheckpointDiffQuery),
+  );
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
 
@@ -89,6 +107,8 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
       if (thread.deletedAt !== null) continue;
       const loaded = yield* loadThread(projections, projects, thread.id as ThreadId, {
         messages: false,
+        ...(diffs === undefined ? {} : { diffs }),
+        questionsRoot,
       });
       if (loaded !== null) threads.push(loaded);
     }
@@ -120,7 +140,31 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     return yield* listWith(pins);
   });
 
-  return SkycotFridge.of({ list, pin });
+  const page: SkycotFridge["Service"]["page"] = Effect.fn("SkycotFridge.page")(function* (input) {
+    const thread = yield* loadThread(projections, projects, input.threadId as ThreadId, {
+      messages: false,
+    });
+    if (thread === null || thread.deleted || thread.cwd === null) return null;
+    const pages = new Set(thread.checkpoints.map((checkpoint) => pageOf(checkpoint.files)));
+    if (!pages.has(input.page)) return null;
+    const root = yield* fs.realPath(thread.cwd).pipe(Effect.orElseSucceed(() => null));
+    if (root === null) return null;
+    const relativePage = path.isAbsolute(input.page)
+      ? path.relative(root, input.page).split(path.sep).join("/")
+      : input.page;
+    return yield* selfContainedPage(relativePage, (relativePath) =>
+      Effect.gen(function* () {
+        const target = yield* fs.realPath(path.join(root, relativePath));
+        // Links and `..` that leave the project are refused, like the project's own file reads.
+        if (target !== root && !target.startsWith(`${root}${path.sep}`)) return null;
+        const info = yield* fs.stat(target);
+        if (info.type !== "File" || Number(info.size) > MAX_ASSET_BYTES) return null;
+        return yield* fs.readFile(target);
+      }).pipe(Effect.orElseSucceed(() => null)),
+    );
+  });
+
+  return SkycotFridge.of({ list, pin, page });
 });
 
 /** For tests and tools: a fridge file at an explicit path. */

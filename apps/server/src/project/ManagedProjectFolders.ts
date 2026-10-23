@@ -24,6 +24,7 @@ import * as ServerConfig from "../config.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectService from "./ProjectService.ts";
+import * as SkycotQuestions from "../skycot/questions/SkycotQuestions.ts"; // nondev-seam: skycot-questions-history
 
 export class ScratchUnavailableError extends Schema.TaggedError<ScratchUnavailableError>()(
   "ScratchUnavailableError",
@@ -183,7 +184,7 @@ function namedProjectReadme(name: string): string {
     "",
     `# ${name}`,
     "",
-    "Created in [T3 Code](https://t3.codes).",
+    "Made with SKYCOT.", // nondev-seam: skycot-project-readme
     "",
   ].join("\n");
 }
@@ -340,7 +341,7 @@ const make = Effect.gen(function* () {
       path.join(root.value, [date, words, idPart].filter(Boolean).join("-"));
     yield* makeScratchFolder(root.value);
     const fullFolder = folderFor(id);
-    return yield* claimFreeFolder(
+    const claimed = yield* claimFreeFolder(
       (attempt) =>
         attempt === 1
           ? Effect.succeed(Option.some(folderFor(id.slice(-8))))
@@ -352,6 +353,7 @@ const make = Effect.gen(function* () {
               ),
       (folder, cause) => new ScratchFolderError({ folder, cause }),
     );
+    return yield* SkycotQuestions.keepVersions(git, claimed); // nondev-seam: skycot-questions-history
   });
 
   const namedProjectsRoot = path.resolve(config.baseDir, "projects");

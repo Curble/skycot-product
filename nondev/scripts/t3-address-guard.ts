@@ -53,8 +53,6 @@ export const REVIEWED_MENTIONS: Readonly<Record<string, string>> = {
     "an example address inside a tool description the AI reads; the engine never opens it",
   "apps/server/src/cli/triagePrompt.ts":
     "the `triage` command's instructions for a developer's own AI agent; runs only when someone types `skycot triage`, never by itself",
-  "apps/server/src/project/ManagedProjectFolders.ts":
-    "a link written into a new project's README; text only (wording queued in BACKLOG)",
   "apps/server/src/telemetry/AnalyticsService.ts":
     "T3's analytics host as upstream's default; analytics are off by default (seam telemetry-default-off) and env.cjs points the host at this Mac",
   "packages/contracts/src/t3ProjectFile.ts":

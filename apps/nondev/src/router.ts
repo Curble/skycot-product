@@ -4,7 +4,7 @@
 // in the fragment; file-based route generation in a sibling package would
 // also mean a second routeTree.gen.ts and plugin config for three screens.
 import { getPairingTokenFromUrl } from "@t3tools/shared/remote";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { useSyncExternalStore } from "react";
 
 export type Route =
@@ -13,6 +13,16 @@ export type Route =
   | { readonly name: "new" }
   | { readonly name: "pair" }
   | { readonly name: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId }
+  /**
+   * A project's files, Finder-style. With a conversation, its private copy (what that
+   * conversation changed); without, the project's own folder.
+   */
+  | {
+      readonly name: "files";
+      readonly environmentId: EnvironmentId;
+      readonly projectId: ProjectId;
+      readonly threadId: ThreadId | null;
+    }
   | { readonly name: "automations" }
   | { readonly name: "people" }
   /** The family fridge: everything the children made. */
@@ -100,6 +110,14 @@ export function parseRoute(hash: string): Route {
   ) {
     return { name: "certificate", kind: segments[2] };
   }
+  if (segments[0] === "files" && (segments.length === 3 || segments.length === 4)) {
+    return {
+      name: "files",
+      environmentId: decodeURIComponent(segments[1]!) as EnvironmentId,
+      projectId: decodeURIComponent(segments[2]!) as ProjectId,
+      threadId: segments[3] === undefined ? null : (decodeURIComponent(segments[3]) as ThreadId),
+    };
+  }
   if (segments[0] === "thread" && segments.length === 3) {
     return {
       name: "thread",
@@ -133,6 +151,15 @@ export function certificateHref(kind: "first" | "tenth"): string {
 
 export function threadHref(environmentId: EnvironmentId, threadId: ThreadId): string {
   return `#/thread/${encodeURIComponent(environmentId)}/${encodeURIComponent(threadId)}`;
+}
+
+export function filesHref(
+  environmentId: EnvironmentId,
+  projectId: ProjectId,
+  threadId: ThreadId | null = null,
+): string {
+  const base = `#/files/${encodeURIComponent(environmentId)}/${encodeURIComponent(projectId)}`;
+  return threadId === null ? base : `${base}/${encodeURIComponent(threadId)}`;
 }
 
 function subscribe(onChange: () => void) {

@@ -73,6 +73,17 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   parent has entered the code; the code opens it on that device for 15 minutes, and
   Settings → Family says how long is left. Its terminal, installs and AI settings need the
   code too.
+- **Files stay inside the project.** **Files** (in a conversation's header and its **…** menu as
+  **See the files**, and beside **New conversation** when a project is picked in the sidebar) lists
+  a project's files the way Finder does, and **Quick Look** shows any of them: pictures, pages
+  (running offline, like **Open it**), PDFs, Markdown, code and text, sounds and videos. Nothing
+  there edits, moves or deletes a file. The engine picks the folder (the project's own, or the
+  conversation's private copy) and refuses any path that leaves it: a typed `../`, a full path, or
+  a shortcut (symlink) pointing elsewhere on the Mac. Hidden and secret files (`.env`, `.git`, keys),
+  installed add-ons (`node_modules`) and build output wait behind **Show everything**, which needs
+  the parent code. **Show in Finder** is a grown-up's button: Finder shows the rest of the Mac, so
+  children never see it, and the engine refuses it without the parent code. See
+  [Files](#files).
 - **The live preview stays on this Mac.** **Preview** (beside a conversation, or full screen on a
   phone) shows the project's site running. Starting it runs the project's own start command, so it
   asks first like any command; the child may start an ordinary one (`node server.js`), but a start
@@ -82,11 +93,26 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   sent back with **Ask a grown-up**; the code allows that one site while the preview stays open.
   What the child points at with **Point at something** travels as words in their next message, so
   the shield reads it like anything they type.
-- **The assistant's own SKYCOT tools are off.** While the profile is on, the engine gives the
-  assistant none of SKYCOT's own tools: it cannot start other conversations, schedule
-  automations, open pull requests, use other devices, or open, click and take pictures of pages
-  itself (those page tools would first download a browser of about 200 MB). The child's own
-  **Preview** button works as before; the assistant is told to suggest it instead.
+- **The assistant's own SKYCOT tools are off.** While the profile is on, the engine does not
+  connect the assistant to SKYCOT's own tool server at all, so the assistant is not even shown
+  those tools' names: it cannot start other conversations, schedule automations, open pull
+  requests, use other devices, open, click and take pictures of pages, or draw a page as a
+  picture (`html_render`, `html_preview`; those page tools would first download a browser of
+  about 200 MB). This holds for every assistant (Codex, Claude, Cursor, OpenCode, Grok and the
+  other ACP agents, Muse, Pi): each one is handed SKYCOT's tool server only when the engine
+  issues it a key, and in the Family profile it issues none. While the profile is on, the engine
+  also refuses every key it issued before, so an assistant that was already running when the
+  profile was turned on can no longer use the tools; it may still see their names until it next
+  starts. The child's own **Preview** button works as before; the assistant is told to suggest
+  it instead. After the profile is turned off, a conversation gets the tools back when its
+  assistant next starts. Outside agents a grown-up approved (MCP clients) are not affected; see
+  below.
+- **The computer's own AI add-ons are off, too.** A child's assistant gets only what SKYCOT gives
+  it. Whatever a grown-up installed for their own AI on this Mac — plugins such as computer use,
+  browser control, Chrome or documents, apps and connectors, MCP servers, skills, hooks, and the
+  program Codex runs after every turn (`notify`, which on some Macs starts computer-use helpers)
+  — does not reach the child's conversation. The engine does this when it starts the assistant,
+  not by asking it nicely: see [The parent's own AI add-ons](#the-parents-own-ai-add-ons).
 - **The look.** Workshop (cream paper, marker pens, Sam builds and Mo checks; SKYCOT's
   default look) stays on unless a parent picked another look, and larger text comes on. Both are ordinary preferences anyone can change; looks never change what
   SKYCOT does.
@@ -123,6 +149,30 @@ Limits, honestly:
   start with a plan that someone has to Build.
 - **An engine restart** between pressing Build it and the build starting turns it back into a
   plan (the safe side): press Build it again.
+- **Going back past a plan** (Undo, or changing an earlier message) takes the plan away: a Build
+  it that names it runs as a new plan, because the assistant no longer has the plan it would
+  build.
+
+## Files
+
+- **Where.** A conversation's **Files** shows its private copy (what that conversation changed);
+  a project's **Files** shows the project's own folder. Any SKYCOT project can be browsed,
+  siblings' projects too, as their conversations can be opened. Folders open in place; a path bar
+  and **Find in this folder** help; nothing is written.
+- **Quick Look** shows pictures up to 10 MB, pages up to 2 MB (with the page's own styles,
+  scripts and pictures put inside it, running offline in the same sandbox as **Open it**), PDFs,
+  sounds and videos up to 10 MB (never playing by themselves), and the first 512 KB of Markdown,
+  code and text. Code carries a short "This is the code behind your page" note. Anything bigger
+  says so plainly; anything else (a `.zip`, a Word file) says "SKYCOT can't show this kind of
+  file".
+- **Held for a grown-up.** With the profile on, hidden and secret files, add-ons and build output
+  are left out of the list and refused by the engine until a grown-up turns on **Show everything**
+  with the parent code (10 minutes on that device). The same yes shows **Show in Finder**, which is
+  never offered to a child: Finder would show the rest of the Mac. Without the profile, Show
+  everything is an ordinary switch and Show in Finder is there on the Mac itself.
+- **Reading elsewhere.** The same rule covers the engine's older ways to read a file: reading a
+  file, listing or searching a folder, or making a picture address is open inside SKYCOT's projects
+  and their private copies and needs the parent code anywhere else, or for a hidden or secret file.
 
 ## Several children
 
@@ -161,11 +211,141 @@ back, and a rename can be changed again.
 - **A conversation that is still working** cannot be put away until the crew finishes or is
   stopped.
 - **A new name** shows in the list, at the top of the conversation, on the fridge, in the recap
-  and on a certificate. An empty name is refused. Renaming is how to fix a title the AI wrote
-  that sounds like an instruction ("Create an Offline Bubbles Pet Page"); SKYCOT does not retitle
-  conversations by itself.
+  and on a certificate. An empty name is refused. A title the AI wrote like an instruction
+  ("Create an Offline Bubbles Pet Page") reads as the thing itself on the fridge, in the recap and
+  on a certificate ("Bubbles pet page"); the list and the conversation keep the AI's words, and a
+  name someone typed is shown as typed everywhere. SKYCOT never renames a conversation itself.
 - **Siblings share the list.** As they can open each other's conversations, they can also put
   away, bring back or rename them. Nothing is lost either way.
+
+### Deleting a conversation
+
+**Delete…** is the last row of every conversation's **…** menu (and its right-click menu), set
+apart in red like Delete in Mail and Notes, for a live conversation and for one in **Old
+conversations**. A conversation that is still working waits, as for putting away. It opens a
+sheet that says what goes and what stays, with **Cancel** chosen first:
+
+- **Goes:** the conversation, every message, plan and picture sent in it, and its restore points
+  (the engine's `thread.delete`).
+- **Stays:** the project's folder and its files as they are now, with their kept versions (the
+  project's history). A page it made stays in the project as a file.
+- "This can't be undone." There is no Undo, so the sheet suggests putting it away instead.
+
+**In a Family profile** the red button reads **Enter parent code…** and opens the parent-code sheet
+over it. The code records a grown-up's "yes" **for that one conversation** (an `approve` grant
+named `delete-conversation:<id>`), the delete spends it, and it opens nothing else. It is
+deliberately not Advanced mode's 15-minute grant: that would also lift plan first and the limits
+for the child's session while it lasted. The engine refuses the delete without that yes (or
+Advanced mode), whatever the screen shows; a wrong code deletes nothing and counts as a wrong try.
+
+What a deleted conversation does to the rest:
+
+- **The fridge:** its magnet comes off (the fridge lists conversations), its pin is forgotten.
+  The page file stays in the project, so a later conversation can still open it.
+- **The grown-up recap:** it leaves "What … made" and the questions list, and its held cards are
+  no longer counted. The day's minutes, messages and the personal-details catches already noted
+  stay, because they were counted when they happened. A child can't hide anything this way: the
+  parent typed the code.
+- **Stickers are never taken away.** A sticker earned in it stays in the sticker book.
+
+## Projects: name and icon
+
+A project's **…** in the sidebar (shown on hover, always on a touch screen) and a right-click on
+it offer **Rename…** and **Change icon…**. Both open one small sheet, like a list's info in
+Reminders: the name (selected, so typing replaces it; Return saves, Escape or Cancel leaves it,
+an empty name is refused) and a grid of icons in the style of a child's picture picker: the
+name's first letters on grey (the default), the name's first letter on one of the six picture
+colours, or a friendly emoji (rocket, game controller, dinosaur, cat, …). SKYCOT's own poses stay
+for people, so a project never looks like a child in the sidebar.
+
+- Both are the **engine's own fields** (`title`, `projectIcon`), so the new name and icon show
+  everywhere at once: the sidebar, beside each conversation, at the top of a conversation, the
+  project picker, Advanced mode, the grown-up recap and other devices. Nothing is kept in the
+  browser. (Fridge magnets show the conversation's name, not the project's.)
+- A letter icon follows the name, like a contact's monogram: renaming "Games" to "Pets" turns the
+  G into a P in the same colour. An icon chosen in Advanced mode that the grid does not offer is
+  kept unless another is picked.
+- **Children may rename a project and change its icon**: each shows a toast with **Undo**, which
+  puts back exactly the name and icon it had.
+- The engine allows a child's project change only when it carries a new name or icon and
+  nothing else. The same command with the project's scripts (they run commands), its other
+  settings (which assistant, pulling from the internet, where conversations work) or a favicon
+  needs Advanced mode; moving its folder needs the "another folder" yes.
+
+## Just ask (Questions)
+
+**Just ask** sits beside the project picker on Home: a question, or a quick job, without
+choosing a folder first. It works the same with the profile on or off.
+
+- **Where it works.** SKYCOT's engine keeps one space for questions, shown as **Questions** in the
+  sidebar and the list (T3's "Scratch" folder, `~/.skycot/scratch` in the Mac app). Every question
+  gets a private folder of its own inside it, so nothing in the family's own folders is touched,
+  and the engine keeps versions there: **What changed**, **Undo**, **Open it** and the fridge work
+  as in a project.
+- **The child's own.** The engine treats a question's folder as the child's own project: writing
+  and running things there is open (still **Ask me first**), and everything else, including a
+  brother's or sister's question next to it, is outside the project and shows **Ask a grown-up**.
+  Plan first, the shield, bedtime and daily limits, and the code for installs and the internet
+  all apply exactly as in a project.
+- **Make this a project.** When a question made something, a strip offers **Make this a project…**:
+  give it a name, and the question's folder becomes a project of that name (nothing is moved or
+  copied), with a first saved version. The conversation keeps its history and Undo, and is listed
+  with the new project from then on. No code is needed; the toast's **Undo** takes the project off
+  the list again (its files stay), and the conversation goes back to Questions.
+- **The recap** counts a question's messages like any other, and lists it under **What they
+  made** only once it made a file.
+- **Tidying.** Questions are put away, brought back and renamed like any conversation.
+
+Honest limits:
+
+- **A plain question still arrives as a plan.** Plan first holds every child's turn, so "Why is the
+  sky blue?" comes back as a plan card whose steps are the answer; **Build it** has nothing to
+  build. Telling plain questions apart reliably would need a guess, and a wrong guess would let a
+  build through without a plan.
+- **The folder is SKYCOT's, not a project folder you chose.** A question made into a project stays
+  where SKYCOT keeps questions (`~/.skycot/scratch/<date-and-words>`), because moving it would
+  break its Undo history.
+- **The cards say "this project".** Inside a question, "Only this project" on a card means the
+  question's own folder.
+- **Not offered** when SKYCOT's data folder is inside a Git checkout (a developer's setup): the
+  engine then has no Questions space and the picker shows projects only.
+
+## Going back to an earlier message
+
+"That's not what I meant": a child (or grown-up) can change something they asked earlier.
+**Edit** sits under their own messages (it shows when the pointer is over the message, on a
+right-click, and always on a phone or tablet). It puts the message back in the box; nothing
+changes until they send it. Sending asks **Go back to here?**, which says what will be
+replaced, with two choices:
+
+- **Keep the files as they are** (chosen to start with): only the conversation goes back.
+- **Put the files back too**: the files Sam changed from that message on go back to how they
+  were, the same restore as Undo. Like Undo it can't itself be undone; Versions shows the later
+  versions as undone.
+
+Rules, honestly:
+
+- **No parent code.** It is the same engine step as Undo, which a child can already use, and it
+  only ever moves files back to a version SKYCOT saved in the conversation's private copy. The
+  project's own folder is never touched, and nothing outside SKYCOT's version history is
+  deleted. A conversation working straight in the project's folder (no private copy), or a
+  restore past a version kept as a Git commit, offers only **Keep the files as they are**.
+- **The changed message is a new message.** It goes through the shield, runs as a plan first and
+  in Ask me first, counts as one of the day's messages and waits at bedtime, exactly like any new
+  request. Going back itself is not a message, so it works at the day's cap and at bedtime (like
+  Undo); the changed message then waits.
+- **A taken-back plan can't be built.** Going back takes the plan's turn away and Sam forgets it.
+  Its card says so and offers no Build it, and the engine plans again for a Build it that names
+  such a plan, whatever sends it.
+- **Not while Sam is working.** Edit then offers **Stop**; a put-away conversation offers **Bring
+  back**. Either way the message then goes into the box by itself.
+- **Too far back.** If the saved point from just before the message is gone (an old conversation,
+  or a different AI service took over later), SKYCOT says it can't go back that far and changes
+  nothing. An AI service that can't go back in a conversation is said plainly too.
+- **What was replaced leaves the chat.** Until the conversation is opened again it shows as one
+  folded row ("Went back: …"), which **Show** opens read-only. Sam doesn't remember it.
+- **Pictures and pointing don't come back.** The words return to the box; pictures and what was
+  pointed at in the preview have to be added again (the box says so).
 
 ## Bedtime and daily limits
 
@@ -237,8 +417,8 @@ too.
 ## The fridge
 
 **The fridge** (sidebar, and **On the fridge** on Home) shows everything made on this Mac: one
-magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running),
-its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
+magnet per conversation that made a page, with a live thumbnail (drawn with no scripts running
+and nothing loaded: the engine puts the page's own stylesheets and pictures inside it), its title, when it was made, and the crew's sticker. Tap it to **Open it**, running offline inside
 SKYCOT. With several children there is a shelf per child and a filter; children see their own
 shelf and their siblings'. **Pin to the fridge** keeps a magnet at the top and **Take it down**
 unpins it; neither needs the code, and neither deletes anything: the page stays in its project.
@@ -274,6 +454,7 @@ Entering the code allows one thing, for this device, for a short time:
 | The AI assistants              | connecting, signing out, installing, other changes | 10 minutes |
 | A key or password, a rename    | handing one over, the child's name                 | 10 minutes |
 | Restart to update              | restarting the Mac app into the downloaded version | 2 minutes  |
+| Show everything (Files)        | hidden and secret files, add-ons, Show in Finder   | 10 minutes |
 | Advanced mode                  | the developer interface and everything above       | 15 minutes |
 
 Settings → Family → **Lock again now** ends them all early.
@@ -312,6 +493,72 @@ turned off and on again starts that file afresh. The browser only remembers whet
 A profile set up in an earlier version lived in the browser only. The first time the code is
 asked for (or in Settings → Family), entering it moves the profile to the engine.
 
+## The parent's own AI add-ons
+
+Codex and Claude read the AI setup a grown-up made for themselves on this Mac (`~/.codex`,
+`~/.claude`). Computer use or browser control would go around everything else the engine
+enforces, so while the Family profile is on the engine starts the child's assistant without
+any of it. Nothing in the grown-up's own setup is changed: their files stay as they are, and
+switching the profile off gives their setup back.
+
+| Assistant                                                          | While the Family profile is on                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Codex** (ChatGPT)                                                | A separate Codex is started for the child with Codex's own switches off on its command line, where neither the grown-up's settings nor a project can turn them back on: plugins, apps and connectors, hooks, computer use, browser use, remote plugins and plugin suggestions, memories, Codex's bundled skills, and `notify` emptied. Before every conversation starts or resumes, the engine asks that Codex which MCP servers and skills it can see and switches each one off by name, read fresh each time so one added a minute ago is included. |
+| **Claude**                                                         | Every Claude session is opened reading no settings files (so no enabled plugin, hook, permission rule or the grown-up's CLAUDE.md), with only SKYCOT's MCP servers (none in the Family profile), no plugins, no skills, hooks off, claude.ai connectors off and Claude in Chrome off.                                                                                                                                                                                                                                                                 |
+| Cursor, OpenCode, Grok, Antigravity, Pi, Muse and other ACP agents | Not started for a child **until a grown-up allows that assistant** (see [Other assistants: a grown-up's choice](#other-assistants-a-grown-ups-choice)). SKYCOT can't switch their own add-ons off, so until then the conversation shows a card for the child ("Ask a grown-up to say yes") with **Allow … for the Family profile…** for the grown-up. Once allowed, the assistant starts with its own add-ons, as the parent's informed choice. A provider added in a later version is refused the same way until a grown-up allows it.               |
+| Titles and other text SKYCOT writes with AI                        | The same rule: Codex's `codex exec` runs with the same switches off (plugins, apps and MCP servers were already off), Claude's with hooks off (it already runs with no tools and no MCP server), and any other provider is not used for it.                                                                                                                                                                                                                                                                                                           |
+
+**It fails closed.** Before a child's first Codex conversation starts, that Codex must report
+plugins, apps, hooks, computer use and browser use off and `notify` empty, and list no enabled
+plugin or app. If it cannot (an unexpected Codex version, an error), the conversation does not
+start and says: _"The Family profile is on, and SKYCOT could not confirm that Codex's own add-ons
+on this computer … are switched off, so it didn't start."_ If an MCP server starts for a child's
+conversation anyway, the engine refuses its next turn. A Family Codex never writes the grown-up's
+Codex settings, installs anything, or calls an MCP tool.
+
+**An assistant that was already running when the profile was switched on** is stopped the moment
+the child next sends anything, and a fresh one starts without the add-ons (a reply it was in the
+middle of stops). Until then it refuses new conversations, turns and follow-ups. After the profile
+is switched off, the child-safe assistant is replaced by the grown-up's normal one once it is idle.
+
+### Other assistants: a grown-up's choice
+
+Every assistant SKYCOT can drive is available in the Family profile, but the ones SKYCOT can't
+lock down (everything except Codex and Claude) only start for a child once a grown-up has allowed
+them, one assistant at a time, with the parent code. It's the parent's choice for their children;
+SKYCOT's job is to show the terms plainly first.
+
+- **Where.** In the conversation, the refused message shows "Ask a grown-up to say yes" for the
+  child and **Allow Cursor for the Family profile…** for the grown-up. In **Settings › Family › AI
+  assistants for children**, every assistant is listed as **Locked down** (Codex, Claude),
+  **Allowed by a grown-up** or **Not allowed**, with **Allow…** or **Stop allowing**.
+- **What the grown-up reads first** (the allow sheet, Cancel first): (1) that assistant's own age
+  rules, as the site's FAQ states them ("As of October 2026, Anthropic's Claude and Cursor require
+  every user to be 18 or over, and OpenAI's terms allow 13 to 17 year olds with a parent's
+  permission; Google sets its own rules for Gemini and Antigravity"), or "Check …'s own terms for
+  age rules" where SKYCOT states no fact, with a link to the provider's terms only where SKYCOT's
+  legal notes already cite one (OpenAI, Anthropic, Cursor, Antigravity, Grok); (2) that SKYCOT can't
+  switch off that assistant's own add-ons (plugins, connectors and helper tools set up on this
+  computer), so a child using it may reach them, while SKYCOT's other Family rules still apply.
+  Then the parent code. Codex's and Claude's age rules also show where a parent picks an assistant
+  for a child (the welcome steps and Settings › AI assistants); they need no allowance.
+- **How it is kept.** The allowance lives in the engine's profile file (`allowedAssistants` in
+  `skycot-family.json`), next to the children and the code. Allowing takes the parent code with
+  that one request; a wrong code counts towards the same five tries and five-minute wait as every
+  other prompt, and leaves no "yes" open afterwards. Codex and Claude can't be put on the list (they
+  are locked down anyway); a hand-edited file can't unlock them either. Allowing is for every child
+  in the profile, and turning the profile off forgets it.
+- **Stopping.** **Stop allowing** needs no code: it only makes the profile stricter, so a child
+  pressing it loses nothing a grown-up can't give back. It counts at once: an allowed assistant's
+  conversation that is still open refuses its next message and is closed, and a new one is refused
+  before it starts.
+- **Honest limits.** An allowed assistant runs with whatever its own add-ons can do on this Mac
+  (computer use, browser control, connectors), which can go around SKYCOT's checks the same way the
+  lockdown for Codex and Claude exists to prevent. Ask first and plan first are held by the engine
+  for every assistant, but how faithfully an assistant asks before its own tools act depends on how
+  it reports them to SKYCOT. The age facts are as of October 2026 and the providers can change them;
+  SKYCOT doesn't check a child's age or the parent's account type.
+
 ## What the engine checks
 
 Every call a client can make to SKYCOT's engine was looked at, and a test keeps it that way:
@@ -319,26 +566,32 @@ a call added later fails the tests until someone decides. Calls that only read, 
 or take something away (declining, pausing or deleting an automation, signing a device out)
 stay open. "Grown-up" names the parent's "yes" a call needs; Advanced mode covers every one.
 
-| Calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Needs                                                                                                                                | Why                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Allowing a held step (`runtime-request.respond` with accept), any "allow for the session/always"                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Grown-up: that one step                                                                                                              | internet, installs, deleting, outside the project, secrets, admin rights, connected apps |
-| `pullRequests.runAction`, `update`, `comment`, `updateComment`, `submitReview`, `replyToThread`, `setThreadResolution`, `setReaction`, `requestReviewers`, `setLabels`; `sourceControl.publishRepository`; `git.runStackedAction` other than commit                                                                                                                                                                                                                                                                                                          | Grown-up: publishing                                                                                                                 | puts work where other people see it                                                      |
-| `scheduledTasks.upsert`, `runNow`, `rotateWebhookToken`, `setEnabled` (on)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Grown-up: automations                                                                                                                | runs later, on its own                                                                   |
-| `projects.add`, `projects.remove`, `projects.mutate` (anything but a rename), `sourceControl.cloneRepository`, `projectClone.start`/`retry`, `vcs.createWorktree`/`removeWorktree`, `launchThread` with a new worktree fetched from the internet or for a project SKYCOT does not have                                                                                                                                                                                                                                                                       | Grown-up: another folder                                                                                                             | the assistant would work somewhere else                                                  |
-| `projects.writeFile`, `thread.create` and `launchThread` with a folder; `launchThread` making a conversation's private copy (it is what makes Undo work)                                                                                                                                                                                                                                                                                                                                                                                                     | Open inside a SKYCOT project; elsewhere Grown-up: another folder                                                                     | writes or works outside the project                                                      |
-| `server.updateSettings` (anything but "Ask me first"), `server.updateProvider`, `provider.install.start`/`remove`, `provider.auth.start`/`complete`/`respond`/`logout`, `provider.chatgpt.reconnect-profile`/`import-profile`, `provider.consumeResetCredit`, `provider.uploadFeedback`, `server.upsertKeybinding`/`removeKeybinding`, `secrets.answerRequest` (save)                                                                                                                                                                                        | Grown-up: AI assistants                                                                                                              | the parent's accounts, sign-ins, settings and keys; feedback sends conversations away    |
-| Deleting a conversation (`thread.delete`; putting it away stays open), `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                                                                                              | developer tools, outside agents, other devices, the internet                             |
-| HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                                                                                                 | as the call it mirrors; otherwise Advanced mode                                                                                      | letting another device or an outside agent in                                            |
-| Putting a conversation away or bringing it back (`thread.archive`, `thread.unarchive`); renaming it (`thread.metadata.update` with a title)                                                                                                                                                                                                                                                                                                                                                                                                                  | Open; with a folder (`worktreePath`), Grown-up: another folder                                                                       | each can be undone; a folder is where the assistant works                                |
-| `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Grown-up: AI assistants                                                                                                              | the children are part of the profile                                                     |
-| `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Grown-up: the recap (or the Family settings' yes)                                                                                    | a child's words and what needed a grown-up are a parent's to read                        |
-| `/api/skycot/preview/start` (starting a conversation's site)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The person's yes, always; Grown-up: that one start when the start command installs something, uses the internet or trips a hard rule | runs the project's own start command on the Mac                                          |
-| `/api/skycot/preview/address` (where the preview may go)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | This Mac's addresses: open; anything else Grown-up: that site, once                                                                  | the internet                                                                             |
-| `/api/skycot/updates/allow-restart`, then the Mac app's own install handler (it reads the profile and needs the engine's two-minute note for that version)                                                                                                                                                                                                                                                                                                                                                                                                   | Grown-up: restart to update                                                                                                          | a new version replaces SKYCOT; checking and downloading stay open                        |
-| `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | The parent code, with the request                                                                                                    | wakes SKYCOT for a child; nothing stays open afterwards                                  |
-| A child's turn, whatever starts it (`sourcePlanRef` marks a Build it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Runs as a plan unless it builds a waiting plan                                                                                       | a plan before making anything                                                            |
-| A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                                                                                        | Refused while SKYCOT is asleep for the child                                                                                         | bedtime and the daily limits; Advanced mode is exempt                                    |
-| Everything else: reading and watching (lists, diffs, files, status, searches), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                                                                      | Open                                                                                                                                 | the child's own work, or it only stops or takes away                                     |
+| Calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Needs                                                                                                                                                                                                                      | Why                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Allowing a held step (`runtime-request.respond` with accept), any "allow for the session/always"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Grown-up: that one step                                                                                                                                                                                                    | internet, installs, deleting, outside the project, secrets, admin rights, connected apps                             |
+| `pullRequests.runAction`, `update`, `comment`, `updateComment`, `submitReview`, `replyToThread`, `setThreadResolution`, `setReaction`, `requestReviewers`, `setLabels`; `sourceControl.publishRepository`; `git.runStackedAction` other than commit                                                                                                                                                                                                                                                                                                                                              | Grown-up: publishing                                                                                                                                                                                                       | puts work where other people see it                                                                                  |
+| `scheduledTasks.upsert`, `runNow`, `rotateWebhookToken`, `setEnabled` (on)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Grown-up: automations                                                                                                                                                                                                      | runs later, on its own                                                                                               |
+| `projects.add`, `projects.remove`, `projects.mutate` (adding, removing, or moving a project's folder), `sourceControl.cloneRepository`, `projectClone.start`/`retry`, `vcs.createWorktree`/`removeWorktree`, `launchThread` with a new worktree fetched from the internet or for a project SKYCOT does not have                                                                                                                                                                                                                                                                                  | Grown-up: another folder                                                                                                                                                                                                   | the assistant would work somewhere else                                                                              |
+| `projects.writeFile`, `thread.create` and `launchThread` with a folder; `launchThread` making a conversation's private copy (it is what makes Undo work)                                                                                                                                                                                                                                                                                                                                                                                                                                         | Open inside a SKYCOT project; elsewhere Grown-up: another folder                                                                                                                                                           | writes or works outside the project                                                                                  |
+| `server.updateSettings` (anything but "Ask me first"), `server.updateProvider`, `provider.install.start`/`remove`, `provider.auth.start`/`complete`/`respond`/`logout`, `provider.chatgpt.reconnect-profile`/`import-profile`, `provider.consumeResetCredit`, `provider.uploadFeedback`, `server.upsertKeybinding`/`removeKeybinding`, `secrets.answerRequest` (save)                                                                                                                                                                                                                            | Grown-up: AI assistants                                                                                                                                                                                                    | the parent's accounts, sign-ins, settings and keys; feedback sends conversations away                                |
+| `projects.mutate` changing a project's scripts, assistant, auto-pull, conversation folder mode or favicon, `terminal.open`/`attach`/`write`/`restart`, `server.updateServer*`, `commitDesktopUpdate`, every ACP-registry change, `server.signalProcess`, `runStorageCleanup`, `checkOtlpEndpoint`, `cloud.installRelayClient`, `shell.openInEditor`, `device.configure`/`testHost`/`open`/`close`/`shutdown`/`action`, `agentSessions.import`, `mcpApps.callTool`, `vcs.pull`, `git.resolvePullRequest`/`preparePullRequestThread`, `preview.open`/`navigate` to an address that is not this Mac | Grown-up: Advanced mode                                                                                                                                                                                                    | developer tools, outside agents, other devices, the internet                                                         |
+| HTTP: `/api/projects/mutate` (as `projects.mutate`), `/api/auth/pairing-token`, `/api/connect/*` changes, `/api/t3-connect/mint-credential`, `/oauth/mcp/decision` (approve)                                                                                                                                                                                                                                                                                                                                                                                                                     | as the call it mirrors; otherwise Advanced mode                                                                                                                                                                            | letting another device or an outside agent in                                                                        |
+| Just ask: `projects.ensureScratch`, `launchThread` into Questions, `projects.writeFile` or `thread.create` inside a question's folder; **Make this a project** (`projects.mutate` `project.create` of a question's folder) and its Undo (`project.delete`, without `force`, of a project made from a question)                                                                                                                                                                                                                                                                                   | Open; any other folder, or removing any other project, Grown-up: another folder                                                                                                                                            | the question's folder is SKYCOT's own space, not the family's folders; taking a project off the list keeps its files |
+| Deleting a conversation (`thread.delete`; putting it away stays open)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Grown-up: that one conversation, spent by the delete                                                                                                                                                                       | it can't be undone                                                                                                   |
+| Undo, Restore and **Go back to here** (`checkpoint.rollback`, with or without the files)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Open; works at bedtime and the day's cap (it is not a message)                                                                                                                                                             | only moves the private copy back to a version SKYCOT saved                                                           |
+| Putting a conversation away or bringing it back (`thread.archive`, `thread.unarchive`); renaming it (`thread.metadata.update` with a title); renaming a project or changing its icon (`projects.mutate` with only `title` and `projectIcon`)                                                                                                                                                                                                                                                                                                                                                     | Open; with a folder (`worktreePath`), Grown-up: another folder                                                                                                                                                             | each can be undone; a folder is where the assistant works                                                            |
+| `/api/skycot/family/rename`, `/children/add`, `/children/update`, `/children/remove`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Grown-up: AI assistants                                                                                                                                                                                                    | the children are part of the profile                                                                                 |
+| `/api/skycot/family/recap`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Grown-up: the recap (or the Family settings' yes)                                                                                                                                                                          | a child's words and what needed a grown-up are a parent's to read                                                    |
+| `/api/skycot/preview/start` (starting a conversation's site)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The person's yes, always; Grown-up: that one start when the start command installs something, uses the internet or trips a hard rule                                                                                       | runs the project's own start command on the Mac                                                                      |
+| `/api/skycot/preview/address` (where the preview may go)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | This Mac's addresses: open; anything else Grown-up: that site, once                                                                                                                                                        | the internet                                                                                                         |
+| `/api/skycot/updates/allow-restart`, then the Mac app's own install handler (it reads the profile and needs the engine's two-minute note for that version)                                                                                                                                                                                                                                                                                                                                                                                                                                       | Grown-up: restart to update                                                                                                                                                                                                | a new version replaces SKYCOT; checking and downloading stay open                                                    |
+| `/api/skycot/family/more-time`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | The parent code, with the request                                                                                                                                                                                          | wakes SKYCOT for a child; nothing stays open afterwards                                                              |
+| A child's turn, whatever starts it (`sourcePlanRef` marks a Build it; a plan whose turn was taken back does not count)                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Runs as a plan unless it builds a waiting plan                                                                                                                                                                             | a plan before making anything                                                                                        |
+| A child's message (`message.dispatch`, `launchThread` with a first message, resuming or promoting a queued one) and a child's "Allow"                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Refused while SKYCOT is asleep for the child                                                                                                                                                                               | bedtime and the daily limits; Advanced mode is exempt                                                                |
+| `/api/skycot/files/list`, `/api/skycot/files/read` (Files and Quick Look)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Open inside a SKYCOT project or a conversation's private copy; hidden and secret files, add-ons and build output: Grown-up: Show everything; outside the project (`../`, a full path, a symlink out): refused, code or not | a child's own work; secrets and the rest of the Mac stay a grown-up's                                                |
+| `projects.readFile`, `projects.listEntries`, `listIgnoredFiles`, `searchEntries`, `searchContents`; `assets.createUrl` for a draft or media file                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Open inside a SKYCOT project or private copy (real paths, so a symlinked folder counts as where it is); elsewhere, or a hidden or secret file: Grown-up: Show everything                                                   | reading the rest of the Mac                                                                                          |
+| `shell.openInEditor` as Show in Finder (`file-manager`, `reveal`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Grown-up: Show everything                                                                                                                                                                                                  | Finder shows the rest of the Mac                                                                                     |
+| Everything else: reading and watching (lists, diffs, status, searches inside a project), the fridge (and pinning), sending messages, stopping, declining, the child's own project (new project, writing inside it, saving a version, previews on this Mac), pausing or deleting an automation, cancelling a sign-in or install, revoking a device                                                                                                                                                                                                                                                | Open                                                                                                                                                                                                                       | the child's own work, or it only stops or takes away                                                                 |
 
 ## What is still possible
 
@@ -359,9 +612,6 @@ Honestly, so a parent can decide how nearby to stay:
   the project's own scripts (`npm run start`). With Codex, the engine's sandbox keeps the
   network off for those; with Claude, a project script that itself downloads something is
   not caught by name.
-- **Rendering a page to a picture** (the assistant's `html_render` and `html_preview` tools) is
-  not switched off by the engine, only asked against in the assistant's instructions; the first use
-  on a computer without SKYCOT's small browser downloads it (about 200 MB).
 - **The live preview's start command runs outside the assistant's safe area.** SKYCOT checks its
   words (and the script it runs) for installs and the internet, not what the program then does: a
   project server that itself downloads something is not caught.
@@ -371,7 +621,21 @@ Honestly, so a parent can decide how nearby to stay:
   Mac app) links inside the preview are not checked at all, and **Point at something** is not
   available there.
 - **Other text the AI writes from the child's words** (conversation titles) is made without
-  the rules; it never reaches the child as an answer.
+  the rules; it never reaches the child as an answer. It runs without the grown-up's add-ons, like
+  the child's conversation.
+- **The assistants' own built-in tools stay.** Switching off the grown-up's add-ons leaves what
+  Codex and Claude come with: running commands and changing files in the project (each one asked
+  first), web search, Codex's image generation and helper agents. The engine's checks on installs,
+  the internet, deleting and publishing apply to those as before.
+- **Codex still reads the grown-up's `AGENTS.md`** (instructions in words, not tools), and Codex
+  itself marks a child's project folder as trusted in the grown-up's `~/.codex/config.toml`, as it
+  does for any folder it works in. SKYCOT does not edit that file.
+- **An assistant a grown-up allowed** (anything other than Codex and Claude) keeps its own add-ons,
+  which can reach outside SKYCOT; see [Other assistants: a grown-up's choice](#other-assistants-a-grown-ups-choice).
+- **Settings an administrator manages** (an organisation's managed Codex or Claude settings, which
+  a family Mac does not normally have) still apply as Codex and Claude intend.
+- **Checking which providers SKYCOT can use** starts Codex and Claude briefly with the grown-up's
+  normal setup, as SKYCOT always has; no conversation and no child's words are involved.
 - **Accounts and outside agents connected before the profile was turned on** keep working:
   an MCP client already approved, or another paired device, is not signed out. Check
   Settings → Connections in Advanced mode when you turn the profile on.
@@ -384,6 +648,16 @@ Honestly, so a parent can decide how nearby to stay:
 - **The shield is a word-spotter.** It catches common shapes of names, schools, addresses, phone
   numbers, emails and birthdays; a detail written in an unusual way can slip past, and an
   ordinary word can be caught. The recap hides the same things the shield catches, no more.
+- **Files: a shortcut changed at just the wrong moment.** The engine checks where a path really
+  leads and then reads it; a program on the Mac swapping a folder for a shortcut between those two
+  steps could slip past. Nothing in SKYCOT does that; a person at Terminal could.
+- **Files: what a page loads by itself.** Quick Look puts a page's own styles, scripts and pictures
+  inside it; pictures named inside a style sheet (`url(...)`) and anything from the internet do not
+  load. PDFs use the browser's own viewer: where there is none (some Mac app builds), Quick Look
+  says so and a grown-up opens it from Finder. The browser's PDF viewer has its own Download and
+  Print buttons, which save a copy and never change the file.
+- **Files: folder names when opening a folder.** **Open a folder…** still lists the names of
+  folders on the Mac (not their files) before the parent code is asked for adding one.
 - **The recap needs the code, the fridge does not.** Siblings can see each other's magnets and
   open each other's pages, as they can open each other's conversations. A child who knows the code
   can read the recap.

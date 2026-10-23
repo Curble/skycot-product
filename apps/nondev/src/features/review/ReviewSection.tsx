@@ -131,10 +131,14 @@ export function ReviewSection({
       : null,
   );
 
-  if (!projection || !target || target.checkpoint.files.length === 0) return null;
+  if (!projection || !target) return null;
   const { checkpoint, run, before } = target;
-
   const fromDiff = diff.data ? describeTurnDiff(diff.data.diff) : null;
+  // A retry's own summary is empty; its card exists only when the span's diff has files.
+  if (checkpoint.files.length === 0 && (fromDiff === null || fromDiff.counts.files === 0)) {
+    return null;
+  }
+
   const what: WhatChanged =
     fromDiff && fromDiff.counts.files > 0
       ? fromDiff

@@ -15,17 +15,26 @@
 // may run without planning; every other turn of the child's runs as a plan
 // (SkycotFamilyInstructions.familyTurnInput).
 //
+// Reading files stays open inside SKYCOT's projects and their conversations' private copies,
+// and nowhere else: the stock file RPCs (`projects.readFile` with a full path, listings and
+// searches of any folder, `assets.createUrl` for a picture anywhere on the Mac) and hidden or
+// secret files (`.env`, `.git`, keys) need a grown-up's `files` yes. The plain client's own
+// Files routes apply the same rule, and also hold add-ons and build output (skycot/files).
+//
 // Agents reach the same capabilities through T3's MCP tools, which this gate does not see;
-// those are closed separately by issuing Family-profile threads an MCP credential without any of
-// the engine's own capabilities: orchestration, worktrees, pull requests, devices and page
-// previews (`SkycotFamily.withholdFamilyMcpCapabilities`).
+// those are closed separately: while the profile is on, ProviderSessionManager issues a thread no
+// MCP credential at all (seam skycot-family-mcp), so the agent is given no engine tool server and
+// none of its tools (thread control, worktrees, pull requests, devices, page previews, and
+// html_render / html_preview, which may first download a browser) is listed or callable.
 
 import {
   AuthOrchestrationOperateScope,
   EnvironmentAuthorizationError,
   ORCHESTRATION_V2_WS_METHODS,
   RpcScopeAuthorization,
+  type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
+  type PlanId,
   type ProjectId,
   type ProviderDriverKind,
   type RuntimeRequestId,
@@ -34,12 +43,20 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import { evaluateFamilyRequest, type FamilyEvaluation } from "@t3tools/skycot-rules/family";
+import { cleanBrowsePath, pathIsHiddenOrSecret } from "@t3tools/skycot-rules/browse";
+import {
+  deleteConversationApprovalId,
+  evaluateFamilyRequest,
+  type FamilyEvaluation,
+} from "@t3tools/skycot-rules/family";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
+import { isInQuestionsSpace, workRootsFor } from "@t3tools/skycot-rules/questions";
 import {
   findPersonalDetails,
   personalCategories,
@@ -48,10 +65,12 @@ import {
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import { isInsideRoot } from "./files/SkycotFiles.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
+import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 
 /** `requiredPermission` on the refusal, so a client can tell "ask a grown-up" from a scope error. */
 export const FAMILY_PERMISSION = "skycot:family-parent-code";
@@ -66,7 +85,14 @@ type Purpose = SkycotFamily.FamilyPurpose;
 
 /** What a gated call needs, or null when it is open to the child. */
 export type GateNeed =
-  | { readonly type: "grant"; readonly purpose: Purpose }
+  | {
+      readonly type: "grant";
+      readonly purpose: Purpose;
+      /** For "approve": the one thing the grown-up said yes to (Advanced mode's grant also opens it). */
+      readonly requestId?: string;
+      /** For "approve": the yes is spent by this call. */
+      readonly consume?: boolean;
+    }
   /** Open inside a project SKYCOT already has; anywhere else is opening another folder. */
   | { readonly type: "projectFolder"; readonly cwd: string }
   /**
@@ -75,6 +101,22 @@ export type GateNeed =
    * what makes Undo possible, so it is open; an unknown project is opening another folder.
    */
   | { readonly type: "projectWorktree"; readonly projectId: ProjectId }
+  /**
+   * A new project at this folder. Inside SKYCOT's Questions space it is "Make this a project"
+   * (a question's own folder becomes a project), which is the child's own work; anywhere else
+   * it is opening another folder.
+   */
+  | { readonly type: "newProject"; readonly cwd: string }
+  /**
+   * Taking a project off the list (its files stay). For a project made from a question, that
+   * is the Undo of "Make this a project", so it is open; any other project is a grown-up's.
+   */
+  | { readonly type: "removeProject"; readonly projectId: ProjectId }
+  /**
+   * Reading: open inside a SKYCOT project or a conversation's private copy, for a path that
+   * stays inside it and is not a hidden or secret file; anything else is a grown-up's `files` yes.
+   */
+  | { readonly type: "readInProject"; readonly cwd: string; readonly path?: string }
   | {
       readonly type: "respond";
       readonly threadId: ThreadId;
@@ -130,6 +172,13 @@ const OPEN_FOLDER_METHODS = new Set([
   "vcs.createWorktree",
   "vcs.removeWorktree",
 ]);
+/** Listings and searches of a folder (`cwd`): open inside SKYCOT's projects only. */
+const READ_FOLDER_METHODS = new Set([
+  "projects.listEntries",
+  "projects.listIgnoredFiles",
+  "projects.searchEntries",
+  "projects.searchContents",
+]);
 /** The developer tools: terminals, updates, outside agents, devices, data clean-up, remotes. */
 const ADVANCED_METHODS = new Set([
   "terminal.open",
@@ -151,7 +200,6 @@ const ADVANCED_METHODS = new Set([
   "server.runStorageCleanup",
   "server.checkOtlpEndpoint",
   "cloud.installRelayClient",
-  "shell.openInEditor",
   "device.configure",
   "device.testHost",
   "device.open",
@@ -192,6 +240,11 @@ function isChildSafeSettingsPatch(payload: unknown): boolean {
   return keys.every((key) => key === "defaultRuntimeMode" && patch[key] === "approval-required");
 }
 
+/** What every project change carries besides the change itself. */
+const PROJECT_UPDATE_ENVELOPE: ReadonlySet<string> = new Set(["type", "commandId", "projectId"]);
+/** The project changes a child may make: its name and its icon. */
+const CHILD_PROJECT_CHANGES: ReadonlySet<string> = new Set(["title", "projectIcon"]);
+
 /** Pure: which grown-up check a call needs. Exported for tests. */
 export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
   const input = record(payload);
@@ -209,8 +262,20 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
         ? { type: "projectFolder", cwd: input["worktreePath"] }
         : null;
     }
-    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's call.
-    if (input["type"] === "thread.delete") return { type: "grant", purpose: "advanced" };
+    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's
+    // call: a parent code for this one conversation (spent by the delete), or Advanced mode.
+    // Not the Advanced grant itself: that would also lift plan first and the limits for the
+    // child's session while it lasts.
+    if (input["type"] === "thread.delete") {
+      return typeof input["threadId"] === "string"
+        ? {
+            type: "grant",
+            purpose: "approve",
+            requestId: deleteConversationApprovalId(input["threadId"]),
+            consume: true,
+          }
+        : { type: "grant", purpose: "advanced" };
+    }
     if (input["type"] !== "runtime-request.respond") return null;
     const decision = input["decision"];
     if (decision !== "accept" && decision !== "acceptForSession" && decision !== "acceptAlways") {
@@ -248,8 +313,32 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
     return input["enabled"] === false ? null : { type: "grant", purpose: "automation" };
   }
   if (method === "projects.mutate") {
-    // Renaming stays open; adding a folder, moving a project's folder or removing it does not.
-    if (input["type"] === "project.update" && input["workspaceRoot"] === undefined) return null;
+    if (input["type"] === "project.update") {
+      const changed = Object.keys(input).filter(
+        (key) => !PROJECT_UPDATE_ENVELOPE.has(key) && input[key] !== undefined,
+      );
+      // A project's scripts run commands, and its other settings pick the assistant, pull from
+      // the internet or change where conversations work: the developer tools' business.
+      if (changed.some((key) => !CHILD_PROJECT_CHANGES.has(key) && key !== "workspaceRoot")) {
+        return { type: "grant", purpose: "advanced" };
+      }
+      // Moving a project's folder is opening another folder.
+      if (changed.includes("workspaceRoot")) return { type: "grant", purpose: "openFolder" };
+      // Renaming and changing the icon stay open (each can be undone).
+      return null;
+    }
+    // Adding a folder needs a grown-up, unless it is the child's own question ("Make this a project").
+    if (input["type"] === "project.create" && typeof input["workspaceRoot"] === "string") {
+      return { type: "newProject", cwd: input["workspaceRoot"] };
+    }
+    // `force` also removes the project's conversations: never the child's call.
+    if (
+      input["type"] === "project.delete" &&
+      typeof input["projectId"] === "string" &&
+      input["force"] !== true
+    ) {
+      return { type: "removeProject", projectId: input["projectId"] as ProjectId };
+    }
     return { type: "grant", purpose: "openFolder" };
   }
   if (OPEN_FOLDER_METHODS.has(method)) return { type: "grant", purpose: "openFolder" };
@@ -263,6 +352,42 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
     return record(input["answer"])["type"] === "decline"
       ? null
       : { type: "grant", purpose: "settings" };
+  }
+  if (method === "projects.readFile") {
+    return typeof input["cwd"] === "string"
+      ? {
+          type: "readInProject",
+          cwd: input["cwd"],
+          path: typeof input["relativePath"] === "string" ? input["relativePath"] : "",
+        }
+      : { type: "grant", purpose: "files" };
+  }
+  if (READ_FOLDER_METHODS.has(method)) {
+    if (typeof input["cwd"] !== "string") return { type: "grant", purpose: "files" };
+    return typeof input["directoryPath"] === "string" && input["directoryPath"].length > 0
+      ? { type: "readInProject", cwd: input["cwd"], path: input["directoryPath"] }
+      : { type: "readInProject", cwd: input["cwd"] };
+  }
+  if (method === "assets.createUrl") {
+    const resource = record(input["resource"]);
+    // A picture anywhere on the Mac by its full path.
+    if (resource["_tag"] === "media-file") return { type: "grant", purpose: "files" };
+    if (resource["_tag"] === "draft-workspace-file") {
+      return typeof resource["cwd"] === "string" && typeof resource["path"] === "string"
+        ? { type: "readInProject", cwd: resource["cwd"], path: resource["path"] }
+        : { type: "grant", purpose: "files" };
+    }
+    return null;
+  }
+  if (method === "shell.openInEditor") {
+    // Show in Finder for a file of the project is the Files view's grown-up button; opening
+    // a code editor, or Finder anywhere else, stays with the developer tools.
+    if (input["editor"] === "file-manager" && input["reveal"] === true) {
+      return typeof input["cwd"] === "string"
+        ? { type: "grant", purpose: "files" }
+        : { type: "grant", purpose: "advanced" };
+    }
+    return { type: "grant", purpose: "advanced" };
   }
   if (method === "preview.open" || method === "preview.navigate") {
     return isLocalPreviewUrl(input["url"]) ? null : { type: "grant", purpose: "advanced" };
@@ -366,6 +491,34 @@ export function buildsPlan(method: string, payload: unknown): boolean {
   );
 }
 
+/** Pure: the plan a Build it names, if the call is one. */
+export function sourcePlanOf(
+  payload: unknown,
+): { readonly threadId: string; readonly planId: string } | null {
+  const ref = record(record(payload)["sourcePlanRef"]);
+  return typeof ref["threadId"] === "string" && typeof ref["planId"] === "string"
+    ? { threadId: ref["threadId"], planId: ref["planId"] }
+    : null;
+}
+
+/**
+ * Pure: whether a Build it may run without a fresh plan. The plan must still be waiting, and
+ * its turn must still be part of the conversation: going back to an earlier message (or Undo)
+ * takes that turn back, the assistant forgets the plan, but the engine leaves the plan
+ * "active". Building it then would make changes from a plan the assistant no longer has, so
+ * such a message plans again, like any other.
+ */
+export function planStillBuildable(
+  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs">,
+  planId: string,
+): boolean {
+  const plan = projection.plans.find((candidate) => candidate.id === planId);
+  if (plan === undefined || plan.kind !== "proposed_plan" || plan.status !== "active") return false;
+  if (plan.runId === null) return true;
+  const run = projection.runs.find((candidate) => candidate.id === plan.runId);
+  return run !== undefined && run.status !== "rolled_back";
+}
+
 /**
  * The same rule for the HTTP API routes that change things (`/api/projects/mutate` is the
  * HTTP twin of `projects.mutate`). Revoking access stays open: it only ever takes away.
@@ -446,19 +599,25 @@ type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" 
 
 const make = Effect.gen(function* () {
   const family = yield* SkycotFamily.SkycotFamily;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
   // Optional so a gate built without the limits (older tests, tools) keeps its old behaviour.
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
+  const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
-  /** Where the thread works (its private copy, else the folder), and the project's folder. */
+  /**
+   * Where the thread works (its private copy, else the folder), and the project's folder. A
+   * question works in its own folder only (`workRootsFor`).
+   */
   const projectRootsFor = Effect.fnUntraced(function* (thread: {
     readonly projectId: ProjectId;
     readonly worktreePath: string | null;
   }) {
     const project = yield* projects.get(thread.projectId);
     const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
-    return { projectRoot: thread.worktreePath ?? projectFolder, projectFolder };
+    return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
   });
 
   const toolCallFor = Effect.fnUntraced(function* (
@@ -514,9 +673,21 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  // A question's own folder is SKYCOT's space, not the person's: open like a project's.
   const isProjectFolder = (cwd: string) =>
-    projects.findActiveByWorkspaceRoot(cwd.replace(/[/\\]+$/, "")).pipe(
-      Effect.map(Option.isSome),
+    isInQuestionsSpace(cwd, questionsRoot)
+      ? Effect.succeed(true)
+      : projects.findActiveByWorkspaceRoot(cwd.replace(/[/\\]+$/, "")).pipe(
+          Effect.map(Option.isSome),
+          Effect.orElseSucceed(() => false),
+        );
+
+  const isQuestionProject = (projectId: ProjectId) =>
+    projects.get(projectId).pipe(
+      Effect.map(
+        (project) =>
+          Option.isSome(project) && isInQuestionsSpace(project.value.workspaceRoot, questionsRoot),
+      ),
       Effect.orElseSucceed(() => false),
     );
 
@@ -526,6 +697,38 @@ const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
 
+  const realOr = (folder: string) =>
+    fs.realPath(folder).pipe(Effect.orElseSucceed(() => path.resolve(folder)));
+
+  /**
+   * Whether a folder is a SKYCOT project's, a conversation's private copy, or inside one,
+   * judged by real paths so a symlinked folder counts as where it really is.
+   */
+  const isKnownFolder = Effect.fnUntraced(function* (cwd: string) {
+    const real = yield* realOr(cwd);
+    const roots = [
+      ...(yield* projects.list().pipe(Effect.orElseSucceed(() => []))).map(
+        (project) => project.workspaceRoot,
+      ),
+      ...(yield* projections
+        .getThreadWorktreePaths({ includeArchived: true })
+        .pipe(Effect.orElseSucceed(() => []))).map((entry) => entry.worktreePath),
+    ];
+    for (const root of roots) {
+      if (isInsideRoot(yield* realOr(root), real, path.sep)) return true;
+    }
+    return false;
+  });
+
+  /** A read inside a known folder, of a path that stays in it and is not hidden or secret. */
+  const isOpenRead = Effect.fnUntraced(function* (need: { cwd: string; path?: string }) {
+    if (need.path !== undefined) {
+      const cleaned = cleanBrowsePath(need.path);
+      if (cleaned === null || pathIsHiddenOrSecret(cleaned)) return false;
+    }
+    return yield* isKnownFolder(need.cwd);
+  });
+
   const enforce = Effect.fn("SkycotFamilyGate.enforce")(function* (
     sessionId: string,
     method: string,
@@ -533,19 +736,42 @@ const make = Effect.gen(function* () {
   ) {
     if (need === null) return;
     if (!(yield* family.isEnabled)) return;
-    if (need.type === "projectFolder" || need.type === "projectWorktree") {
+    if (
+      need.type === "projectFolder" ||
+      need.type === "projectWorktree" ||
+      need.type === "newProject" ||
+      need.type === "removeProject"
+    ) {
       if (
         need.type === "projectFolder"
           ? yield* isProjectFolder(need.cwd)
-          : yield* isKnownProject(need.projectId)
+          : need.type === "newProject"
+            ? isInQuestionsSpace(need.cwd, questionsRoot)
+            : need.type === "removeProject"
+              ? yield* isQuestionProject(need.projectId)
+              : yield* isKnownProject(need.projectId)
       )
         return;
       if (yield* family.allows({ sessionId, purpose: "openFolder" })) return;
       yield* Effect.logInfo("skycot-family.refused", { method, purpose: "openFolder" });
       return yield* familyRefusal();
     }
+    if (need.type === "readInProject") {
+      if (yield* isOpenRead(need)) return;
+      if (yield* family.allows({ sessionId, purpose: "files" })) return;
+      yield* Effect.logInfo("skycot-family.refused", { method, purpose: "files" });
+      return yield* familyRefusal();
+    }
     if (need.type === "grant") {
-      if (yield* family.allows({ sessionId, purpose: need.purpose })) return;
+      if (
+        yield* family.allows({
+          sessionId,
+          purpose: need.purpose,
+          ...(need.requestId === undefined ? {} : { requestId: need.requestId }),
+          ...(need.consume === true ? { consume: true } : {}),
+        })
+      )
+        return;
       yield* Effect.logInfo("skycot-family.refused", { method, purpose: need.purpose });
       return yield* familyRefusal();
     }
@@ -647,7 +873,18 @@ const make = Effect.gen(function* () {
   ) {
     const message = sentMessage(method, payload);
     if (message === null || !(yield* family.isEnabled)) return;
-    if (buildsPlan(method, payload)) {
+    const source = buildsPlan(method, payload) ? sourcePlanOf(payload) : null;
+    const buildable =
+      source !== null &&
+      (yield* projections.getThreadProjection(source.threadId as ThreadId).pipe(
+        Effect.map((projection) => planStillBuildable(projection, source.planId as PlanId)),
+        // A plan the gate cannot read is not one it can vouch for: it plans (the safe side).
+        Effect.orElseSucceed(() => false),
+      ));
+    if (source !== null && !buildable) {
+      yield* Effect.logInfo("skycot-family.plan-first", { buildIt: "plan-not-waiting" });
+    }
+    if (buildable) {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "builds-plan");
     } else if (yield* family.allows({ sessionId, purpose: "advanced" })) {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "grown-up");

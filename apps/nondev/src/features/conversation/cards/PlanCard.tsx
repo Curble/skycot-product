@@ -47,29 +47,38 @@ export function PlanCard({
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
+  // A plan whose turn was taken back (Undo, or going back to an earlier message) is gone
+  // from the assistant's memory: building it would build nothing it remembers.
+  const takenBack = projection.runs.some(
+    (candidate) => candidate.id === item.runId && candidate.status === "rolled_back",
+  );
   const state = item.streaming
     ? "writing"
-    : acceptedRun
-      ? "accepted"
-      : plan?.status === "superseded"
-        ? "superseded"
-        : plan?.status === "completed"
-          ? "completed"
-          : busyThread
-            ? "busy"
-            : "actionable";
+    : takenBack
+      ? "taken-back"
+      : acceptedRun
+        ? "accepted"
+        : plan?.status === "superseded"
+          ? "superseded"
+          : plan?.status === "completed"
+            ? "completed"
+            : busyThread
+              ? "busy"
+              : "actionable";
 
   const steps = countSteps(item.markdown);
   const subtitle =
     state === "writing"
       ? "Writing the plan…"
-      : state === "accepted"
-        ? `You pressed Build it · ${shortTime(acceptedRun?.requestedAt ?? null)}`
-        : state === "superseded"
-          ? "Replaced by a newer plan"
-          : state === "completed"
-            ? "Carried out"
-            : `${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
+      : state === "taken-back"
+        ? "Taken back when you went back. Ask again for a new plan."
+        : state === "accepted"
+          ? `You pressed Build it · ${shortTime(acceptedRun?.requestedAt ?? null)}`
+          : state === "superseded"
+            ? "Replaced by a newer plan"
+            : state === "completed"
+              ? "Carried out"
+              : `${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
 
   const approve = card.options.find((o) => o.id === "approve");
 

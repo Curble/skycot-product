@@ -54,6 +54,7 @@ import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as SkycotFamily from "../skycot/SkycotFamily.ts"; // nondev-seam: skycot-family-mcp
 import * as SkycotFamilyInstructions from "../skycot/SkycotFamilyInstructions.ts"; // nondev-seam: skycot-family-instructions
+import * as SkycotFamilyLockdown from "../skycot/SkycotFamilyLockdown.ts"; // nondev-seam: skycot-family-lockdown
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_MAX_IDLE_PIN_MS = 4 * 60 * 60 * 1000;
@@ -313,7 +314,10 @@ export const layerWithOptions = (
   Layer.effect(
     ProviderSessionManagerV2,
     Effect.gen(function* () {
-      const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2;
+      // nondev-seam: skycot-family-lockdown (while the Family profile is on, sessions open without the parent's AI add-ons, or not at all)
+      const registry = yield* SkycotFamilyLockdown.lockRegistry(
+        yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2,
+      );
       const fileSystem = yield* FileSystem.FileSystem;
       const mcpSessionRegistry = yield* McpSessionRegistry.McpSessionRegistry;
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -446,6 +450,12 @@ export const layerWithOptions = (
           : mcpPrepareLock.withLock(
               threadId,
               Effect.gen(function* () {
+                // nondev-seam: skycot-family-mcp (Family profile on: no engine tool server at all, so none of its tools is listed to the agent or callable; an earlier credential is revoked)
+                if (Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled)) {
+                  yield* mcpSessionRegistry.revokeThread(threadId);
+                  yield* mcpSessions.clear(threadId);
+                  return { mcpCredentialId: undefined, issued: false };
+                }
                 // Reuse a still-valid credential for this thread instead of
                 // rotating: long-lived provider processes (codex app-server)
                 // build their MCP client once per conversation and keep using
@@ -459,11 +469,6 @@ export const layerWithOptions = (
                 >(["orchestration", "worktree", "pull-requests"]);
                 if (browserToolsAvailable) capabilities.add("preview");
                 if (deviceToolsAvailable) capabilities.add("device");
-                // nondev-seam: skycot-family-mcp (Family profile on: none of the engine's own tools: no thread control, scheduling, PRs, worktrees, devices or page previews)
-                const withheld =
-                  Option.isSome(skycotFamily) && (yield* skycotFamily.value.isEnabled)
-                    ? SkycotFamily.withholdFamilyMcpCapabilities(capabilities)
-                    : undefined;
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before the async resolve so a release cannot
@@ -485,10 +490,8 @@ export const layerWithOptions = (
                     resolved !== undefined &&
                     resolved.thread.threadId === threadId &&
                     resolved.thread.providerInstanceId === providerInstanceId &&
-                    resolved.capabilities.has("preview") === capabilities.has("preview") && // nondev-seam: skycot-family-mcp
-                    resolved.capabilities.has("device") === capabilities.has("device") &&
-                    resolved.capabilities.has("orchestration") ===
-                      capabilities.has("orchestration") // nondev-seam: skycot-family-mcp
+                    resolved.capabilities.has("preview") === browserToolsAvailable &&
+                    resolved.capabilities.has("device") === deviceToolsAvailable
                   ) {
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
                   }
@@ -500,7 +503,6 @@ export const layerWithOptions = (
                   providerInstanceId,
                   browserToolsAvailable,
                   capabilities,
-                  ...(withheld === undefined ? {} : { withheld }), // nondev-seam: skycot-family-mcp
                 });
                 yield* mcpSessions.set(credential.config);
                 reserveMcpCredential(threadId, credential.config.providerSessionId);
@@ -2129,6 +2131,17 @@ export const layerWithOptions = (
                 }
               }
               const key = sessionKey(input.providerSessionId);
+              // nondev-seam: skycot-family-lockdown-restart (a live session opened under the other Family setting is closed, so this one opens to match)
+              yield* SkycotFamilyLockdown.releaseIfMismatched(
+                skycotFamily,
+                (yield* Ref.get(sessions)).get(key),
+                (detail) =>
+                  releaseEntry({
+                    providerSessionId: input.providerSessionId,
+                    reason: "manual_shutdown",
+                    detail,
+                  }).pipe(logReleaseFailure(input.providerSessionId)),
+              );
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
                 const attached = existing.attachedThreadIds.has(input.threadId);

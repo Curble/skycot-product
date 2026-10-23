@@ -185,8 +185,8 @@ function PreviewPanelBody({
     refresh();
   };
 
-  // "Try again" after a failed start: clear it and go back through the engine's decision like a
-  // first start (the card for "Ask me first", by itself for "Just do it, carefully"). Never a
+  // "Try again" after a failed start (or "Start it again" after it stopped): clear it and go back
+  // through the engine's decision like a first start (the card for "Ask me first", by itself for "Just do it, carefully"). Never a
   // pre-approved start: the start command may have changed since the person last saw it.
   const tryAgain = async () => {
     setBusy(true);
@@ -477,6 +477,29 @@ function StatusBody({
             </Button>
             <Button variant="primary" onClick={() => onAsk(fixItMessage(status))}>
               Ask {builder} to fix it
+            </Button>
+          </span>
+          {status.output.trim().length > 0 ? (
+            <div className="fm-preview__said">
+              <Disclosure summary="What it said">
+                <pre className="fm-preview__output">{status.output}</pre>
+              </Disclosure>
+            </div>
+          ) : null}
+        </div>
+      );
+    case "stopped":
+      return (
+        <div className="fm-preview__state">
+          <Mascot pose="thinking" size={72} decorative />
+          <p className="fm-preview__state-title">Your preview stopped.</p>
+          <p className="fm-preview__state-text">Start it again?</p>
+          <span className="fm-preview__actions">
+            <Button disabled={busy} onClick={() => onAsk(fixItMessage(status))}>
+              Ask {builder} why
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={onTryAgain}>
+              Start it again
             </Button>
           </span>
           {status.output.trim().length > 0 ? (

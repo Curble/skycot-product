@@ -7,6 +7,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { WELCOME_HREF, navigate } from "../../../router";
+import { familyAgeTermsNote } from "../../family/assistantAllowance";
 import { useFamily } from "../../family/FamilyProvider";
 import { UsageSettingsGroup } from "../../usage/UsageSettings";
 import { providerForSelection, resolveDefaultModelSelection } from "../../../state/providers";
@@ -51,7 +52,11 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
     <>
       <SettingsGroup
         title="Which AI do you pay for?"
-        footer="Green means ready. Signing in happens on the provider's own website; SKYCOT never sees your password."
+        footer={
+          family.enabled
+            ? `Green means ready. Signing in happens on the provider's own website; SKYCOT never sees your password. ${familyAgeTermsNote()}`
+            : "Green means ready. Signing in happens on the provider's own website; SKYCOT never sees your password."
+        }
       >
         {primary.map((entry) => (
           <ProviderRow

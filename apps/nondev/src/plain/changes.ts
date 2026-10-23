@@ -1,5 +1,7 @@
 import type { OrchestrationV2CheckpointFileSummary } from "@t3tools/contracts";
 
+import { parseUnifiedDiff as parseSharedDiff } from "@t3tools/skycot-rules/checkpoints";
+
 import { changes as copy } from "./copy";
 
 export type ChangeArea = "pages" | "styles" | "content" | "settings" | "behind the scenes";
@@ -67,6 +69,29 @@ interface PathRule {
   readonly isTest?: boolean;
 }
 
+/**
+ * "the <name> <kind>", read the way a person would say it: a file the child called
+ * "my-pet.html" is "your pet page" (never "the my pet page"), "pet-page.html" is "the pet
+ * page" (never "the pet page page"), and "the-end.html" keeps one "the".
+ */
+export function named(name: string, kind: string): string {
+  let rest = name.trim();
+  let article = "the";
+  const owned = /^(?:my|our|your|mine)(?:\s+|$)(.*)$/i.exec(rest);
+  if (owned) {
+    article = "your";
+    rest = owned[1]!.trim();
+  } else {
+    rest = rest.replace(/^(?:the|a|an)\s+/i, "");
+  }
+  if (kind.length > 0) {
+    const lower = rest.toLowerCase();
+    if (lower === kind) rest = "";
+    else if (lower.endsWith(` ${kind}`)) rest = rest.slice(0, -kind.length - 1).trim();
+  }
+  return [article, rest, kind].filter((part) => part.length > 0).join(" ");
+}
+
 // One ordered table drives every path heuristic in this layer. First match wins,
 // so put the specific rows (lockfiles, env files) before the broad ones (any
 // .ts file). Extend here, not in the callers.
@@ -109,26 +134,26 @@ const PATH_RULES: ReadonlyArray<PathRule> = [
   {
     test: /(^|\/)(tsconfig[^/]*\.json|vite\.config\.[cm]?[jt]s|next\.config\.[cm]?[jt]s|tailwind\.config\.[cm]?[jt]s|postcss\.config\.[cm]?[jt]s|eslint\.config\.[cm]?[jt]s|\.eslintrc[^/]*|\.prettierrc[^/]*|babel\.config\.[cm]?[jt]s|webpack\.config\.[cm]?[jt]s|jest\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s|playwright\.config\.[cm]?[jt]s)$/i,
     area: "settings",
-    noun: (n) => `the ${n} tool settings`,
+    noun: (n) => named(n, "tool settings"),
     configOrSecret: true,
   },
   {
     test: /(^|\/)(Dockerfile|docker-compose[^/]*\.ya?ml|\.github\/workflows\/[^/]+|netlify\.toml|vercel\.json|fly\.toml|Procfile|\.gitignore|\.npmrc|\.nvmrc|\.editorconfig)$/i,
     area: "settings",
-    noun: (n) => `the ${n} setup file`,
+    noun: (n) => named(n, "setup file"),
     configOrSecret: true,
   },
   {
     test: /(^|\/)[^/]*\.(ya?ml|toml|ini|conf|cfg|properties)$/i,
     area: "settings",
-    noun: (n) => `the ${n} settings`,
+    noun: (n) => named(n, "settings"),
     configOrSecret: true,
   },
   // Tests.
   {
     test: /(^|\/)(__tests__|tests?|spec|e2e|cypress|playwright)\/|\.(test|spec)\.[cm]?[jt]sx?$|_test\.(go|py)$|test_[^/]+\.py$/i,
     area: "behind the scenes",
-    noun: (n) => `the checks for ${n}`,
+    noun: (n) => `the checks for ${named(n, "").replace(/^the /, "")}`,
     isTest: true,
   },
   // Styles.
@@ -136,14 +161,14 @@ const PATH_RULES: ReadonlyArray<PathRule> = [
     test: /\.(css|scss|sass|less|styl)$/i,
     area: "styles",
     noun: (n) =>
-      /^(global|globals|index|main|app|style|styles)$/i.test(n)
+      /^(?:(?:my|our|your)\s+)?(global|globals|index|main|app|style|styles)$/i.test(n)
         ? "the site's overall styling"
-        : `the ${n} styling`,
+        : named(n, "styling"),
   },
   {
     test: /(^|\/)(theme|tokens|colors|colours|typography)\.[cm]?[jt]sx?$/i,
     area: "styles",
-    noun: (n) => `the ${n} design settings`,
+    noun: (n) => named(n, "design settings"),
   },
   // Content.
   {
@@ -156,19 +181,19 @@ const PATH_RULES: ReadonlyArray<PathRule> = [
           ? "the change log"
           : /^license$/i.test(n)
             ? "the licence"
-            : `the ${n} text`,
+            : named(n, "text"),
   },
   {
     test: /\.(png|jpe?g|gif|svg|webp|avif|ico|bmp|tiff?|mp4|webm|mov|mp3|wav|ogg|woff2?|ttf|otf|eot|pdf)$/i,
     area: "content",
-    noun: (n) => `the ${n} image or media file`,
+    noun: (n) => named(n, "image or media file"),
   },
   {
     test: /(^|\/)(content|posts|blog|articles|copy|locales?|i18n|translations?)\//i,
     area: "content",
-    noun: (n) => `the ${n} content`,
+    noun: (n) => named(n, "content"),
   },
-  { test: /\.(json|csv|xml)$/i, area: "content", noun: (n) => `the ${n} data file` },
+  { test: /\.(json|csv|xml)$/i, area: "content", noun: (n) => named(n, "data file") },
   // Pages: route folders and page-ish names.
   {
     test: /(^|\/)(pages|app|routes|views|screens)\/.*\.(tsx?|jsx?|vue|svelte|astro|html?|php|erb|hbs|ejs|njk)$/i,
@@ -176,36 +201,36 @@ const PATH_RULES: ReadonlyArray<PathRule> = [
     noun: (n) =>
       /^(index|page|home|route|layout|\+page|\[\.\.\.slug\]|\[slug\])$/i.test(n)
         ? "a page"
-        : `the ${n} page`,
+        : named(n, "page"),
   },
   {
     test: /\.(html?|vue|svelte|astro|erb|hbs|ejs|njk)$/i,
     area: "pages",
     // index.html is what a browser opens first: "the home page", not "the index page".
-    noun: (n) => (/^(index|home|default)$/i.test(n) ? "the home page" : `the ${n} page`),
+    noun: (n) => (/^(index|home|default)$/i.test(n) ? "the home page" : named(n, "page")),
   },
   {
     test: /(^|\/)(components?|ui|widgets|partials)\/.*\.(tsx|jsx)$/i,
     area: "pages",
-    noun: (n) => `the ${n} building block`,
+    noun: (n) => named(n, "building block"),
   },
   // Code that is not a page.
   {
     test: /(^|\/)(api|server|backend|lib|utils?|helpers?|services?|hooks?|store|state|db|database|models?|schema|migrations?|prisma)\//i,
     area: "behind the scenes",
-    noun: (n) => `the ${n} behind-the-scenes code`,
+    noun: (n) => named(n, "behind-the-scenes code"),
   },
   {
     test: /\.(tsx?|jsx?|mjs|cjs|py|rb|go|rs|java|kt|swift|cs|php|c|cc|cpp|h|hpp|sh|bash|zsh|ps1|sql|prisma|graphql|gql)$/i,
     area: "behind the scenes",
-    noun: (n) => `the ${n} code`,
+    noun: (n) => named(n, "code"),
   },
 ];
 
 const FALLBACK_RULE: PathRule = {
   test: /.*/,
   area: "behind the scenes",
-  noun: (n) => `the ${n} file`,
+  noun: (n) => named(n, "file"),
 };
 
 // Prompt parsing lives in the shared rules package so the server policy reads prompts the
@@ -240,50 +265,9 @@ export function describeFile(path: string): FileDescription {
   };
 }
 
-/**
- * Reads a unified diff (the `diff` string from `getTurnDiff` / `getFullThreadDiff`) into
- * per-file changes. Tolerant: unknown headers are skipped, binary files count as a change
- * with no line numbers.
- */
+/** Reads a unified diff into per-file changes; the engine's fridge and recap read it the same way. */
 export function parseUnifiedDiff(diff: string): Array<FileChange> {
-  const files: Array<{
-    path: string;
-    oldPath?: string;
-    operation: ChangeOperation;
-    additions: number;
-    deletions: number;
-    binary: boolean;
-  }> = [];
-  let current: (typeof files)[number] | undefined;
-  for (const rawLine of diff.split(/\r?\n/)) {
-    const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(rawLine);
-    if (header) {
-      const oldPath = header[1]!;
-      const path = header[2]!;
-      current = {
-        path,
-        operation: "edited",
-        additions: 0,
-        deletions: 0,
-        binary: false,
-        ...(oldPath !== path ? { oldPath, operation: "renamed" as const } : {}),
-      };
-      files.push(current);
-      continue;
-    }
-    if (!current) continue;
-    if (rawLine.startsWith("new file mode")) current.operation = "added";
-    else if (rawLine.startsWith("deleted file mode")) current.operation = "deleted";
-    else if (rawLine.startsWith("rename from ")) {
-      current.operation = "renamed";
-      current.oldPath = rawLine.slice("rename from ".length);
-    } else if (rawLine.startsWith("rename to ")) current.path = rawLine.slice("rename to ".length);
-    else if (rawLine.startsWith("Binary files ") || rawLine.startsWith("GIT binary patch"))
-      current.binary = true;
-    else if (rawLine.startsWith("+") && !rawLine.startsWith("+++")) current.additions += 1;
-    else if (rawLine.startsWith("-") && !rawLine.startsWith("---")) current.deletions += 1;
-  }
-  return files.map(({ binary, ...file }) => (binary ? { ...file, binary } : file));
+  return parseSharedDiff(diff);
 }
 
 /** Checkpoint summaries name the operation loosely ("A", "added", "modify"); normalise it. */
@@ -323,7 +307,7 @@ function joinList(parts: ReadonlyArray<string>): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
-function capitalize(text: string): string {
+export function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 

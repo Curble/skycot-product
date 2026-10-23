@@ -2,7 +2,14 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 
-import { cleanTitle, MAX_TITLE_LENGTH, putAwayBlocked } from "./tidy";
+import {
+  cleanTitle,
+  deleteBlocked,
+  deleteSheetCopy,
+  MAX_TITLE_LENGTH,
+  putAwayBlocked,
+  quotedName,
+} from "./tidy";
 
 const withRuntime = (status: string | null, activeRunId: string | null = null) =>
   ({
@@ -44,5 +51,39 @@ describe("putAwayBlocked", () => {
       );
     }
     expect(putAwayBlocked(withRuntime("queued", "run-1"), "Sam")).not.toBeNull();
+  });
+});
+
+describe("deleteSheetCopy", () => {
+  it("says what goes, what stays and that it can't be undone", () => {
+    const copy = deleteSheetCopy({ title: "Dino game", archived: false, family: false });
+    expect(copy.title).toBe("Delete “Dino game”?");
+    expect(copy.goes).toContain("every message");
+    expect(copy.goes).toContain("restore points");
+    expect(copy.stays.join(" ")).toContain("files stay on this Mac");
+    expect(copy.stays.join(" ")).toContain("Stickers stay");
+    expect(copy.final).toBe("This can't be undone.");
+    expect(copy.button).toBe("Delete");
+    expect(copy.alternative).toContain("put it away instead");
+  });
+
+  it("asks for the parent code in a Family profile", () => {
+    const copy = deleteSheetCopy({ title: "Dino game", archived: true, family: true });
+    expect(copy.button).toBe("Enter parent code…");
+    expect(copy.final).toContain("parent code");
+    // Already put away: no point suggesting it.
+    expect(copy.alternative).toBeNull();
+  });
+
+  it("keeps a long or empty name short", () => {
+    expect(quotedName("")).toBe("this conversation");
+    const long = quotedName("a very long conversation name that keeps on going and going");
+    expect(long.length).toBeLessThanOrEqual(42);
+    expect(long.endsWith("…”")).toBe(true);
+  });
+
+  it("waits while the crew is working, like putting away", () => {
+    expect(deleteBlocked(withRuntime("running", "run-1"), "Sam")).not.toBeNull();
+    expect(deleteBlocked(withRuntime("idle"), "Sam")).toBeNull();
   });
 });

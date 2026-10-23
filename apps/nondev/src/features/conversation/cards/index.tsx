@@ -5,6 +5,8 @@ import { parseExplanation, readExplainMarker } from "@t3tools/skycot-rules/expla
 import { readPointing } from "@t3tools/skycot-rules/preview";
 
 import { ExplainCard } from "../../explain/ExplainCard";
+import { EditActions } from "../../rewind/MessageActions";
+import { canOfferEdit } from "../../rewind/rewind";
 import { CrewBubble, ErrorNote, UserBubble } from "./MessageBubbles";
 import { PlanCard } from "./PlanCard";
 import { registerTimelineRenderer } from "./registry";
@@ -12,10 +14,27 @@ import { RequestCard } from "./RequestCard";
 
 // The explain-mode marker is for the engine; the person sees what they typed.
 // So is the "Point at something" block: the person sees chips, the assistant the element.
-registerTimelineRenderer("user_message", ({ item }) => {
+// Your own earlier requests offer Edit ("go back to here"); RewindHost decides if it can.
+registerTimelineRenderer("user_message", ({ item, environmentId, projection, threadId }) => {
   if (item.type !== "user_message") return null;
   const pointing = readPointing(readExplainMarker(item.text).text);
-  return <UserBubble item={{ ...item, text: pointing.text }} pointing={pointing.labels} />;
+  const shown = { ...item, text: pointing.text };
+  if (!canOfferEdit(item, projection.runs)) {
+    return <UserBubble item={shown} environmentId={environmentId} pointing={pointing.labels} />;
+  }
+  return (
+    <EditActions threadId={threadId} itemId={item.id}>
+      {({ actions, onContextMenu }) => (
+        <UserBubble
+          item={shown}
+          environmentId={environmentId}
+          pointing={pointing.labels}
+          actions={actions}
+          onContextMenu={onContextMenu}
+        />
+      )}
+    </EditActions>
+  );
 });
 // A "How I did it" section becomes its own Explain card under the message.
 registerTimelineRenderer("assistant_message", (context) => {

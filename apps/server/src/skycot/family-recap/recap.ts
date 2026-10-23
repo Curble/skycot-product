@@ -38,6 +38,11 @@ export interface RecapThreadInput {
   readonly createdAt: number;
   /** Where its files are: the private copy, else the project's folder. */
   readonly cwd: string | null;
+  /**
+   * A "Just ask" question (no project). Its messages count like any other; it is something
+   * they made only once it changed a file.
+   */
+  readonly question?: boolean;
   /** The thread's user-role messages; `createdBy` tells the child's own from wake-ups. */
   readonly messages: ReadonlyArray<{
     readonly id: string;
@@ -249,6 +254,7 @@ export function buildRecap(input: {
         asks.push({ threadId: thread.threadId, at: message.createdAt, ...ask });
       }
     }
+    if (thread.question === true && changes.length === 0) continue;
     const withPage = changes.findLast((change) => pageOf(change.files) !== null);
     const page = withPage ? pageOf(withPage.files) : null;
     const lastAt = Math.max(

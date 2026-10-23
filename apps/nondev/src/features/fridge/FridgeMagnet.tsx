@@ -1,12 +1,12 @@
 // One magnet: a live thumbnail of the page, its title, when it was made and by whom, and the
 // crew's sticker. Tapping the picture opens it with "Open it" (running, offline). Pinning and
 // taking it down are free for everyone; neither touches the page.
-import type { EnvironmentId } from "@t3tools/contracts";
 import { Pin, PinOff, Play } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { Button } from "../../ui/Button";
+import { displayTitle } from "../tidy/renamedTitles";
 import { madeLabel, type FridgeItem } from "./fridge";
 import { MagnetThumb } from "./MagnetThumb";
 
@@ -19,7 +19,6 @@ function tiltOf(threadId: string): number {
 
 export function FridgeMagnet({
   item,
-  environmentId,
   now,
   maker,
   index,
@@ -28,7 +27,6 @@ export function FridgeMagnet({
   onPin,
 }: {
   readonly item: FridgeItem;
-  readonly environmentId: EnvironmentId | null;
   readonly now: number;
   /** "Ava", or null when nobody is known to have made it. */
   readonly maker: string | null;
@@ -39,30 +37,31 @@ export function FridgeMagnet({
   readonly onPin?: (pinned: boolean) => void;
 }) {
   const pinned = item.pinnedAt !== null;
+  const title = displayTitle(item.threadId, item.title);
   return (
     <article
       className={`fm-magnet${compact ? " fm-magnet--compact" : ""}`}
       data-pinned={pinned ? "" : undefined}
       data-note={index % 4}
       style={{ "--fm-magnet-tilt": `${tiltOf(item.threadId)}deg` } as CSSProperties}
-      aria-label={item.title}
+      aria-label={title}
     >
       <span className="fm-magnet__magnet" aria-hidden />
       <button
         type="button"
         className="fm-magnet__open"
         onClick={onOpen}
-        aria-label={`Open ${item.title}`}
+        aria-label={`Open ${title}`}
       >
         <MagnetThumb
-          environmentId={environmentId}
-          cwd={item.cwd}
+          threadId={item.threadId}
           page={item.page}
-          title={item.title}
+          version={item.madeAt}
+          title={title}
         />
       </button>
       <div className="fm-magnet__meta">
-        <b className="fm-magnet__title">{item.title}</b>
+        <b className="fm-magnet__title">{title}</b>
         <small className="fm-magnet__when">
           {madeLabel(item.madeAt, now)}
           {maker ? ` · by ${maker}` : ""}

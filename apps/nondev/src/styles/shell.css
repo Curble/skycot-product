@@ -74,6 +74,8 @@
 .fm-sidebar__scroll {
   flex: 1;
   min-height: 0;
+  /* The list scrolls above the pinned footer; without this the last rows slid under it. */
+  overflow-y: auto;
 }
 .fm-sidebar__footer {
   margin-top: auto;
@@ -125,6 +127,11 @@
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px 6px;
+}
+.fm-list-column__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .fm-list-column__title {
   margin: 0;
@@ -481,6 +488,7 @@
   gap: 14px;
   align-items: start;
 }
+.fm-home__main,
 .fm-home__side {
   display: grid;
   gap: 14px;
@@ -685,6 +693,14 @@ html.dark .fm-standalone__foot {
 }
 .fm-shell[data-columns="1"] .fm-composer__label {
   flex-basis: 100%;
+}
+/* Phones: the locked pills say it; the sentence behind them is under "What's this?" (F8). */
+.fm-shell[data-columns="1"] .fm-composer__context .fm-family-lock__note {
+  display: none;
+}
+/* Phones: a greeting that fits on one or two short lines leaves room for the cards. */
+.fm-shell[data-columns="1"] .fm-home__greeting {
+  font-size: calc(24px * var(--fm-text-scale));
 }
 
 /* Sidebar as an overlay drawer when it no longer fits */

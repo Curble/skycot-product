@@ -10,12 +10,16 @@ import {
   describeThreadStatus,
   type ConversationStatus,
 } from "../features/conversation/status";
+import { isQuestionsProject, projectForConversation } from "../features/questions/questions";
 import { environmentProjects } from "./projects";
 import { environmentThreadShells } from "./threads";
 
 export interface ConversationRow {
   readonly shell: EnvironmentThreadShell;
+  /** The project it belongs with: a question that became a project is listed with that one. */
   readonly project: EnvironmentProject | null;
+  /** `projectKeyOf` of `project` (the sidebar's counts and filter use it). */
+  readonly projectKey: string;
   readonly title: string;
   readonly status: ConversationStatus;
   readonly preview: string;
@@ -69,14 +73,23 @@ export function toConversationRow(
   const status = describeThreadStatus(shell, {
     refused: runId !== null && refusedRuns.has(runId),
   });
+  const own = get(
+    environmentProjects.projectAtom({
+      environmentId: shell.environmentId,
+      projectId: shell.projectId,
+    }),
+  );
+  // Only a question can move, so the full project list is read for questions alone.
+  const project = isQuestionsProject(own)
+    ? projectForConversation(shell, own, get(environmentProjects.projectsAtom))
+    : own;
   return {
     shell,
-    project: get(
-      environmentProjects.projectAtom({
-        environmentId: shell.environmentId,
-        projectId: shell.projectId,
-      }),
-    ),
+    project,
+    projectKey:
+      project === null
+        ? projectKeyOf(shell)
+        : projectKeyOf({ environmentId: project.environmentId, projectId: project.id }),
     title: conversationTitle(shell),
     status,
     preview: conversationPreview(shell, status),
@@ -110,7 +123,7 @@ export function filterRows(
   return rows.filter((row) => {
     if (filter === "waiting" && row.status.attention !== "waiting") return false;
     if (filter === "ready" && row.status.kind !== "ready") return false;
-    if (projectKey !== null && projectKeyOf(row.shell) !== projectKey) return false;
+    if (projectKey !== null && row.projectKey !== projectKey) return false;
     if (needle.length > 0) {
       const haystack = `${row.title} ${row.preview} ${row.project?.title ?? ""}`.toLowerCase();
       if (!haystack.includes(needle)) return false;

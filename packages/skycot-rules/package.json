@@ -39,6 +39,22 @@
     "./preview": {
       "types": "./src/preview.ts",
       "import": "./src/preview.ts"
+    },
+    "./checkpoints": {
+      "types": "./src/checkpoints.ts",
+      "import": "./src/checkpoints.ts"
+    },
+    "./questions": {
+      "types": "./src/questions.ts",
+      "import": "./src/questions.ts"
+    },
+    "./browse": {
+      "types": "./src/browse.ts",
+      "import": "./src/browse.ts"
+    },
+    "./assistants": {
+      "types": "./src/assistants.ts",
+      "import": "./src/assistants.ts"
     }
   },
   "scripts": {

@@ -1,12 +1,16 @@
 import { Hammer, type LucideIcon } from "lucide-react";
 
 export type AvatarSize = "sm" | "md" | "lg" | "xl";
-export type AvatarKind = "initials" | "emoji" | "crew" | "person" | "icon" | "image";
+export type AvatarKind = "initials" | "monogram" | "emoji" | "crew" | "person" | "icon" | "image";
+/** The six picture colours a child's picture and a project's letter use. */
+export type AvatarTone = "sky" | "sun" | "leaf" | "berry" | "grape" | "coral";
 
 interface AvatarProps {
   readonly kind: AvatarKind;
-  /** Initials text, the emoji, the image URL, or ignored for `crew`. */
+  /** Initials text, a monogram's letters as they are, the emoji, the image URL, or ignored for `crew`. */
   readonly value?: string;
+  /** A coloured background (white letters), for a project's letter icon. */
+  readonly tone?: AvatarTone | null;
   readonly icon?: LucideIcon;
   readonly size?: AvatarSize;
   readonly square?: boolean;
@@ -24,6 +28,7 @@ export function Avatar({
   size = "md",
   square = false,
   label,
+  tone = null,
 }: AvatarProps) {
   const classes = [
     "fm-avatar",
@@ -32,6 +37,7 @@ export function Avatar({
     kind === "crew" ? "fm-avatar--crew" : "",
     kind === "person" ? "fm-avatar--person" : "",
     square ? "fm-avatar--square" : "",
+    tone ? `fm-avatar--tone fm-avatar--tone-${tone}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -51,7 +57,11 @@ export function Avatar({
         <Icon size={iconSize[size]} strokeWidth={1.8} aria-hidden />
       ) : (
         <span aria-hidden>
-          {kind === "initials" || kind === "person" ? initials(value ?? "") : value}
+          {kind === "initials" || kind === "person"
+            ? initials(value ?? "")
+            : kind === "monogram"
+              ? (value ?? "").toLocaleUpperCase()
+              : value}
         </span>
       )}
     </span>

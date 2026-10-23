@@ -11,8 +11,10 @@ import * as SkycotPolicyReactor from "./skycot/SkycotPolicyReactor.ts"; // nonde
 import * as SkycotFamily from "./skycot/SkycotFamily.ts"; // nondev-seam: skycot-family
 import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts"; // nondev-seam: skycot-family
 import * as SkycotFamilyHttp from "./skycot/SkycotFamilyHttp.ts"; // nondev-seam: skycot-family
+import * as SkycotFamilyMcp from "./skycot/SkycotFamilyMcp.ts"; // nondev-seam: skycot-family-mcp-guard
 import * as SkycotBadgesHttp from "./skycot/badges/SkycotBadgesHttp.ts"; // nondev-seam: skycot-family
 import * as SkycotPreviewHttp from "./skycot/preview/SkycotPreviewHttp.ts"; // nondev-seam: skycot-preview
+import * as SkycotFilesHttp from "./skycot/files/SkycotFilesHttp.ts"; // nondev-seam: skycot-files
 // Effect wraps this raw Node HTTP server after its startup and write-error guards attach.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
@@ -730,6 +732,7 @@ const layerMakeRoutes = Layer.mergeAll(
     SkycotFamilyHttp.layer, // nondev-seam: skycot-family
     SkycotBadgesHttp.layer, // nondev-seam: skycot-family
     SkycotPreviewHttp.layer, // nondev-seam: skycot-preview
+    SkycotFilesHttp.layer, // nondev-seam: skycot-files
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
@@ -1075,8 +1078,11 @@ const layerMakeServer = Layer.unwrap(
       Layer.provide(CloudLink.layer.pipe(Layer.provideMerge(ConnectReachability.layer))),
       Layer.provideMerge(layerRuntimeServices),
       Layer.provideMerge(
-        McpSessionRegistry.layer.pipe(
-          Layer.provide(ServerEnvironment.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+        // nondev-seam: skycot-family-mcp-guard (no agent credential is honoured while the Family profile is on)
+        SkycotFamilyMcp.guardRegistry(
+          McpSessionRegistry.layer.pipe(
+            Layer.provide(ServerEnvironment.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+          ),
         ),
       ),
       Layer.provide(layerActivation),

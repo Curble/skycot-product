@@ -1,10 +1,12 @@
-// The two sheets the sidebar opens live here, above the shell, because the
+// The sheets the sidebar opens live here, above the shell, because the
 // sidebar itself comes and goes with the window width (a column at three
 // columns, a drawer below). A sheet owned by the sidebar would close the moment
 // the window crossed that breakpoint; one owned here stays open.
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
+import { ProjectSheet, type ProjectSheetFocus } from "../features/projects/ProjectSheet";
 import { AdvancedModeSheet } from "./AdvancedModeSheet";
 import { OpenFolderSheet } from "./OpenFolderSheet";
 
@@ -15,11 +17,18 @@ interface FolderRequest {
 
 type Open =
   | { readonly kind: "folder"; readonly request: FolderRequest }
-  | { readonly kind: "advanced" };
+  | { readonly kind: "advanced" }
+  | {
+      readonly kind: "project";
+      readonly project: EnvironmentProject;
+      readonly focus: ProjectSheetFocus;
+    };
 
 export interface SidebarSheets {
   readonly openFolder: (request: FolderRequest) => void;
   readonly openAdvanced: () => void;
+  /** Rename… or Change icon… for a project (one sheet, focused on the name or the icons). */
+  readonly editProject: (project: EnvironmentProject, focus: ProjectSheetFocus) => void;
 }
 
 const SidebarSheetsContext = createContext<SidebarSheets | null>(null);
@@ -30,6 +39,7 @@ export function SidebarSheetsHost({ children }: { readonly children: ReactNode }
     () => ({
       openFolder: (request) => setOpen({ kind: "folder", request }),
       openAdvanced: () => setOpen({ kind: "advanced" }),
+      editProject: (project, focus) => setOpen({ kind: "project", project, focus }),
     }),
     [],
   );
@@ -46,6 +56,12 @@ export function SidebarSheetsHost({ children }: { readonly children: ReactNode }
         />
       ) : null}
       <AdvancedModeSheet open={open?.kind === "advanced"} onClose={close} />
+      <ProjectSheet
+        key={open?.kind === "project" ? `${open.project.environmentId}:${open.project.id}` : "none"}
+        project={open?.kind === "project" ? open.project : null}
+        focus={open?.kind === "project" ? open.focus : "name"}
+        onClose={close}
+      />
     </SidebarSheetsContext.Provider>
   );
 }

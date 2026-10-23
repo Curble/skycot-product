@@ -60,7 +60,11 @@ export function Sheet({
     <div
       className="fm-sheet-backdrop"
       onMouseDown={(event) => {
-        if (dismissOnBackdrop && event.target === event.currentTarget) onClose();
+        // `detail` counts the clicks in a row: the second press of a double-click that opened
+        // this sheet (a file in Files, say) lands on the backdrop and must not close it again.
+        if (dismissOnBackdrop && event.target === event.currentTarget && event.detail < 2) {
+          onClose();
+        }
       }}
     >
       <div

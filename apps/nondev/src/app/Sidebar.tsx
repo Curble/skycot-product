@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   Archive,
@@ -22,13 +23,14 @@ import {
   navigate,
   type Route,
 } from "../router";
-import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
+import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf } from "../state/conversations";
 import { environmentProjects } from "../state/projects";
 import { CrewAvatar } from "../themes/CrewAvatar";
 import { useCrew } from "../themes/useCrew";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
+import { ContextMenu, type MenuPoint } from "../ui/ContextMenu";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -36,6 +38,8 @@ import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
+import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
+import { useCallback, useState, type MouseEvent } from "react";
 
 /** Source list: smart folders, projects, automations, people, then the user and the Advanced mode button. */
 export function AppSidebar({
@@ -50,27 +54,30 @@ export function AppSidebar({
   const rows = useAtomValue(conversationRowsAtom);
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const projects = useAtomValue(environmentProjects.projectsAtom);
-  const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
+  const [projectMenu, setProjectMenu] = useState<{
+    readonly project: EnvironmentProject;
+    readonly at: MenuPoint;
+  } | null>(null);
+  const closeProjectMenu = useCallback(() => setProjectMenu(null), []);
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
   const countsByProject = new Map<string, number>();
   const attentionByProject = new Set<string>();
   for (const row of rows) {
-    const key = projectKeyOf(row.shell);
+    const key = row.projectKey;
     countsByProject.set(key, (countsByProject.get(key) ?? 0) + 1);
     if (row.status.attention === "waiting") attentionByProject.add(key);
   }
 
+  const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
+  // The Mac's own name ("MamaBear") is not a person, and a child should never see it.
+  const meLabel = sidebarPersonLabel(family.enabled);
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
-  const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
-  const environmentLabel = primaryEnvironmentId
-    ? (catalog.entries.get(primaryEnvironmentId)?.target.label ?? "This Mac")
-    : "This Mac";
 
   const select = (apply: () => void) => {
     apply();
@@ -130,23 +137,43 @@ export function AppSidebar({
         </SidebarSection>
 
         <SidebarSection title="Projects">
-          {projects.map((project) => {
-            const key = projectKeyOf({
-              environmentId: project.environmentId,
-              projectId: project.id,
-            });
-            return (
-              <SidebarItem
-                key={key}
-                glyph={<ProjectAvatar project={project} size="sm" />}
-                label={project.title}
-                count={countsByProject.get(key) ?? 0}
-                attention={attentionByProject.has(key)}
-                selected={conversationRoute && shell.projectKey === key}
-                onClick={() => showList(() => shell.setProjectKey(key))}
-              />
-            );
-          })}
+          {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
+          {[...projects]
+            .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
+            .map((project) => {
+              const key = projectKeyOf({
+                environmentId: project.environmentId,
+                projectId: project.id,
+              });
+              return (
+                <SidebarItem
+                  key={key}
+                  glyph={<ProjectAvatar project={project} size="sm" />}
+                  label={project.title}
+                  count={countsByProject.get(key) ?? 0}
+                  attention={attentionByProject.has(key)}
+                  selected={conversationRoute && shell.projectKey === key}
+                  onClick={() => showList(() => shell.setProjectKey(key))}
+                  // Questions is SKYCOT's own space: nothing to rename or re-icon.
+                  {...(project.isScratch === true
+                    ? {}
+                    : {
+                        menuOpen: projectMenu?.project === project,
+                        onContextMenu: (event: MouseEvent) => {
+                          event.preventDefault();
+                          setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
+                        },
+                        trailing: (
+                          <ProjectMenuButton
+                            project={project}
+                            expanded={projectMenu?.project === project}
+                            onOpen={(at) => setProjectMenu({ project, at })}
+                          />
+                        ),
+                      })}
+                />
+              );
+            })}
           <SidebarItem
             icon={FolderPlus}
             label="Open a folder…"
@@ -201,11 +228,26 @@ export function AppSidebar({
         </SidebarSection>
       </div>
 
+      <ContextMenu
+        at={projectMenu?.at ?? null}
+        onClose={closeProjectMenu}
+        label={projectMenu?.project.title ?? "Project"}
+      >
+        {(close) =>
+          projectMenu ? (
+            <ProjectMenuItems
+              close={close}
+              onEdit={(focus) => sheets.editProject(projectMenu.project, focus)}
+            />
+          ) : null
+        }
+      </ContextMenu>
+
       <footer className="fm-sidebar__footer">
         <div className="fm-sidebar__footer-row">
           <span className="fm-sidebar__me">
-            <Avatar kind="person" value={environmentLabel} size="sm" label={environmentLabel} />
-            <b>{environmentLabel}</b>
+            <Avatar kind="person" value={meLabel} size="sm" label={meLabel} />
+            <b>{meLabel}</b>
           </span>
           <IconButton
             icon={Settings}
@@ -227,4 +269,9 @@ export function AppSidebar({
       </footer>
     </nav>
   );
+}
+
+/** Who the footer stands for: the grown-up whose settings the gear opens, never the computer. */
+export function sidebarPersonLabel(familyOn: boolean): string {
+  return familyOn ? "Grown-up" : "You";
 }
