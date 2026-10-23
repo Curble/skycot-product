@@ -21,6 +21,7 @@ import { conversationRows, relativeTime, rowLabel, stateLabel } from "../../data
 import { useMacData } from "../../data/MacData";
 import { BUILDER_NAME } from "../../ui/brand";
 import { Banner, Card, Mascot, Row, Section, Symbol, Txt, haptic, Page } from "../../ui/kit";
+import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
 import { FridgeTile } from "./Fridge";
 
@@ -69,6 +70,7 @@ export const PHONE_STARTERS: ReadonlyArray<Starter> = KID_STARTERS.filter(
 function StarterCard(props: { readonly starter: Starter; readonly onPress: () => void }) {
   const theme = useTheme();
   const color = toneColor(props.starter.tone, theme.dark);
+  const grid = useGridBasis();
   return (
     <Pressable
       accessibilityRole="button"
@@ -77,7 +79,7 @@ function StarterCard(props: { readonly starter: Starter; readonly onPress: () =>
         haptic();
         props.onPress();
       }}
-      style={({ pressed }) => ({ flexBasis: "47%", flexGrow: 1, opacity: pressed ? 0.8 : 1 })}
+      style={({ pressed }) => ({ flexBasis: grid, flexGrow: 1, opacity: pressed ? 0.8 : 1 })}
     >
       <Card style={{ minHeight: 118, gap: 8 }}>
         <View

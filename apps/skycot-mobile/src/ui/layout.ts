@@ -28,3 +28,8 @@ export function useLayout(): Layout {
   const { width, height } = useWindowDimensions();
   return deriveLayout({ width, height });
 }
+
+/** How wide a grid cell is: two across on a phone, three across beside the iPad's sidebar. */
+export function useGridBasis(): "46%" | "30%" {
+  return useLayout().usesSplitView ? "30%" : "46%";
+}

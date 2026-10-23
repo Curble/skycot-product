@@ -8,6 +8,7 @@ import { BADGE_COPY, earnedDate } from "../../../../nondev/src/features/badges/c
 import { useChild } from "../../app/child/ChildContext";
 import { readStickers, useFamilyRead } from "../../data/hooks";
 import { Card, EmptyState, Page, Spinner, Symbol, Txt } from "../../ui/kit";
+import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
 
 export function StickersScreen() {
@@ -15,6 +16,7 @@ export function StickersScreen() {
   const child = useChild();
   const mac = child.macs[0] ?? null;
   const book = useFamilyRead(mac, readStickers, 60_000, "stickers");
+  const grid = useGridBasis();
   if (book.loading) return <Spinner />;
   const view = book.value?.book ?? null;
   if (view === null) {
@@ -52,7 +54,7 @@ export function StickersScreen() {
             <Card
               key={badge.id}
               style={{
-                flexBasis: "46%",
+                flexBasis: grid,
                 flexGrow: 1,
                 alignItems: "center",
                 gap: 6,

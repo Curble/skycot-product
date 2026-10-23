@@ -29,6 +29,7 @@ import {
   Txt,
   haptic,
 } from "../../ui/kit";
+import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
 
 const MAGNET_COLORS = ["#F26B4E", "#3A9DF6", "#3FA66F", "#8E5AA8", "#E8A50C", "#E0603F"];
@@ -43,6 +44,7 @@ function Magnet(props: {
 }) {
   const theme = useTheme();
   const color = MAGNET_COLORS[props.index % MAGNET_COLORS.length]!;
+  const grid = useGridBasis();
   return (
     <Pressable
       accessibilityRole="button"
@@ -52,7 +54,7 @@ function Magnet(props: {
         props.onOpen();
       }}
       style={({ pressed }) => ({
-        flexBasis: props.compact ? "30%" : "46%",
+        flexBasis: props.compact ? "30%" : grid,
         flexGrow: 1,
         opacity: pressed ? 0.85 : 1,
       })}

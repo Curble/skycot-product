@@ -27,17 +27,9 @@ import { BUILDER_NAME } from "../../ui/brand";
 import { Banner, Button, Card, Row, Section, Symbol, Txt, haptic } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 import { VoiceButton } from "./VoiceButton";
+import { titleFrom } from "./titles";
 
 type Target = { readonly macId: string; readonly projectId: string | null };
-
-function titleFrom(text: string): string {
-  const first = text
-    .split("\n")[0]!
-    .replace(/\[[^\]]*\]/gu, "")
-    .trim();
-  const words = first.split(/\s+/u).slice(0, 8).join(" ");
-  return words.length > 0 ? words : "A new idea";
-}
 
 export function NewConversationScreen() {
   const theme = useTheme();
@@ -104,7 +96,8 @@ export function NewConversationScreen() {
       const projectId = target.projectId ?? (await openQuestions(mac.transport)).projectId;
       const { threadId } = await startConversation(mac.transport, {
         projectId,
-        title: titleFrom(words),
+        title:
+          starter && words === starterPrompt(starter).trim() ? starter.title : titleFrom(words),
         text: words,
         modelSelection: model,
         runtimeMode: "approval-required",
