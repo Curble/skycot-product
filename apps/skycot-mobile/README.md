@@ -93,6 +93,32 @@ linked without taps; `…?url=<whole QR link>&go=1` links through the relay; `sk
 (`ask`, `made`) shows a demo conversation; `skycot-dev://section/fridge` and `…/open/macs` open
 screens.
 
+## Build and install on your own iPhone (development signing)
+
+For testing on a real device, build the development app (`com.skycot.app.ios.dev`, "SKYCOT Dev")
+in **Release** so the JavaScript is inside the app and it runs without `expo start` on the Mac.
+Xcode's automatic signing for team `3F72LCWGG2` registers the development app ids (app, `.widgets`,
+`.watchkitapp`), the App Group and the device, and makes development profiles; no App Store
+Connect record, distribution certificate or push key is involved.
+
+```bash
+APP_VARIANT=development EXPO_NO_GIT_STATUS=1 ./node_modules/.bin/expo prebuild --clean --platform ios --no-install
+(cd ios && LANG=en_US.UTF-8 pod install)
+cd ios && APP_VARIANT=development LANG=en_US.UTF-8 xcodebuild -workspace SKYCOTDev.xcworkspace \
+  -scheme SKYCOTDev -configuration Release -destination 'id=<the iPhone UDID>' \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+  DEVELOPMENT_TEAM=3F72LCWGG2 CODE_SIGN_STYLE=Automatic build
+xcrun devicectl device install app --device <device> <DerivedData>/Build/Products/Release-iphoneos/SKYCOTDev.app
+```
+
+`xcrun devicectl device info details --device <id>` shows the UDID and whether Developer Mode is
+on. The Watch app is only provisioned for a Watch that is registered with the team, which needs
+the Watch's Developer Mode on first; then build again and install
+`SKYCOTDev.app/Watch/SkycotWatch.app` on the Watch. For the engine, run it with `--host 0.0.0.0`
+(or the Mac's LAN address) so the phone on the same Wi-Fi can reach it; the Family link's QR code
+then carries the Mac's home-network address. The first link asks for Local Network access on the
+phone (Allow).
+
 ## Checks
 
 - `vp test run` (here): linking, links, the ways to a Mac, the cards. The
