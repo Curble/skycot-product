@@ -47,6 +47,7 @@ import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 import * as SkycotPolicy from "../skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-runtime
+import * as SkycotApprovedInstalls from "../skycot/SkycotApprovedInstalls.ts"; // nondev-seam: skycot-approved-installs
 import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadLaunchService from "./ThreadLaunchService.ts";
@@ -181,9 +182,22 @@ const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pip
 const layerProviderTurnControlServiceProvided = ProviderTurnControlService.layer.pipe(
   Layer.provide(Layer.merge(ProjectionStore.layer, layerProviderSessionManagerProvided)),
 );
-const layerRuntimeRequestServiceProvided = RuntimeRequestService.layer.pipe(
+const layerRuntimeRequestServiceBase = RuntimeRequestService.layer.pipe(
   Layer.provide(Layer.merge(ProjectionStore.layer, layerProviderSessionManagerProvided)),
 );
+// nondev-seam: skycot-approved-installs (a yes to an add-on install is done by SKYCOT, outside the sandbox; identity unless T3CODE_SKYCOT_POLICY=1)
+const layerRuntimeRequestServiceProvided = SkycotPolicy.isSkycotPolicyEnabled(process.env)
+  ? SkycotApprovedInstalls.layerRuntimeRequests.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          layerRuntimeRequestServiceBase,
+          ProjectionStore.layer,
+          ProjectStore.layer,
+          layerProviderSessionManagerProvided,
+        ),
+      ),
+    )
+  : layerRuntimeRequestServiceBase;
 const layerCheckpointRollbackServiceProvided = CheckpointRollbackService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
