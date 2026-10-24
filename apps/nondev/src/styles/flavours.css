@@ -683,3 +683,47 @@ html[data-flavour-accent-shape="square"] .fm-chip--on {
   position: relative;
   overflow: hidden;
 }
+
+/* ---------------------------------------------------------------------------
+   The child's icon rail inside a make, in the Workshop look: the same pieces as the
+   sidebar and the Home starter cards (dashed edge, ink-outlined colour tiles, the
+   current place a sticky note with a hard ink shadow, handwritten labels).
+   --------------------------------------------------------------------------- */
+html[data-flavour-borders="sketch"] .fm-child-rail {
+  border-right: 2.5px dashed var(--fm-sep);
+}
+html[data-flavour-borders="sketch"] .fm-child-rail__tile {
+  border: 2px solid var(--fm-ink);
+  border-radius: var(--fm-sketch-xs);
+  box-shadow: none;
+}
+html[data-flavour-borders="sketch"] .fm-child-rail__item {
+  border-radius: 6px;
+}
+html[data-flavour-borders="sketch"] .fm-child-rail__item:hover {
+  background: transparent;
+  transform: translate(-1px, -1px);
+}
+html[data-flavour-borders="sketch"] .fm-child-rail__item:hover .fm-child-rail__tile {
+  box-shadow: 2px 3px 0 var(--fm-ink);
+}
+html[data-flavour-cards="sticky"] .fm-child-rail__item--current,
+html[data-flavour-cards="sticky"] .fm-child-rail__item--current:hover {
+  border: 2px solid var(--fm-ink);
+  background: color-mix(in srgb, var(--fm-marker) 55%, var(--fm-bg-card));
+  color: var(--fm-marker-ink, var(--fm-ink));
+  box-shadow: 3px 4px 0 var(--fm-ink);
+  transform: rotate(-1.2deg);
+}
+html[data-flavour-labels="handwritten"] .fm-child-rail__item span {
+  font-family: var(--fm-font-label);
+  font-weight: 400;
+  font-size: calc(14px * var(--fm-text-scale));
+  letter-spacing: 0.01em;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-flavour-borders="sketch"] .fm-child-rail__item:hover,
+  html[data-flavour-cards="sticky"] .fm-child-rail__item--current {
+    transform: none;
+  }
+}
