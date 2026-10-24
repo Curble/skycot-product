@@ -44,7 +44,7 @@ describe("the personal-details shield on Family turns", () => {
       );
       assert.include(wrapped.text, Instructions.shieldNote(["full-name", "school"]));
       assert.include(wrapped.text, "SKYCOT hid a full name and a school's name");
-      assert.include(wrapped.text, "Makers (ages 8–10)");
+      assert.include(wrapped.text, "the way you would to a 9-year-old");
     }),
   );
 
@@ -287,22 +287,19 @@ describe("plan first in the Family profile", () => {
 });
 
 describe("familyReadingLevel", () => {
-  it("gives one level and never a name, the youngest when siblings differ", () => {
-    assert.equal(Instructions.familyReadingLevel([]), "Makers (ages 8–10)");
+  it("gives one style example and never a name, the youngest when siblings differ", () => {
+    assert.equal(Instructions.familyReadingLevel([]), "a 9-year-old");
     assert.equal(
       Instructions.familyReadingLevel([{ readingLevel: "big-makers" }]),
-      "Big makers (ages 11–13)",
+      "a 12-year-old",
     );
     assert.equal(
       Instructions.familyReadingLevel([
         { readingLevel: "big-makers" },
         { readingLevel: "little-makers" },
       ]),
-      "Little makers (ages 5–7)",
+      "a 6-year-old",
     );
-    assert.equal(
-      Instructions.familyReadingLevel([{ readingLevel: "nonsense" }]),
-      "Makers (ages 8–10)",
-    );
+    assert.equal(Instructions.familyReadingLevel([{ readingLevel: "nonsense" }]), "a 9-year-old");
   });
 });

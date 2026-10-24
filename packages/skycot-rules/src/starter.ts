@@ -54,9 +54,9 @@ export function stripStarterMarker(text: string): string {
 export function starterRulesFor(id: string | null): string | null {
   if (id === null || !Object.hasOwn(STARTER_FILE_NAMES, id)) return null;
   return [
-    "The child started from a SKYCOT starter card, so this request also follows these technical rules (the child does not see them; do not repeat them):",
+    "This request came from a SKYCOT starter card, so it also follows these technical rules (they are not shown in the chat; do not repeat them):",
     `- Make it one new file called ${STARTER_FILE_NAMES[id]}, with the HTML, CSS and JavaScript all inside that one file.`,
     "- It must work offline: no internet, no installs, and no pictures, sounds or fonts from websites (draw with CSS, SVG or emoji).",
-    "- Then tell the child in one short, friendly sentence what you made.",
+    "- Then say in one short, friendly sentence what you made.",
   ].join("\n");
 }

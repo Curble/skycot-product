@@ -100,7 +100,7 @@ export function installArguments(install: ApprovedInstall): ReadonlyArray<string
 
 const quote = (word: string) => `'${word.replaceAll("'", "'\\''")}'`;
 
-const GROWN_UP_SAID_YES = "a grown-up said yes";
+const GROWN_UP_SAID_YES = "it was approved";
 
 /** Why SKYCOT did it, for the assistant's note: the policy's relief, else a person's yes. */
 export function becauseFor(relief: string | undefined): string {
@@ -108,9 +108,9 @@ export function becauseFor(relief: string | undefined): string {
     case "trusted-add-on":
       return "this is a trusted add-on";
     case "approved-before":
-      return "a grown-up already said yes to it in this conversation";
+      return "it was already approved in this conversation";
     default:
-      return "someone said yes";
+      return "it was approved";
   }
 }
 
