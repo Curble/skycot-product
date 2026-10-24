@@ -146,6 +146,7 @@ import {
 import { planThreadDeletion } from "./ThreadDeletion.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SkycotQueuedTurn from "../skycot/model-fallback/queuedTurn.ts"; // nondev-seam: skycot-model-fallback-queue
 
 export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDispatchError>()(
   "OrchestratorDispatchError",
@@ -914,6 +915,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const providerSessions = yield* ProviderSessionManagerV2;
   const providerSwitchService = yield* ProviderSwitchServiceV2;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const skycotQueuedTurnModel = SkycotQueuedTurn.queuedTurnModel(
+    yield* Effect.serviceOption(SkycotQueuedTurn.SkycotQueuedTurnModel),
+  ); // nondev-seam: skycot-model-fallback-queue
   const runtimePolicy = yield* RuntimePolicyV2;
   const threadForkService = yield* ThreadForkServiceV2;
   const threadDispatch = yield* ThreadCommandExecutor.ThreadCommandExecutor;
@@ -1390,7 +1394,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const queuedMessage = projection.messages.find(
         (candidate) => candidate.id === storedQueuedRun.userMessageId,
       );
-      const modelSelection = queuedRunModelSelection(projection, storedQueuedRun);
+      // nondev-seam: skycot-model-fallback-queue (a resting model's queued turn starts on the fallback; identity without it)
+      const modelSelection = yield* skycotQueuedTurnModel({
+        projection,
+        run: storedQueuedRun,
+        message: queuedMessage,
+        modelSelection: queuedRunModelSelection(projection, storedQueuedRun),
+      });
       const queuedRun = {
         ...storedQueuedRun,
         modelSelection,
@@ -1519,7 +1529,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const activeProviderThread = projection.providerThreads.find(
         (candidate) => candidate.id === projection.thread.activeProviderThreadId,
       );
-      const followsCurrent = followsCurrentConversation(queuedMessage);
+      const followsCurrent =
+        followsCurrentConversation(queuedMessage) ||
+        storedQueuedRun.modelSelection.instanceId !== modelSelection.instanceId; // nondev-seam: skycot-model-fallback-queue
       const targetProviderThread = followsCurrent
         ? activeProviderThread?.providerInstanceId === queuedRun.providerInstanceId
           ? activeProviderThread
