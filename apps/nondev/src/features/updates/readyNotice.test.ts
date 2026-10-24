@@ -181,14 +181,23 @@ describe("who counts as a child's session", () => {
     expect(childSessionFor(view({ enabled: true }), none)).toBe(false);
   });
 
-  it("Family profile with a child here, the picker up, asleep, or a child's own device", () => {
+  it("\"Who's using SKYCOT?\" is a grown-up's moment, even after a child was chosen", () => {
+    expect(childSessionFor(view({ enabled: true, needsChoice: true }), none)).toBe(false);
+    expect(childSessionFor(view({ enabled: true }), { pickerOpen: true, asleep: false })).toBe(
+      false,
+    );
+    expect(
+      childSessionFor(view({ enabled: true, children: [child], currentChildId: "c1" }), {
+        pickerOpen: true,
+        asleep: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("Family profile with a child here, asleep, or a child's own device", () => {
     expect(
       childSessionFor(view({ enabled: true, children: [child], currentChildId: "c1" }), none),
     ).toBe(true);
-    expect(childSessionFor(view({ enabled: true, needsChoice: true }), none)).toBe(true);
-    expect(childSessionFor(view({ enabled: true }), { pickerOpen: true, asleep: false })).toBe(
-      true,
-    );
     expect(childSessionFor(view({ enabled: true }), { pickerOpen: false, asleep: true })).toBe(
       true,
     );

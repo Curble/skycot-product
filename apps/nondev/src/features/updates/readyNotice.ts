@@ -6,8 +6,9 @@
 // The rules, decided once per version at the moment it becomes ready:
 //   - at most once per version, ever (remembered on this Mac; once per run if storage is blocked);
 //   - only when the SKYCOT window is not in front (someone looking at it sees the pill);
-//   - never while a child is using SKYCOT (Family profile), nor while "Who's using SKYCOT?" or
-//     the asleep screen is up: a grown-up sees the pill instead;
+//   - never while a child is using SKYCOT (Family profile) or the asleep screen is up: a grown-up
+//     sees the pill instead. "Who's using SKYCOT?" is a grown-up's moment too, so it may show
+//     there (Mark, 24 October 2026: "might as well show that");
 //   - only when notifications are already allowed: SKYCOT never asks for this one.
 // Clicking it brings SKYCOT to the front and opens "Restart to update"; it never restarts.
 //
@@ -27,8 +28,9 @@ export function readyNoticeText(productName: string): {
 }
 
 /**
- * A child's session, for this notice: the Family profile is on and a child is (or is about to
- * be) the person here. On the family's Mac with the profile on and any child, that is always.
+ * A child's session, for this notice: the Family profile is on and a child is the person here
+ * (their own device, the child chosen on this Mac, or SKYCOT asleep for them). While "Who's
+ * using SKYCOT?" is up nobody is chosen yet, so it is not one, even if a child was chosen before.
  */
 export function childSessionFor(
   view: Pick<
@@ -38,14 +40,9 @@ export function childSessionFor(
   extras: { readonly pickerOpen: boolean; readonly asleep: boolean },
 ): boolean {
   if (!view.enabled && !view.legacy) return false;
-  return (
-    view.me.kind === "child" ||
-    view.currentChildId !== null ||
-    view.needsChoice ||
-    view.childName !== null ||
-    extras.pickerOpen ||
-    extras.asleep
-  );
+  if (view.me.kind === "child" || extras.asleep) return true;
+  if (view.needsChoice || extras.pickerOpen) return false;
+  return view.currentChildId !== null || view.childName !== null;
 }
 
 export interface ReadyNoticeMoment {
