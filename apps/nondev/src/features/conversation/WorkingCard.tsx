@@ -38,7 +38,6 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Disclosure, TechnicalList } from "./cards/Disclosure";
 import type { WorkGroup } from "./cards/grouping";
 import { shortTime, toIso } from "./cards/time";
-import { useChildView } from "../../app/useChildView";
 import { elapsedCopy, estimateCopy, estimateBuildTime } from "../../plain/estimate";
 import { readBuildTimes } from "./buildTimes";
 
