@@ -502,9 +502,15 @@ export function ConversationView({
           projectName={projectName}
           trailing={
             childView &&
-            !waitingOnYou &&
-            (active ||
-              (latestRunId !== null && projection.turnItems.at(-1)?.type !== "user_message")) ? (
+            ((active && !waitingOnYou) ||
+              // After a build: its Finish page stays until the child sends something new.
+              (!active &&
+                !waitingForGrownUp &&
+                latestRunId !== null &&
+                projection.turnItems.at(-1)?.type !== "user_message" &&
+                projection.turnItems.some(
+                  (item) => item.type === "file_change" && item.runId === latestRunId,
+                ))) ? (
               <BuildJourney
                 projection={projection}
                 elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}

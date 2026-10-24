@@ -142,7 +142,7 @@ describe("child sidebar and make rail", () => {
     fixture.childView = true;
     const page = await mounted();
     expect(page.host.querySelector(".fm-child-rail")).not.toBeNull();
-    await page.click("Open navigation");
+    await page.click("Show sidebar");
     expect(page.host.querySelector(".fm-sidebar--child-overlay")).not.toBeNull();
     await page.key("Escape");
     expect(page.host.querySelector(".fm-sidebar--child-overlay")).toBeNull();

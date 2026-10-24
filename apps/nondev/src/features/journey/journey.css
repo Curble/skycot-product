@@ -311,13 +311,24 @@
 .fm-stream__conversation {
   min-width: 0;
 }
+/* The notebook stays in view while the chat scrolls (wide windows only). */
+.fm-stream__inner--journey > .fm-journey {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 @media (max-width: 999px) {
   .fm-stream__inner--journey {
     display: flex;
     flex-direction: column;
   }
   .fm-stream__inner--journey > .fm-journey {
+    position: static;
     width: 100%;
+    max-height: none;
+    overflow: visible;
   }
 }
 @media (prefers-reduced-motion: reduce) {

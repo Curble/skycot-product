@@ -6,12 +6,14 @@ import {
   Archive,
   BookOpen,
   Bell,
+  Blocks,
   CheckCircle2,
   CircleAlert,
   FolderPlus,
   MessageCircle,
   Home,
   PanelLeftOpen,
+  Refrigerator,
   Sticker as StickerOutline,
   Settings,
   User,
@@ -159,7 +161,8 @@ export function AppSidebar({
           ref={railToggle}
           type="button"
           className="fm-child-rail__toggle"
-          aria-label="Open navigation"
+          aria-label="Show sidebar"
+          title="Show sidebar"
           aria-expanded={false}
           aria-controls="fm-child-sidebar"
           onClick={() => {
@@ -167,59 +170,61 @@ export function AppSidebar({
             setRailOpen(true);
           }}
         >
-          <PanelLeftOpen size={18} />
+          <PanelLeftOpen size={20} strokeWidth={1.9} />
         </button>
         <a
+          className="fm-child-rail__item"
           href={HOME_HREF}
-          aria-label="Home"
           title="Home"
           onClick={(event) => {
             event.preventDefault();
             navigate(HOME_HREF);
           }}
         >
-          <Home size={18} />
-          <small>Home</small>
+          <Home size={26} strokeWidth={1.9} aria-hidden />
+          <span>Home</span>
         </a>
+        {/* Inside a make, so My makes is where the child is. */}
         <button
           type="button"
-          aria-label="My makes"
+          className="fm-child-rail__item fm-child-rail__item--current"
+          aria-current="page"
           title="My makes"
           onClick={() => {
             openedRail.current = true;
             setRailOpen(true);
           }}
         >
-          <MessageCircle size={18} />
-          <small>My makes</small>
+          <Blocks size={26} strokeWidth={1.9} aria-hidden />
+          <span>My makes</span>
         </button>
         <a
+          className="fm-child-rail__item"
           href={FRIDGE_HREF}
-          aria-label="The fridge"
-          title="Fridge"
+          title="The fridge"
           onClick={(event) => {
             event.preventDefault();
             navigate(FRIDGE_HREF);
           }}
         >
-          <BookOpen size={18} />
-          <small>Fridge</small>
+          <Refrigerator size={26} strokeWidth={1.9} aria-hidden />
+          <span>Fridge</span>
         </a>
         <a
+          className="fm-child-rail__item"
           href={STICKERS_HREF}
-          aria-label="My stickers"
-          title="Stickers"
+          title="My stickers"
           onClick={(event) => {
             event.preventDefault();
             navigate(STICKERS_HREF);
           }}
         >
-          <StickerOutline size={18} />
-          <small>Stickers</small>
+          <StickerOutline size={26} aria-hidden />
+          <span>Stickers</span>
         </a>
         {child ? (
-          <span className="fm-child-rail__avatar" aria-label={child.name ?? "Child"}>
-            <ChildAvatar child={child} size={26} />
+          <span className="fm-child-rail__avatar" title={child.name ?? undefined}>
+            <ChildAvatar child={child} size={40} />
           </span>
         ) : null}
       </nav>
