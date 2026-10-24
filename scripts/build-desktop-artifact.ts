@@ -1668,6 +1668,24 @@ export function createStagePatchedDependencies(
   );
 }
 
+// nondev-seam: skycot-stage-pin-patched
+/**
+ * The staged install has no lockfile, so a range like `^1.2.0-beta.15` takes whatever is newest
+ * on the day; a patch written for 1.2.0-beta.15 then fails the install (ERR_PNPM_UNUSED_PATCH,
+ * beta 3, 24 October 2026) or, worse, ships an unpatched newer copy. Each patched dependency is
+ * pinned to the exact version its patch names.
+ */
+export function pinnedPatchedDependencies(
+  patchedDependencies: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.keys(patchedDependencies).flatMap((patchKey) => {
+      const separator = patchKey.lastIndexOf("@");
+      return separator > 0 ? [[patchKey.slice(0, separator), patchKey.slice(separator + 1)]] : [];
+    }),
+  );
+}
+
 function getPatchedDependencyPackageName(patchKey: string): string {
   const versionSeparator = patchKey.lastIndexOf("@");
   return versionSeparator > 0 ? patchKey.slice(0, versionSeparator) : patchKey;
@@ -3962,6 +3980,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     workspacePatchedDependencies,
     stageDependencies,
   );
+  // nondev-seam: skycot-stage-pin-patched (a patch fits one version: install exactly that one)
+  Object.assign(stageDependencies, pinnedPatchedDependencies(stagePatchedDependencies));
   const windowsServerAsarPath =
     options.platform === "win"
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
