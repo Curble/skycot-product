@@ -424,3 +424,23 @@ export function chooseBuildWord(input: {
     .toLowerCase();
   return WORD_CLUES.find(([, pattern]) => pattern.test(clues))?.[0] ?? "plan";
 }
+
+/**
+ * Up to three real lines from the child's own project that show the build's word (for Big
+ * makers' code peek); null when none match, so nothing made-up is ever shown.
+ */
+export function codePeekFor(changedCode: string, word: BuildWord): ReadonlyArray<string> | null {
+  const pattern = WORD_CLUES.find(([candidate]) => candidate === word)?.[1];
+  if (pattern === undefined) return null;
+  const lines = changedCode.split("\n");
+  const at = lines.findIndex((line) => pattern.test(line.toLowerCase()));
+  if (at === -1) return null;
+  const peek = lines
+    .slice(at, at + 3)
+    .map((line) => line.replace(/\s+$/u, ""))
+    .filter((line) => line.trim().length > 0)
+    .map((line) => (line.length > 70 ? `${line.slice(0, 69)}…` : line));
+  if (peek.length === 0) return null;
+  const indent = Math.min(...peek.map((line) => /^\s*/u.exec(line)![0].length));
+  return peek.map((line) => line.slice(indent));
+}

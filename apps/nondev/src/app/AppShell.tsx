@@ -73,6 +73,7 @@ export function AppShell({
 function ShellFrame({ route, children }: { readonly route: Route; readonly children: ReactNode }) {
   const columns = useColumns();
   const shell = useShellState();
+  const childView = useChildView();
   const selectedThreadId: ThreadId | null = route.name === "thread" ? route.threadId : null;
   const selectedEnvironmentId: EnvironmentId | null =
     route.name === "thread" ? route.environmentId : null;
@@ -89,7 +90,10 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
     route.name === "thread" && previewMode !== "hidden" ? route.threadId : null,
   );
   const showList =
-    conversationRoute && !(columns === 1 && route.name !== "home") && previewMode !== "panel";
+    conversationRoute &&
+    !childView &&
+    !(columns === 1 && route.name !== "home") &&
+    previewMode !== "panel";
 
   // One place owns the window title, derived from the route, so no screen can
   // leave a stale title behind when it unmounts.
@@ -139,8 +143,12 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
       </div>
       <NotificationCoordinator />
       <ReadyNotifier />
-      <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
-        {columns === 3 ? <AppSidebar route={route} /> : null}
+      <div
+        className={`fm-body${showList ? "" : " fm-body--no-list"}${childView && route.name === "thread" ? " fm-body--child-make" : ""}`}
+      >
+        {columns === 3 || (childView && route.name === "thread") ? (
+          <AppSidebar route={route} insideMake={childView && route.name === "thread"} />
+        ) : null}
         {showList ? (
           <ConversationList
             columns={columns}

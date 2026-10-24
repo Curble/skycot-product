@@ -217,25 +217,30 @@ export function Timeline({
       aria-label="Conversation"
       onScroll={onScroll}
     >
-      <div ref={inner} className="fm-stream__inner">
-        {startedAt ? <DayDivider>{formatDayDivider(startedAt)}</DayDivider> : null}
-        {folded.map((entry) =>
-          entry.kind === "taken-back" ? (
-            <div key={entry.key} className="fm-stream__item">
-              <TakenBackFold
-                messages={
-                  entry.entries.filter(
-                    (part) => part.kind === "item" && part.item.type === "user_message",
-                  ).length
-                }
-              >
-                {entry.entries.map(renderEntry)}
-              </TakenBackFold>
-            </div>
-          ) : (
-            renderEntry(entry)
-          ),
-        )}
+      <div
+        ref={inner}
+        className={`fm-stream__inner${trailing && childView ? " fm-stream__inner--journey" : ""}`}
+      >
+        <div className="fm-stream__conversation">
+          {startedAt ? <DayDivider>{formatDayDivider(startedAt)}</DayDivider> : null}
+          {folded.map((entry) =>
+            entry.kind === "taken-back" ? (
+              <div key={entry.key} className="fm-stream__item">
+                <TakenBackFold
+                  messages={
+                    entry.entries.filter(
+                      (part) => part.kind === "item" && part.item.type === "user_message",
+                    ).length
+                  }
+                >
+                  {entry.entries.map(renderEntry)}
+                </TakenBackFold>
+              </div>
+            ) : (
+              renderEntry(entry)
+            ),
+          )}
+        </div>
         {trailing}
       </div>
     </div>

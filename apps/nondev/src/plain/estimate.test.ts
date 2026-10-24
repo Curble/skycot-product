@@ -44,7 +44,23 @@ describe("build time estimates", () => {
     expect(estimateCopy("plan", null)).toBe("A few seconds…");
     expect(estimateCopy("build", null)).toBe("Most builds take 1 to 3 minutes.");
     expect(
-      elapsedCopy(240000, "build", { low: 60000, high: 180000 }, "Testing your game"),
+      elapsedCopy(300000, "build", { low: 60000, high: 180000 }, "Testing your game"),
     ).toContain("now: Testing your game");
+  });
+});
+
+describe("taking longer than usual", () => {
+  it("waits until a build is well past its usual time, and skips an empty step", () => {
+    const plan = { low: 4_000, high: 6_000 };
+    expect(elapsedCopy(7_000, "plan", plan, "Thinking")).not.toContain("longer than usual");
+    expect(elapsedCopy(40_000, "plan", plan, "Thinking")).toContain("longer than usual");
+    const build = { low: 60_000, high: 180_000 };
+    expect(elapsedCopy(200_000, "build", build, "Testing your game")).not.toContain("longer");
+    expect(elapsedCopy(300_000, "build", build, "Testing your game")).toBe(
+      "Taking a bit longer than usual · 5 min so far · now: Testing your game",
+    );
+    expect(elapsedCopy(300_000, "build", build, "Working on it…")).toBe(
+      "Taking a bit longer than usual · 5 min so far",
+    );
   });
 });

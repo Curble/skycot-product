@@ -304,6 +304,7 @@ export function ConversationView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [makeProjectOpen, setMakeProjectOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const [journeyNote, setJourneyNote] = useState<string | null>(null);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
     environmentId,
@@ -491,10 +492,15 @@ export function ConversationView({
           shell={shell}
           projectName={projectName}
           trailing={
-            active && !waitingOnYou && childView ? (
+            childView &&
+            !waitingOnYou &&
+            (active ||
+              (latestRunId !== null && projection.turnItems.at(-1)?.type !== "user_message")) ? (
               <BuildJourney
                 projection={projection}
                 elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}
+                finished={!active}
+                onTellSam={setJourneyNote}
               />
             ) : active &&
               !waitingOnYou &&
@@ -525,6 +531,8 @@ export function ConversationView({
           seed={seed}
           projection={projection}
           rewindFacts={rewindFacts}
+          journeyNote={journeyNote}
+          onJourneyNoteHandled={() => setJourneyNote(null)}
         />
       )}
 
@@ -722,6 +730,8 @@ function ReplyComposer({
   seed,
   projection,
   rewindFacts,
+  journeyNote,
+  onJourneyNoteHandled,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -731,6 +741,8 @@ function ReplyComposer({
   readonly seed: ComposerSeed | null;
   readonly projection: OrchestrationV2ThreadProjection | null;
   readonly rewindFacts: ReturnType<typeof useRewindFacts>;
+  readonly journeyNote: string | null;
+  readonly onJourneyNoteHandled: () => void;
 }) {
   const childView = useChildView();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -945,6 +957,17 @@ function ReplyComposer({
     }
     await deliver(message, active);
   };
+
+  useEffect(() => {
+    if (journeyNote === null) return;
+    const answer = journeyNote;
+    onJourneyNoteHandled();
+    void (async () => {
+      const cleared = await shield.clear(answer, 0);
+      if (cleared.kind !== "send") return;
+      await deliver({ text: cleared.text, messageId: cleared.messageId }, true);
+    })();
+  }, [journeyNote, onJourneyNoteHandled, shield]);
 
   const confirmGoBack = async (restoreFiles: boolean) => {
     if (goBackOpen === null) return;

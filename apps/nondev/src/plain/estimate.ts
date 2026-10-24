@@ -56,8 +56,12 @@ export function elapsedCopy(
     elapsedMs < 60_000
       ? `${Math.max(1, Math.floor(elapsedMs / 1000))} s`
       : `${Math.floor(elapsedMs / 60_000)} min`;
-  const beyond = range !== null && elapsedMs > range.high;
+  // Only well past the usual time: half as long again, and at least 30 s over (a 6 s plan that
+  // takes 7 s is not "longer than usual" to a child).
+  const beyond = range !== null && elapsedMs > Math.max(range.high * 1.5, range.high + 30_000);
   return beyond
-    ? `Taking a bit longer than usual · ${elapsed} so far · now: ${now}`
-    : `${estimateCopy(phase, range)} · ${elapsed} so far`;
+    ? `Taking a bit longer than usual · ${elapsed} so far${
+        /^\s*$|^working on it/i.test(now) ? "" : ` · now: ${now}`
+      }`
+    : `${estimateCopy(phase, range).replace(/\.$/u, "")} · ${elapsed} so far`;
 }
