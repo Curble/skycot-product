@@ -113,8 +113,8 @@ import { BuildJourney } from "../journey/BuildJourney";
 import { withoutAssistantPlumbing } from "../../plain/plumbing";
 import { recordBuildTime } from "./buildTimes";
 import { starterIdFromText } from "../badges/facts";
-import { elapsedCopy, estimateBuildTime } from "../../plain/estimate";
-import { readBuildTimes } from "./buildTimes";
+import { elapsedCopy } from "../../plain/estimate";
+import { estimateForRun } from "./runEstimate";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -239,15 +239,10 @@ export function ConversationView({
     shell?.latestRun?.completedAt ?? null,
     active && !(childView && waitingOnYou),
   );
-  const runPhase = shell?.latestRun?.sourcePlanRef ? "build" : "plan";
-  const runEstimate =
-    childView && shell
-      ? estimateBuildTime(readBuildTimes(), {
-          kind: "other",
-          model: shell.modelSelection.model,
-          phase: runPhase,
-        })
-      : null;
+  // The run's own record carries `sourcePlanRef`; the shell summary does not.
+  const { phase: runPhase, range: runEstimate } = estimateForRun(
+    projection?.runs.find((run) => run.id === latestRunId),
+  );
   const timeLine =
     childView && active && !waitingOnYou && runStart
       ? elapsedCopy(

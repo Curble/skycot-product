@@ -1,8 +1,8 @@
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
 import { useState } from "react";
 
-import { estimateCopy, estimateBuildTime } from "../../plain/estimate";
-import { readBuildTimes } from "../conversation/buildTimes";
+import { estimateCopy } from "../../plain/estimate";
+import { estimateForRun } from "../conversation/runEstimate";
 import { ReadAloudButton } from "../voice/ReadAloud";
 import { useFamily } from "../family/FamilyProvider";
 import { useCrew } from "../../themes/useCrew";
@@ -82,10 +82,9 @@ export function BuildJourney({
   const word = wordFor(chosen, level);
   const [known, setKnown] = useState(() => (child ? readKnownWords(child.id) : []));
   const [answer, setAnswer] = useState<(typeof explanation.answers)[number] | null>(null);
-  // While Sam is still thinking or planning, the plan's few seconds; then the build's minutes.
-  const phase =
-    journey.now === "Think it through" || journey.now === "Make a plan" ? "plan" : "build";
-  const range = estimateBuildTime(readBuildTimes(), { kind: "other", model: "unknown", phase });
+  // The same estimate as the strip and the working card, for the run going on now.
+  const latestRunId = projection.turnItems.findLast((item) => item.runId !== null)?.runId;
+  const { phase, range } = estimateForRun(projection.runs?.find((run) => run.id === latestRunId));
   const peek = level === "big-makers" ? codePeekFor(changedCode, chosen) : null;
   const textToRead = `${explanation.now} ${explanation.why}`;
   const steps = journey.steps.map((entry) => (

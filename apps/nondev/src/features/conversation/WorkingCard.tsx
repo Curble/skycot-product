@@ -38,8 +38,8 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Disclosure, TechnicalList } from "./cards/Disclosure";
 import type { WorkGroup } from "./cards/grouping";
 import { shortTime, toIso } from "./cards/time";
-import { elapsedCopy, estimateCopy, estimateBuildTime } from "../../plain/estimate";
-import { readBuildTimes } from "./buildTimes";
+import { elapsedCopy, estimateCopy } from "../../plain/estimate";
+import { estimateForRun } from "./runEstimate";
 
 const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "preparing",
@@ -225,28 +225,14 @@ export function WorkingCard({
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
   const doneSoFar = checklist.done.length;
-  const phase = run?.sourcePlanRef ? "build" : "plan";
-  const estimate =
-    childView && run
-      ? estimateCopy(
-          phase,
-          estimateBuildTime(readBuildTimes(), {
-            kind: "other",
-            model: run.modelSelection.model,
-            phase,
-          }),
-        )
-      : null;
+  const { phase, range } = estimateForRun(run);
+  const estimate = childView && run ? estimateCopy(phase, range) : null;
   const childElapsed =
     childView && run && startMillis
       ? elapsedCopy(
           Math.max(0, Date.now() - Date.parse(startMillis) - waited),
           phase,
-          estimateBuildTime(readBuildTimes(), {
-            kind: "other",
-            model: run.modelSelection.model,
-            phase,
-          }),
+          range,
           hint.replace(/[.…]+$/, "") || "Building it",
         )
       : null;

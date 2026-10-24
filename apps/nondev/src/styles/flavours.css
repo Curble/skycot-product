@@ -727,3 +727,48 @@ html[data-flavour-labels="handwritten"] .fm-child-rail__item span {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The Build Journey notebook in the Workshop look: real cream paper in light and dark
+   (the C1 mockup's "the paper stays cream: it is the real notebook"). The app's own
+   tokens are redefined inside it, so every card, button and sticky note on the page
+   takes the paper's colours.
+   --------------------------------------------------------------------------- */
+html[data-flavour-cards="sticky"] .fm-journey {
+  --fm-bg-card: #fffcf1;
+  --fm-bg-fill: #ead9b6;
+  --fm-bg-window: #fffcf1;
+  --fm-bg-content: #fffcf1;
+  --fm-bg-button: #fffcf1;
+  --fm-bg-hover: #f1e4c6;
+  --fm-label: #3a2d22;
+  --fm-label-2: #675543;
+  --fm-label-3: #8a735c;
+  --fm-ink: #3a2d22;
+  --fm-sep: #d9c49b;
+  --fm-sep-2: #eadcb8;
+  --fm-accent: #2c5a8c;
+  --fm-accent-soft: #dfe9f4;
+  --fm-orange-soft: #ffe27a;
+  --fm-orange: #b4651f;
+  --fm-green: #2e8b4f;
+  --fm-marker: #ffd84a;
+  --fm-marker-ink: #3a2d22;
+  --journey-paper: #f6ecd6;
+  --journey-ink: #3a2d22;
+  --journey-soft: #675543;
+  color-scheme: light;
+  border: 2px solid #3a2d22;
+  box-shadow: 4px 5px 0 rgba(8, 5, 2, 0.45);
+}
+html[data-flavour-cards="sticky"] .fm-journey::before {
+  /* Binder holes show the dark workbench through the paper. */
+  background: radial-gradient(
+      circle at 50% 50%,
+      #2a221c 0 5px,
+      #c9b48c 5.5px 7px,
+      transparent 7.5px
+    )
+    0 0 / 24px 44px repeat-y;
+  border-right-color: #e6a3a0;
+}
