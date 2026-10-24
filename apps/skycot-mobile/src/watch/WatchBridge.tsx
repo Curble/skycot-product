@@ -7,8 +7,8 @@
  *   the answer itself (submitted exactly as the phone's own Allow once / Decline, through the
  *   Mac's approver routes, once), and "Lock SKYCOT now" (the phone's Lock everything);
  * - posts "Ava needs a grown-up" when a new request appears while SKYCOT runs on the phone,
- *   with Allow once and Decline (Allow once opens the card first: the notification itself is
- *   content-free). When SKYCOT is closed, SKYCOT Relay's push ("SKYCOT needs a grown-up", same
+ *   with Allow once and Decline (Allow once opens the card first and starts Face ID there: the
+ *   notification itself is content-free). When SKYCOT is closed, SKYCOT Relay's push ("SKYCOT needs a grown-up", same
  *   buttons, no request named) does the same: Allow once opens Requests; Decline declines the
  *   one waiting request, or, with several, posts one notification for each to choose from.
  *
@@ -41,6 +41,7 @@ import {
 } from "./protocol";
 import { buildWatchSnapshot, snapshotKey } from "./snapshot";
 import { pushedDeclineTarget, type WaitingRequest } from "../push/plan";
+import { requestAllow } from "../faceid/allowIntent";
 
 const NO_WATCH: WatchLinkState = {
   supported: false,
@@ -260,7 +261,10 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
                 void refresh(mac.macId);
               }
             } else {
-              // Allow once (or a tap): SKYCOT opens on Requests, where the card is.
+              // Allow once (or a tap): SKYCOT opens on Requests, where the card is. Allow once
+              // also starts Face ID on that card (the one waiting card, for the relay's push);
+              // the yes still needs Face ID's fresh signature, or the parent code.
+              if (action === "allow") requestAllow(requestKey);
               await Linking.openURL(Linking.createURL("section/requests"));
             }
           } finally {

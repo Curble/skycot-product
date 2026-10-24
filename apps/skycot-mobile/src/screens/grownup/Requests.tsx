@@ -1,15 +1,18 @@
 /**
- * Requests: every "Ask a grown-up" waiting on any linked Mac. Allow once (the parent code
- * here; Face ID once SKYCOT Relay gives the Mac a secure address) or Decline; never "for the
- * session" or "always". The Mac checks the request, the card's fingerprint and the proof every
- * time, and logs who said yes (Phase 1's approver routes).
+ * Requests: every "Ask a grown-up" waiting on any linked Mac. Allow once (Face ID when it is set
+ * up on this phone, src/faceid; the parent code otherwise, or when Face ID is cancelled or
+ * fails) or Decline; never "for the session" or "always". The Mac checks the request, the
+ * card's fingerprint and the proof every time, and logs who said yes and how (Phase 1's
+ * approver routes).
  */
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { requestHeading } from "../../../../nondev/src/features/family/people";
 import { useGrownUp, type WaitingRequest } from "../../app/grownup/GrownUpContext";
 import { useCodeLength, useMacData } from "../../data/MacData";
+import { subscribeAllow, takeAllow } from "../../faceid/allowIntent";
+import { useFaceId } from "../../faceid/FaceIdProvider";
 import { familyApi } from "../../family/api";
 import {
   Avatar,
@@ -38,12 +41,21 @@ export function countSentence(count: number): string {
   return count === 1 ? "1 request needs a grown-up." : `${count} requests need a grown-up.`;
 }
 
-function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac: boolean }) {
+function RequestCard(props: {
+  readonly waiting: WaitingRequest;
+  readonly showMac: boolean;
+  /** Every request waiting now ("<macId>:<requestId>"), for a notification's Allow once. */
+  readonly liveKeys: ReadonlyArray<string>;
+}) {
   const theme = useTheme();
   const { refresh } = useMacData();
+  const faceId = useFaceId();
   const { mac, request, child } = props.waiting;
   const codeLength = useCodeLength(mac.macId);
   const [asking, setAsking] = useState(false);
+  /** Why the code is asked for, when Face ID was tried and didn't say yes. */
+  const [codeNote, setCodeNote] = useState<string | null>(null);
+  const [allowing, setAllowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -58,10 +70,13 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
     .filter(Boolean)
     .join(" · ");
 
-  const settle = (sentence: string) => {
-    setDone(sentence);
-    setTimeout(() => void refresh(mac.macId), 1_200);
-  };
+  const settle = useCallback(
+    (sentence: string) => {
+      setDone(sentence);
+      setTimeout(() => void refresh(mac.macId), 1_200);
+    },
+    [refresh, mac.macId],
+  );
 
   const decline = async () => {
     setBusy(true);
@@ -77,6 +92,51 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
     if (result.ok) settle("Declined. They see that on their screen.");
     else setProblem(result.message);
   };
+
+  const useFace = faceId.readyOn(mac);
+  const childName = child?.name ?? null;
+  const allowingRef = useRef(false);
+  /** Allow once: Face ID's fresh signature when it is set up; the parent code otherwise. */
+  const allow = useCallback(async () => {
+    if (allowingRef.current || done !== null || request.lapsed) return;
+    setProblem(null);
+    setCodeNote(null);
+    if (!faceId.readyOn(mac)) {
+      setAsking(true);
+      return;
+    }
+    allowingRef.current = true;
+    setAllowing(true);
+    try {
+      const outcome = await faceId.allow(mac, request, childName);
+      if (outcome.kind === "allowed") {
+        haptic("success");
+        settle(`Allowed with ${faceId.label}, this once.`);
+      } else if (outcome.kind === "use-code") {
+        setCodeNote(outcome.note);
+        setAsking(true);
+      } else {
+        setProblem(outcome.message);
+      }
+    } finally {
+      allowingRef.current = false;
+      setAllowing(false);
+    }
+  }, [faceId, mac, request, childName, done, settle]);
+
+  // "Allow once" on this card's notification: Face ID starts here, with the card on screen.
+  const key = `${mac.macId}:${request.requestId}`;
+  const liveKeysRef = useRef(props.liveKeys);
+  useEffect(() => {
+    liveKeysRef.current = props.liveKeys;
+  }, [props.liveKeys]);
+  useEffect(() => {
+    const check = () => {
+      if (takeAllow(key, liveKeysRef.current)) void allow();
+    };
+    check();
+    return subscribeAllow(check);
+  }, [key, allow]);
 
   return (
     <Card style={{ gap: 12 }}>
@@ -116,7 +176,11 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
           />
           <Button
             title="Allow once"
-            onPress={() => setAsking(true)}
+            {...(useFace
+              ? { icon: "faceid" as const, accessibilityLabel: `Allow once with ${faceId.label}` }
+              : {})}
+            busy={allowing}
+            onPress={() => void allow()}
             style={{ flex: 1 }}
             size="medium"
           />
@@ -125,10 +189,13 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
       <ParentCodeSheet
         visible={asking}
         title="Allow this once?"
-        description={`${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}. Enter the parent code to allow it, this once.`}
+        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}. Enter the parent code to allow it, this once.`}
         actionLabel="Allow once"
         length={codeLength}
-        onClose={() => setAsking(false)}
+        onClose={() => {
+          setAsking(false);
+          setCodeNote(null);
+        }}
         onCode={async (code) => {
           const result = await familyApi.answerRequest(mac.transport, {
             threadId: request.threadId,
@@ -150,7 +217,9 @@ function RequestCard(props: { readonly waiting: WaitingRequest; readonly showMac
 
 export function RequestsScreen() {
   const grownUp = useGrownUp();
-  const count = grownUp.waiting.filter((waiting) => !waiting.request.lapsed).length;
+  const live = grownUp.waiting.filter((waiting) => !waiting.request.lapsed);
+  const count = live.length;
+  const liveKeys = live.map((waiting) => `${waiting.mac.macId}:${waiting.request.requestId}`);
   return (
     <Page>
       <View
@@ -183,6 +252,7 @@ export function RequestsScreen() {
               key={`${waiting.mac.macId}:${waiting.request.requestId}`}
               waiting={waiting}
               showMac={grownUp.macs.length > 1}
+              liveKeys={liveKeys}
             />
           ))}
         </View>

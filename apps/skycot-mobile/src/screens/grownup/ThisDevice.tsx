@@ -1,6 +1,6 @@
 /**
- * This device, on a grown-up's phone: Face ID (waits for SKYCOT Relay's secure address; the
- * parent code works meanwhile), Apple Watch (say yes from the wrist, Phase 4), Lock everything
+ * This device, on a grown-up's phone: Face ID (this phone's own Secure Enclave key, set up once
+ * with the parent code; src/faceid), Apple Watch (say yes from the wrist, Phase 4), Lock everything
  * (ends every grown-up's yes on every device), the linked Macs, About, and Unlink this device.
  * Phase 1's copy throughout.
  */
@@ -11,8 +11,9 @@ import { useState } from "react";
 import type { StackRoutes } from "../../app/routes";
 import { useGrownUp } from "../../app/grownup/GrownUpContext";
 import { useSharedCodeLength } from "../../data/MacData";
+import { SkycotDeviceKey } from "../../../modules/skycot-device-key";
+import { useFaceId } from "../../faceid/FaceIdProvider";
 import { familyApi } from "../../family/api";
-import { passkeySupport } from "../../family/passkey";
 import { useLinks, type Mac } from "../../links/store";
 import {
   Button,
@@ -44,6 +45,24 @@ export function watchRowSubtitle(input: {
   return "Your Watch shows requests and today's time. Set it up to say yes too.";
 }
 
+/** The Face ID row's title: what it does once it is on. */
+export function faceIdRowTitle(label: string, everywhere: boolean): string {
+  return everywhere ? `${label} says yes` : `Use ${label} to say yes`;
+}
+
+/** The Face ID row's subtitle, from what this iPhone and the linked Macs know. */
+export function faceIdRowSubtitle(input: {
+  readonly label: string;
+  readonly available: boolean;
+  readonly everywhere: boolean;
+}): string {
+  if (input.everywhere) return "Allow once asks for it each time, for that one request.";
+  if (!input.available) {
+    return `Turn on ${input.label} for this iPhone in Settings to use it here. For now, the parent code says yes.`;
+  }
+  return "Set it up once with the parent code.";
+}
+
 export function ThisDeviceScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
@@ -51,7 +70,10 @@ export function ThisDeviceScreen() {
   const grownUp = useGrownUp();
   // The Watch's set-up sends one code to every linked Mac: known only when they all agree.
   const codeLength = useSharedCodeLength(grownUp.macs.map((mac) => mac.macId));
-  const faceId = passkeySupport();
+  const faceId = useFaceId();
+  const [settingUpFaceId, setSettingUpFaceId] = useState(false);
+  const [faceIdProblem, setFaceIdProblem] = useState<string | null>(null);
+  const [faceIdBusy, setFaceIdBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [locking, setLocking] = useState(false);
   const [unlinking, setUnlinking] = useState<Mac | null>(null);
@@ -77,18 +99,53 @@ export function ThisDeviceScreen() {
 
   return (
     <Page>
-      <Section title="Face ID" footer={faceId.possible ? undefined : (faceId.reason ?? undefined)}>
+      <Section
+        title={faceId.label}
+        footer={
+          faceIdProblem ??
+          `${faceId.label} signs each yes with a key that never leaves this iPhone, and only your ${faceId.label === "Touch ID" ? "fingerprint" : "face"} can use it. The parent code always works too, and saying no never needs either.`
+        }
+      >
         <Row
           leading={
-            <RowIcon name="faceid" color={faceId.possible ? theme.color.green : "#8E8E93"} />
+            <RowIcon
+              name={faceId.label === "Touch ID" ? "touchid" : "faceid"}
+              color={faceId.everywhere ? theme.color.green : "#8E8E93"}
+            />
           }
-          title="Use Face ID to say yes"
-          subtitle={
-            faceId.possible
-              ? "Set it up once with the parent code."
-              : "For now, the parent code says yes."
+          title={faceIdRowTitle(faceId.label, faceId.everywhere)}
+          subtitle={faceIdRowSubtitle({
+            label: faceId.label,
+            available: faceId.native?.available ?? false,
+            everywhere: faceId.everywhere,
+          })}
+          trailing={
+            faceId.native?.available && !faceId.everywhere ? (
+              <Button
+                title="Set up"
+                kind="tinted"
+                size="small"
+                onPress={() => {
+                  setFaceIdProblem(null);
+                  setSettingUpFaceId(true);
+                }}
+              />
+            ) : null
           }
         />
+        {faceId.native?.hasKey ? (
+          <Row
+            title={`Stop using ${faceId.label}`}
+            subtitle="Allow once asks for the parent code again."
+            destructive
+            onPress={async () => {
+              if (faceIdBusy) return;
+              setFaceIdBusy(true);
+              setFaceIdProblem(await faceId.stop());
+              setFaceIdBusy(false);
+            }}
+          />
+        ) : null}
       </Section>
       {watch.link.supported ? (
         <Section
@@ -183,6 +240,22 @@ export function ThisDeviceScreen() {
         ))}
       </Section>
       <ParentCodeSheet
+        visible={settingUpFaceId}
+        title={`Use ${faceId.label} to say yes?`}
+        description={`Enter the parent code once. Then Allow once asks for your ${faceId.label === "Touch ID" ? "fingerprint" : "face"} instead, every time.`}
+        actionLabel="Set up"
+        length={codeLength}
+        onClose={() => setSettingUpFaceId(false)}
+        onCode={async (code) => {
+          const result = await faceId.setUp(code);
+          if (result === null) {
+            setSettingUpFaceId(false);
+            haptic("success");
+          }
+          return result;
+        }}
+      />
+      <ParentCodeSheet
         visible={settingUpWatch}
         title="Say yes from your Watch?"
         description="Open SKYCOT on your Apple Watch first. Then enter the parent code: your Watch makes its own key and can say yes once while it's unlocked and on your wrist."
@@ -213,6 +286,8 @@ export function ThisDeviceScreen() {
             setBusy(true);
             await familyApi.unlinkSelf(unlinking.transport);
             await links.forget(unlinking.macId);
+            // The last Mac gone: this phone's Face ID key goes too (the Mac forgot its half).
+            if (grownUp.macs.length <= 1) SkycotDeviceKey?.remove();
             setBusy(false);
             setUnlinking(null);
           }}

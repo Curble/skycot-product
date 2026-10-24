@@ -92,6 +92,29 @@ describe("the recap in plain words", () => {
     ).toContain("Approved from Mum's phone, 6:42 pm.");
   });
 
+  it("says a yes was given with Face ID on the grown-up's phone", () => {
+    const lines = grownUpLines({
+      timeZone: MELBOURNE,
+      grownUp: {
+        held: 1,
+        approved: 1,
+        moreTime: [],
+        shield: {},
+        shieldAllowed: 0,
+        fromDevices: [
+          {
+            at: Date.parse("2026-10-22T18:42:00+11:00"),
+            device: "Mark's iPhone",
+            with: "Face ID",
+          },
+        ],
+      },
+    });
+    expect(lines).toContain("Approved with Face ID on Mark's iPhone, 6:42 pm.");
+    // Not "with the parent code" when a yes wasn't.
+    expect(lines.join(" ")).not.toContain("parent code");
+  });
+
   it("draws the week against its busiest day", () => {
     const bars = weekBars([
       { date: "2026-10-21", minutes: 20, turns: 2 },

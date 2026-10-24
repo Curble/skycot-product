@@ -98,6 +98,10 @@ const FamilyEventBy = Schema.Struct({
   deviceName: Schema.String,
   /** Said on the grown-up's Apple Watch and carried by that phone (Phase 4). */
   via: Schema.optionalKey(Schema.Struct({ kind: Schema.Literal("watch"), name: Schema.String })),
+  /** Said yes with the device's own Face ID key (a fresh Secure Enclave signature). */
+  how: Schema.optionalKey(Schema.Literal("face-id")),
+  /** Which of Apple's checks that was, as the device said: "touch-id" on an iPad without Face ID. */
+  biometry: Schema.optionalKey(Schema.Literals(["face-id", "touch-id", "optic-id"])),
 });
 export type FamilyEventBy = typeof FamilyEventBy.Type;
 const FamilyEvent = Schema.Struct({

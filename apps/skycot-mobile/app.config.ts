@@ -94,8 +94,9 @@ const config: ExpoConfig = {
     bundleIdentifier: variant.iosBundleIdentifier,
     appleTeamId: SKYCOT_APPLE_TEAM_ID,
     // Each upload to App Store Connect needs a new build number (TestFlight 0.1.0: 1 failed
-    // processing, 2 the first TestFlight build, 3 the first with notifications).
-    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "3",
+    // processing, 2 the first TestFlight build, 3 the first with notifications, 4 the first
+    // with Face ID to say yes).
+    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "4",
     // "SKYCOT needs a grown-up" and "Sam has finished" from SKYCOT Relay, also when the app is
     // closed (iOS forwards them to a paired Apple Watch). The pushes are content-free and shown
     // by iOS itself, so no background mode is needed (UIBackgroundModes stays unset).
@@ -123,6 +124,9 @@ const config: ExpoConfig = {
       NSMicrophoneUsageDescription:
         "Lets you talk instead of type, when a grown-up has turned talking on.",
       NSSupportsLiveActivities: true,
+      // Face ID to say yes on a grown-up's phone (modules/skycot-device-key): the Secure Enclave
+      // key signs a yes only after Face ID, so iOS asks once whether SKYCOT may use it.
+      NSFaceIDUsageDescription: "SKYCOT uses Face ID so only you can say yes to a request.",
       // Export compliance (24 October 2026): Mark answered App Store Connect's questions for builds
       // 2 and 3 (standard encryption in addition to Apple's — the relay's Noise tunnel — and not
       // distributed in France), and Apple then said the build needs no encryption documentation and

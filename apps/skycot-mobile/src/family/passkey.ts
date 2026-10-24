@@ -1,4 +1,8 @@
 /**
+ * (Not used by the phone's screens now: Face ID says yes with this phone's own Secure Enclave
+ * key, src/faceid, which needs no web address. Kept for the passkey route, which the plain
+ * client in a browser still uses.)
+ *
  * Face ID to say yes, through a passkey: Phase 1's design (WHO-IS-WHO, "Passkeys and the
  * relying party"). A passkey belongs to a secure web address, and an iPhone app may only use
  * one for an address Apple has seen it own (an "associated domain"). The home Wi-Fi address of

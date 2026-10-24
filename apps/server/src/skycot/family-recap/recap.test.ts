@@ -315,6 +315,34 @@ describe("buildRecap", () => {
     });
   });
 
+  it("says a yes was given with Face ID on the grown-up's own phone", () => {
+    const yes = {
+      at: at("2026-10-22T15:20:00+11:00"),
+      childId: "ava",
+      kind: "approved" as const,
+      threadId: "thread:space",
+      requestId: "req-9",
+      by: {
+        personId: "mark",
+        deviceId: "d1",
+        deviceName: "Mark's iPhone",
+        how: "face-id" as const,
+        biometry: "face-id" as const,
+      },
+    };
+    const today = buildRecap({
+      childId: "ava",
+      range: "session",
+      now: NOW,
+      timeZone: MELBOURNE,
+      activity: { ...activity, events: [...(activity.events ?? []), yes] },
+      threads,
+    });
+    expect(today.grownUp.fromDevices).toEqual([
+      { at: yes.at, device: "Mark's iPhone", with: "Face ID" },
+    ]);
+  });
+
   it("names the Watch and the phone that carried a yes from the wrist", () => {
     const yes = {
       at: at("2026-10-22T15:20:00+11:00"),

@@ -48,9 +48,16 @@ export type ApproverProof =
       readonly keyId: string;
       readonly challenge: string;
       readonly signature: string;
+    }
+  | {
+      /** This phone's own Face ID key (Secure Enclave; see src/faceid). */
+      readonly type: "device-key";
+      readonly keyId: string;
+      readonly challenge: string;
+      readonly signature: string;
     };
 
-/** A challenge the Mac gave for the Watch to sign, with what it is for. */
+/** A challenge the Mac gave for the Watch (or this phone's Face ID key) to sign. */
 export interface WatchChallenge {
   readonly challenge: string;
   readonly action: string;
@@ -251,6 +258,43 @@ export const familyApi = {
     call(
       transport,
       { method: "POST", path: `${FAMILY_API_PATH}/approver/watch/challenge`, body: input },
+      parseWatchChallenge,
+    ),
+  /** "Use Face ID to say yes": the parent code once; this phone's Face ID key signs what comes back. */
+  deviceKeyOptions: (transport: MacTransport, code: string) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/device-key/options`, body: { code } },
+      parseWatchChallenge,
+    ),
+  deviceKeyRegister: (
+    transport: MacTransport,
+    input: {
+      readonly challenge: string;
+      readonly publicKey: string;
+      readonly signature: string;
+      readonly biometry: "face-id" | "touch-id" | "optic-id";
+    },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/device-key/register`, body: input },
+      (body) => (typeof record(body).keyId === "string" ? (record(body).keyId as string) : null),
+    ),
+  deviceKeyForget: (transport: MacTransport) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/device-key/forget`, body: {} },
+      ok,
+    ),
+  /** A one-use challenge for one yes with Face ID, for the card this phone shows. */
+  deviceKeyChallenge: (
+    transport: MacTransport,
+    input: { readonly threadId: string; readonly requestId: string; readonly fingerprint: string },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/device-key/challenge`, body: input },
       parseWatchChallenge,
     ),
   approverMoreTime: (

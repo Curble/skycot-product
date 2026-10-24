@@ -10,6 +10,7 @@ import { ChildApp } from "./app/child/ChildApp";
 import { ChildProvider, useChild } from "./app/child/ChildContext";
 import { GrownUpApp } from "./app/grownup/GrownUpApp";
 import { MacDataProvider, useMacData } from "./data/MacData";
+import { FaceIdProvider } from "./faceid/FaceIdProvider";
 import { DeepLinkProvider } from "./links/deepLinks";
 import { LinksProvider, useLinks } from "./links/store";
 import { WelcomeScreen } from "./screens/link/WelcomeScreen";
@@ -86,10 +87,12 @@ export default function App() {
       <DeepLinkProvider>
         <LinksProvider>
           <MacDataProvider>
-            <WatchBridgeProvider>
-              <PushRegistration />
-              <Root />
-            </WatchBridgeProvider>
+            <FaceIdProvider>
+              <WatchBridgeProvider>
+                <PushRegistration />
+                <Root />
+              </WatchBridgeProvider>
+            </FaceIdProvider>
           </MacDataProvider>
         </LinksProvider>
       </DeepLinkProvider>

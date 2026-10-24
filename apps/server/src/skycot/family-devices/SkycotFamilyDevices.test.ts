@@ -30,7 +30,11 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
-import { deviceSubject, watchSignedMessage } from "@t3tools/skycot-rules/people";
+import {
+  deviceKeySignedMessage,
+  deviceSubject,
+  watchSignedMessage,
+} from "@t3tools/skycot-rules/people";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../../config.ts";
@@ -1052,6 +1056,242 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
           );
         }),
       ),
+  );
+
+  it.effect(
+    "Mum's Face ID key: set up once with the code, a fresh signature for each yes, logged as Face ID",
+    () =>
+      withDevices((world) =>
+        Effect.gen(function* () {
+          const { devices, recorded, limits, avaId, family } = world;
+          const phoneKey = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+          const otherKey = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+          const publicKey = phoneKey.publicKey
+            .export({ format: "der", type: "spki" })
+            .toString("base64url");
+          const sign = (key: NodeCrypto.KeyObject, message: string) =>
+            NodeCrypto.sign("sha256", Buffer.from(message), { key, dsaEncoding: "der" }).toString(
+              "base64url",
+            );
+          const register = (challenge: string, signature: string) =>
+            devices.deviceKeyRegister({
+              who: mum(world),
+              challenge,
+              publicKey,
+              signature,
+              biometry: "face-id",
+            });
+
+          // Enrolling: the parent code first, then a signature by the key it names.
+          assert.isTrue(
+            yield* refused(devices.deviceKeyOptions({ who: mum(world), code: "000000" })),
+          );
+          // No key yet: no challenge to say yes with.
+          assert.isTrue(
+            yield* refused(
+              devices.deviceKeyChallenge({
+                who: mum(world),
+                threadId: "thread-ava",
+                requestId: "req-1",
+                fingerprint: "f",
+              }),
+            ),
+          );
+          const first = yield* devices.deviceKeyOptions({ who: mum(world), code: CODE });
+          assert.equal(first.action, `device-key-register:${MUM_PHONE}`);
+          assert.isTrue(
+            yield* refused(
+              register(
+                first.challenge,
+                sign(
+                  otherKey.privateKey,
+                  deviceKeySignedMessage("register", first.challenge, first.action),
+                ),
+              ),
+            ),
+          );
+          // That challenge is spent, even by a good signature now.
+          assert.isTrue(
+            yield* refused(
+              register(
+                first.challenge,
+                sign(
+                  phoneKey.privateKey,
+                  deviceKeySignedMessage("register", first.challenge, first.action),
+                ),
+              ),
+            ),
+          );
+          // A Watch's register challenge can't enrol a Face ID key, nor the other way round.
+          const watchOptions = yield* devices.watchKeyOptions({ who: mum(world), code: CODE });
+          assert.isTrue(
+            yield* refused(
+              register(
+                watchOptions.challenge,
+                sign(
+                  phoneKey.privateKey,
+                  deviceKeySignedMessage(
+                    "register",
+                    watchOptions.challenge,
+                    `device-key-register:${MUM_PHONE}`,
+                  ),
+                ),
+              ),
+            ),
+          );
+          const options = yield* devices.deviceKeyOptions({ who: mum(world), code: CODE });
+          const { keyId } = yield* register(
+            options.challenge,
+            sign(
+              phoneKey.privateKey,
+              deviceKeySignedMessage("register", options.challenge, options.action),
+            ),
+          );
+          assert.isTrue((yield* devices.list).find((row) => row.id === MUM_PHONE)?.faceId);
+          assert.isTrue(
+            (yield* family.status).devices.find((device) => device.id === MUM_PHONE)?.faceId,
+          );
+
+          const [pending] = yield* devices.approvals;
+          const challengeFor = (fingerprint = pending!.fingerprint) =>
+            devices.deviceKeyChallenge({
+              who: mum(world),
+              threadId: "thread-ava",
+              requestId: "req-1",
+              fingerprint,
+            });
+          const yes = (proof: SkycotFamilyDevices.Proof, fingerprint = pending!.fingerprint) =>
+            devices.answer({
+              who: mum(world),
+              sessionId: "mum-phone",
+              origin: "http://192.168.1.20:3790",
+              threadId: "thread-ava",
+              requestId: "req-1",
+              decision: "accept",
+              fingerprint,
+              proof,
+            });
+          const signed = (
+            issued: { readonly challenge: string; readonly action: string },
+            key = phoneKey.privateKey,
+            message = deviceKeySignedMessage("approve", issued.challenge, issued.action),
+          ) =>
+            ({
+              type: "device-key",
+              keyId,
+              challenge: issued.challenge,
+              signature: sign(key, message),
+            }) as const;
+
+          // Signed by another key: refused.
+          assert.isTrue(yield* refused(yes(signed(yield* challengeFor(), otherKey.privateKey))));
+          // Signed for another request: refused.
+          const swapped = yield* challengeFor();
+          assert.isTrue(
+            yield* refused(
+              yes(
+                signed(
+                  swapped,
+                  phoneKey.privateKey,
+                  deviceKeySignedMessage("approve", swapped.challenge, "approve:thread-leo:r:x"),
+                ),
+              ),
+            ),
+          );
+          // The same key's signature in the Watch's words: refused (its own first line only).
+          const watchWords = yield* challengeFor();
+          assert.isTrue(
+            yield* refused(
+              yes(
+                signed(
+                  watchWords,
+                  phoneKey.privateKey,
+                  watchSignedMessage("approve", watchWords.challenge, watchWords.action),
+                ),
+              ),
+            ),
+          );
+          // A challenge for a card that has since changed: the fingerprint check still holds.
+          const stale = yield* challengeFor("an-older-card");
+          assert.isTrue(yield* refused(yes(signed(stale), "an-older-card")));
+          // A challenge the Mac never gave: refused.
+          assert.isTrue(
+            yield* refused(
+              yes(
+                signed({
+                  challenge: "made-up",
+                  action: `approve:thread-ava:req-1:${pending!.fingerprint}`,
+                }),
+              ),
+            ),
+          );
+          assert.equal(recorded.dispatched.length, 0);
+
+          const good = signed(yield* challengeFor());
+          yield* yes(good);
+          assert.equal(recorded.dispatched.length, 1);
+          assert.equal(recorded.dispatched[0]!["decision"], "accept");
+          // Replayed: the challenge was spent, and the request is answered.
+          assert.isTrue(yield* refused(yes(good)));
+          assert.equal(recorded.dispatched.length, 1);
+          const logged = (yield* limits.snapshot)!.activity.events.find(
+            (event) => event.requestId === "req-1",
+          );
+          assert.equal(logged?.kind, "approved");
+          assert.equal(logged?.childId, avaId);
+          assert.equal(logged?.by?.deviceName, "Mum's phone");
+          assert.equal(logged?.by?.how, "face-id");
+          assert.equal(logged?.by?.biometry, "face-id");
+          assert.isUndefined(logged?.by?.via);
+          const record = yield* family.device(MUM_PHONE);
+          assert.isString(record?.deviceKey?.lastUsedAt);
+
+          // More time still asks for the parent code.
+          assert.isTrue(
+            yield* refused(
+              devices.moreTime({
+                who: mum(world),
+                sessionId: "mum-phone",
+                origin: "http://192.168.1.20:3790",
+                childId: avaId,
+                kind: "extra15",
+                proof: signed(yield* challengeFor()),
+              }),
+            ),
+          );
+
+          // "Stop using Face ID": no code needed, and a challenge given before it is void.
+          const before = yield* challengeFor();
+          yield* devices.deviceKeyForget(mum(world));
+          assert.isFalse((yield* devices.list).find((row) => row.id === MUM_PHONE)?.faceId);
+          assert.isTrue(yield* refused(challengeFor()));
+          // Even with the request waiting again, the old challenge and the old key are gone.
+          world.request.status = "pending";
+          assert.isTrue(yield* refused(yes(signed(before))));
+          assert.equal(recorded.dispatched.length, 1);
+        }),
+      ),
+  );
+
+  it.effect("Face ID is a grown-up's: never a child's device, and Remove device forgets it", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const { devices, family } = world;
+        const key = {
+          id: "k1",
+          publicKey: "x",
+          biometry: "face-id" as const,
+          createdAt: DateTime.formatIso(DateTime.makeUnsafe(EPOCH)),
+          lastUsedAt: null,
+        };
+        assert.isTrue(yield* refused(family.setDeviceKey({ deviceId: AVA_IPAD, key })));
+        assert.isUndefined((yield* family.device(AVA_IPAD))?.deviceKey);
+        yield* family.setDeviceKey({ deviceId: MUM_PHONE, key });
+        assert.equal((yield* family.device(MUM_PHONE))?.deviceKey?.id, "k1");
+        yield* devices.remove(MUM_PHONE);
+        assert.isNull(yield* family.device(MUM_PHONE));
+      }),
+    ),
   );
 
   it.effect("a no from the Watch needs no proof and is logged as the Watch's", () =>
