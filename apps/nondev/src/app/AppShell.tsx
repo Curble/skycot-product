@@ -47,6 +47,7 @@ import { AppSidebar } from "./Sidebar";
 import { ShellStateProvider, useShellState } from "./ShellState";
 import { TitleBar } from "./TitleBar";
 import { useColumns, type Columns } from "./useColumns";
+import { useChildView } from "./useChildView";
 
 /**
  * The Messages window. Decides which columns exist at this width and which
@@ -272,6 +273,7 @@ function useTitleDetail(
  */
 function ProviderPill() {
   const family = useFamily();
+  const childView = useChildView();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
   const providers = useAtomValue(
@@ -280,7 +282,7 @@ function ProviderPill() {
       : serverEnvironment.providersValueAtom(environmentId),
   );
   const preference = useDefaultAssistantPreference(environmentId);
-  if (environmentId === null || providers === null) return null;
+  if (childView || environmentId === null || providers === null) return null;
   const provider = providerForSelection(
     providers,
     resolveDefaultModelSelection(providers, null, preference),

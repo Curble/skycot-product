@@ -187,7 +187,7 @@ export function asleepCopy(
     case "allowance":
       return {
         title: "SKYCOT is having a rest",
-        body: `It's leaving some of the ${state.allowance?.brand ?? "AI"} allowance for the grown-ups${wakes ? `, and wakes up ${wakes}` : ""}. Your work is saved.`,
+        body: "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
       };
     case null:
       return { title: "SKYCOT is awake", body: "" };

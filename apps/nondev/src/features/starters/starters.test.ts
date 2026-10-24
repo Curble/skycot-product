@@ -71,6 +71,7 @@ describe("starter cards", () => {
     expect(starterPrompt(surprise, () => 0)).toContain(`Please make ${SURPRISE_IDEAS[0]}.`);
     expect(starterPrompt(surprise, () => 0.9999)).toContain(SURPRISE_IDEAS.at(-1)!);
     expect(starterPrompt(surprise, () => 0)).not.toContain("{idea}");
+    expect(SURPRISE_IDEAS.join(" ")).not.toContain("Web Audio API");
   });
 
   it("clamps a random source that strays out of range", () => {

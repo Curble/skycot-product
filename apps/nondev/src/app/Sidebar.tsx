@@ -36,6 +36,10 @@ import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
 import { useSidebarSheets } from "./SidebarSheets";
 import { useFamily } from "../features/family/FamilyProvider";
+import { currentChild } from "../features/family/family";
+import { ChildAvatar } from "../features/family/ChildAvatar";
+import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
+import type { FamilyChild } from "../features/family/children";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
@@ -57,6 +61,7 @@ export function AppSidebar({
   const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
+  const childView = family.enabled && family.profile.me.kind !== "grown-up";
   const [projectMenu, setProjectMenu] = useState<{
     readonly project: EnvironmentProject;
     readonly at: MenuPoint;
@@ -75,7 +80,7 @@ export function AppSidebar({
 
   const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
   // The Mac's own name ("MamaBear") is not a person, and a child should never see it.
-  const meLabel = sidebarPersonLabel(family.enabled);
+  const child = currentChild(family.profile);
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
 
@@ -174,20 +179,22 @@ export function AppSidebar({
                 />
               );
             })}
-          <SidebarItem
-            icon={FolderPlus}
-            label="Open a folder…"
-            muted
-            onClick={() => {
-              if (!primaryEnvironmentId) return;
-              const environmentId = primaryEnvironmentId;
-              sheets.openFolder({
-                environmentId,
-                onOpened: (projectId) =>
-                  showList(() => shell.setProjectKey(projectKeyOf({ environmentId, projectId }))),
-              });
-            }}
-          />
+          {!childView ? (
+            <SidebarItem
+              icon={FolderPlus}
+              label="Open a folder…"
+              muted
+              onClick={() => {
+                if (!primaryEnvironmentId) return;
+                const environmentId = primaryEnvironmentId;
+                sheets.openFolder({
+                  environmentId,
+                  onOpened: (projectId) =>
+                    showList(() => shell.setProjectKey(projectKeyOf({ environmentId, projectId }))),
+                });
+              }}
+            />
+          ) : null}
         </SidebarSection>
 
         {crew.named ? (
@@ -209,23 +216,27 @@ export function AppSidebar({
           </SidebarSection>
         ) : null}
 
-        <SidebarSection title="Automations">
-          <SidebarItem
-            icon={Bell}
-            label="Automations"
-            selected={route.name === "automations"}
-            href={AUTOMATIONS_HREF}
-          />
-        </SidebarSection>
+        {!childView ? (
+          <SidebarSection title="Automations">
+            <SidebarItem
+              icon={Bell}
+              label="Automations"
+              selected={route.name === "automations"}
+              href={AUTOMATIONS_HREF}
+            />
+          </SidebarSection>
+        ) : null}
 
-        <SidebarSection title="People">
-          <SidebarItem
-            icon={User}
-            label="Who can help"
-            selected={route.name === "people"}
-            href={PEOPLE_HREF}
-          />
-        </SidebarSection>
+        {!childView ? (
+          <SidebarSection title="People">
+            <SidebarItem
+              icon={User}
+              label="Who can help"
+              selected={route.name === "people"}
+              href={PEOPLE_HREF}
+            />
+          </SidebarSection>
+        ) : null}
       </div>
 
       <ContextMenu
@@ -245,17 +256,28 @@ export function AppSidebar({
 
       <footer className="fm-sidebar__footer">
         <div className="fm-sidebar__footer-row">
-          <span className="fm-sidebar__me">
-            <Avatar kind="person" value={meLabel} size="sm" label={meLabel} />
-            <b>{meLabel}</b>
-          </span>
-          <IconButton
-            icon={Settings}
-            label="Settings"
-            size="sm"
-            aria-current={route.name === "settings" ? "page" : undefined}
-            onClick={() => select(() => navigate(SETTINGS_HREF))}
+          <SidebarIdentity
+            familyOn={family.enabled}
+            childView={childView}
+            child={child}
+            onSwitch={openChildPicker}
           />
+          {childView ? (
+            <IconButton
+              icon={Settings}
+              label="Settings"
+              size="sm"
+              onClick={sheets.openChildSettings}
+            />
+          ) : (
+            <IconButton
+              icon={Settings}
+              label="Settings"
+              size="sm"
+              aria-current={route.name === "settings" ? "page" : undefined}
+              onClick={() => select(() => navigate(SETTINGS_HREF))}
+            />
+          )}
         </div>
         {/* The Family profile keeps the developer tools out of reach; Settings › Family has the parent's way in. */}
         {family.enabled ? null : (
@@ -274,4 +296,35 @@ export function AppSidebar({
 /** Who the footer stands for: the grown-up whose settings the gear opens, never the computer. */
 export function sidebarPersonLabel(familyOn: boolean): string {
   return familyOn ? "Grown-up" : "You";
+}
+
+export function SidebarIdentity({
+  familyOn,
+  childView,
+  child,
+  onSwitch,
+}: {
+  readonly familyOn: boolean;
+  readonly childView: boolean;
+  readonly child: FamilyChild | null;
+  readonly onSwitch: () => void;
+}) {
+  const label = sidebarPersonLabel(familyOn);
+  return (
+    <>
+      <span className="fm-sidebar__me">
+        {childView && child ? (
+          <ChildAvatar child={child} size={24} />
+        ) : (
+          <Avatar kind="person" value={label} size="sm" label={label} />
+        )}
+        <b>{childView ? (child?.name ?? "You") : label}</b>
+      </span>
+      {childView ? (
+        <Button size="sm" variant="quiet" onClick={onSwitch}>
+          Switch
+        </Button>
+      ) : null}
+    </>
+  );
 }

@@ -19,6 +19,8 @@ import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { offlinePreviewDocument, openItChoice, PREVIEW_SANDBOX, usesModules } from "./preview";
+import { Mascot } from "../brand/Mascot";
+import { useChildView } from "../../app/useChildView";
 
 /** One page to open: the conversation that made it, its project, and its project path. */
 export interface OpenItTarget {
@@ -95,6 +97,8 @@ export function PreviewSheet({
 }) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [run, setRun] = useState(0);
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  const childView = useChildView();
   const name = relativePath.split("/").at(-1) ?? relativePath;
   const { projectId, threadId } = place;
 
@@ -125,14 +129,19 @@ export function PreviewSheet({
       onClose={onClose}
       icon={Play}
       iconTone="blue"
-      title={`Open ${name}`}
+      title={
+        childView ? (/game/i.test(name) ? "Play your game" : "Look at your page") : `Open ${name}`
+      }
       description="Running inside SKYCOT, offline: the page can't reach the internet or anything else on this Mac."
       wide
       actions={
         <>
           <Button
             icon={RotateCcw}
-            onClick={() => setRun((count) => count + 1)}
+            onClick={() => {
+              setFrameLoaded(false);
+              setRun((count) => count + 1);
+            }}
             disabled={load.state !== "ready"}
           >
             Start again
@@ -158,14 +167,23 @@ export function PreviewSheet({
               in a browser, like the Preview in SKYCOT on the Mac.
             </Banner>
           ) : null}
-          <iframe
-            key={run}
-            className="fm-preview-frame"
-            title={`Preview of ${name}`}
-            sandbox={PREVIEW_SANDBOX}
-            referrerPolicy="no-referrer"
-            srcDoc={offlinePreviewDocument(load.html)}
-          />
+          <div className="fm-preview-frame-wrap">
+            {!frameLoaded ? (
+              <div className="fm-preview-frame-loading">
+                <Mascot pose="thinking" size={56} decorative />
+                <p>Getting it ready…</p>
+              </div>
+            ) : null}
+            <iframe
+              key={run}
+              className="fm-preview-frame"
+              title={`Preview of ${name}`}
+              sandbox={PREVIEW_SANDBOX}
+              referrerPolicy="no-referrer"
+              srcDoc={offlinePreviewDocument(load.html)}
+              onLoad={() => setFrameLoaded(true)}
+            />
+          </div>
         </>
       )}
     </Sheet>

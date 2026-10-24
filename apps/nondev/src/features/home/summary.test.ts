@@ -17,4 +17,8 @@ describe("summarySentence", () => {
     expect(summarySentence(0, 0, 0, 0, false)).toMatch(/Waiting for your Mac/);
     expect(summarySentence(0, 0, 0, 0, true)).toMatch(/Nothing is on the go yet/);
   });
+
+  it("uses child words for their things", () => {
+    expect(summarySentence(1, 0, 0, 1, true, true)).toBe("One thing is being made.");
+  });
 });

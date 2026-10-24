@@ -141,6 +141,15 @@ describe("words", () => {
     expect(message).toContain("Error: Cannot find module 'server.js'");
   });
 
+  it("keeps raw preview output out of the child's message", () => {
+    const message = fixItMessage(
+      { state: "failed", command, reason: "exited", output: "private output" },
+      true,
+    );
+    expect(message).toBe("The preview didn't work. Can you fix it?");
+    expect(message).not.toContain("private output");
+  });
+
   it("knows a plain web page, and says what it shows rather than a command it runs", () => {
     const page = parsePreviewStatus({
       state: "failed",

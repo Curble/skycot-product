@@ -9,6 +9,7 @@ import { Button } from "../../ui/Button";
 import { Pill, type PillTone } from "../../ui/Pill";
 import { RestoreSheet } from "./RestoreSheet";
 import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "./timeline";
+import { useChildView } from "../../app/useChildView";
 
 const KIND_TONE: Record<NumberedVersion["kind"], PillTone> = {
   "restore point": "neutral",
@@ -39,12 +40,15 @@ export function VersionsTimeline({
   const [explained, setExplained] = useState<string | null>(null);
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const explainer = restoreExplainerFor();
+  const childView = useChildView();
 
   return (
     <>
       {timeline.entries.length === 0 ? (
         <p className="fm-tm__empty">
-          No versions yet. The first one appears when a change finishes.
+          {childView
+            ? "No earlier tries yet."
+            : "No versions yet. The first one appears when a change finishes."}
         </p>
       ) : (
         <ol className="fm-tm" aria-label="Versions, newest first">
@@ -96,7 +100,7 @@ export function VersionsTimeline({
                       else setExplained((current) => (current === entry.id ? null : entry.id));
                     }}
                   >
-                    Restore
+                    {childView ? "Go back" : "Restore"}
                   </Button>
                 ) : null}
                 {!canRestore && blocker && explained === entry.id ? (
@@ -116,30 +120,32 @@ export function VersionsTimeline({
           back.
         </p>
       ) : null}
-      <div className="fm-tm__explainer">
-        <p className="fm-tm__explainer-head">
-          <Check size={12} strokeWidth={2.6} aria-hidden className="fm-restore-explainer__yes" />
-          Restore does
-        </p>
-        <ul>
-          {explainer.does.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="fm-tm__explainer-head">
-          <X size={12} strokeWidth={2.6} aria-hidden className="fm-restore-explainer__no" />
-          It does not
-        </p>
-        <ul>
-          {explainer.doesNot.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="fm-tm__advanced">
-          Advanced: each restore point is a hidden Git ref; a kept version is a Git commit on the
-          conversation's branch.
-        </p>
-      </div>
+      {!childView ? (
+        <div className="fm-tm__explainer">
+          <p className="fm-tm__explainer-head">
+            <Check size={12} strokeWidth={2.6} aria-hidden className="fm-restore-explainer__yes" />
+            Restore does
+          </p>
+          <ul>
+            {explainer.does.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="fm-tm__explainer-head">
+            <X size={12} strokeWidth={2.6} aria-hidden className="fm-restore-explainer__no" />
+            It does not
+          </p>
+          <ul>
+            {explainer.doesNot.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="fm-tm__advanced">
+            Advanced: each restore point is a hidden Git ref; a kept version is a Git commit on the
+            conversation's branch.
+          </p>
+        </div>
+      ) : null}
       <RestoreSheet
         open={restoring !== null}
         onClose={() => setRestoring(null)}

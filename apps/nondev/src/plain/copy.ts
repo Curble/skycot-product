@@ -218,6 +218,13 @@ export const errors = {
   stoppedByYou: "Stopped — you asked the assistant to stop.",
 } as const;
 
+export const childErrors = {
+  needsRest: "Sam needs a rest. Try again later.",
+  gotStuck: "Sam got stuck. Press Try again.",
+  allowance: "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
+  connection: "SKYCOT can't wake up right now. Ask a grown-up to check the Mac is on.",
+} as const;
+
 export const progress = {
   gettingReady: "Getting ready…",
   working: "Working on it…",

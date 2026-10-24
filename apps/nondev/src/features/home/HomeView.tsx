@@ -80,7 +80,14 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                 </span>
               </h2>
               <p className="fm-home__sub">
-                {summarySentence(working, waiting, ready, rows.length, connected)}
+                {summarySentence(
+                  working,
+                  waiting,
+                  ready,
+                  rows.length,
+                  connected,
+                  family.enabled && family.profile.me.kind !== "grown-up",
+                )}
               </p>
             </div>
           </div>
@@ -96,21 +103,41 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
           />
           <div className="fm-home__grid">
             <div className="fm-home__main">
-              <Card label="Today, across every project">
+              <Card
+                label={
+                  family.enabled && family.profile.me.kind !== "grown-up"
+                    ? "Your things"
+                    : "Today, across every project"
+                }
+              >
                 <CardHeader
                   icon={ListTodo}
-                  title="Today, across every project"
+                  title={
+                    family.enabled && family.profile.me.kind !== "grown-up"
+                      ? "Your things"
+                      : "Today, across every project"
+                  }
                   subtitle={
                     active.length === 0
                       ? connected
-                        ? "Nothing is running or waiting on you right now."
+                        ? family.enabled && family.profile.me.kind !== "grown-up"
+                          ? "Sam isn't making anything right now."
+                          : "Nothing is running or waiting on you right now."
                         : "Your jobs appear once your Mac is reachable."
-                      : "Tap any row to open its conversation."
+                      : family.enabled && family.profile.me.kind !== "grown-up"
+                        ? "Tap any thing to see it."
+                        : "Tap any row to open its conversation."
                   }
                 />
                 {active.length > 0 ? (
                   <CardBody>
-                    <List label="Jobs">
+                    <List
+                      label={
+                        family.enabled && family.profile.me.kind !== "grown-up"
+                          ? "Things Sam is making"
+                          : "Jobs"
+                      }
+                    >
                       {active.map((row) => (
                         <JobRow key={`${row.shell.environmentId}:${row.shell.id}`} row={row} />
                       ))}

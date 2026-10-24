@@ -22,6 +22,7 @@ import {
   useThemes,
 } from "./store";
 import { ThemeEditorSheet } from "./ThemeEditorSheet";
+import { useChildView } from "../app/useChildView";
 
 export function ThemeGallery({
   compact = false,
@@ -33,6 +34,7 @@ export function ThemeGallery({
   readonly label?: string;
 }) {
   const themes = useThemes();
+  const childView = useChildView();
   const active = useActiveTheme();
   const builtIn = themes.filter((theme) => isBuiltInThemeId(theme.id));
   const custom = themes.filter((theme) => !isBuiltInThemeId(theme.id));
@@ -181,7 +183,7 @@ export function ThemeGallery({
           {grid(custom)}
         </>
       ) : null}
-      {showActions ? (
+      {showActions && !childView ? (
         <>
           <div className="fm-themes__actions">
             <Button size="sm" icon={Upload} onClick={() => fileInput.current?.click()}>

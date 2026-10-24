@@ -12,11 +12,13 @@ import {
   useRestartSheetOpen,
 } from "./store";
 import { readyVersion } from "./updates";
+import { useChildView } from "../../app/useChildView";
 
 export function UpdatePill() {
   const state = useDesktopUpdateState();
+  const childView = useChildView();
   const open = useRestartSheetOpen();
-  if (readyVersion(state) === null) return null;
+  if (childView || readyVersion(state) === null) return null;
   return (
     <>
       <span className="fm-update-pill">

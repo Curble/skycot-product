@@ -10,6 +10,7 @@ import { newThreadId, randomUUID } from "~/lib/utils";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { CrewName } from "../../themes/CrewName";
+import { useCrew } from "../../themes/useCrew";
 import { navigate, threadHref } from "../../router";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import {
@@ -32,6 +33,7 @@ import { SegmentedControl } from "../../ui/SegmentedControl";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
 import { useShortWindow } from "../../app/useShortWindow";
+import { useChildView } from "../../app/useChildView";
 import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
@@ -103,6 +105,8 @@ export function NewConversationComposer({
   const policyEnforced = config?.skycotPolicy === true;
   const [chosenKey, setChosenKey] = useState<string | null>(null);
   const family = useFamily();
+  const childView = useChildView();
+  const crew = useCrew();
   // Family: how this child's steps run (safe steps by themselves, unless a parent chose
   // "Ask before each step"), instead of "Ask me first … before every command".
   const familySteps = useFamilySteps();
@@ -163,79 +167,89 @@ export function NewConversationComposer({
     <div className="fm-composer">
       <div className="fm-composer__inner">
         <div className="fm-composer__context">
-          <Popover
-            label="Project"
-            // The message box sits at the bottom of the window: open upwards so every
-            // project (and Just ask) stays on screen.
-            placement="top-start"
-            trigger={
-              <Button size="sm" disabled={nothingToPick}>
-                {asking ? (
-                  <MessageCircleQuestion size={14} strokeWidth={1.8} aria-hidden />
-                ) : project ? (
-                  <ProjectAvatar project={project} size="sm" />
-                ) : null}
-                {asking
-                  ? JUST_ASK_COPY.choice
-                  : project
-                    ? project.title
-                    : nothingToPick
-                      ? connected
-                        ? "No project yet"
-                        : "Waiting for your Mac…"
-                      : "Choose a project"}
-                <ChevronDown size={12} strokeWidth={2} aria-hidden />
-              </Button>
-            }
-          >
-            {(close) => (
-              <>
-                {questionsAvailable ? (
-                  <MenuItem
-                    checked={asking}
-                    onSelect={() => {
-                      setChosenKey(QUESTION_KEY);
-                      // Remembered once the space exists (after the first question).
-                      if (questionsProject) {
+          {!childView || ownProjects.length > 1 ? (
+            <Popover
+              label="Project"
+              // The message box sits at the bottom of the window: open upwards so every
+              // project (and Just ask) stays on screen.
+              placement="top-start"
+              trigger={
+                <Button size="sm" disabled={nothingToPick}>
+                  {asking ? (
+                    <MessageCircleQuestion size={14} strokeWidth={1.8} aria-hidden />
+                  ) : project ? (
+                    <ProjectAvatar project={project} size="sm" />
+                  ) : null}
+                  {asking
+                    ? JUST_ASK_COPY.choice
+                    : project
+                      ? childView
+                        ? "Your project"
+                        : project.title
+                      : nothingToPick
+                        ? connected
+                          ? "No project yet"
+                          : "Waiting for your Mac…"
+                        : "Choose a project"}
+                  <ChevronDown size={12} strokeWidth={2} aria-hidden />
+                </Button>
+              }
+            >
+              {(close) => (
+                <>
+                  {questionsAvailable ? (
+                    <MenuItem
+                      checked={asking}
+                      onSelect={() => {
+                        setChosenKey(QUESTION_KEY);
+                        // Remembered once the space exists (after the first question).
+                        if (questionsProject) {
+                          writeLastProject({
+                            environmentId: questionsProject.environmentId,
+                            projectId: questionsProject.id,
+                          });
+                        }
+                        close();
+                      }}
+                    >
+                      <span className="fm-menu-item__two">
+                        <span>{JUST_ASK_COPY.choice}</span>
+                        <small>{JUST_ASK_COPY.choiceHint}</small>
+                      </span>
+                    </MenuItem>
+                  ) : null}
+                  {questionsAvailable && ownProjects.length > 0 ? (
+                    <div className="fm-menu-sep" role="separator" />
+                  ) : null}
+                  {ownProjects.map((candidate, index) => (
+                    <MenuItem
+                      key={keyOf(candidate)}
+                      checked={project !== null && keyOf(candidate) === keyOf(project)}
+                      onSelect={() => {
+                        setChosenKey(keyOf(candidate));
+                        // Remembered at once, so a detour through Settings does not reset it.
                         writeLastProject({
-                          environmentId: questionsProject.environmentId,
-                          projectId: questionsProject.id,
+                          environmentId: candidate.environmentId,
+                          projectId: candidate.id,
                         });
-                      }
-                      close();
-                    }}
-                  >
-                    <span className="fm-menu-item__two">
-                      <span>{JUST_ASK_COPY.choice}</span>
-                      <small>{JUST_ASK_COPY.choiceHint}</small>
-                    </span>
-                  </MenuItem>
-                ) : null}
-                {questionsAvailable && ownProjects.length > 0 ? (
-                  <div className="fm-menu-sep" role="separator" />
-                ) : null}
-                {ownProjects.map((candidate) => (
-                  <MenuItem
-                    key={keyOf(candidate)}
-                    checked={project !== null && keyOf(candidate) === keyOf(project)}
-                    onSelect={() => {
-                      setChosenKey(keyOf(candidate));
-                      // Remembered at once, so a detour through Settings does not reset it.
-                      writeLastProject({
-                        environmentId: candidate.environmentId,
-                        projectId: candidate.id,
-                      });
-                      close();
-                    }}
-                  >
-                    {candidate.title}
-                  </MenuItem>
-                ))}
-              </>
-            )}
-          </Popover>
+                        close();
+                      }}
+                    >
+                      {childView ? `Project ${index + 1}` : candidate.title}
+                    </MenuItem>
+                  ))}
+                </>
+              )}
+            </Popover>
+          ) : null}
           {family.enabled ? (
-            <FamilyAutonomyLock planFirst />
+            childView ? (
+              <span className="fm-composer__label">
+                {crew.builder.name} shows you a plan first. Then you press Build it.
+              </span>
+            ) : (
+              <FamilyAutonomyLock planFirst />
+            )
           ) : (
             <>
               <span className="fm-composer__label">
@@ -260,7 +274,7 @@ export function NewConversationComposer({
               <PlanFirstSwitch />
             </>
           )}
-          {foldNotes ? (
+          {foldNotes && !childView ? (
             <Button
               size="sm"
               variant="plain"
@@ -273,7 +287,7 @@ export function NewConversationComposer({
             </Button>
           ) : null}
         </div>
-        {showNotes ? (
+        {showNotes && !childView ? (
           <div id={notesId}>
             {/* One sentence for the chosen level, not a paragraph about every level. */}
             <p className="fm-help" style={{ marginBottom: 6 }}>
@@ -392,6 +406,8 @@ function ComposerField({
   readonly wantsPicture: boolean;
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
+  const childView = useChildView();
+  const crew = useCrew();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const preference = useDefaultAssistantPreference(environmentId);
@@ -576,7 +592,10 @@ function ComposerField({
     }
     if (started._tag === "Failure") {
       await deleteThread({ environmentId, input: { threadId } });
-      return { kind: "failed", message: calm(squashAtomCommandFailure(started)) };
+      return {
+        kind: "failed",
+        message: calm(squashAtomCommandFailure(started), childView, crew.builder.name),
+      };
     }
     if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
     // Family with siblings: list it under this child's conversations straight away.
@@ -647,15 +666,21 @@ function ComposerField({
               {project === null
                 ? JUST_ASK_COPY.foot
                 : `Starts a new conversation in ${project.title}`}{" "}
-              · <Kbd>⇧</Kbd>
-              <Kbd>Return</Kbd> for a new line
+              {childView ? null : (
+                <>
+                  · <Kbd>⇧</Kbd>
+                  <Kbd>Return</Kbd> for a new line
+                </>
+              )}
             </>
           ),
-          right: sending
-            ? (phase ?? "Starting…")
-            : provider
-              ? `Using ${catalogEntryFor(String(provider.driver)).brand}`
-              : "",
+          right: childView
+            ? ""
+            : sending
+              ? (phase ?? "Starting…")
+              : provider
+                ? `Using ${catalogEntryFor(String(provider.driver)).brand}`
+                : "",
         }}
       />
       {tracking && project ? (
@@ -665,12 +690,14 @@ function ComposerField({
   );
 }
 
-function calm(error: unknown): string {
+function calm(error: unknown, childView = false, builder = "Sam"): string {
   const message = error instanceof Error ? error.message : String(error);
   // The screen stays plain-language; the real cause goes to the console for whoever debugs.
   console.warn("[skycot] starting a conversation failed:", error);
   if (/scope|permission|not allowed|unauthori/i.test(message)) {
     return "This connection isn't allowed to start conversations.";
   }
-  return "Crew couldn't start just now. Check your Mac is awake and try again.";
+  return childView
+    ? `${builder} couldn't start. Try again, or ask a grown-up.`
+    : "Crew couldn't start just now. Check your Mac is awake and try again.";
 }

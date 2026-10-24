@@ -10,8 +10,10 @@ import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
+import { Mascot } from "../brand/Mascot";
 
 import { isElectron } from "../../app/platform";
+import { useChildView } from "../../app/useChildView";
 import { connectionAtomRuntime } from "../../connection/runtime";
 import { serverEnvironment } from "../../state/server";
 import { Banner } from "../../ui/Banner";
@@ -77,7 +79,9 @@ export function QuickLook({
 }) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [run, setRun] = useState(0);
+  const [frameLoaded, setFrameLoaded] = useState(false);
   const [revealProblem, setRevealProblem] = useState<string | null>(null);
+  const childView = useChildView();
   const canReveal = useCanReveal(environmentId) && grownUpView;
   const reveal = useAtomCommand(shellCommands.openInEditor, { reportFailure: false });
   const { projectId, threadId } = place;
@@ -134,13 +138,19 @@ export function QuickLook({
       onClose={onClose}
       icon={KIND_ICON[kind]}
       iconTone={kind === "picture" ? "orange" : kind === "page" ? "blue" : "grey"}
-      title={entry.name}
+      title={childView && file?.mode === "page" ? "Look at your page" : entry.name}
       description={entryDetails(entry, now)}
       wide
       actions={
         <>
           {file?.mode === "page" ? (
-            <Button icon={RotateCcw} onClick={() => setRun((count) => count + 1)}>
+            <Button
+              icon={RotateCcw}
+              onClick={() => {
+                setFrameLoaded(false);
+                setRun((count) => count + 1);
+              }}
+            >
               Start again
             </Button>
           ) : null}
@@ -166,6 +176,9 @@ export function QuickLook({
           objectUrl={objectUrl}
           run={run}
           canReveal={showInFinder !== null}
+          childView={childView}
+          frameLoaded={frameLoaded}
+          onFrameLoad={() => setFrameLoaded(true)}
         />
       )}
     </Sheet>
@@ -178,12 +191,18 @@ function Body({
   objectUrl,
   run,
   canReveal,
+  childView,
+  frameLoaded,
+  onFrameLoad,
 }: {
   readonly file: FileRead;
   readonly page: string | null;
   readonly objectUrl: string | null;
   readonly run: number;
   readonly canReveal: boolean;
+  readonly childView: boolean;
+  readonly frameLoaded: boolean;
+  readonly onFrameLoad: () => void;
 }) {
   const elsewhere = canReveal
     ? "Show in Finder opens it on the Mac."
@@ -208,18 +227,29 @@ function Body({
     case "page":
       return (
         <>
-          <p className="fm-help fm-ql__lead">
-            Running inside SKYCOT, offline: the page can't reach the internet or anything else on
-            this Mac.
-          </p>
-          <iframe
-            key={run}
-            className="fm-preview-frame fm-ql__frame"
-            title={`Preview of ${file.name}`}
-            sandbox={PREVIEW_SANDBOX}
-            referrerPolicy="no-referrer"
-            srcDoc={offlinePreviewDocument(page ?? file.contents ?? "")}
-          />
+          {!childView ? (
+            <p className="fm-help fm-ql__lead">
+              Running inside SKYCOT, offline: the page can't reach the internet or anything else on
+              this Mac.
+            </p>
+          ) : null}
+          <div className="fm-preview-frame-wrap">
+            {childView && !frameLoaded ? (
+              <div className="fm-preview-frame-loading">
+                <Mascot pose="thinking" size={56} decorative />
+                <p>Getting it ready…</p>
+              </div>
+            ) : null}
+            <iframe
+              key={run}
+              className="fm-preview-frame fm-ql__frame"
+              title={`Preview of ${file.name}`}
+              sandbox={PREVIEW_SANDBOX}
+              referrerPolicy="no-referrer"
+              srcDoc={offlinePreviewDocument(page ?? file.contents ?? "")}
+              onLoad={onFrameLoad}
+            />
+          </div>
         </>
       );
     case "pdf":

@@ -157,7 +157,7 @@ export const SURPRISE_IDEAS: ReadonlyArray<string> = [
   "a pretend aquarium where fish swim over to wherever I click",
   "a big dice I can roll with a button, with a little rolling wobble",
   "a night sky where I click to add stars and join them into my own constellations",
-  "a drum pad I can play with the keyboard, making the sounds with the Web Audio API instead of sound files",
+  "a drum pad I can play with the keyboard, making its own sounds",
   "a page that tells a different silly joke every time I press the button",
   "a magic 8-ball that answers my questions",
 ];

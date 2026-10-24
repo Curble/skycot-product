@@ -108,8 +108,8 @@ export const FAMILY_PERMISSION = "skycot:family-parent-code";
 /** `requiredPermission` when SKYCOT is asleep for the child: the client shows its asleep screen. */
 export const FAMILY_ASLEEP_PERMISSION = "skycot:family-asleep";
 
-export const FAMILY_REFUSAL_MESSAGE =
-  "The Family profile is on, so a grown-up needs to enter the parent code first.";
+// nondev-seam: skycot-child-gate-copy
+export const FAMILY_REFUSAL_MESSAGE = "A grown-up needs to say yes first.";
 
 /** `requiredPermission` when a device may not do this at all (whose it is decides, not a code). */
 export const FAMILY_DEVICE_PERMISSION = "skycot:family-device";

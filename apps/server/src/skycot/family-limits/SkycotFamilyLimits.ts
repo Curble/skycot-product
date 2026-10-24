@@ -258,7 +258,8 @@ export function asleepSentence(
     case "turns":
       return `That's ${limits?.dailyTurns ? `today's ${limits.dailyTurns} messages` : "today's messages"}, so SKYCOT is asleep${wakes}. A grown-up can give more time.`;
     case "allowance":
-      return `SKYCOT is resting to leave some of the ${state?.allowance?.brand ?? "AI"} allowance for grown-ups. A grown-up can give more time.`;
+      // nondev-seam: skycot-child-limit-copy
+      return "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.";
   }
 }
 

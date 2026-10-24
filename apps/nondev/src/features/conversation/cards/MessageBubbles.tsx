@@ -17,6 +17,8 @@ import { ReadAloudButton, useAutoReadAloud } from "../../voice/ReadAloud";
 import type { TimelineRenderContext } from "./registry";
 import { imagesOf, SentPictures } from "./SentPictures";
 import { shortTime } from "./time";
+import { useChildView } from "../../../app/useChildView";
+import { childErrors } from "../../../plain/copy";
 
 type UserMessage = Extract<OrchestrationV2TurnItem, { type: "user_message" }>;
 type AssistantMessage = Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>;
@@ -133,6 +135,7 @@ function FailureNote({
     ...(context.projectName === null ? {} : { projectName: context.projectName }),
     usageLimitResetAt: context.shell?.runtime?.usageLimitResetAt ?? null,
   });
+  const childView = useChildView();
   const retry = item.retry;
   const retryLine =
     retry && retry.maxAttempts !== null
@@ -151,11 +154,17 @@ function FailureNote({
           <CardHeader
             icon={CircleAlert}
             tone="red"
-            title={narration.headline}
-            subtitle={retryLine ?? undefined}
+            title={
+              childView
+                ? item.failure.class === "usage_limit"
+                  ? childErrors.needsRest
+                  : childErrors.gotStuck
+                : narration.headline
+            }
+            subtitle={childView ? undefined : (retryLine ?? undefined)}
           />
           <CardBody>
-            {narration.detail ? <p>{narration.detail}</p> : null}
+            {!childView && narration.detail ? <p>{narration.detail}</p> : null}
             <Disclosure>
               <pre className="fm-details__pre">
                 <code>{narration.technical}</code>

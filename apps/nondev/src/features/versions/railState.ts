@@ -1,6 +1,7 @@
 // Whether the Versions rail is open at three columns. Remembered per browser;
 // storage can be blocked, so reads are guarded and "open" is the default.
 import { useSyncExternalStore } from "react";
+import { useChildView } from "../../app/useChildView";
 
 const KEY = "skycot:versions-rail";
 const listeners = new Set<() => void>();
@@ -32,7 +33,9 @@ export function setVersionsRailOpen(open: boolean): void {
 }
 
 export function useVersionsRailOpen(): boolean {
-  return useSyncExternalStore(subscribe, read, () => true);
+  const childView = useChildView();
+  const stored = useSyncExternalStore(subscribe, read, () => true);
+  return childView ? false : stored;
 }
 
 // Sidebar + list + rail is 820px; below this the conversation would be squeezed

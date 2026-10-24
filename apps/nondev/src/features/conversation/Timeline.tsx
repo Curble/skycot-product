@@ -29,6 +29,7 @@ import {
 import { formatDayDivider } from "./status";
 import { SwitchNote, useAssistantSwitches, useEnvironmentProviders } from "./SwitchNote";
 import { WorkingCard } from "./WorkingCard";
+import { useChildView } from "../../app/useChildView";
 
 export {
   getTimelineRenderer,
@@ -46,8 +47,13 @@ const HIDDEN_BY_DEFAULT: ReadonlySet<TimelineItemType> = new Set<TimelineItemTyp
   // Stop says so once, on its result line below; the request half is bookkeeping.
   "run_interrupt_request",
 ]);
+const HIDDEN_IN_CHILD_VIEW: ReadonlySet<TimelineItemType> = new Set<TimelineItemType>([
+  "handoff",
+  "fork",
+  "system_notice",
+]);
 
-function renderDefault(context: TimelineRenderContext): ReactNode {
+function renderDefault(context: TimelineRenderContext, childView = false): ReactNode {
   const { item } = context;
   switch (item.type) {
     case "user_message":
@@ -68,7 +74,8 @@ function renderDefault(context: TimelineRenderContext): ReactNode {
       );
     }
     default: {
-      if (HIDDEN_BY_DEFAULT.has(item.type)) return null;
+      if (HIDDEN_BY_DEFAULT.has(item.type) || (childView && HIDDEN_IN_CHILD_VIEW.has(item.type)))
+        return null;
       const narration = describeTurnItem(
         item,
         context.projectName === null ? {} : { projectName: context.projectName },
@@ -83,9 +90,9 @@ function renderDefault(context: TimelineRenderContext): ReactNode {
   }
 }
 
-export function renderTimelineItem(context: TimelineRenderContext): ReactNode {
+export function renderTimelineItem(context: TimelineRenderContext, childView = false): ReactNode {
   const custom = getTimelineRenderer(context.item.type);
-  return custom ? custom(context) : renderDefault(context);
+  return custom ? custom(context) : renderDefault(context, childView);
 }
 
 export function Timeline({
@@ -104,6 +111,7 @@ export function Timeline({
   /** Rendered after the last item (e.g. the typing indicator while a run is live). */
   readonly trailing?: ReactNode;
 }) {
+  const childView = useChildView();
   const items = projection.turnItems;
   const startedAt = shell?.createdAt ?? null;
   // Asks the SKYCOT rules answered were never a question for the person: they
@@ -158,16 +166,19 @@ export function Timeline({
         </div>
       );
     }
-    const node = renderTimelineItem({
-      item: entry.item,
-      index: entry.index,
-      items,
-      projection,
-      environmentId,
-      threadId,
-      shell,
-      projectName,
-    });
+    const node = renderTimelineItem(
+      {
+        item: entry.item,
+        index: entry.index,
+        items,
+        projection,
+        environmentId,
+        threadId,
+        shell,
+        projectName,
+      },
+      childView,
+    );
     // The wrapper is `display: contents`, so the note sits in the stream as its own line.
     return node === null || node === undefined ? null : (
       <div key={entry.item.id} className="fm-stream__item">

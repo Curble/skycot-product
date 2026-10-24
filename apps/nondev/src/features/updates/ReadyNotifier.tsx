@@ -5,12 +5,10 @@
 import { useEffect, useState } from "react";
 
 import { PRODUCT_NAME } from "../../brand";
-import { readFamilyView } from "../family/store";
-import { childPickerRequested } from "../family-limits/FamilyLimitsHost";
-import { readLimits } from "../family-limits/store";
 import { readPermission } from "../notifications/prefs";
-import { createReadyNotifier, childSessionFor, READY_NOTICE_KEY } from "./readyNotice";
+import { createReadyNotifier, READY_NOTICE_KEY } from "./readyNotice";
 import { openRestartSheet, useDesktopUpdateState } from "./store";
+import { isChildSession } from "../../app/useChildView";
 
 function readNoticed(): string | null {
   try {
@@ -30,15 +28,6 @@ function writeNoticed(version: string) {
 
 function windowInFront(): boolean {
   return document.visibilityState === "visible" && document.hasFocus();
-}
-
-function isChildSession(): boolean {
-  const view = readFamilyView();
-  const session = readLimits().session;
-  return childSessionFor(view, {
-    pickerOpen: childPickerRequested(),
-    asleep: session?.limits?.asleep === true,
-  });
 }
 
 function show(text: { readonly title: string; readonly body: string }, onClick: () => void) {

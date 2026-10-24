@@ -66,6 +66,7 @@ import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
+import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
@@ -160,6 +161,7 @@ export function ConversationView({
   // The mode the engine enforces: the Family rules while the profile is on (safe steps by
   // themselves, or "Ask me first" when a parent chose it for this child).
   const family = useFamily();
+  const childView = useChildView();
   const familySteps = useFamilySteps();
   const planFirst = usePlanFirst();
   const runtimeMode =
@@ -269,7 +271,7 @@ export function ConversationView({
                 ? "Put away in Old conversations"
                 : question
                   ? `${status.presence.split(" · ")[0]} · ${JUST_ASK_COPY.presence}`
-                  : shell?.worktreePath && project === ownProject
+                  : !childView && shell?.worktreePath && project === ownProject
                     ? // The private copy is the reassurance that matters; keep the
                       // first clause ("Working", "Waiting for you") and drop the rest.
                       `${status.presence.split(" · ")[0]} · in a private copy of your project`
@@ -291,7 +293,7 @@ export function ConversationView({
             />
           ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
-          {archived || question || family.profile.me.kind === "grown-up" ? null : (
+          {archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
           {shell && canOperate ? (
@@ -655,6 +657,7 @@ function ReplyComposer({
   readonly projection: OrchestrationV2ThreadProjection | null;
   readonly rewindFacts: ReturnType<typeof useRewindFacts>;
 }) {
+  const childView = useChildView();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const ensureMode = useEnsureInteractionMode();
@@ -961,14 +964,19 @@ function ReplyComposer({
               ? editing !== null
                 ? "Change your message…"
                 : active
-                  ? "Add a note while it works… (“also add a vegan option”)"
-                  : "Reply, change course, or ask for something else…"
+                  ? childView
+                    ? "Tell Sam what to change… (“make the cat blue”)"
+                    : "Add a note while it works… (“also add a vegan option”)"
+                  : childView
+                    ? "Tell Sam what to change…"
+                    : "Reply, change course, or ask for something else…"
               : "This connection can read but not reply"
           }
           label={editing !== null ? "Your changed message" : "Reply"}
           foot={{
-            left:
-              editing !== null
+            left: childView
+              ? ""
+              : editing !== null
                 ? "Return to go back and send · Shift-Return for a new line"
                 : active
                   ? `Replies while ${crew.builder.name} is working get picked up at the next step.`

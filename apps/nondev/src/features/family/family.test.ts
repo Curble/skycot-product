@@ -14,6 +14,7 @@ import {
   createProfile,
   digitsOnly,
   hashCode,
+  grownUpSettingsOpen,
   isFamilyLocked,
   LOCKED_ACTIONS,
   isValidCode,
@@ -551,5 +552,15 @@ describe("Ask before each step", () => {
     expect(asksEachStep({ enabled: true, children, currentChildId: "ava" })).toBe(false);
     expect(asksEachStep({ enabled: true, children, currentChildId: null })).toBe(false);
     expect(asksEachStep({ enabled: false, children, currentChildId: "leo" })).toBe(false);
+  });
+});
+
+describe("grownUpSettingsOpen", () => {
+  it("is open only while a settings or Advanced grant has time left", () => {
+    expect(grownUpSettingsOpen({ openUntil: {} }, 1_000)).toBe(false);
+    expect(grownUpSettingsOpen({ openUntil: { settings: 2_000 } }, 1_000)).toBe(true);
+    expect(grownUpSettingsOpen({ openUntil: { advanced: 2_000 } }, 1_000)).toBe(true);
+    expect(grownUpSettingsOpen({ openUntil: { settings: 500 } }, 1_000)).toBe(false);
+    expect(grownUpSettingsOpen({ openUntil: { publish: 2_000 } }, 1_000)).toBe(false);
   });
 });

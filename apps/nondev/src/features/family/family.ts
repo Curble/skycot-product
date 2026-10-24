@@ -533,6 +533,13 @@ export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: 
   return view.lockedUntil === null ? 0 : Math.max(0, view.lockedUntil - now);
 }
 
+/** True while the parent code has Family and AI settings (or Advanced mode) open on this device. */
+export function grownUpSettingsOpen(view: Pick<FamilyView, "openUntil">, now: number): boolean {
+  return [view.openUntil.settings, view.openUntil.advanced].some(
+    (until) => until !== undefined && until > now,
+  );
+}
+
 const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
   ["advanced", "Advanced mode"],
   ["settings", "Family and AI settings"],

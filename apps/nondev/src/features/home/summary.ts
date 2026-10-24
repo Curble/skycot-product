@@ -5,17 +5,29 @@ export function summarySentence(
   ready: number,
   total: number,
   connected = true,
+  childView = false,
 ): string {
   // Until the engine has answered, an empty list means "not loaded", not "nothing".
   if (total === 0 && !connected) {
-    return "Waiting for your Mac. Your conversations appear once it's reachable.";
+    return childView
+      ? "Waiting for your Mac. Your things appear once it's reachable."
+      : "Waiting for your Mac. Your conversations appear once it's reachable.";
   }
-  if (total === 0) return "Nothing is on the go yet. Start a conversation below.";
+  if (total === 0)
+    return childView
+      ? "Nothing is on the go yet. Make something below."
+      : "Nothing is on the go yet. Start a conversation below.";
   const parts: string[] = [];
-  if (working > 0) parts.push(`${count(working, "job is", "jobs are")} running`);
-  if (waiting > 0) parts.push(`${count(waiting, "job is", "jobs are")} waiting on you`);
-  if (ready > 0) parts.push(`${count(ready, "job is", "jobs are")} ready to look at`);
-  if (parts.length === 0) return "All quiet. Nothing is running or waiting on you.";
+  const one = childView ? "thing is" : "job is";
+  const many = childView ? "things are" : "jobs are";
+  if (working > 0)
+    parts.push(`${count(working, one, many)} ${childView ? "being made" : "running"}`);
+  if (waiting > 0) parts.push(`${count(waiting, one, many)} waiting on you`);
+  if (ready > 0) parts.push(`${count(ready, one, many)} ready to look at`);
+  if (parts.length === 0)
+    return childView
+      ? "All quiet. Sam isn't making anything right now."
+      : "All quiet. Nothing is running or waiting on you.";
   // "One job is running, one is waiting on you": the noun once, then pronouns.
   const sentence = parts
     .map((part, index) =>

@@ -22,6 +22,7 @@ import { createPortal } from "react-dom";
 import { randomUUID } from "~/lib/utils";
 
 import { useCrew } from "../../themes/useCrew";
+import { useChildView } from "../../app/useChildView";
 import { previewPageUrl } from "../starters/preview";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
@@ -151,6 +152,7 @@ function PreviewPanelBody({
   const crew = useCrew();
   const builder = crew.builder.name;
   const family = useFamily();
+  const childView = useChildView();
   const { answer, setAnswer, refresh } = usePreviewAnswer(threadId);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -355,7 +357,9 @@ function PreviewPanelBody({
         <span className="fm-preview__title">
           <AppWindow size={15} strokeWidth={1.8} aria-hidden />
           Preview
-          {frameUrl ? <span className="fm-preview__address">{shortAddress(frameUrl)}</span> : null}
+          {frameUrl && !childView ? (
+            <span className="fm-preview__address">{shortAddress(frameUrl)}</span>
+          ) : null}
         </span>
         <span className="fm-preview__tools">
           <IconButton
@@ -419,7 +423,9 @@ function PreviewPanelBody({
             {!canPoint
               ? "Pointing works in the SKYCOT app for Mac. Here, say it in words: “the big pink title”."
               : pointing === "picking"
-                ? "Click the part you mean, then press Attach. Esc stops."
+                ? childView
+                  ? "Click the part you mean, then press Attach."
+                  : "Click the part you mean, then press Attach. Esc stops."
                 : `Click a part of your page, then tell ${builder} what to change.`}
           </span>
         </footer>
@@ -455,6 +461,7 @@ function StatusBody({
   readonly onAsk: (text: string) => void;
   readonly frame: ReactNode;
 }) {
+  const childView = useChildView();
   switch (status.state) {
     case "no-folder":
       return (
@@ -496,8 +503,8 @@ function StatusBody({
             <Button disabled={busy} onClick={onTryAgain}>
               Try again
             </Button>
-            <Button variant="primary" onClick={() => onAsk(fixItMessage(status))}>
-              Ask {builder} to fix it
+            <Button variant="primary" onClick={() => onAsk(fixItMessage(status, childView))}>
+              {childView ? "Ask Sam to fix it" : `Ask ${builder} to fix it`}
             </Button>
           </span>
           {status.output.trim().length > 0 ? (
@@ -516,8 +523,8 @@ function StatusBody({
           <p className="fm-preview__state-title">Your preview stopped.</p>
           <p className="fm-preview__state-text">Start it again?</p>
           <span className="fm-preview__actions">
-            <Button disabled={busy} onClick={() => onAsk(fixItMessage(status))}>
-              Ask {builder} why
+            <Button disabled={busy} onClick={() => onAsk(fixItMessage(status, childView))}>
+              {childView ? "Ask Sam to fix it" : `Ask ${builder} why`}
             </Button>
             <Button variant="primary" disabled={busy} onClick={onTryAgain}>
               Start it again
@@ -546,6 +553,7 @@ function StartCard({
   readonly busy: boolean;
   readonly onStart: (approved: boolean) => Promise<void>;
 }) {
+  const childView = useChildView();
   const grownUp = status.decision.kind === "grown-up";
   const reasons = status.decision.kind === "start" ? [] : status.decision.reasons;
   const risky = reasons.length > 0;
@@ -555,12 +563,14 @@ function StartCard({
         <CardHeader
           icon={grownUp ? KeyRound : risky ? ShieldAlert : Play}
           tone={grownUp || risky ? "orange" : "blue"}
-          title={grownUp ? "Ask a grown-up" : "Start the preview?"}
+          title={grownUp || childView ? "Ask a grown-up" : "Start the preview?"}
           subtitle={grownUp ? "Family profile" : "Ask me first"}
         />
         <CardBody>
           <p className="fm-preview__card-text">
-            To show your site, SKYCOT starts it on this Mac by running your project's start command.
+            {childView
+              ? "To see your page, a grown-up needs to say yes."
+              : "To show your site, SKYCOT starts it on this Mac by running your project's start command."}
             {risky ? ` Heads up: it ${reasons.join(" and ")}.` : ""}
             {grownUp ? " A grown-up needs to enter the parent code first." : ""}
           </p>
@@ -577,10 +587,10 @@ function StartCard({
           <Button onClick={closePreview}>Not now</Button>
           <Button variant="primary" disabled={busy} onClick={() => void onStart(true)}>
             {busy
-              ? grownUp
+              ? grownUp || childView
                 ? "Waiting for a grown-up…"
                 : "Starting…"
-              : grownUp
+              : grownUp || childView
                 ? "Ask a grown-up"
                 : "Start the preview"}
           </Button>

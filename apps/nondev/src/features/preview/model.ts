@@ -161,7 +161,9 @@ export function shortAddress(url: string): string {
 /** The message the "Ask Sam to fix it" button puts in the box, ready to send. */
 export function fixItMessage(
   status: PreviewStatusView & { readonly state: "failed" | "stopped" },
+  childView = false,
 ): string {
+  if (childView) return "The preview didn't work. Can you fix it?";
   const what =
     status.state === "stopped"
       ? "The preview was working, then it stopped by itself."

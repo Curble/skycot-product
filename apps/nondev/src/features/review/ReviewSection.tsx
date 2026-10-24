@@ -52,6 +52,7 @@ import { useLastUpload } from "../publish/uploads";
 import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
 import { reviewTargetFor } from "./turnReview";
 import { useConversationShell } from "../../state/oldConversations";
+import { useChildView } from "../../app/useChildView";
 
 const CodeChanges = lazy(() => import("./CodeChanges"));
 
@@ -95,6 +96,7 @@ export function ReviewSection({
   const timeline = useVersionsTimeline(environmentId, threadId, shell);
   const kept = useKeptVersions(threadId);
   const lastUpload = useLastUpload(threadId);
+  const childView = useChildView();
 
   const cwd = shell?.worktreePath ?? project?.workspaceRoot ?? null;
   const gitStatus = useEnvironmentQuery(
@@ -154,9 +156,11 @@ export function ReviewSection({
 
   if (run?.status === "rolled_back") {
     // Files roll back; a kept commit never does. Say which happened.
-    const keptNote = keptHere
-      ? ` The files are back to how they were, but this version is still saved as Git commit ${keptHere.sha.slice(0, 7)}${uploadedHere ? " and on the online copy" : ""}. Publishing now would send the reversal.`
-      : " Everything is back to how it was before this change.";
+    const keptNote = childView
+      ? ""
+      : keptHere
+        ? ` The files are back to how they were, but this version is still saved as Git commit ${keptHere.sha.slice(0, 7)}${uploadedHere ? " and on the online copy" : ""}. Publishing now would send the reversal.`
+        : " Everything is back to how it was before this change.";
     return (
       <div className="fm-review" data-checkpoint-id={checkpoint.id}>
         <Card label="What changed (undone)" tinted>
@@ -270,14 +274,16 @@ export function ReviewSection({
     field.scrollIntoView({ block: "nearest" });
   };
 
-  const footerNote = keptHere
-    ? `Kept${uploadedHere ? " and uploaded" : ""} · also a Git commit ${keptHere.sha.slice(0, 7)}`
-    : (keepNote ??
-      (nothingToKeep
-        ? copy.git.nothingToKeep
-        : plan.kind === "blocked"
-          ? plan.reason
-          : "Keeping doesn't make it live — that's the next step."));
+  const footerNote = childView
+    ? null
+    : keptHere
+      ? `Kept${uploadedHere ? " and uploaded" : ""} · also a Git commit ${keptHere.sha.slice(0, 7)}`
+      : (keepNote ??
+        (nothingToKeep
+          ? copy.git.nothingToKeep
+          : plan.kind === "blocked"
+            ? plan.reason
+            : "Keeping doesn't make it live — that's the next step."));
 
   return (
     <div className="fm-review" data-checkpoint-id={checkpoint.id}>
@@ -288,93 +294,107 @@ export function ReviewSection({
           title={
             <span className="fm-marker-underline fm-marker-underline--green">What changed</span>
           }
-          subtitle={[
-            versionNumber ? `Version ${versionNumber}` : "Restore point",
-            when,
-            keptHere ? (uploadedHere ? "kept and uploaded" : "kept") : "nothing is live yet",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          subtitle={
+            childView
+              ? undefined
+              : [
+                  versionNumber ? `Version ${versionNumber}` : "Restore point",
+                  when,
+                  keptHere ? (uploadedHere ? "kept and uploaded" : "kept") : "nothing is live yet",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+          }
           trailing={
-            <Pill tone="ok" size="sm" dot={false}>
-              {what.counts.files} {what.counts.files === 1 ? "file" : "files"}
-            </Pill>
+            !childView ? (
+              <Pill tone="ok" size="sm" dot={false}>
+                {what.counts.files} {what.counts.files === 1 ? "file" : "files"}
+              </Pill>
+            ) : undefined
           }
         />
         <CardBody>
           <p>{what.summary}</p>
-          {what.groups.map((group) => (
-            <section key={group.area} className="fm-review__area" aria-label={group.label}>
-              <h4 className="fm-review__area-title">
-                {group.label}
-                <OperationTags files={group.files} />
-              </h4>
-              <List plain label={`${group.label} changes`}>
-                {group.files.map((file) => (
-                  <ListRow
-                    key={file.path}
-                    leading={<StepBadge state="number" icon={AREA_ICON[group.area]} />}
-                    title={fileTitle(file.line)}
-                    subtitle={fileDetail(file)}
-                    trailing={<OperationTag operation={file.operation} />}
-                  />
-                ))}
-              </List>
-            </section>
-          ))}
-          <List plain label="Not touched">
-            <ListRow
-              leading={<StepBadge state="ok" icon={ShieldCheck} />}
-              title="Not touched"
-              subtitle={what.untouched}
-            />
-          </List>
-          {what.warnings.map((warning) => (
-            <div key={warning} className="fm-review__flag">
-              <Banner tone="warning">{warning}</Banner>
-            </div>
-          ))}
-          <details
-            className="fm-disclosure"
-            open={showCode}
-            onToggle={(event) => setShowCode(event.currentTarget.open)}
-          >
-            <summary>
-              Show the code changes — {what.counts.files}{" "}
-              {what.counts.files === 1 ? "file" : "files"}, +{what.counts.additions} −
-              {what.counts.deletions} lines
-            </summary>
-            <p className="fm-disclosure__hint">
-              Green lines were added, red lines removed. You don't need to read this — it's here for
-              you or whoever reviews it.
-            </p>
-            {shell?.branch ? (
-              <details className="fm-disclosure__advanced">
-                <summary>Advanced</summary>
-                On branch {shell.branch}.
-              </details>
-            ) : null}
-            {showCode ? (
-              diffInput === null ? (
-                <p className="fm-disclosure__hint">
-                  The engine didn't record which turn this was, so the line-by-line view isn't
-                  available. The list above is still exact.
-                </p>
-              ) : diff.error ? (
-                <Banner tone="warning">
-                  Couldn't load the code changes just now. The list above is still exact.
-                </Banner>
-              ) : diff.data === null ? (
-                <p className="fm-disclosure__hint">Loading the code changes…</p>
-              ) : (
-                <Suspense
-                  fallback={<p className="fm-disclosure__hint">Preparing the code view…</p>}
-                >
-                  <CodeChanges diff={diff.data.diff} scope={`review:${checkpoint.id}`} />
-                </Suspense>
-              )
-            ) : null}
-          </details>
+          {!childView
+            ? what.groups.map((group) => (
+                <section key={group.area} className="fm-review__area" aria-label={group.label}>
+                  <h4 className="fm-review__area-title">
+                    {group.label}
+                    <OperationTags files={group.files} />
+                  </h4>
+                  <List plain label={`${group.label} changes`}>
+                    {group.files.map((file) => (
+                      <ListRow
+                        key={file.path}
+                        leading={<StepBadge state="number" icon={AREA_ICON[group.area]} />}
+                        title={fileTitle(file.line)}
+                        subtitle={fileDetail(file)}
+                        trailing={<OperationTag operation={file.operation} />}
+                      />
+                    ))}
+                  </List>
+                </section>
+              ))
+            : null}
+          {!childView ? (
+            <List plain label="Not touched">
+              <ListRow
+                leading={<StepBadge state="ok" icon={ShieldCheck} />}
+                title="Not touched"
+                subtitle={what.untouched}
+              />
+            </List>
+          ) : null}
+          {!childView
+            ? what.warnings.map((warning) => (
+                <div key={warning} className="fm-review__flag">
+                  <Banner tone="warning">{warning}</Banner>
+                </div>
+              ))
+            : null}
+          {!childView ? (
+            <details
+              className="fm-disclosure"
+              open={showCode}
+              onToggle={(event) => setShowCode(event.currentTarget.open)}
+            >
+              <summary>
+                Show the code changes — {what.counts.files}{" "}
+                {what.counts.files === 1 ? "file" : "files"}, +{what.counts.additions} −
+                {what.counts.deletions} lines
+              </summary>
+              <p className="fm-disclosure__hint">
+                Green lines were added, red lines removed. You don't need to read this — it's here
+                for you or whoever reviews it.
+              </p>
+              {shell?.branch ? (
+                <details className="fm-disclosure__advanced">
+                  <summary>Advanced</summary>
+                  On branch {shell.branch}.
+                </details>
+              ) : null}
+              {showCode ? (
+                diffInput === null ? (
+                  <p className="fm-disclosure__hint">
+                    The engine didn't record which turn this was, so the line-by-line view isn't
+                    available. The list above is still exact.
+                  </p>
+                ) : diff.error ? (
+                  <Banner tone="warning">
+                    Couldn't load the code changes just now. The list above is still exact.
+                  </Banner>
+                ) : diff.data === null ? (
+                  <p className="fm-disclosure__hint">Loading the code changes…</p>
+                ) : (
+                  <Suspense
+                    fallback={<p className="fm-disclosure__hint">Preparing the code view…</p>}
+                  >
+                    <CodeChanges diff={diff.data.diff} scope={`review:${checkpoint.id}`} />
+                  </Suspense>
+                )
+              ) : null}
+            </details>
+          ) : null}
           {problem && !keepBlocked ? (
             <div className="fm-review__flag">
               <Banner tone="danger">{problem}</Banner>
@@ -389,40 +409,28 @@ export function ReviewSection({
           ) : null}
         </CardBody>
         <CardFooter note={footerNote}>
-          {page !== null ? (
-            <Button
-              variant="primary"
-              icon={Play}
-              onClick={() =>
-                shell?.projectId && openIt.openIt({ threadId, projectId: shell.projectId, page })
-              }
-            >
-              Open it
-            </Button>
-          ) : null}
-          <Button
-            variant={page !== null ? "secondary" : "primary"}
-            disabled={keepBlocked || keeping || nothingToKeep}
-            onClick={() => void keep()}
-          >
-            {keeping ? "Keeping…" : keptHere ? "Kept" : "Keep these changes"}
-          </Button>
-          <Button
-            variant="destructive"
-            icon={Undo2}
-            aria-disabled={!canUndo}
-            aria-describedby={!canUndo && undoBlocker ? undoNoteId : undefined}
-            onClick={() => {
+          <ReviewActions
+            childView={childView}
+            hasPage={page !== null}
+            keepDisabled={keepBlocked || keeping || nothingToKeep}
+            keeping={keeping}
+            kept={keptHere !== null}
+            canUndo={canUndo}
+            undoNoteId={undoNoteId}
+            undoBlocker={undoBlocker}
+            onPlay={() =>
+              page !== null &&
+              shell?.projectId &&
+              openIt.openIt({ threadId, projectId: shell.projectId, page })
+            }
+            onKeep={() => void keep()}
+            onUndo={() => {
               if (canUndo) setUndoOpen(true);
             }}
-          >
-            Undo all of it
-          </Button>
-          <Button icon={MessageSquarePlus} onClick={askForTweak}>
-            Ask for a tweak
-          </Button>
+            onChange={askForTweak}
+          />
         </CardFooter>
-        {undoBlocker && !canUndo ? (
+        {!childView && undoBlocker && !canUndo ? (
           <p id={undoNoteId} className="fm-review__footnote">
             {undoBlocker}
           </p>
@@ -440,6 +448,59 @@ export function ReviewSection({
         onRequested={() => setUndoRequested(true)}
       />
     </div>
+  );
+}
+
+export function ReviewActions({
+  childView,
+  hasPage,
+  keepDisabled,
+  keeping,
+  kept,
+  canUndo,
+  undoNoteId,
+  undoBlocker,
+  onPlay,
+  onKeep,
+  onUndo,
+  onChange,
+}: {
+  readonly childView: boolean;
+  readonly hasPage: boolean;
+  readonly keepDisabled: boolean;
+  readonly keeping: boolean;
+  readonly kept: boolean;
+  readonly canUndo: boolean;
+  readonly undoNoteId: string;
+  readonly undoBlocker: string | null;
+  readonly onPlay: () => void;
+  readonly onKeep: () => void;
+  readonly onUndo: () => void;
+  readonly onChange: () => void;
+}) {
+  return (
+    <>
+      {hasPage ? (
+        <Button variant="primary" icon={Play} onClick={onPlay}>
+          {childView ? "Play it" : "Open it"}
+        </Button>
+      ) : null}
+      <Button variant={hasPage ? "secondary" : "primary"} disabled={keepDisabled} onClick={onKeep}>
+        {childView ? "Keep it" : keeping ? "Keeping…" : kept ? "Kept" : "Keep these changes"}
+      </Button>
+      <Button
+        variant="destructive"
+        icon={Undo2}
+        aria-disabled={!canUndo}
+        aria-describedby={!canUndo && undoBlocker ? undoNoteId : undefined}
+        onClick={onUndo}
+      >
+        {childView ? "Go back" : "Undo all of it"}
+      </Button>
+      <Button icon={MessageSquarePlus} onClick={onChange}>
+        {childView ? "Change something" : "Ask for a tweak"}
+      </Button>
+    </>
   );
 }
 

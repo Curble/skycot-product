@@ -11,6 +11,7 @@ import { Sheet } from "../../ui/Sheet";
 import { setVersionsRailOpen } from "./railState";
 import { VersionsTimeline } from "./VersionsTimeline";
 import { useConversationShell } from "../../state/oldConversations";
+import { useChildView } from "../../app/useChildView";
 
 const LEDE = "Every change is a point you can step back to, like Time Machine for this project.";
 
@@ -43,6 +44,7 @@ export function VersionsRailSlot({
 }) {
   // Put-away conversations too: their private copy is still theirs.
   const { shell } = useConversationShell(environmentId, threadId);
+  const childView = useChildView();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const [sheetOpen, setSheetOpen] = useState(false);
   // Hiding the rail unmounts its Hide button; keyboard focus moves to the
@@ -75,10 +77,10 @@ export function VersionsRailSlot({
     return (
       <InspectorPanel label="Versions">
         <div className="fm-versions__head" ref={hideWrap}>
-          <h3 className="fm-inspector__title">Versions</h3>
+          <h3 className="fm-inspector__title">{childView ? "Earlier tries" : "Versions"}</h3>
           <IconButton
             icon={PanelRightClose}
-            label="Hide Versions"
+            label={childView ? "Hide earlier tries" : "Hide Versions"}
             size="sm"
             onClick={() => {
               focusShowNext.current = true;
@@ -86,7 +88,7 @@ export function VersionsRailSlot({
             }}
           />
         </div>
-        <p className="fm-inspector__lede">{LEDE}</p>
+        <p className="fm-inspector__lede">{childView ? "Go back to an earlier try." : LEDE}</p>
         {timeline}
       </InspectorPanel>
     );
@@ -118,9 +120,9 @@ export function VersionsRailSlot({
       <Sheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        title="Versions"
+        title={childView ? "Earlier tries" : "Versions"}
         icon={History}
-        description={LEDE}
+        description={childView ? "Go back to an earlier try." : LEDE}
         wide
         actions={null}
       >

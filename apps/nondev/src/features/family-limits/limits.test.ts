@@ -86,7 +86,7 @@ describe("the asleep screen's words", () => {
     ).toContain("today's 30 messages");
   });
 
-  it("says the allowance rest is for the grown-ups", () => {
+  it("uses the child allowance-rest copy", () => {
     const copy = asleepCopy(
       {
         reason: "allowance",
@@ -99,7 +99,9 @@ describe("the asleep screen's words", () => {
       ZONE,
     );
     expect(copy.title).toBe("SKYCOT is having a rest");
-    expect(copy.body).toContain("ChatGPT allowance for the grown-ups");
+    expect(copy.body).toBe(
+      "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
+    );
   });
 });
 

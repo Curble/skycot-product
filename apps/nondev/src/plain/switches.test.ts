@@ -56,6 +56,24 @@ const claude = (model: string) => ({ instanceId: "claudeAgent", driver: "claudeA
 const chatgpt = { instanceId: "codex", driver: "codex", model: "gpt-6-astra" };
 
 describe("the conversation's plain line", () => {
+  it("uses the short rest message in the child view", () => {
+    expect(
+      switchLine({
+        change: {
+          from: claude("claude-fable-5-1"),
+          to: chatgpt,
+          until: TUESDAY,
+          crossProvider: true,
+        },
+        providers: PROVIDERS,
+        now: NOW,
+        timeZone: TZ,
+        crewName: "Sam",
+        childView: true,
+      }),
+    ).toBe("Sam took a short rest, so a helper stepped in.");
+  });
+
   it("within the company: the top helper rests, the crew carries on with the next one", () => {
     expect(
       switchLine({
