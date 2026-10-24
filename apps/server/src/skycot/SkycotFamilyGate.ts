@@ -1005,7 +1005,13 @@ const make = Effect.gen(function* () {
     });
     if (allowed) {
       if (Option.isSome(limits)) {
-        yield* limits.value.recordEvent({ sessionId, kind: "approved", threadId: need.threadId });
+        yield* limits.value.recordEvent({
+          sessionId,
+          kind: "approved",
+          threadId: need.threadId,
+          // So the child's card can say "A grown-up said yes" (grownUpAnswers.ts).
+          ...(need.requestId === undefined ? {} : { requestId: need.requestId }),
+        });
       }
       return;
     }

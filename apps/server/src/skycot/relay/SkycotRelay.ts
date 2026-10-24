@@ -61,6 +61,7 @@ import {
 } from "./relayFile.ts";
 import { makeTunnelHandler } from "./tunnelHandler.ts";
 import { approvalNotifications } from "./approvalNotifications.ts";
+import { eveningRecapDue, macTimeZone } from "./eveningRecap.ts";
 
 export const RELAY_URL_ENV = "SKYCOT_RELAY_URL";
 /** Where a linked browser opens the app (Phase 2); the iOS app (Phase 3) needs no page. */
@@ -472,6 +473,9 @@ const make = Effect.gen(function* () {
     readonly finished: ReadonlyMap<string, number> | null;
   }>({ requests: new Set(), lapsed: new Set(), finished: null });
 
+  // The evening recap's last day, in memory: its short window keeps a restart from resending.
+  const recapSentDay = yield* Ref.make<string | null>(null);
+
   const watch = Effect.gen(function* () {
     yield* forgetVanished;
     const live = yield* Ref.get(connection);
@@ -524,6 +528,18 @@ const make = Effect.gen(function* () {
           yield* notify({ familyDeviceIds: childDevices, kind: "finished" });
       }
       yield* Ref.update(announced, (current) => ({ ...current, finished: completed }));
+
+      // nondev-seam: skycot-evening-recap
+      const recapDay = eveningRecapDue({
+        now: yield* Clock.currentTimeMillis,
+        timeZone: macTimeZone(),
+        lastSentDay: yield* Ref.get(recapSentDay),
+        childFinishedAt: [...completed.values()],
+      });
+      if (recapDay !== null && grownUpDevices.length > 0) {
+        yield* Ref.set(recapSentDay, recapDay);
+        yield* notify({ familyDeviceIds: grownUpDevices, kind: "recap" });
+      }
     }
   }).pipe(Effect.ignoreCause({ log: true }));
 
