@@ -12,6 +12,11 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 
 import { describeTurnItem } from "../../plain/narration";
+import {
+  SWITCH_MESSAGE_PREFIX,
+  continuationSwitch,
+  isCarriedOnLimitItem,
+} from "../../plain/switches";
 import { foldTakenBack, rolledBackRunIds } from "../rewind/rewind";
 import { TakenBackFold } from "../rewind/TakenBackFold";
 import { Bubble, DayDivider, TypingIndicator } from "../../ui/Bubble";
@@ -22,6 +27,7 @@ import {
   type TimelineRenderContext,
 } from "./cards/registry";
 import { formatDayDivider } from "./status";
+import { SwitchNote, useAssistantSwitches, useEnvironmentProviders } from "./SwitchNote";
 import { WorkingCard } from "./WorkingCard";
 
 export {
@@ -107,6 +113,10 @@ export function Timeline({
       .filter((request) => readPolicyDecision(request.answers) !== null)
       .map((request) => request.id),
   );
+  // SKYCOT moved a turn to another model while the one in use rested: one plain line instead of
+  // the "limit reached" card, and the engine's own "Continue where you left off." stays unseen.
+  const switches = useAssistantSwitches(String(threadId), String(projection.runs.length));
+  const providers = useEnvironmentProviders(environmentId);
   const entries = groupTimelineItems(items, {
     absorb: (item) =>
       item.type === "approval_request" && item.runId !== null && policyAnswered.has(item.requestId),
@@ -133,6 +143,21 @@ export function Timeline({
         </div>
       );
     }
+    const item = entry.item;
+    if (isCarriedOnLimitItem(projection, item)) return null;
+    const messageId = item.type === "user_message" ? String(item.messageId) : null;
+    const change =
+      messageId === null
+        ? null
+        : (switches.get(messageId) ?? continuationSwitch(projection, providers, messageId));
+    const note = change === null ? null : <SwitchNote change={change} providers={providers} />;
+    if (messageId !== null && messageId.startsWith(SWITCH_MESSAGE_PREFIX)) {
+      return note === null ? null : (
+        <div key={item.id} className="fm-stream__item">
+          {note}
+        </div>
+      );
+    }
     const node = renderTimelineItem({
       item: entry.item,
       index: entry.index,
@@ -143,9 +168,11 @@ export function Timeline({
       shell,
       projectName,
     });
+    // The wrapper is `display: contents`, so the note sits in the stream as its own line.
     return node === null || node === undefined ? null : (
       <div key={entry.item.id} className="fm-stream__item">
         {node}
+        {note}
       </div>
     );
   };

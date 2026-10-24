@@ -1,5 +1,6 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { deviceTimeZone } from "../../../plain/daylight";
+import { grownUpSwitchLines } from "../../../plain/switches";
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -579,6 +580,7 @@ function ChildCard({
       ? Math.min(1, state.usedMinutes / child.limits.dailyMinutes)
       : null;
   const extras = today?.moreTime ?? [];
+  const switched = grownUpSwitchLines(today?.switches ?? [], (at) => clockPhrase(at, timeZone));
   return (
     <div className="fm-child-card">
       <ChildAvatar child={child} size={52} />
@@ -624,6 +626,9 @@ function ChildCard({
               )
               .join(" · ")}
           </span>
+        ) : null}
+        {switched.length > 0 ? (
+          <span className="fm-child-card__line">{switched.join(" ")}</span>
         ) : null}
       </div>
       <div className="fm-child-card__actions">

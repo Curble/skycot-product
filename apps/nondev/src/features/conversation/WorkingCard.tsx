@@ -18,6 +18,7 @@ import { useElapsedLabel } from "../../app/useElapsed";
 import { describeDecision } from "../../plain/approvals";
 import { filesFromPrompt } from "../../plain/changes";
 import { progress } from "../../plain/copy";
+import { wasCarriedOn } from "../../plain/switches";
 import {
   askBeforeItsStep,
   commandInputsOf,
@@ -254,13 +255,17 @@ export function WorkingCard({
     return n === 1 ? base : `${base}#${n}`;
   };
 
+  // A limit stopped it and SKYCOT carried the turn on with another model (plain line below).
+  const carriedOn = !active && run?.status === "failed" && wasCarriedOn(projection, run.id);
   const headerTone = active
     ? "blue"
-    : run?.status === "failed" && !refusedByFamily(projection, run.id)
-      ? "red"
-      : failed > 0 || refused || run?.status === "failed"
-        ? "orange"
-        : "green";
+    : carriedOn
+      ? "orange"
+      : run?.status === "failed" && !refusedByFamily(projection, run.id)
+        ? "red"
+        : failed > 0 || refused || run?.status === "failed"
+          ? "orange"
+          : "green";
   // The Family profile turned the assistant away before it started (nobody allowed it): the
   // grown-up card below says so, so this card is a calm note, not "something went wrong".
   const awaitingGrownUp =
@@ -269,14 +274,18 @@ export function WorkingCard({
     ? "Working on it"
     : awaitingGrownUp
       ? "Waiting for a grown-up"
-      : finishedTitle(run?.status, refused);
-  const icon = awaitingGrownUp
-    ? HandMetal
-    : run?.status === "failed" && !active
-      ? CircleAlert
-      : refused
-        ? HandMetal
-        : Hammer;
+      : carriedOn
+        ? "Paused here, carried on below"
+        : finishedTitle(run?.status, refused);
+  const icon = carriedOn
+    ? Hammer
+    : awaitingGrownUp
+      ? HandMetal
+      : run?.status === "failed" && !active
+        ? CircleAlert
+        : refused
+          ? HandMetal
+          : Hammer;
 
   return (
     <Bubble author="crew" full meta={active ? undefined : shortTime(run?.completedAt ?? null)}>

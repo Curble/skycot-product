@@ -24,6 +24,8 @@ export function useActiveUsage(): {
   readonly environmentId: EnvironmentId | null;
   readonly providers: ReadonlyArray<ServerProvider> | null;
   readonly active: ServerProvider | null;
+  /** The model a new conversation starts with: its own allowance counts when it is tighter. */
+  readonly model: string | null;
 } {
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
@@ -32,8 +34,9 @@ export function useActiveUsage(): {
       ? EMPTY_PROVIDERS_ATOM
       : serverEnvironment.providersValueAtom(environmentId),
   );
-  const active = providerForSelection(providers, resolveDefaultModelSelection(providers, null));
-  return { environmentId, providers, active };
+  const selection = resolveDefaultModelSelection(providers, null);
+  const active = providerForSelection(providers, selection);
+  return { environmentId, providers, active, model: selection?.model ?? null };
 }
 
 /**

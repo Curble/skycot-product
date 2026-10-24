@@ -293,6 +293,56 @@ describe("Claude's model-only allowance", () => {
     ]);
     expect(usage).toMatchObject({ leftPercent: 44, tone: "ok" });
   });
+
+  // Mark's Mac, 24 October 2026: "About 15% of this week's Claude allowance left" while the
+  // model in use (Fable) had none of its own week left.
+  const fableOut = provider({
+    instanceId: "claudeAgent",
+    driver: "claudeAgent",
+    models: [
+      { slug: "claude-fable-5-1", name: "Claude Fable 5.1", isCustom: false, capabilities: null },
+      { slug: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", isCustom: false, capabilities: null },
+    ],
+    usageLimits: {
+      checkedAt: "2026-10-22T02:58:00.000Z",
+      windows: [
+        { id: "seven_day", kind: "weekly", label: "Weekly", usedPercent: 85 },
+        {
+          id: "seven_day_fable",
+          kind: "weekly",
+          label: "Weekly · Fable",
+          usedPercent: 100,
+          resetsAt: "2026-10-25T01:04:00.000Z",
+        },
+      ],
+    },
+  });
+
+  it("speaks for the model in use when its own allowance is the tighter one", () => {
+    const usage = describeProviderUsage(fableOut, NOW, TZ, "claude-fable-5-1");
+    expect(usage).toMatchObject({ leftPercent: 0, tone: "critical" });
+    expect(usage.binding?.id).toBe("seven_day_fable");
+    expect(usageWarning(usage, fableOut.usageLimits)?.text).toBe(
+      "This week's Claude Fable allowance is used up · resets Sun 12:04 pm",
+    );
+    // By alias too, as a conversation may name it.
+    expect(describeProviderUsage(fableOut, NOW, TZ, "fable").leftPercent).toBe(0);
+  });
+
+  it("another model's own allowance never speaks for the one in use", () => {
+    const usage = describeProviderUsage(fableOut, NOW, TZ, "claude-sonnet-5-5");
+    expect(usage).toMatchObject({ leftPercent: 15, tone: "low" });
+    expect(usageWarning(usage, fableOut.usageLimits)?.text).toBe(
+      "About 15% of this week's Claude allowance left",
+    );
+  });
+
+  it("the Usage sheet reads the active assistant's model only", () => {
+    const [usage] = connectedProviderUsage([fableOut], "claudeAgent", NOW, TZ, "claude-fable-5-1");
+    expect(usage?.leftPercent).toBe(0);
+    const [other] = connectedProviderUsage([fableOut], "codex", NOW, TZ, "claude-fable-5-1");
+    expect(other?.leftPercent).toBe(15);
+  });
 });
 
 describe("a window whose reset has already passed", () => {

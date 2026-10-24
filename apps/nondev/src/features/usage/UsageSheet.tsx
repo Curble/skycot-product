@@ -43,7 +43,7 @@ const BAR_TONE: Record<UsageTone, ProgressTone> = {
 export function UsageSheetHost() {
   const open = useUsageSheetOpen();
   const family = useFamily();
-  const { environmentId, providers, active } = useActiveUsage();
+  const { environmentId, providers, active, model } = useActiveUsage();
   if (family.enabled || !open) return null;
   return (
     <Sheet
@@ -67,6 +67,7 @@ export function UsageSheetHost() {
           environmentId={environmentId}
           providers={providers}
           activeInstanceId={active ? String(active.instanceId) : null}
+          activeModel={model}
         />
       )}
     </Sheet>
@@ -82,10 +83,13 @@ export function UsageDetails({
   environmentId,
   providers,
   activeInstanceId,
+  activeModel = null,
 }: {
   readonly environmentId: EnvironmentId;
   readonly providers: ReadonlyArray<ServerProvider> | null;
   readonly activeInstanceId: string | null;
+  /** The model in use: its own allowance counts for the active assistant when it is tighter. */
+  readonly activeModel?: string | null;
 }) {
   const refresh = useGentleUsageRefresh(environmentId);
   // Captured once per opening: the words ("resets in 12 minutes") describe that moment.
@@ -96,7 +100,13 @@ export function UsageDetails({
   }, [refresh]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const timeZone = localTimeZone();
-  const list = connectedProviderUsage(providers ?? [], activeInstanceId, now, timeZone);
+  const list = connectedProviderUsage(
+    providers ?? [],
+    activeInstanceId,
+    now,
+    timeZone,
+    activeModel,
+  );
 
   return (
     <div className="fm-usage-details">

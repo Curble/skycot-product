@@ -8,7 +8,8 @@ import { useRef, useState } from "react";
 import { View } from "react-native";
 
 import { childLabel, type FamilyChild } from "../../../../nondev/src/features/family/children";
-import { todaySummary } from "../../../../nondev/src/features/family-limits/limits";
+import { clockPhrase, todaySummary } from "../../../../nondev/src/features/family-limits/limits";
+import { grownUpSwitchLines } from "../../../../nondev/src/plain/switches";
 import type { StackRoutes } from "../../app/routes";
 import { useGrownUp } from "../../app/grownup/GrownUpContext";
 import { conversationRows, relativeTime, stateLabel } from "../../data/conversations";
@@ -60,14 +61,21 @@ export function ChildrenScreen() {
             ) : null}
             {children.map((child, index) => {
               const label = childLabel(child, index);
-              const state =
-                today?.children.find((entry) => entry.childId === child.id)?.limits ?? null;
+              const entry = today?.children.find((candidate) => candidate.childId === child.id);
+              const state = entry?.limits ?? null;
+              const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+              const switched = grownUpSwitchLines(entry?.switches ?? [], (at) =>
+                clockPhrase(at, zone),
+              );
               return (
                 <Section key={child.id}>
                   <Row
                     leading={<Avatar person={child} size={44} />}
                     title={label}
-                    subtitle={state ? todaySummary(state, child.limits) : "Nothing yet today."}
+                    subtitle={[
+                      state ? todaySummary(state, child.limits) : "Nothing yet today.",
+                      ...switched,
+                    ].join(" ")}
                     trailing={state?.asleep ? <Pill text="Asleep" tone="accent" /> : null}
                   />
                   <Row

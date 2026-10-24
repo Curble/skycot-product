@@ -33,19 +33,29 @@ function writeDismissed(key: string): void {
  */
 export function UsageBanner() {
   const family = useFamily();
-  const { active } = useActiveUsage();
+  const { active, model } = useActiveUsage();
   if (family.enabled || active === null) return null;
   // Remounted per limits snapshot, so "resets in 12 minutes" is measured from when it arrived.
   return (
-    <WarningFor key={`${active.instanceId}:${active.usageLimits?.checkedAt}`} active={active} />
+    <WarningFor
+      key={`${active.instanceId}:${active.usageLimits?.checkedAt}`}
+      active={active}
+      model={model}
+    />
   );
 }
 
-function WarningFor({ active }: { readonly active: ServerProvider }) {
+function WarningFor({
+  active,
+  model,
+}: {
+  readonly active: ServerProvider;
+  readonly model: string | null;
+}) {
   const [now] = useState(() => Date.now());
   const [dismissed, setDismissed] = useState(readDismissed);
   const warning = usageWarning(
-    describeProviderUsage(active, now, localTimeZone()),
+    describeProviderUsage(active, now, localTimeZone(), model),
     active.usageLimits,
   );
   if (warning === null || warning.key === dismissed) return null;

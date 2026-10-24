@@ -16,7 +16,7 @@ const CLOSE_DELAY_MS = 200;
  * link and out again, Escape or leaving closes it.
  */
 export function UsageIndicator() {
-  const { environmentId, active } = useActiveUsage();
+  const { environmentId, active, model } = useActiveUsage();
   const refresh = useGentleUsageRefresh(environmentId);
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -62,7 +62,7 @@ export function UsageIndicator() {
   }, [open]);
 
   if (active === null) return null;
-  const usage = describeProviderUsage(active, openedAt ?? 0, localTimeZone());
+  const usage = describeProviderUsage(active, openedAt ?? 0, localTimeZone(), model);
 
   const onKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
     if (event.key === "Escape" && open) {

@@ -4,12 +4,19 @@
 // Nothing here reads the clock or the time zone on its own: callers pass `now` and `timeZone`.
 import type {
   ServerProvider,
+  ServerProviderModel,
   ServerProviderUsageLimits,
   ServerProviderUsageWindow,
   UsageBucket,
   UsageProviderKind,
   UsageSummary,
 } from "@t3tools/contracts";
+import {
+  isSpendWindow,
+  scopedModelName,
+  windowLimitsModel,
+  type ModelLike,
+} from "@t3tools/skycot-rules/usageWindows";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -145,6 +152,20 @@ function zoned(at: number, timeZone: string) {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/**
+ * How long a resting model rests, for the conversation's plain line: "until 3:40 pm" today,
+ * "until tomorrow", "until Tuesday" within the week, then "until 3 Nov". Empty when unknown.
+ */
+export function restingUntilPhrase(until: number | null, now: number, timeZone: string): string {
+  if (until === null || !Number.isFinite(until) || until <= now) return "";
+  const at = zoned(until, timeZone);
+  const days = at.dayNumber - zoned(now, timeZone).dayNumber;
+  if (days <= 0) return `until ${clockTime(until, timeZone)}`;
+  if (days === 1) return "until tomorrow";
+  if (days < 7) return `until ${at.weekday}`;
+  return `until ${at.day} ${MONTHS[at.month - 1]}`;
+}
+
 /** "3:40 pm", "9 am". */
 export function clockTime(at: number, timeZone: string): string {
   const time = zoned(at, timeZone);
@@ -213,10 +234,13 @@ export interface PlainUsageWindow {
   readonly expired: boolean;
   /**
    * Whether this window can decide the ring. Claude's model-only weekly allowance ("This week
-   * (Opus)") stops one model, not the assistant, and its extra-spending cap is not an
-   * allowance; both show in the lists but never colour the ring on their own.
+   * (Opus)") stops one model, not the assistant: it decides only when that model is the one in
+   * use (then it is what actually holds the person back). The extra-spending cap is not an
+   * allowance. Both show in the lists either way.
    */
   readonly decides: boolean;
+  /** The model a model-only window belongs to ("Fable"); null for the whole account's. */
+  readonly scopedTo: string | null;
   /** "5-hour window: 62% left · resets 3:40 pm", or "5-hour window: refilled 1:12 pm" */
   readonly line: string;
 }
@@ -318,6 +342,7 @@ function plainWindow(
   driver: string,
   now: number,
   timeZone: string,
+  modelInUse: ModelLike | null,
 ): PlainUsageWindow {
   const leftPercent = percentLeft(window);
   const parsed = window.resetsAt === undefined ? Number.NaN : Date.parse(window.resetsAt);
@@ -333,10 +358,8 @@ function plainWindow(
     resetsAt,
     reset,
     expired,
-    decides: !(
-      driver === "claudeAgent" &&
-      (window.id.startsWith("seven_day_") || window.id === "monthly_spend")
-    ),
+    decides: !isSpendWindow(window) && windowLimitsModel(window, modelInUse),
+    scopedTo: scopedModelName(window),
     line: expired
       ? `${name}: ${reset}, new figure after the next message`
       : `${name}: ${leftPercent}% left${reset ? ` · ${reset}` : ""}`,
@@ -366,14 +389,38 @@ export function bindingWindow(windows: ReadonlyArray<PlainUsageWindow>): PlainUs
   return best;
 }
 
+/** The provider's model for a slug or alias, as a conversation names it. */
+export function modelOf(
+  provider: Pick<ServerProvider, "models">,
+  slugOrAlias: string | null | undefined,
+): ServerProviderModel | null {
+  const wanted = slugOrAlias?.trim().toLowerCase();
+  if (!wanted) return null;
+  return (
+    provider.models.find((model) => model.slug.toLowerCase() === wanted) ??
+    provider.models.find((model) =>
+      model.aliases?.some((alias) => alias.toLowerCase() === wanted),
+    ) ??
+    null
+  );
+}
+
+/**
+ * `modelInUse` (a slug or alias): the model the person is using. A model's own allowance then
+ * counts when it is the tighter one, so the ring can never say 15% while that model is at 0%.
+ */
 export function describeProviderUsage(
   provider: ServerProvider,
   now: number,
   timeZone: string,
+  modelInUse?: string | null,
 ): ProviderUsage {
   const driver = String(provider.driver);
   const brand = brandForDriver(driver);
   const limits = provider.usageLimits;
+  // A model the provider no longer lists is still matched by its own name.
+  const inUse: ModelLike | null =
+    modelOf(provider, modelInUse) ?? (modelInUse ? { slug: modelInUse } : null);
   const reported =
     provider.auth.status !== "unauthenticated" &&
     limits !== undefined &&
@@ -381,7 +428,7 @@ export function describeProviderUsage(
     limits.windows.length > 0;
   const windows = reported
     ? shownWindows(limits.windows, driver).map((window) =>
-        plainWindow(window, driver, now, timeZone),
+        plainWindow(window, driver, now, timeZone, inUse),
       )
     : [];
   const binding = bindingWindow(windows);
@@ -422,6 +469,7 @@ export function connectedProviderUsage(
   activeInstanceId: string | null,
   now: number,
   timeZone: string,
+  activeModel?: string | null,
 ): ReadonlyArray<ProviderUsage> {
   return providers
     .filter(
@@ -431,7 +479,14 @@ export function connectedProviderUsage(
         provider.availability !== "unavailable" &&
         provider.auth.status !== "unauthenticated",
     )
-    .map((provider) => describeProviderUsage(provider, now, timeZone))
+    .map((provider) =>
+      describeProviderUsage(
+        provider,
+        now,
+        timeZone,
+        String(provider.instanceId) === activeInstanceId ? activeModel : null,
+      ),
+    )
     .toSorted(
       (left, right) =>
         Number(right.instanceId === activeInstanceId) -
@@ -456,10 +511,12 @@ export function usageWarning(
   const window = limits?.windows.find((entry) => entry.id === binding.id);
   const phrase = window ? allowancePhrase(window, usage.driver) : "the";
   const reset = binding.reset ? ` · ${binding.reset}` : "";
+  // A model's own allowance names the model: "this week's Claude Fable allowance".
+  const whose = binding.scopedTo === null ? usage.brand : `${usage.brand} ${binding.scopedTo}`;
   const text =
     binding.leftPercent === 0
-      ? `${capitalise(phrase)} ${usage.brand} allowance is used up${reset}`
-      : `About ${binding.leftPercent}% of ${phrase} ${usage.brand} allowance left${reset}`;
+      ? `${capitalise(phrase)} ${whose} allowance is used up${reset}`
+      : `About ${binding.leftPercent}% of ${phrase} ${whose} allowance left${reset}`;
   return {
     key: `${usage.instanceId}:${binding.id}:${binding.resetsAt ?? "open"}`,
     text,

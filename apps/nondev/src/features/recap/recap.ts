@@ -4,6 +4,7 @@
 import { describePersonalCategories, type PersonalCategory } from "@t3tools/skycot-rules/personal";
 
 import { describeChanges, fromCheckpointFiles } from "../../plain/changes";
+import { grownUpSwitchLines } from "../../plain/switches";
 import { clockPhrase } from "../family-limits/limits";
 
 export type RecapRange = "session" | "week";
@@ -69,6 +70,12 @@ export interface RecapReport {
     readonly shieldAllowed: number;
     /** Yeses from a grown-up's own device. Older engines leave it out. */
     readonly fromDevices?: ReadonlyArray<{ readonly at: number; readonly device: string }>;
+    /** Turns moved to another company while the one in use rested. Older engines leave it out. */
+    readonly switches?: ReadonlyArray<{
+      readonly at: number;
+      readonly from: string;
+      readonly to: string;
+    }>;
   };
   readonly proudOf: {
     readonly threadId: string;
@@ -184,6 +191,9 @@ export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">):
   if (shieldAllowed > 0) {
     lines.push(`${plural(shieldAllowed, "message")} went as typed after a grown-up said yes.`);
   }
+  lines.push(
+    ...grownUpSwitchLines(report.grownUp.switches ?? [], (at) => clockPhrase(at, report.timeZone)),
+  );
   return lines;
 }
 

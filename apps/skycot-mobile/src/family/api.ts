@@ -97,6 +97,15 @@ const ok = () => true as const;
 export interface TodayEntry {
   readonly childId: string;
   readonly limits: LimitState | null;
+  /**
+   * Turns SKYCOT moved to another company today while the one in use was resting (driver ids).
+   * Older engines leave it out.
+   */
+  readonly switches: ReadonlyArray<{
+    readonly at: number;
+    readonly from: string;
+    readonly to: string;
+  }>;
 }
 
 export interface Today {
@@ -110,8 +119,16 @@ function parseToday(body: unknown): Today | null {
   if (!Array.isArray(input.children)) return null;
   const children = input.children.flatMap((entry: unknown) => {
     const row = record(entry);
+    const switches = (Array.isArray(row.switches) ? row.switches : []).flatMap((value: unknown) => {
+      const entry = record(value);
+      return typeof entry.at === "number" &&
+        typeof entry.from === "string" &&
+        typeof entry.to === "string"
+        ? [{ at: entry.at, from: entry.from, to: entry.to }]
+        : [];
+    });
     return typeof row.childId === "string"
-      ? [{ childId: row.childId, limits: parseLimitState(row.limits) }]
+      ? [{ childId: row.childId, limits: parseLimitState(row.limits), switches }]
       : [];
   });
   const threads: Record<string, string> = {};

@@ -22,10 +22,19 @@ export interface MoreTimeEntry {
   readonly minutes: number | null;
 }
 
+/** A turn SKYCOT moved to another company while the one in use was resting (driver ids). */
+export interface SwitchEntry {
+  readonly at: number;
+  readonly from: string;
+  readonly to: string;
+}
+
 export interface ChildToday {
   readonly childId: string;
   readonly limits: LimitState;
   readonly moreTime: ReadonlyArray<MoreTimeEntry>;
+  /** Older engines leave it out: read as none. */
+  readonly switches: ReadonlyArray<SwitchEntry>;
 }
 
 export interface FamilyToday {
@@ -70,7 +79,17 @@ export function parseToday(body: unknown): FamilyToday | null {
               : [];
           })
         : [];
-      return [{ childId: child["childId"], limits, moreTime }];
+      const switches = Array.isArray(child["switches"])
+        ? child["switches"].flatMap((logged: unknown) => {
+            const item = record(logged);
+            return typeof item["at"] === "number" &&
+              typeof item["from"] === "string" &&
+              typeof item["to"] === "string"
+              ? [{ at: item["at"], from: item["from"], to: item["to"] } satisfies SwitchEntry]
+              : [];
+          })
+        : [];
+      return [{ childId: child["childId"], limits, moreTime, switches }];
     }),
     threads: stringMap(input["threads"]),
     projects: stringMap(input["projects"]),
