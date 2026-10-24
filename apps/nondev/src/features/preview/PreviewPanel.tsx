@@ -1,5 +1,6 @@
 // "Preview": the conversation's site, running, beside the conversation (a full-screen sheet on
-// a phone). The engine starts the site and names the address; starting asks like any command
+// a phone, or when "Open it" opened it from outside the conversation). "Open it" may ask for one
+// page of the site (features/starters/preview.ts); the Preview button shows its first page. The engine starts the site and names the address; starting asks like any command
 // in "Ask me first" (in a Family profile, the parent code when the start script installs
 // something or uses the internet). Plain controls only: Reload, Open in browser, Close, and
 // "Point at something", which turns a click in the page into a chip in the message box.
@@ -21,6 +22,7 @@ import { createPortal } from "react-dom";
 import { randomUUID } from "~/lib/utils";
 
 import { useCrew } from "../../themes/useCrew";
+import { previewPageUrl } from "../starters/preview";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
@@ -50,7 +52,13 @@ import {
   startApproval,
   type PreviewStatusView,
 } from "./model";
-import { addPointer, closePreview, suggestMessage, type PointerDraft } from "./store";
+import {
+  addPointer,
+  closePreview,
+  suggestMessage,
+  usePreviewPage,
+  type PointerDraft,
+} from "./store";
 
 /** Polls while the panel is open: quickly while starting, slowly otherwise (it also keeps the site alive). */
 function usePreviewAnswer(threadId: string) {
@@ -163,6 +171,21 @@ function PreviewPanelBody({
         })
       : null;
   const runningUrl = status?.state === "running" ? status.url : null;
+  // The page "Open it" asked for, on the running site; the site's own first page otherwise.
+  const pageRequest = usePreviewPage(threadId);
+  const frameUrl =
+    runningUrl === null ? null : previewPageUrl(runningUrl, pageRequest?.path ?? null);
+  // A new "Open it" while the site is already showing: go to that page. (A new address reaches
+  // the frame by itself; this is for the same address asked for again after clicking around.)
+  const askedNonce = useRef(pageRequest?.nonce ?? null);
+  const previousFrameUrl = useRef(frameUrl);
+  useEffect(() => {
+    const sameAddress = previousFrameUrl.current === frameUrl;
+    previousFrameUrl.current = frameUrl;
+    if (pageRequest === null || pageRequest.nonce === askedNonce.current) return;
+    askedNonce.current = pageRequest.nonce;
+    if (sameAddress && frameUrl !== null) controls?.navigate(frameUrl);
+  }, [pageRequest, frameUrl, controls]);
 
   const start = async (approved: boolean) => {
     setBusy(true);
@@ -225,10 +248,10 @@ function PreviewPanelBody({
   // The page went somewhere on its own (a link clicked inside it). The engine says whether the
   // internet is allowed; in a Family profile it is not without a grown-up, so the page goes back.
   const onNavigated = async (url: string) => {
-    if (runningUrl === null) return;
+    if (frameUrl === null) return;
     const answer = await mayLeave(url);
     if (answer.allowed) return;
-    controls?.navigate(runningUrl);
+    controls?.navigate(frameUrl);
     setLeaving({ url, ...(answer.requestId ? { requestId: answer.requestId } : {}) });
   };
   const onOpenLink = async (url: string) => {
@@ -308,10 +331,10 @@ function PreviewPanelBody({
         onTryAgain={() => void tryAgain()}
         onAsk={(text) => suggestMessage(threadId, text, "replace")}
         frame={
-          status?.state === "running" && surface !== null ? (
+          status?.state === "running" && surface !== null && frameUrl !== null ? (
             <RunningFrame
               surface={surface}
-              url={status.url}
+              url={frameUrl}
               environmentId={environmentId}
               onControls={setControls}
               onNavigated={(url) => void onNavigated(url)}
@@ -323,7 +346,7 @@ function PreviewPanelBody({
     );
   }
 
-  const canOpenOutside = runningUrl !== null && surface !== "elsewhere";
+  const canOpenOutside = frameUrl !== null && surface !== "elsewhere";
   // The picker runs inside T3's preview browser, which only the Mac app has.
   const canPoint = surface === "desktop" && controls?.pick !== undefined;
   return (
@@ -332,9 +355,7 @@ function PreviewPanelBody({
         <span className="fm-preview__title">
           <AppWindow size={15} strokeWidth={1.8} aria-hidden />
           Preview
-          {runningUrl ? (
-            <span className="fm-preview__address">{shortAddress(runningUrl)}</span>
-          ) : null}
+          {frameUrl ? <span className="fm-preview__address">{shortAddress(frameUrl)}</span> : null}
         </span>
         <span className="fm-preview__tools">
           <IconButton
@@ -349,7 +370,7 @@ function PreviewPanelBody({
             label="Open in browser"
             size="sm"
             disabled={!canOpenOutside}
-            onClick={() => runningUrl && openOutside(runningUrl)}
+            onClick={() => frameUrl && openOutside(frameUrl)}
           />
           <IconButton icon={X} label="Close preview" size="sm" onClick={closePreview} />
         </span>

@@ -1,13 +1,13 @@
 // Home's "On the fridge" tile: the three magnets at the top of the fridge, each opening its
 // page with "Open it", and the way to the whole fridge. Hidden until something has been made.
 import { useAtomValue } from "@effect/atom-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { FRIDGE_HREF } from "../../router";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
-import { PreviewSheet } from "../starters/PreviewSheet";
-import { homeMagnets, type FridgeItem } from "./fridge";
+import { useOpenIt } from "../starters/PreviewSheet";
+import { homeMagnets } from "./fridge";
 import { FridgeMagnet } from "./FridgeMagnet";
 import { useHourClock } from "./FridgeScreen";
 import { refreshFridge, useFridge } from "./store";
@@ -18,7 +18,7 @@ export function FridgeHomeTile() {
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
   const now = useHourClock();
-  const [open, setOpen] = useState<FridgeItem | null>(null);
+  const openIt = useOpenIt(environmentId);
   useEffect(() => {
     void refreshFridge();
   }, []);
@@ -37,20 +37,12 @@ export function FridgeHomeTile() {
               now={now}
               maker={null}
               compact
-              onOpen={() => setOpen(item)}
+              onOpen={() => openIt.openIt(item)}
             />
           ))}
         </div>
       </CardBody>
-      {open !== null && environmentId !== null ? (
-        <PreviewSheet
-          open
-          onClose={() => setOpen(null)}
-          environmentId={environmentId}
-          cwd={open.cwd}
-          relativePath={open.page}
-        />
-      ) : null}
+      {openIt.sheet}
     </Card>
   );
 }

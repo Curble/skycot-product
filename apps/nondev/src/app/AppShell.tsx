@@ -16,7 +16,7 @@ import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
 import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
 import { PreviewPanel } from "../features/preview/PreviewPanel";
-import { usePreviewOpen } from "../features/preview/store";
+import { usePreviewElsewhere, usePreviewOpen } from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { ReadyNotifier } from "../features/updates/ReadyNotifier";
 import { UpdatePill } from "../features/updates/UpdatePill";
@@ -83,6 +83,10 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   // so the two share the window), and fills the window on a phone.
   const previewOpen = usePreviewOpen(route.name === "thread" ? route.threadId : null);
   const previewMode = !previewOpen || !showContent ? "hidden" : columns === 1 ? "sheet" : "panel";
+  // "Open it" on the fridge or a recap opens that conversation's preview over the screen.
+  const previewElsewhere = usePreviewElsewhere(
+    route.name === "thread" && previewMode !== "hidden" ? route.threadId : null,
+  );
   const showList =
     conversationRoute && !(columns === 1 && route.name !== "home") && previewMode !== "panel";
 
@@ -153,6 +157,13 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
             environmentId={route.environmentId}
             threadId={route.threadId}
             sheet={previewMode === "sheet"}
+          />
+        ) : null}
+        {previewElsewhere !== null ? (
+          <PreviewPanel
+            environmentId={previewElsewhere.environmentId}
+            threadId={previewElsewhere.threadId}
+            sheet
           />
         ) : null}
         {route.name === "thread" && showContent && previewMode !== "panel" ? (

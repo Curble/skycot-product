@@ -8,6 +8,8 @@ export interface PreviewCommandView {
   readonly script: string;
   /** A plain web page SKYCOT shows itself (an index.html, no start script): nothing runs. */
   readonly page?: true;
+  /** For a plain page: the folder SKYCOT shows, inside the project ("" for the folder itself). */
+  readonly pageFolder?: string;
 }
 
 export type StartDecisionView =
@@ -50,7 +52,13 @@ function parseCommand(value: unknown): PreviewCommandView | null {
   const runner = text(command?.["runner"]);
   if (!command || !runner) return null;
   const script = text(command["script"]) ?? runner;
-  return command["source"] === "static" ? { runner, script, page: true } : { runner, script };
+  if (command["source"] !== "static") return { runner, script };
+  // The engine names the folder; its script ("public/index.html") says the same thing.
+  const pageFolder =
+    text(command["pageFolder"]) ?? /^(.*?)\/?index\.html$/i.exec(script)?.[1] ?? null;
+  return pageFolder === null
+    ? { runner, script, page: true }
+    : { runner, script, page: true, pageFolder };
 }
 
 function parseDecision(value: unknown): StartDecisionView | null {
@@ -129,6 +137,14 @@ export function previewSurface(input: {
     sameOrigin = new URL(input.url).origin === input.page.origin;
   } catch {}
   return input.frameable && !sameOrigin ? "frame" : "outside";
+}
+
+/** Whether the Preview's address (this Mac's own) works on this device: not on a phone. */
+export function previewAddressWorksHere(input: {
+  readonly hasDesktopPreview: boolean;
+  readonly hostname: string;
+}): boolean {
+  return input.hasDesktopPreview || LOOPBACK_HOST.test(input.hostname);
 }
 
 /** "localhost:5173" for the toolbar: the address without its scheme or a bare trailing slash. */

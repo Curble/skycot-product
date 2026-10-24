@@ -3,7 +3,6 @@
 // needed a grown-up. The same view prints: recap.css drops the app around it on paper.
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Clock, MessageCircle, Play, ShieldCheck, Sparkles, Star } from "lucide-react";
-import { useState } from "react";
 
 import { threadHref } from "../../router";
 import { Button } from "../../ui/Button";
@@ -12,7 +11,7 @@ import { List, ListRow } from "../../ui/ListRow";
 import { ChildAvatar } from "../family/ChildAvatar";
 import type { FamilyChild } from "../family/children";
 import { MagnetThumb } from "../fridge/MagnetThumb";
-import { PreviewSheet } from "../starters/PreviewSheet";
+import { useOpenIt } from "../starters/PreviewSheet";
 import {
   askLine,
   grownUpLines,
@@ -53,7 +52,7 @@ export function RecapReportView({
   /** Off where a sheet's own title already says who and when. */
   readonly hero?: boolean;
 }) {
-  const [preview, setPreview] = useState<{ cwd: string; page: string } | null>(null);
+  const openIt = useOpenIt(environmentId);
   const week = report.range === "week";
   const lines = grownUpLines(report);
   const made = compact ? report.made.slice(0, 3) : report.made;
@@ -63,6 +62,17 @@ export function RecapReportView({
     report.proudOf === null
       ? null
       : { ...report.proudOf, title: displayTitle(report.proudOf.threadId, report.proudOf.title) };
+  // "Open it" reads the page through its project: the made entry for that conversation names it.
+  const proudProjectId =
+    proud === null
+      ? null
+      : (report.made.find((entry) => entry.threadId === proud.threadId)?.projectId ?? null);
+  const proudPage = proud?.page ?? null;
+  const openProud =
+    proud !== null && proudPage !== null && proud.cwd !== null && proudProjectId !== null
+      ? () =>
+          openIt.openIt({ threadId: proud.threadId, projectId: proudProjectId, page: proudPage })
+      : null;
 
   return (
     <div className={`fm-recap${compact ? " fm-recap--compact" : ""}`} data-range={report.range}>
@@ -97,16 +107,16 @@ export function RecapReportView({
           <CardHeader icon={Star} tone="orange" title="Most proud of" subtitle={proud.title} />
           <CardBody>
             <div className="fm-recap__proud">
-              {proud.page !== null && proud.cwd !== null ? (
+              {openProud !== null && proudPage !== null ? (
                 <button
                   type="button"
                   className="fm-recap__proud-picture"
-                  onClick={() => setPreview({ cwd: proud.cwd!, page: proud.page! })}
+                  onClick={openProud}
                   aria-label={`Open ${proud.title}`}
                 >
                   <MagnetThumb
                     threadId={proud.threadId}
-                    page={proud.page}
+                    page={proudPage}
                     version={proud.at}
                     title={proud.title}
                   />
@@ -117,13 +127,9 @@ export function RecapReportView({
                   The newest thing {name} finished{week ? " this week" : " today"}, at{" "}
                   {timeOf(proud.at, report.timeZone, week)}.
                 </p>
-                {proud.page !== null && proud.cwd !== null ? (
+                {openProud !== null ? (
                   <span className="fm-recap__noprint">
-                    <Button
-                      size="sm"
-                      icon={Play}
-                      onClick={() => setPreview({ cwd: proud.cwd!, page: proud.page! })}
-                    >
+                    <Button size="sm" icon={Play} onClick={openProud}>
                       Open it
                     </Button>
                   </span>
@@ -225,15 +231,7 @@ export function RecapReportView({
         save it as a PDF if you'd like a copy.
       </p>
 
-      {preview !== null && environmentId !== null ? (
-        <PreviewSheet
-          open
-          onClose={() => setPreview(null)}
-          environmentId={environmentId}
-          cwd={preview.cwd}
-          relativePath={preview.page}
-        />
-      ) : null}
+      {openIt.sheet}
     </div>
   );
 }

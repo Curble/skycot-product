@@ -14,7 +14,7 @@ import { Mascot } from "../brand/Mascot";
 import { ChildAvatar } from "../family/ChildAvatar";
 import { childLabel, type FamilyChild } from "../family/children";
 import { useFamily } from "../family/FamilyProvider";
-import { PreviewSheet } from "../starters/PreviewSheet";
+import { useOpenIt } from "../starters/PreviewSheet";
 import { fridgeShelves, type FridgeItem } from "./fridge";
 import { FridgeIcon } from "./FridgeIcon";
 import { FridgeMagnet } from "./FridgeMagnet";
@@ -40,7 +40,7 @@ export function FridgeScreen() {
   const columns = useColumns();
   const now = useHourClock();
   const [only, setOnly] = useState<string>("everyone");
-  const [open, setOpen] = useState<FridgeItem | null>(null);
+  const openIt = useOpenIt(environmentId);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     void refreshFridge();
@@ -137,7 +137,7 @@ export function FridgeScreen() {
                         index={index}
                         now={now}
                         maker={only === "everyone" && children.length > 1 ? name : null}
-                        onOpen={() => setOpen(item)}
+                        onOpen={() => openIt.openIt(item)}
                         onPin={(pinned) => pin(item, pinned)}
                       />
                     ))}
@@ -151,15 +151,7 @@ export function FridgeScreen() {
           The fridge is kept on this Mac. SKYCOT doesn't upload or share anything on it.
         </p>
       </div>
-      {open !== null && environmentId !== null ? (
-        <PreviewSheet
-          open
-          onClose={() => setOpen(null)}
-          environmentId={environmentId}
-          cwd={open.cwd}
-          relativePath={open.page}
-        />
-      ) : null}
+      {openIt.sheet}
     </div>
   );
 }

@@ -20,7 +20,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { Sheet } from "../../ui/Sheet";
 import { Markdown } from "../conversation/cards/Markdown";
 import { offlinePreviewDocument, PREVIEW_SANDBOX } from "../starters/preview";
-import { filesApi, type FilesPlace } from "./api";
+import { filesApi, pageWithAssets, type FilesPlace } from "./api";
 import { KIND_ICON } from "./icons";
 import {
   codeNote,
@@ -28,11 +28,8 @@ import {
   type FileRead,
   type FilesEntry,
   formatSize,
-  inlinePageAssets,
   kindOfEntry,
   markdownForQuickLook,
-  pageAssetKey,
-  pageAssetRefs,
 } from "./model";
 
 const shellCommands = createShellEnvironmentAtoms(connectionAtomRuntime);
@@ -47,27 +44,6 @@ function bytesOf(base64: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
-}
-
-/** A page with its own files inside it, read through the same engine route. */
-async function pageWithAssets(place: FilesPlace, file: FileRead): Promise<string> {
-  const html = file.contents ?? "";
-  const refs = pageAssetRefs(file.path, html);
-  const reads = await Promise.all(refs.map((ref) => filesApi.read(place, ref.path)));
-  const assets = new Map<string, string>();
-  refs.forEach((ref, index) => {
-    const answer = reads[index];
-    if (!answer?.ok || answer.value.contents === null) return;
-    const asset = answer.value;
-    if (ref.kind === "picture") {
-      if (asset.encoding === "base64") {
-        assets.set(pageAssetKey(ref), `data:${asset.mimeType};base64,${asset.contents}`);
-      }
-    } else if (asset.encoding === "utf8" && !asset.truncated) {
-      assets.set(pageAssetKey(ref), asset.contents!);
-    }
-  });
-  return inlinePageAssets(file.path, html, assets);
 }
 
 /** Show in Finder only works on the Mac itself, and only when the engine can reveal files. */
