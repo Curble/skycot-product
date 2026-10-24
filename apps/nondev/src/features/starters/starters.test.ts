@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  STARTER_FILE_NAMES,
+  readStarterMarker,
+  starterRulesFor,
+} from "@t3tools/skycot-rules/starter";
+
+import {
   GROWN_UP_RULES,
   GROWN_UP_STARTERS,
   KID_STARTERS,
   SURPRISE_IDEAS,
   firstBlank,
   pickSurprise,
+  starterMessageText,
   starterPrompt,
   startersFor,
+  stillFromStarter,
 } from "./starters";
 
 describe("starter cards", () => {
@@ -39,16 +47,51 @@ describe("starter cards", () => {
     expect(startersFor({ family: false, playful: false })).toBe(GROWN_UP_STARTERS);
   });
 
-  it("asks every kid starter for one offline file with no installs", () => {
+  it("shows a child only the friendly sentence, with no developer words", () => {
     for (const starter of KID_STARTERS) {
       const prompt = starterPrompt(starter, () => 0);
-      expect(starter.fileName).toMatch(/^[a-z-]+\.html$/);
-      expect(prompt).toContain(`one new file called ${starter.fileName}`);
-      expect(prompt).toMatch(/HTML, CSS and JavaScript all inside that one file/);
-      expect(prompt).toMatch(/work offline/);
-      expect(prompt).toMatch(/no internet/);
-      expect(prompt).toMatch(/no installs/);
+      expect(prompt).toBe(starter.ask.replace("{idea}", SURPRISE_IDEAS[0]!));
+      expect(prompt).not.toMatch(/\.html|HTML|CSS|JavaScript|offline|no installs|new file/i);
     }
+  });
+
+  it("names the same one file as the engine's rules for every kid card", () => {
+    expect(KID_STARTERS.map((starter) => starter.id).toSorted()).toEqual(
+      Object.keys(STARTER_FILE_NAMES).toSorted(),
+    );
+    for (const starter of KID_STARTERS) {
+      expect(starter.fileName).toBe(STARTER_FILE_NAMES[starter.id]);
+      expect(starterRulesFor(starter.id)).toContain(`one new file called ${starter.fileName}`);
+    }
+  });
+
+  it("sends the card's rules as a hidden marker while the words are still the card's", () => {
+    const game = KID_STARTERS.find((starter) => starter.id === "game")!;
+    const prompt = starterPrompt(game);
+    const seed = { starterId: "game", text: prompt };
+    const filled = prompt.replace(/\[[^\]]+\]/, "a maze where a penguin finds a fish");
+    const sent = starterMessageText(filled, seed);
+    expect(sent.startsWith(filled)).toBe(true);
+    expect(readStarterMarker(sent)).toBe("game");
+    // A few changed words still count as the card.
+    expect(readStarterMarker(starterMessageText(filled.replace("simple", "fun"), seed))).toBe(
+      "game",
+    );
+  });
+
+  it("sends no marker when the child cleared the box and typed their own idea", () => {
+    const game = KID_STARTERS.find((starter) => starter.id === "game")!;
+    const seed = { starterId: "game", text: starterPrompt(game) };
+    expect(starterMessageText("make me a game about dogs", seed)).toBe("make me a game about dogs");
+    expect(starterMessageText("", seed)).toBe("");
+    expect(stillFromStarter(seed.text, "hello")).toBe(false);
+    expect(starterMessageText("anything", null)).toBe("anything");
+  });
+
+  it("sends no marker for a grown-up card, which shows its own rules", () => {
+    const form = GROWN_UP_STARTERS[0]!;
+    const text = starterPrompt(form);
+    expect(starterMessageText(text, { starterId: form.id, text })).toBe(text);
   });
 
   it("never asks a child for personal details such as a real name or school", () => {

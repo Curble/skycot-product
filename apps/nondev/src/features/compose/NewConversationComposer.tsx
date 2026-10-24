@@ -49,7 +49,7 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "./autonomy";
-import { firstBlank } from "../starters/starters";
+import { firstBlank, starterMessageText } from "../starters/starters";
 import type { ComposerSeed } from "../starters/StarterCards";
 import { useShield, type ShieldOutcome } from "../shield";
 import { firstMessageLabels } from "./firstMessage";
@@ -334,6 +334,7 @@ export function NewConversationComposer({
             phone={phone}
             inputRef={inputRef}
             wantsPicture={appliedSeed?.wantsPicture === true}
+            seed={appliedSeed}
             onSend={async (send) => {
               setSending(true);
               setProblem(null);
@@ -388,6 +389,7 @@ function ComposerField({
   phone,
   inputRef,
   wantsPicture,
+  seed,
   onSend,
 }: {
   readonly environmentId: EnvironmentProject["environmentId"];
@@ -404,6 +406,8 @@ function ComposerField({
   readonly inputRef: RefObject<HTMLTextAreaElement | null>;
   /** "Draw it, then build it": the box hints at the + button until a picture is added. */
   readonly wantsPicture: boolean;
+  /** The starter card the box was filled from; its hidden rules go along while the words stand. */
+  readonly seed: ComposerSeed | null;
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
   const childView = useChildView();
@@ -512,7 +516,8 @@ function ComposerField({
     const message = {
       messageId: cleared.messageId,
       role: "user",
-      text: cleared.text,
+      // The card's technical rules ride as a hidden marker; the child's words stay as typed.
+      text: starterMessageText(cleared.text, seed),
       attachments: pictures.uploads(),
     } as const;
     const labels = firstMessageLabels(cleared.text, randomUUID(), family.enabled);

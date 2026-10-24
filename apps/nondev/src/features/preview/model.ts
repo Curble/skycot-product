@@ -1,7 +1,11 @@
 // The live preview as the plain client sees it: the engine's answer about one conversation's
 // site, where it can be drawn on this device, and the plain words for what the person pointed
 // at ("the big pink title"). Pure, so every rule here is tested without a browser.
-import { isLocalPreviewAddress, type Pointer } from "@t3tools/skycot-rules/preview";
+import {
+  isLocalPreviewAddress,
+  type Pointer,
+  type PreviewProblem,
+} from "@t3tools/skycot-rules/preview";
 
 export interface PreviewCommandView {
   readonly runner: string;
@@ -158,25 +162,42 @@ export function shortAddress(url: string): string {
   }
 }
 
-/** The message the "Ask Sam to fix it" button puts in the box, ready to send. */
-export function fixItMessage(
+export const CHILD_FIX_IT_MESSAGE = "The preview didn't work. Can you fix it?";
+
+/**
+ * What went wrong, in the words the assistant needs: the command, and what the start printed.
+ * A grown-up reads it in the message box; a child never does (see `fixItMessage`) and it
+ * travels as a hidden block instead (`withPreviewProblem`).
+ */
+export function fixItDetails(
   status: PreviewStatusView & { readonly state: "failed" | "stopped" },
-  childView = false,
-): string {
-  if (childView) return "The preview didn't work. Can you fix it?";
+): PreviewProblem {
   const what =
     status.state === "stopped"
       ? "The preview was working, then it stopped by itself."
       : status.reason === "no-address"
         ? "The preview didn't start: it ran but never opened a page I could see."
         : "The preview didn't start.";
-  const said = status.output.trim();
   const how = status.command.page
     ? `It shows \`${status.command.script}\` as a plain page.`
     : `It runs \`${status.command.runner}\`.`;
+  return { what, how, output: status.output.trim() };
+}
+
+/**
+ * The message the "Ask Sam to fix it" button puts in the box, ready to send. A child sees
+ * one friendly sentence; the command and the raw output go as hidden context
+ * (`fixItDetails`), so no developer text lands in their box or their bubble.
+ */
+export function fixItMessage(
+  status: PreviewStatusView & { readonly state: "failed" | "stopped" },
+  childView = false,
+): string {
+  if (childView) return CHILD_FIX_IT_MESSAGE;
+  const { what, how, output } = fixItDetails(status);
   return [
     `${what} Can you fix it so the preview works? ${how}`,
-    ...(said.length > 0 ? ["", "Here's what it said:", "```", said, "```"] : []),
+    ...(output.length > 0 ? ["", "Here's what it said:", "```", output, "```"] : []),
   ].join("\n");
 }
 
