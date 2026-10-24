@@ -1,6 +1,8 @@
-// Which conversation's preview is open, the things pointed at waiting in its message box, and
-// a message the preview asks to put there ("Ask Sam to fix it"). Kept in memory for this tab:
-// the preview is a view, and the engine stops a site nobody looks at.
+// Which conversation's preview is open (and which of its pages "Open it" asked for), the things
+// pointed at waiting in its message box, and a message the preview asks to put there ("Ask Sam
+// to fix it"). Kept in memory for this tab: the preview is a view, and the engine stops a site
+// nobody looks at.
+import type { EnvironmentId } from "@t3tools/contracts";
 import type { Pointer } from "@t3tools/skycot-rules/preview";
 import { MAX_POINTERS } from "@t3tools/skycot-rules/preview";
 import { useSyncExternalStore } from "react";
@@ -12,8 +14,23 @@ export interface PointerDraft {
   readonly picture: string | null;
 }
 
+/** "Open it" asked the Preview for one page of the site; a new ask has a new `nonce`. */
+export interface PageRequest {
+  readonly path: string;
+  readonly nonce: number;
+}
+
+/** A preview opened from outside its conversation (the fridge, a recap): shown as a sheet. */
+export interface PreviewElsewhere {
+  readonly threadId: string;
+  readonly environmentId: EnvironmentId;
+}
+
 interface State {
   readonly openThreadId: string | null;
+  readonly page: PageRequest | null;
+  /** Where the open preview belongs, when it was opened by "Open it" from anywhere. */
+  readonly environmentId: EnvironmentId | null;
   readonly pointers: ReadonlyMap<string, ReadonlyArray<PointerDraft>>;
   readonly composerText: ReadonlyMap<string, SuggestedMessage>;
 }
@@ -25,7 +42,13 @@ export interface SuggestedMessage {
   readonly nonce: number;
 }
 
-let state: State = { openThreadId: null, pointers: new Map(), composerText: new Map() };
+let state: State = {
+  openThreadId: null,
+  page: null,
+  environmentId: null,
+  pointers: new Map(),
+  composerText: new Map(),
+};
 const listeners = new Set<() => void>();
 let nonce = 0;
 
@@ -39,12 +62,56 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
+/** The Preview button: the site as it starts (its own first page). */
 export function openPreview(threadId: string): void {
-  if (state.openThreadId !== threadId) update({ ...state, openThreadId: threadId });
+  if (state.openThreadId !== threadId || state.page !== null) {
+    update({ ...state, openThreadId: threadId, page: null, environmentId: null });
+  }
+}
+
+/** "Open it": the conversation's Preview, at one page of its site. */
+export function openPreviewAt(threadId: string, environmentId: EnvironmentId, path: string): void {
+  nonce += 1;
+  update({ ...state, openThreadId: threadId, page: { path, nonce }, environmentId });
 }
 
 export function closePreview(): void {
-  if (state.openThreadId !== null) update({ ...state, openThreadId: null });
+  if (state.openThreadId !== null) {
+    update({ ...state, openThreadId: null, page: null, environmentId: null });
+  }
+}
+
+/** The page "Open it" asked this conversation's Preview for, if it did. */
+export function usePreviewPage(threadId: string): PageRequest | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => (state.openThreadId === threadId ? state.page : null),
+    () => null,
+  );
+}
+
+let elsewhere: PreviewElsewhere | null = null;
+
+/**
+ * The preview "Open it" opened for a conversation other than `shownThreadId` (the one on
+ * screen, which shows its own preview beside it), or null.
+ */
+export function usePreviewElsewhere(shownThreadId: string | null): PreviewElsewhere | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const { openThreadId, environmentId } = state;
+      if (openThreadId === null || environmentId === null || openThreadId === shownThreadId) {
+        return null;
+      }
+      // One object per open preview, so React sees the same answer until it changes.
+      if (elsewhere?.threadId !== openThreadId || elsewhere.environmentId !== environmentId) {
+        elsewhere = { threadId: openThreadId, environmentId };
+      }
+      return elsewhere;
+    },
+    () => null,
+  );
 }
 
 export function usePreviewOpen(threadId: string | null): boolean {

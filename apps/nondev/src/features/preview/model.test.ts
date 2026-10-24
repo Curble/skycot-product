@@ -6,6 +6,7 @@ import {
   fixItMessage,
   parsePreviewStatus,
   pointerFor,
+  previewAddressWorksHere,
   previewSurface,
   shortAddress,
   startApproval,
@@ -153,6 +154,31 @@ describe("words", () => {
     expect(message).not.toContain("It runs");
     const site = parsePreviewStatus({ state: "starting", command });
     expect(site?.state === "starting" ? site.command.page : "x").toBeUndefined();
+  });
+
+  it("knows which folder a plain page's Preview shows, so Open it can find a page in it", () => {
+    const shown = (command: Record<string, unknown>) => {
+      const status = parsePreviewStatus({ state: "starting", command });
+      return status?.state === "starting" ? status.command.pageFolder : "x";
+    };
+    const server = { runner: "SKYCOT's built-in page server", source: "static" };
+    expect(shown({ ...server, script: "public/index.html", pageFolder: "public" })).toBe("public");
+    expect(shown({ ...server, script: "index.html", pageFolder: "" })).toBe("");
+    // An engine that names only the page still says the folder.
+    expect(shown({ ...server, script: "dist/index.html" })).toBe("dist");
+    expect(shown({ ...server, script: "index.html" })).toBe("");
+    expect(shown(command)).toBeUndefined();
+  });
+
+  it("says whether the Preview's address works on this device", () => {
+    expect(previewAddressWorksHere({ hasDesktopPreview: true, hostname: "192.168.1.5" })).toBe(
+      true,
+    );
+    expect(previewAddressWorksHere({ hasDesktopPreview: false, hostname: "localhost" })).toBe(true);
+    expect(previewAddressWorksHere({ hasDesktopPreview: false, hostname: "127.0.0.1" })).toBe(true);
+    expect(previewAddressWorksHere({ hasDesktopPreview: false, hostname: "192.168.1.5" })).toBe(
+      false,
+    );
   });
 
   it("tells Sam a preview that stopped had been working, not that it didn't start (M4)", () => {
