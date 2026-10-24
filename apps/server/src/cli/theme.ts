@@ -29,6 +29,7 @@ import {
 } from "../environmentTheme.ts";
 import { expandHomePath, resolveBaseDir } from "../os-jank.ts";
 import { baseDirFlag } from "./config.ts";
+import { CLI_APP_NAME, CLI_COMMAND_NAME } from "@t3tools/shared/cliRelease"; // nondev-seam: brand-cli-theme
 
 const SparseSettings = Schema.Record(Schema.String, Schema.Unknown);
 const decodeSettingsJson = Schema.decodeUnknownEffect(fromLenientJson(SparseSettings));
@@ -88,7 +89,7 @@ export class ThemeFileInvalidError extends Schema.TaggedError<ThemeFileInvalidEr
   { filePath: Schema.String, cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `${this.filePath} is not a valid theme file. Use a theme exported from T3 Code, or a seeded file with name, appearance, canvas, and accent.`;
+    return `${this.filePath} is not a valid theme file. Use a theme exported from ${CLI_APP_NAME}, or a seeded file with name, appearance, canvas, and accent.`;
   }
 }
 
@@ -154,7 +155,7 @@ export class ThemeTargetMissingError extends Schema.TaggedError<ThemeTargetMissi
   {},
 ) {
   override get message(): string {
-    return "Provide a theme id or file, or run `t3 theme clear` to remove the theme.";
+    return `Provide a theme id or file, or run \`${CLI_COMMAND_NAME} theme clear\` to remove the theme.`;
   }
 }
 

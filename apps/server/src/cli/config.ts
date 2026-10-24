@@ -25,6 +25,7 @@ import { readBootstrapEnvelope } from "../bootstrap.ts";
 import * as ServerConfig from "../config.ts";
 import { expandHomePath, resolveBaseDir } from "../os-jank.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import { CLI_APP_NAME } from "@t3tools/shared/cliRelease"; // nondev-seam: brand-cli-config
 
 const modeFlag = Flag.Literals("mode", ServerConfig.RuntimeMode.literals).pipe(
   Flag.withDescription("Runtime mode. `desktop` keeps loopback defaults unless overridden."),
@@ -41,7 +42,7 @@ const hostFlag = Flag.String("host").pipe(
 );
 export const baseDirFlag = Flag.String("base-dir").pipe(
   Flag.withDescription(
-    "Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).",
+    `Explicit ${CLI_APP_NAME} data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).`,
   ),
   Flag.optional,
 );
@@ -340,7 +341,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
       isProcessAlive(runtime.value.pid)
     ) {
       return yield* new CliError.UserError({
-        cause: `A T3 Code server is already running for ${baseDir} (pid ${runtime.value.pid}, ${runtime.value.origin}). Connect to that server, stop it before starting another, or use a different --base-dir.`,
+        cause: `A ${CLI_APP_NAME} server is already running for ${baseDir} (pid ${runtime.value.pid}, ${runtime.value.origin}). Connect to that server, stop it before starting another, or use a different --base-dir.`,
       });
     }
   }

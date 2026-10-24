@@ -1,6 +1,12 @@
 // nondev-seam: brand-cli-update-repo
 const CLI_RELEASE_REPOSITORY =
   globalThis.process?.env?.T3CODE_CLI_UPDATE_REPOSITORY ?? "pingdotgg/t3code";
+// nondev-seam: brand-cli-name (the command a person types and the product its help names;
+// `env.cjs` sets both from brand.json, so a branded build installs and prints `skycot`, never `t3`)
+export const CLI_COMMAND_NAME = globalThis.process?.env?.T3CODE_CLI_NAME ?? "t3";
+export const CLI_APP_NAME = globalThis.process?.env?.T3CODE_APP_BASE_NAME ?? "T3 Code";
+/** How a person runs the CLI without installing it: upstream's npm package, or the brand's command. */
+export const CLI_RUN_COMMAND = globalThis.process?.env?.T3CODE_CLI_NAME ?? "npx t3";
 export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";

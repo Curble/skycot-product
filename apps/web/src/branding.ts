@@ -16,7 +16,13 @@ export const HOSTED_APP_CHANNEL =
   hostedAppChannel === "latest" || hostedAppChannel === "nightly" ? hostedAppChannel : null;
 export const HOSTED_APP_CHANNEL_LABEL =
   HOSTED_APP_CHANNEL === "nightly" ? "Nightly" : HOSTED_APP_CHANNEL === "latest" ? "Latest" : null;
-export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "T3 Code";
+// nondev-seam: brand-advanced-web-name (the build's T3CODE_APP_BASE_NAME / T3CODE_CLI_NAME, via vite.config.ts)
+export const APP_BASE_NAME =
+  injectedDesktopAppBranding?.baseName ?? (import.meta.env.T3CODE_APP_BASE_NAME || "T3 Code");
+/** The command Settings installs and the commands the client suggests (`t3 pair`, ...). */
+export const CLI_COMMAND_NAME = import.meta.env.T3CODE_CLI_NAME || "t3";
+/** How a person runs the command without installing it first. */
+export const CLI_RUN_COMMAND = import.meta.env.T3CODE_CLI_NAME || "npx t3";
 export const APP_STAGE_LABEL =
   injectedDesktopAppBranding?.stageLabel ??
   HOSTED_APP_CHANNEL_LABEL ??

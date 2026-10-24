@@ -5,6 +5,7 @@ import {
 } from "@t3tools/contracts";
 
 import { ConnectionBlockedError } from "./model.ts";
+import { APP_NAME } from "@t3tools/shared/appName"; // nondev-seam: brand-advanced-compatibility
 
 export function orchestrationProtocolCompatibilityError(
   descriptor: ExecutionEnvironmentDescriptor,
@@ -21,7 +22,7 @@ export function orchestrationProtocolCompatibilityError(
       })
     : new ConnectionBlockedError({
         reason: "unsupported",
-        detail: `This client requires a newer server. Update T3 Code on ${descriptor.label} to connect.`,
+        detail: `This client requires a newer server. Update ${APP_NAME} on ${descriptor.label} to connect.`,
         ...(canSelfUpdate(descriptor) ? { serverUpdateRequired: true } : {}),
       });
 }

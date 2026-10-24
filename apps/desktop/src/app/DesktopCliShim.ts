@@ -3,6 +3,8 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 
+import { CLI_APP_NAME, CLI_COMMAND_NAME } from "@t3tools/shared/cliRelease"; // nondev-seam: brand-cli-launcher
+import * as SkycotCliCommand from "../skycot/cliCommand.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import { makeComponentLogger } from "./DesktopObservability.ts";
 
@@ -10,7 +12,7 @@ import { makeComponentLogger } from "./DesktopObservability.ts";
 // AppImage itself instead of pointing into it.
 const { logInfo, logWarning } = makeComponentLogger("desktop-cli-shim");
 
-export const MARKER = "Written by T3 Code: runs the desktop app's bundled t3 CLI.";
+export const MARKER = `Written by ${CLI_APP_NAME}: runs the desktop app's bundled ${CLI_COMMAND_NAME} CLI.`;
 
 const SERVER_ENTRY = "apps/server/dist/bin.mjs";
 
@@ -19,7 +21,7 @@ const shellWord = (value: string) => `'${value.replaceAll("'", `'"'"'`)}'`;
 const cmdText = (value: string) => value.replaceAll("%", "%%");
 const cmdWord = (value: string) => `"${cmdText(value)}"`;
 
-const MOVED = "T3 Code has moved or been removed. Open the app once to update this command.";
+const MOVED = `${CLI_APP_NAME} has moved or been removed. Open the app once to update this command.`;
 
 export type CliShimTarget =
   | { readonly kind: "appimage"; readonly appImage: string; readonly executableName: string }
@@ -36,7 +38,10 @@ export const renderCliShim = (input: {
   readonly target: CliShimTarget;
   readonly shimPath: string;
   readonly t3Home: string;
+  /** Variables to set unless already set (nondev-seam: brand-cli-launcher; none upstream). */
+  readonly env?: ReadonlyArray<readonly [string, string]>;
 }) => {
+  const env = input.env ?? [];
   const { target } = input;
   if (target.kind === "windows") {
     const utf8 = [target.executable, target.entry, input.shimPath, input.t3Home].some((value) =>
@@ -59,6 +64,7 @@ export const renderCliShim = (input: {
         : []),
       `set "T3CODE_CLI_PATH=${cmdText(input.shimPath)}"`,
       `if not defined T3CODE_HOME set "T3CODE_HOME=${cmdText(input.t3Home)}"`,
+      ...env.map(([name, value]) => `if not defined ${name} set "${name}=${cmdText(value)}"`),
       'set "ELECTRON_RUN_AS_NODE=1"',
       // Electron's Windows executable starts without stdin; this tells the CLI to reopen the console.
       'set "T3CODE_DESKTOP_CLI_LAUNCHER=1"',
@@ -81,6 +87,7 @@ export const renderCliShim = (input: {
     `export T3CODE_CLI_PATH=${shellWord(input.shimPath)}`,
     `home=${shellWord(input.t3Home)}`,
     'export T3CODE_HOME="${T3CODE_HOME:-$home}"',
+    ...env.map(([name, value]) => `[ -n "\${${name}+x}" ] || export ${name}=${shellWord(value)}`),
     "export ELECTRON_RUN_AS_NODE=1",
     `app=${shellWord(target.kind === "appimage" ? target.appImage : target.executable)}`,
     'if [ ! -x "$app" ]; then',
@@ -125,7 +132,7 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
   environment.path.join(
     environment.baseDir,
     "bin",
-    environment.platform === "win32" ? "t3.cmd" : "t3",
+    environment.platform === "win32" ? `${CLI_COMMAND_NAME}.cmd` : CLI_COMMAND_NAME, // nondev-seam: brand-cli-launcher
   );
 
 export const install = Effect.gen(function* () {
@@ -146,7 +153,12 @@ export const install = Effect.gen(function* () {
         }),
         onNone: () => ({ kind: "direct" as const, executable: process.execPath, entry }),
       });
-  const content = renderCliShim({ target, shimPath, t3Home: environment.baseDir });
+  const content = renderCliShim({
+    target,
+    shimPath,
+    t3Home: environment.baseDir,
+    env: SkycotCliCommand.launcherEnv(), // nondev-seam: brand-cli-launcher
+  });
 
   return yield* Effect.gen(function* () {
     const existing = yield* fs.readFileString(shimPath).pipe(Effect.option);

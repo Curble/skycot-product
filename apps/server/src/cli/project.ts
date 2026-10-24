@@ -42,6 +42,7 @@ import {
 } from "../serverRuntimeState.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 import { type CliAuthLocationFlags, projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
+import { CLI_COMMAND_NAME } from "@t3tools/shared/cliRelease"; // nondev-seam: brand-cli-project
 
 type ProjectMutationTarget = {
   readonly id: ProjectId;
@@ -222,7 +223,7 @@ const withProjectCliSessionToken = <A, E, R>(
   Effect.acquireUseRelease(
     environmentAuth.issueSession({
       scopes: AuthStandardClientScopes,
-      label: "t3 project cli",
+      label: `${CLI_COMMAND_NAME} project cli`,
     }),
     (issued) => run(issued.token),
     (issued) => environmentAuth.revokeSession(issued.sessionId).pipe(Effect.ignore({ log: true })),

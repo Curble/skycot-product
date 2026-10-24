@@ -321,6 +321,8 @@ export const DesktopCliCommandStateSchema = Schema.Struct({
   installedPath: Schema.NullOr(Schema.String),
   onPath: Schema.Boolean,
   shadowedBy: Schema.optionalKey(Schema.String),
+  /** An older build's own `t3` command that Install replaces with this build's command name. */
+  replaces: Schema.optionalKey(Schema.String), // nondev-seam: brand-cli-replace-state
 });
 export type DesktopCliCommandState = typeof DesktopCliCommandStateSchema.Type;
 

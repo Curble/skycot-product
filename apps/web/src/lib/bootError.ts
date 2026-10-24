@@ -1,5 +1,8 @@
+// nondev-seam: brand-advanced-boot-error (no imports here: it must run when the app cannot load)
+const APP_NAME = import.meta.env.T3CODE_APP_BASE_NAME || "T3 Code";
+
 export function showBootError(error: unknown) {
-  console.error("T3 Code failed to start.", error);
+  console.error(`${APP_NAME} failed to start.`, error);
   const bootShell = document.getElementById("boot-shell");
   if (!bootShell) return;
 
@@ -8,7 +11,7 @@ export function showBootError(error: unknown) {
   content.setAttribute("role", "alert");
 
   const message = document.createElement("p");
-  message.textContent = "T3 Code could not load.";
+  message.textContent = `${APP_NAME} could not load.`;
   content.append(message);
 
   if (import.meta.env.DEV && error instanceof Error) {

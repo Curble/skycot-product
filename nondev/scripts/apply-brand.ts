@@ -313,6 +313,33 @@ function seams(): Seam[] {
       mechanism: "env seam",
     },
     {
+      id: "brand-cli-name",
+      file: "packages/shared/src/cliRelease.ts",
+      constant: "CLI_COMMAND_NAME (the command Advanced settings installs; CLI help and hints)",
+      envName: "T3CODE_CLI_NAME",
+      upstreamDefault: '"t3"',
+      effective: (e) => e.T3CODE_CLI_NAME!,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-advanced-web-define",
+      file: "apps/web/vite.config.ts",
+      constant: "Advanced mode's product and command name (web build define)",
+      envName: "T3CODE_APP_BASE_NAME",
+      upstreamDefault: 'process.env.T3CODE_APP_BASE_NAME?.trim() || ""',
+      effective: (e) => `${e.T3CODE_APP_BASE_NAME!} / ${e.T3CODE_CLI_NAME!}`,
+      mechanism: "env seam",
+    },
+    {
+      id: "brand-advanced-web-name",
+      file: "apps/web/src/branding.ts",
+      constant: "APP_BASE_NAME (every Advanced mode screen)",
+      envName: "import.meta.env.T3CODE_APP_BASE_NAME",
+      upstreamDefault: '"T3 Code"',
+      effective: (e) => e.T3CODE_APP_BASE_NAME!,
+      mechanism: "env seam",
+    },
+    {
       id: "skycot-default-runtime-mode",
       file: "packages/contracts/src/providerPolicy.ts",
       constant: "DEFAULT_RUNTIME_MODE (threads that inherit the engine default)",
@@ -449,6 +476,14 @@ function checkEnv(brand: Brand, env: Record<string, string>): string[] {
     if (!env[name] || read(env[name]) === undefined)
       errors.push(`env.cjs: ${name} names "${env[name] ?? ""}", which is not a file in the repo`);
   }
+  // The installed command must never be called t3: that is a real T3 Code's command on the
+  // same Mac, and Settings would link over (or be shadowed by) it (seam brand-cli-name).
+  if (env.T3CODE_CLI_NAME !== brand.cliName)
+    errors.push(`env.cjs: T3CODE_CLI_NAME must follow brand.json cliName (${brand.cliName})`);
+  if (!/^[a-z][a-z0-9-]*$/u.test(brand.cliName) || brand.cliName === "t3")
+    errors.push(
+      `brand.json: cliName "${brand.cliName}" must be a plain command name other than t3`,
+    );
   for (const file of ["LICENSE", "NOTICE", "nondev/bin/skycot.cjs"]) {
     if (read(file) === undefined)
       errors.push(`${file}: missing (shipped in every bundle / the only supported CLI entry)`);

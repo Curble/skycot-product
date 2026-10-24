@@ -22,6 +22,7 @@ import * as Equal from "effect/Equal";
 import * as Cause from "effect/Cause";
 
 import type { ResolvedSettingsScope } from "./settingsScope";
+import { APP_BASE_NAME } from "~/branding"; // nondev-seam: brand-advanced-scoped-settings
 
 export type ScopedSettingsPatch = ServerSettingsPatch & ClientSettingsPatch;
 
@@ -462,7 +463,7 @@ export async function persistScopedSettingsPatch(
       return [
         {
           ...environment,
-          message: "This environment does not support this setting. Update T3 Code on it.",
+          message: `This environment does not support this setting. Update ${APP_BASE_NAME} on it.`,
         },
       ];
     }

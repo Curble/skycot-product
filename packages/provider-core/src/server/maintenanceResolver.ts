@@ -33,6 +33,8 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { collectUint8StreamText } from "./collectStreamText.ts";
 import * as ProviderLatestVersions from "./ProviderLatestVersions.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-advanced-provider-maintenance-resolver
+
 const LATEST_VERSION_TIMEOUT_MS = 4_000;
 const PROBE_TIMEOUT_MS = 10_000;
 const PROBE_MAX_BYTES = 256 * 1_024;
@@ -787,7 +789,7 @@ export const makeCachedProviderMaintenanceResolution = Effect.fn(
  */
 function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {
   return installPath
-    ? `Version ${latestVersion} is out. T3 Code runs ${installPath}; update it with the app or tool that installed it.`
+    ? `Version ${latestVersion} is out. ${BRAND_NAME} runs ${installPath}; update it with the app or tool that installed it.`
     : `Version ${latestVersion} is out. Update it with the app or tool that installed it.`;
 }
 
