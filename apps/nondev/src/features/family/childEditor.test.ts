@@ -16,6 +16,7 @@ describe("the child editor", () => {
     expect(draft.readAloud).toBe(true);
     expect(draft.avatar).toEqual({ kind: "initial", color: "sun" });
     expect(draft.bedtimeOn).toBe(false);
+    expect(draft.readingLevel).toBe("makers");
   });
 
   it("saves exactly what the sheet shows", () => {
@@ -31,6 +32,7 @@ describe("the child editor", () => {
       name: "Leo",
       voice: { typing: false, readAloud: true },
       limits: { bedtime: { start: "19:00", end: "06:30" }, dailyMinutes: null, dailyTurns: 20 },
+      readingLevel: "makers",
     });
     expect(patchFor({ ...draft, name: "  " }).name).toBeNull();
   });

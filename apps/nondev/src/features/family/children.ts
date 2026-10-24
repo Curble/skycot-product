@@ -31,6 +31,10 @@ export interface ChildVoice {
   readonly readAloud: boolean;
 }
 
+export const READING_LEVELS = ["little-makers", "makers", "big-makers"] as const;
+export type ReadingLevel = (typeof READING_LEVELS)[number];
+export const DEFAULT_READING_LEVEL: ReadingLevel = "makers";
+
 export interface FamilyChild {
   readonly id: string;
   readonly name: string | null;
@@ -45,6 +49,7 @@ export interface FamilyChild {
    * step that needs a grown-up waits for one (the engine decides, SkycotPolicyReactor).
    */
   readonly askEachStep: boolean;
+  readonly readingLevel: ReadingLevel;
 }
 
 export const NO_LIMITS: ChildLimits = {
@@ -111,6 +116,9 @@ export function parseChild(value: unknown): FamilyChild | null {
     },
     limits: parseLimits(input["limits"]),
     askEachStep: input["askEachStep"] === true,
+    readingLevel: (READING_LEVELS as ReadonlyArray<unknown>).includes(input["readingLevel"])
+      ? (input["readingLevel"] as ReadingLevel)
+      : DEFAULT_READING_LEVEL,
   };
 }
 

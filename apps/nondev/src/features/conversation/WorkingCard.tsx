@@ -36,6 +36,9 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Disclosure, TechnicalList } from "./cards/Disclosure";
 import type { WorkGroup } from "./cards/grouping";
 import { shortTime, toIso } from "./cards/time";
+import { useChildView } from "../../app/useChildView";
+import { elapsedCopy, estimateCopy, estimateBuildTime } from "../../plain/estimate";
+import { readBuildTimes } from "./buildTimes";
 
 const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "preparing",
@@ -103,6 +106,7 @@ export function WorkingCard({
   readonly threadId: ThreadId;
   readonly projectName: string | null;
 }) {
+  const childView = useChildView();
   // environmentId / threadId stay in the signature for the stream's call site;
   // the card itself no longer dispatches anything (Stop moved to the header).
   void environmentId;
@@ -139,9 +143,13 @@ export function WorkingCard({
             item.runId === group.runId &&
             (item.type === "approval_request" || item.type === "user_input_request"),
         );
-  const active = run
+  const runActive = run
     ? ACTIVE_RUN.has(run.status)
     : group.items.some((item) => describeTurnItem(item, ctx).status === "running");
+  const pendingAsk = runAsks.some(
+    (item) => item.type === "approval_request" && requests.get(item.requestId)?.resolvedAt === null,
+  );
+  const active = runActive && !(childView && pendingAsk);
   const narrated = group.items.map((item) => {
     const narration = describeTurnItem(item, ctx);
     // A run that was stopped leaves its unfinished steps "about to …": they never ran.
@@ -203,25 +211,54 @@ export function WorkingCard({
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
   const doneSoFar = checklist.done.length;
-  const subtitleParts = active
-    ? [
-        total > 0
-          ? `Step ${stepNow} of ${total}`
-          : doneSoFar > 0
-            ? `${doneSoFar} ${doneSoFar === 1 ? "step" : "steps"} done so far`
-            : genericHint
-              ? "Just started"
-              : hint.replace(/[.…]+$/, ""),
-        elapsed,
-      ]
-    : [
-        refused || (stopped && stepCount === 0)
-          ? "Nothing was changed"
-          : stepCount === 0
-            ? "No files touched"
-            : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
-        elapsed,
-      ];
+  const phase = run?.sourcePlanRef ? "build" : "plan";
+  const estimate =
+    childView && run
+      ? estimateCopy(
+          phase,
+          estimateBuildTime(readBuildTimes(), {
+            kind: "other",
+            model: run.modelSelection.model,
+            phase,
+          }),
+        )
+      : null;
+  const childElapsed =
+    childView && run && startMillis
+      ? elapsedCopy(
+          Math.max(0, Date.now() - Date.parse(startMillis) - waited),
+          phase,
+          estimateBuildTime(readBuildTimes(), {
+            kind: "other",
+            model: run.modelSelection.model,
+            phase,
+          }),
+          hint.replace(/[.…]+$/, "") || "Building it",
+        )
+      : null;
+  const subtitleParts =
+    pendingAsk && childView
+      ? []
+      : active
+        ? [
+            total > 0
+              ? `Step ${stepNow} of ${total}`
+              : doneSoFar > 0
+                ? `${doneSoFar} ${doneSoFar === 1 ? "step" : "steps"} done so far`
+                : genericHint
+                  ? "Just started"
+                  : hint.replace(/[.…]+$/, ""),
+            childElapsed ?? estimate,
+            childView ? null : elapsed,
+          ]
+        : [
+            refused || (stopped && stepCount === 0)
+              ? "Nothing was changed"
+              : stepCount === 0
+                ? "No files touched"
+                : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
+            elapsed,
+          ];
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
   const detailLines = askBeforeItsStep(narrated).map(({ item, narration }) => {
@@ -257,26 +294,32 @@ export function WorkingCard({
 
   // A limit stopped it and SKYCOT carried the turn on with another model (plain line below).
   const carriedOn = !active && run?.status === "failed" && wasCarriedOn(projection, run.id);
-  const headerTone = active
-    ? "blue"
-    : carriedOn
+  const headerTone =
+    pendingAsk && childView
       ? "orange"
-      : run?.status === "failed" && !refusedByFamily(projection, run.id)
-        ? "red"
-        : failed > 0 || refused || run?.status === "failed"
+      : active
+        ? "blue"
+        : carriedOn
           ? "orange"
-          : "green";
+          : run?.status === "failed" && !refusedByFamily(projection, run.id)
+            ? "red"
+            : failed > 0 || refused || run?.status === "failed"
+              ? "orange"
+              : "green";
   // The Family profile turned the assistant away before it started (nobody allowed it): the
   // grown-up card below says so, so this card is a calm note, not "something went wrong".
   const awaitingGrownUp =
     !active && run?.status === "failed" && refusedByFamily(projection, run.id);
-  const title = active
-    ? "Working on it"
-    : awaitingGrownUp
-      ? "Waiting for a grown-up"
-      : carriedOn
-        ? "Paused here, carried on below"
-        : finishedTitle(run?.status, refused);
+  const title =
+    pendingAsk && childView
+      ? "Paused — waiting for a grown-up"
+      : active
+        ? "Working on it"
+        : awaitingGrownUp
+          ? "Waiting for a grown-up"
+          : carriedOn
+            ? "Paused here, carried on below"
+            : finishedTitle(run?.status, refused);
   const icon = carriedOn
     ? Hammer
     : awaitingGrownUp

@@ -12,6 +12,7 @@ import type {
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
+import { orchestrationV2RunWorkStartedAt } from "@t3tools/contracts";
 import { withExplainMarker } from "@t3tools/skycot-rules/explain";
 import { withPointing } from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
@@ -103,6 +104,11 @@ import {
 import { conversationTitle, describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
+import { BuildJourney } from "../journey/BuildJourney";
+import { recordBuildTime } from "./buildTimes";
+import { starterIdFromText } from "../badges/facts";
+import { elapsedCopy, estimateBuildTime } from "../../plain/estimate";
+import { readBuildTimes } from "./buildTimes";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -165,6 +171,7 @@ export function ConversationView({
   const waitingOnYou =
     shell !== null &&
     (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
+  const waitingForGrownUp = shell?.hasPendingApprovals ?? false;
   const crew = useCrew();
   const crewName = crew.builder.name;
   // The mode the engine enforces: the Family rules while the profile is on (safe steps by
@@ -216,8 +223,26 @@ export function ConversationView({
       ? runStart
       : new Date(Date.parse(runStart) + waited).toISOString(),
     shell?.latestRun?.completedAt ?? null,
-    active,
+    active && !(childView && waitingOnYou),
   );
+  const runPhase = shell?.latestRun?.sourcePlanRef ? "build" : "plan";
+  const runEstimate =
+    childView && shell
+      ? estimateBuildTime(readBuildTimes(), {
+          kind: "other",
+          model: shell.modelSelection.model,
+          phase: runPhase,
+        })
+      : null;
+  const timeLine =
+    childView && active && !waitingOnYou && runStart
+      ? elapsedCopy(
+          Math.max(0, Date.now() - Date.parse(runStart) - waited),
+          runPhase,
+          runEstimate,
+          status?.headline ?? "Building it",
+        )
+      : elapsed;
 
   const projectName = project?.title ?? null;
 
@@ -238,6 +263,35 @@ export function ConversationView({
   }, [latestId, seenLatest]);
   const startNote = useStartNote(threadId);
   useBadgeWatcher({ threadId, shell, projection, active, retryMade });
+  const recordedRuns = useRef(new Set<string>());
+  useEffect(() => {
+    if (!childView || !projection) return;
+    for (const run of projection.runs) {
+      if (!run.completedAt || recordedRuns.current.has(run.id) || run.status !== "completed")
+        continue;
+      recordedRuns.current.add(run.id);
+      const start = DateTime.toEpochMillis(orchestrationV2RunWorkStartedAt(run));
+      const end = DateTime.toEpochMillis(run.completedAt);
+      const runAsks = projection.turnItems.filter(
+        (item): item is AskItem =>
+          item.runId === run.id &&
+          (item.type === "approval_request" || item.type === "user_input_request"),
+      );
+      const requestMap = new Map(
+        projection.runtimeRequests.map((request) => [request.id, request]),
+      );
+      const duration = end - start - waitedMillis(runAsks, requestMap);
+      if (Number.isFinite(duration) && duration > 0) {
+        const message = projection.messages.find((entry) => entry.id === run.userMessageId);
+        recordBuildTime({
+          kind: starterIdFromText(message?.text ?? "") ?? "other",
+          model: run.modelSelection.model,
+          phase: run.sourcePlanRef ? "build" : "plan",
+          milliseconds: duration,
+        });
+      }
+    }
+  }, [childView, projection]);
 
   const rewindFacts = useRewindFacts({ environmentId, threadId, shell, projection, archived });
   const [publishOpen, setPublishOpen] = useState(false);
@@ -340,10 +394,10 @@ export function ConversationView({
               Ready to look at
             </Pill>
           ) : null}
-          {elapsed ? (
+          {timeLine ? (
             <span className="fm-strip__time">
               <Clock size={13} strokeWidth={1.8} aria-hidden />
-              {elapsed}
+              {waitingForGrownUp && childView ? "Paused — waiting for a grown-up" : timeLine}
             </span>
           ) : null}
           <span className="fm-strip__dot">·</span>
@@ -359,7 +413,7 @@ export function ConversationView({
               <PublishStatusPill status={publish.status} />
             </>
           ) : null}
-          {active ? (
+          {active && !childView ? (
             <span className="fm-strip__grow">
               <ProgressBar value={1} max={1} thin label="Working" tone="accent" />
             </span>
@@ -432,11 +486,16 @@ export function ConversationView({
           shell={shell}
           projectName={projectName}
           trailing={
-            active &&
-            !waitingOnYou &&
-            !projection.turnItems.some(
-              (item) => item.type === "assistant_message" && item.streaming,
-            ) ? (
+            active && !waitingOnYou && childView && shell?.latestRun?.sourcePlanRef ? (
+              <BuildJourney
+                projection={projection}
+                elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}
+              />
+            ) : active &&
+              !waitingOnYou &&
+              !projection.turnItems.some(
+                (item) => item.type === "assistant_message" && item.streaming,
+              ) ? (
               <TypingIndicator meta={`${crewName} is working…`} />
             ) : null
           }

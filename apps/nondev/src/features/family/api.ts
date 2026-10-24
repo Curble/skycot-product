@@ -5,7 +5,7 @@ import { readDesktopPrimaryBearerToken } from "~/environments/primary/desktopAut
 import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target";
 
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
-import type { ChildAvatar, ChildLimits, ChildVoice } from "./children";
+import type { ChildAvatar, ChildLimits, ChildVoice, ReadingLevel } from "./children";
 import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
 import { parseRelayStatus } from "./relay";
 import {
@@ -101,6 +101,7 @@ export interface ChildPatch {
   readonly voice?: Partial<ChildVoice>;
   readonly limits?: Partial<ChildLimits>;
   readonly askEachStep?: boolean;
+  readonly readingLevel?: ReadingLevel;
 }
 
 function parseAdded(body: unknown) {

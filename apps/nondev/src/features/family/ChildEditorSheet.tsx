@@ -27,9 +27,12 @@ import {
   COLOR_NAMES,
   DEFAULT_VOICE,
   NO_LIMITS,
+  DEFAULT_READING_LEVEL,
+  READING_LEVELS,
   POSE_NAMES,
   type ChildAvatar as Avatar,
   type FamilyChild,
+  type ReadingLevel,
 } from "./children";
 import { addChild, removeChild, updateChild } from "./store";
 
@@ -48,6 +51,7 @@ export interface ChildDraft {
   readonly keepAllowancePercent: number | null;
   /** "Ask [child] before each step": off by default (safe steps run by themselves). */
   readonly askEachStep: boolean;
+  readonly readingLevel: ReadingLevel;
 }
 
 export function draftFor(child: FamilyChild | null, siblings: number): ChildDraft {
@@ -70,6 +74,7 @@ export function draftFor(child: FamilyChild | null, siblings: number): ChildDraf
     dailyTurns: limits.dailyTurns,
     keepAllowancePercent: limits.keepAllowancePercent,
     askEachStep: child?.askEachStep ?? false,
+    readingLevel: child?.readingLevel ?? DEFAULT_READING_LEVEL,
   };
 }
 
@@ -88,6 +93,7 @@ export function patchFor(draft: ChildDraft): ChildPatch {
       keepAllowancePercent: draft.keepAllowancePercent,
     },
     askEachStep: draft.askEachStep,
+    readingLevel: draft.readingLevel,
   };
 }
 
@@ -319,6 +325,24 @@ export function ChildEditorSheet({
           ) : null}
         </section>
 
+        <section className="fm-child-editor__section">
+          <h3>Reading level</h3>
+          <label>
+            How Sam explains things
+            <select
+              value={draft.readingLevel}
+              onChange={(event) =>
+                change({ readingLevel: event.currentTarget.value as ReadingLevel })
+              }
+            >
+              {READING_LEVELS.map((level, index) => (
+                <option key={level} value={level}>
+                  {["Little makers (5–7)", "Makers (8–10)", "Big makers (11–13)"][index]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
         <section className="fm-child-editor__section">
           <h3>Steps</h3>
           <div className="fm-child-editor__row">

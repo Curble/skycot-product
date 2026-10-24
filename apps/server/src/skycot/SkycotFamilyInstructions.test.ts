@@ -15,6 +15,7 @@ import * as Instructions from "./SkycotFamilyInstructions.ts";
 const familyOn = (enabled: boolean) =>
   Option.some({
     isEnabled: Effect.succeed(enabled),
+    status: Effect.succeed({ children: [{ readingLevel: "makers" }] }),
   } as unknown as SkycotFamily.SkycotFamily["Service"]);
 
 const message = (
@@ -42,6 +43,7 @@ describe("the personal-details shield on Family turns", () => {
       );
       assert.include(wrapped.text, Instructions.shieldNote(["full-name", "school"]));
       assert.include(wrapped.text, "SKYCOT hid a full name and a school's name");
+      assert.include(wrapped.text, "Makers (ages 8–10)");
     }),
   );
 
@@ -218,4 +220,25 @@ describe("plan first in the Family profile", () => {
       assert.strictEqual(yield* Instructions.familyTurnInput(family(false), input), input);
     }),
   );
+});
+
+describe("familyReadingLevel", () => {
+  it("gives one level and never a name, the youngest when siblings differ", () => {
+    assert.equal(Instructions.familyReadingLevel([]), "Makers (ages 8–10)");
+    assert.equal(
+      Instructions.familyReadingLevel([{ readingLevel: "big-makers" }]),
+      "Big makers (ages 11–13)",
+    );
+    assert.equal(
+      Instructions.familyReadingLevel([
+        { readingLevel: "big-makers" },
+        { readingLevel: "little-makers" },
+      ]),
+      "Little makers (ages 5–7)",
+    );
+    assert.equal(
+      Instructions.familyReadingLevel([{ readingLevel: "nonsense" }]),
+      "Makers (ages 8–10)",
+    );
+  });
 });

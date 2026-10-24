@@ -108,6 +108,7 @@ export interface TurnInstructions {
   readonly hidden?: ReadonlyArray<PersonalCategory>;
   /** The turn runs as a plan (plan first): the rules say so. Family only. */
   readonly plan?: boolean;
+  readonly readingLevel?: string;
 }
 
 /** The text a provider receives for one message. Unchanged when no instruction applies. */
@@ -119,6 +120,11 @@ export function wrapTurnText(text: string, instructions: TurnInstructions): stri
         FAMILY_RULES_TAG,
         [
           FAMILY_RULES_TEXT,
+          ...(instructions.readingLevel
+            ? [
+                `- The child reads at the ${instructions.readingLevel} level. Pitch each short progress note to it.`,
+              ]
+            : []),
           ...(hidden.length > 0 ? [shieldNote(hidden)] : []),
           ...(instructions.plan === true ? [PLAN_FIRST_NOTE] : []),
         ].join("\n"),
@@ -228,6 +234,24 @@ export const familyTurnPlans = (
 ): Effect.Effect<boolean> =>
   Effect.map(planPassFor(messageId), (pass) => familyInteractionMode(requested, pass) === "plan");
 
+const LEVEL_LABELS = {
+  "little-makers": "Little makers (ages 5–7)",
+  makers: "Makers (ages 8–10)",
+  "big-makers": "Big makers (ages 11–13)",
+} as const;
+const LEVEL_ORDER = ["little-makers", "makers", "big-makers"] as const;
+
+/** The family's reading level for Sam's notes: the youngest any child has, as a label. */
+export function familyReadingLevel(
+  children: ReadonlyArray<{ readonly readingLevel?: string | null | undefined }>,
+): string {
+  const levels = children.map(
+    (child) => LEVEL_ORDER.find((level) => level === child.readingLevel) ?? "makers",
+  );
+  const youngest = LEVEL_ORDER.find((level) => levels.includes(level)) ?? "makers";
+  return LEVEL_LABELS[youngest];
+}
+
 /**
  * The message a provider receives. While the Family profile is on: the rules, the shield
  * and (by default) explain mode; otherwise explain mode only when the message asked for it.
@@ -249,6 +273,10 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
           if (!explain && marked.choice === null) return message;
           return { ...message, text: wrapTurnText(marked.text, { family: false, explain }) };
         }
+        const status = yield* family.value.status.pipe(Effect.catch(() => Effect.succeed(null)));
+        // One level, and never a name (names stay off the AI service, like the shield's rule):
+        // with siblings on different levels, Sam pitches to the youngest so everyone follows.
+        const readingLevel = familyReadingLevel(status?.children ?? []);
         const allowed = yield* takeShieldPass(message.messageId);
         const redaction = allowed
           ? { text: marked.text, categories: [] }
@@ -271,6 +299,7 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
             explain,
             hidden: redaction.categories,
             plan: options.plan === true,
+            readingLevel,
           }),
         };
       });

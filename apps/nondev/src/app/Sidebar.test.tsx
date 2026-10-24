@@ -13,6 +13,7 @@ const child: FamilyChild = {
   voice: { typing: false, readAloud: true },
   limits: { bedtime: null, dailyMinutes: null, dailyTurns: null, keepAllowancePercent: null },
   askEachStep: false,
+  readingLevel: "makers",
 };
 
 describe("Sidebar identity in the child view", () => {

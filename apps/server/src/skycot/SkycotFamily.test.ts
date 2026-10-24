@@ -393,6 +393,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
             avatar: { kind: "mascot", pose: "yay" },
             look: "classic",
             largerText: false,
+            readingLevel: "little-makers",
           });
           assert.lengthOf(status.children, 2);
           const leo = status.children.find((child) => child.id === childId)!;
@@ -400,6 +401,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           assert.deepEqual(leo.avatar, { kind: "mascot", pose: "yay" });
           assert.equal(leo.look, "classic");
           assert.isFalse(leo.largerText);
+          assert.equal(leo.readingLevel, "little-makers");
           // A second letter picture never shares the first one's colour.
           assert.notDeepEqual(status.children[0]!.avatar, leo.avatar);
 
@@ -413,6 +415,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
                 dailyTurns: null,
               },
               avatar: { kind: "mascot", pose: "not-a-pose" },
+              readingLevel: "not-a-level",
             },
           });
           const changed = updated.children.find((child) => child.id === childId)!;
@@ -424,6 +427,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
             keepAllowancePercent: null,
           });
           assert.deepEqual(changed.avatar, leo.avatar);
+          assert.equal(changed.readingLevel, "little-makers");
 
           const removed = yield* family.removeChild({ childId });
           assert.deepEqual(
