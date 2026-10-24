@@ -21,6 +21,8 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import { Cursor, InMemoryCredentialStore } from "./sdk.ts";
 import type { ProviderAuthController } from "@t3tools/provider-core/server/auth";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-cursor-api-key
+
 const AUTH_TIMEOUT_MS = 300_000;
 
 interface AuthFlow {
@@ -185,7 +187,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             openBrowser: false,
             store: pendingStore,
             signal,
-            apiKeyName: `T3 Code - ${options.displayName}`,
+            apiKeyName: `${BRAND_NAME} - ${options.displayName}`,
             onLoginUrl: (authorizationUrl) => {
               if (active === flow) Queue.offerUnsafe(urls, authorizationUrl);
             },

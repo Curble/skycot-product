@@ -6,6 +6,8 @@ import type {
   ThreadPullRequestWatch,
 } from "@t3tools/contracts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-pr-watch
+
 /**
  * Wakes in a row that bring only comments. Check, conflict, or push news resets the count, so
  * this only stops a chatty bot looping an agent that is replying to it.
@@ -178,12 +180,12 @@ export function pullRequestWatchMessage(input: {
     commit: input.headSha === null ? "" : ` on ${input.headSha.slice(0, 7)}`,
   };
   const text = [
-    `Update on pull request #${input.number} (${input.url}), which T3 Code is watching for you:`,
+    `Update on pull request #${input.number} (${input.url}), which ${BRAND_NAME} is watching for you:`,
     ...changes.flatMap((change) => changeLines(change, context)),
     "",
     exhausted
-      ? `T3 Code stopped watching after ${PULL_REQUEST_WATCH_WAKE_LIMIT} comment-only updates in a row. Call watch_pull_request to watch it again.`
-      : "Look into each item and act on it as your task requires. T3 Code keeps watching and wakes you on the next change, so end your turn when you are done. When you hand the work back to the user, call unwatch_pull_request first so the thread returns to their inbox.",
+      ? `${BRAND_NAME} stopped watching after ${PULL_REQUEST_WATCH_WAKE_LIMIT} comment-only updates in a row. Call watch_pull_request to watch it again.`
+      : `Look into each item and act on it as your task requires. ${BRAND_NAME} keeps watching and wakes you on the next change, so end your turn when you are done. When you hand the work back to the user, call unwatch_pull_request first so the thread returns to their inbox.`,
   ].join("\n");
   const failed = changes.some(
     (change) => change.kind === "checks-failed" || change.kind === "conflicting",

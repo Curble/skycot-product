@@ -124,7 +124,7 @@ const layerCapabilities = Layer.effectContext(
       clerkToken: Effect.fail(
         new ConnectionBlockedError({
           reason: "authentication",
-          detail: "T3 Connect sign-in is not available in the simple client yet.",
+          detail: "SKYCOT doesn't use an online account to reach your Mac.",
         }),
       ),
     });

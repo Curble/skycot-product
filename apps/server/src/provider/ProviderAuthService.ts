@@ -81,7 +81,7 @@ export const makeProviderAuthService = Effect.gen(function* () {
         instanceId,
         operation,
         detail: instance
-          ? "This provider does not support sign-in in T3 Code."
+          ? `This provider does not support sign-in in ${process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"}.` // nondev-seam: brand-sweep-provider-auth
           : "This provider instance is no longer available.",
       });
     }

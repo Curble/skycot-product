@@ -48,6 +48,8 @@ import {
   type PiDiscoveredCommands,
 } from "./commands.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-pi-status
+
 const PI_PRESENTATION = {
   displayName: "Pi",
   showInteractionModeToggle: false,
@@ -238,7 +240,7 @@ export const buildInitialPiProviderSnapshot = Effect.fn(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Pi is disabled in T3 Code settings.",
+        message: `Pi is disabled in ${BRAND_NAME} settings.`,
       },
     });
   }
@@ -276,7 +278,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Pi is disabled in T3 Code settings.",
+        message: `Pi is disabled in ${BRAND_NAME} settings.`,
       },
     });
   }
@@ -351,7 +353,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message: `T3 Code could not determine the Pi version. Pi ${MINIMUM_PI_VERSION} or newer is required.`,
+        message: `${BRAND_NAME} could not determine the Pi version. Pi ${MINIMUM_PI_VERSION} or newer is required.`,
       },
     });
   }
@@ -409,8 +411,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version,
         status: "ready",
         auth: { status: "unknown" },
-        message:
-          "Pi is available, but T3 Code could not refresh its models and commands. The live session will retry startup.",
+        message: `Pi is available, but ${BRAND_NAME} could not refresh its models and commands. The live session will retry startup.`,
       },
     });
   }

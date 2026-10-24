@@ -11,6 +11,8 @@ import {
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-mcp-thread-credential
+
 const ALL_MCP_CAPABILITIES = [
   "preview",
   "orchestration",
@@ -107,7 +109,7 @@ export const requireThreadMcpCapability = <const C extends "preview" | "device">
 const threadCallerRequired = (operation: string) =>
   new OrchestratorMcpFailure({
     code: "thread_credential_required",
-    message: `${operation} acts as the calling T3 thread, so it needs an agent running inside T3 Code. This MCP client signed in from outside a thread.`,
+    message: `${operation} acts as the calling T3 thread, so it needs an agent running inside ${BRAND_NAME}. This MCP client signed in from outside a thread.`,
   });
 
 export type McpThreadInvocationScope = McpInvocationScope & { readonly thread: McpThreadCaller };

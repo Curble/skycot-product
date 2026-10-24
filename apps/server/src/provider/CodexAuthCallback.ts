@@ -23,7 +23,9 @@ export function subscribeCodexAuthCallback(input: CodexAuthCallbackInput) {
           codexAuthorizationRequest(input.authorizationUrl);
           const destination = providerAuthReturnUrl(input.returnUrl);
           if (!destination || !isLoopbackHost(new URL(destination).hostname))
-            throw new Error("The local sign-in receiver needs a local T3 Code return address.");
+            throw new Error(
+              `The local sign-in receiver needs a local ${process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"} return address.`, // nondev-seam: brand-sweep-codex-receiver
+            );
           return destination;
         },
         catch: failure,

@@ -39,6 +39,8 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as SkycotDockIcon from "../skycot/dockIcon.ts"; // nondev-seam: brand-dock-icon
 
 const DEFAULT_DESKTOP_BACKEND_PORT = 3773;
+
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-desktop-startup-error
 const MAX_TCP_PORT = 65_535;
 const DESKTOP_BACKEND_PORT_PROBE_HOSTS = ["127.0.0.1", "0.0.0.0", "::"] as const;
 
@@ -137,7 +139,7 @@ const handleFatalStartupError = Effect.fn("desktop.startup.handleFatalStartupErr
   const wasQuitting = yield* Ref.getAndSet(state.quitting, true);
   if (!wasQuitting) {
     yield* electronDialog.showErrorBox(
-      "T3 Code failed to start",
+      `${BRAND_NAME} failed to start`,
       `Stage: ${stage}\n${message}${detail}`,
     );
   }

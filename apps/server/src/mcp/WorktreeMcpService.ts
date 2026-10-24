@@ -24,6 +24,8 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as VcsStatusBroadcaster from "../vcs/VcsStatusBroadcaster.ts";
 import type { McpInvocationScope, McpThreadInvocationScope } from "./McpInvocationContext.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-mcp-worktree
+
 export class WorktreeMcpService extends Context.Service<
   WorktreeMcpService,
   {
@@ -73,7 +75,7 @@ const make = Effect.gen(function* () {
       ? Effect.fail(
           failure(
             "thread_credential_required",
-            "Worktree handoff and status act as the calling T3 thread, so they need an agent running inside T3 Code.",
+            `Worktree handoff and status act as the calling T3 thread, so they need an agent running inside ${BRAND_NAME}.`,
           ),
         )
       : Effect.succeed(scope as McpThreadInvocationScope);
