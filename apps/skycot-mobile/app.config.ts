@@ -123,11 +123,12 @@ const config: ExpoConfig = {
       NSMicrophoneUsageDescription:
         "Lets you talk instead of type, when a grown-up has turned talking on.",
       NSSupportsLiveActivities: true,
-      // ITSAppUsesNonExemptEncryption is left out on purpose: the relay tunnel seals traffic with
-      // SKYCOT's own Noise_IK_25519_ChaChaPoly_SHA256 (standard algorithms, @noble), so "false"
-      // (only Apple's encryption) would be untrue, and "true" needs a compliance code from filed
-      // documentation (upload error 90592). Without the key, App Store Connect asks the export
-      // questions for each build, answered by the account holder.
+      // Export compliance (24 October 2026): Mark answered App Store Connect's questions for builds
+      // 2 and 3 (standard encryption in addition to Apple's — the relay's Noise tunnel — and not
+      // distributed in France), and Apple then said the build needs no encryption documentation and
+      // that this key may say so, so later builds skip the "Missing Compliance" stop. Revisit if
+      // France or non-standard encryption ever comes in.
+      ITSAppUsesNonExemptEncryption: false,
     },
     // The iPhone app's own privacy manifest, made at prebuild (React Native's pod install adds
     // the reasons its libraries need). Declared here so it exists before the Watch app's own
