@@ -43,6 +43,11 @@ export function openChildPicker() {
   for (const listener of pickerListeners) listener();
 }
 
+/** Whether "Who's using SKYCOT?" was asked for and is still up (read outside React). */
+export function childPickerRequested(): boolean {
+  return pickerRequested;
+}
+
 function closeRequestedPicker() {
   pickerRequested = false;
   for (const listener of pickerListeners) listener();

@@ -18,6 +18,7 @@ import { NotificationCoordinator } from "../features/notifications/NotificationC
 import { PreviewPanel } from "../features/preview/PreviewPanel";
 import { usePreviewOpen } from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
+import { ReadyNotifier } from "../features/updates/ReadyNotifier";
 import { UpdatePill } from "../features/updates/UpdatePill";
 import { UsageBanner } from "../features/usage/UsageBanner";
 import { UsageIndicator } from "../features/usage/UsagePopover";
@@ -131,6 +132,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <UsageBanner />
       </div>
       <NotificationCoordinator />
+      <ReadyNotifier />
       <div className={`fm-body${showList ? "" : " fm-body--no-list"}`}>
         {columns === 3 ? <AppSidebar route={route} /> : null}
         {showList ? (

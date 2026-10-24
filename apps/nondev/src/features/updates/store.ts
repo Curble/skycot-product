@@ -92,3 +92,30 @@ export async function installDownloadedUpdate(): Promise<boolean> {
   publish(result.state);
   return result.accepted;
 }
+
+// The title-bar pill's "Restart to update" sheet, as one shared switch: the pill opens it, and
+// so does clicking the "new version ready" notification (./ReadyNotifier.tsx).
+let restartSheetOpen = false;
+const sheetListeners = new Set<() => void>();
+
+function setRestartSheetOpen(open: boolean) {
+  if (restartSheetOpen === open) return;
+  restartSheetOpen = open;
+  for (const listener of sheetListeners) listener();
+}
+
+export const openRestartSheet = () => setRestartSheetOpen(true);
+export const closeRestartSheet = () => setRestartSheetOpen(false);
+
+export function useRestartSheetOpen(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      sheetListeners.add(listener);
+      return () => {
+        sheetListeners.delete(listener);
+      };
+    },
+    () => restartSheetOpen,
+    () => false,
+  );
+}
