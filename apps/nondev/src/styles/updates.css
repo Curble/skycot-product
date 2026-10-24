@@ -5,6 +5,25 @@
   flex-shrink: 0;
   display: inline-flex;
 }
+/* Prominent on purpose (Mark, beta 4: it "blends in too much"): the look's accent as a filled
+   capsule with its on-accent text, like a primary button, in every look, light and dark. The
+   selector outweighs the Workshop look's own pill rule (flavours.css) and keeps its ink outline. */
+.fm-titlebar .fm-update-pill .fm-pill.fm-pill--button {
+  background: var(--fm-accent-fill, var(--fm-accent));
+  color: var(--fm-on-accent);
+  font-weight: 600;
+}
+.fm-titlebar .fm-update-pill .fm-pill.fm-pill--button:hover {
+  box-shadow: none;
+  filter: brightness(1.06);
+}
+.fm-titlebar .fm-update-pill .fm-pill.fm-pill--button:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+html[data-flavour-borders="sketch"] .fm-titlebar .fm-update-pill .fm-pill.fm-pill--button {
+  box-shadow: var(--fm-shadow-button);
+}
 /* Narrower windows keep "Restart to update", a phone just "Update"; the pill's accessible
    name always carries the whole sentence. */
 .fm-update-pill__short {
