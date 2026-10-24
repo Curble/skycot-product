@@ -14,6 +14,7 @@ import type {
 import * as DateTime from "effect/DateTime";
 import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
+import { useChildView } from "../../app/useChildView";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { describeDecision } from "../../plain/approvals";
 import { filesFromPrompt } from "../../plain/changes";
@@ -28,6 +29,7 @@ import {
   summarizeRun,
   type NarrationContext,
 } from "../../plain/narration";
+import { asksForGame } from "../badges/facts";
 import { isAssistantRefusal } from "../family/assistantAllowance";
 import { Bubble } from "../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
@@ -121,7 +123,20 @@ export function WorkingCard({
         : [],
     ),
   );
+  // A child's lines use kid words; "Testing your game" when the first ask was for a game.
+  const kid = useChildView();
+  const firstAsk = kid
+    ? projection.turnItems
+        .filter((item) => item.type === "user_message" && item.createdBy === "user")
+        .reduce<(typeof projection.turnItems)[number] | undefined>(
+          (first, item) => (first === undefined || item.ordinal < first.ordinal ? item : first),
+          undefined,
+        )
+    : undefined;
+  const kidThing =
+    firstAsk?.type === "user_message" && asksForGame(firstAsk.text) ? "game" : "page";
   const ctx: NarrationContext = {
+    ...(kid ? { kid: true, kidThing } : {}),
     ...(projectName === null ? {} : { projectName }),
     runtimeRequests: requests,
     ...(stopped ? { stopped: true } : {}),

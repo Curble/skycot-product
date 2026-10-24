@@ -13,7 +13,12 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { withExplainMarker } from "@t3tools/skycot-rules/explain";
-import { withPointing } from "@t3tools/skycot-rules/preview";
+import { withStarterMarker } from "@t3tools/skycot-rules/starter";
+import {
+  withPointing,
+  withPreviewProblem,
+  type PreviewProblem,
+} from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
@@ -56,7 +61,7 @@ import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
 import { requestMode, usePlanFirst } from "../compose/planFirst";
 import { useEnsureInteractionMode } from "../compose/turnMode";
-import { firstBlank } from "../starters/starters";
+import { firstBlank, stillFromStarter } from "../starters/starters";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
 import {
@@ -687,8 +692,11 @@ function ReplyComposer({
   const [explainOn] = useExplainMode(threadId, family.enabled);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
+  // A card's hidden rules go with the one message it started, not with later follow-ups.
+  const [seedSent, setSeedSent] = useState(false);
   if (seed !== appliedSeed) {
     setAppliedSeed(seed);
+    setSeedSent(false);
     if (seed !== null) setText(seed.text);
   }
   useEffect(() => {
@@ -701,8 +709,18 @@ function ReplyComposer({
   // "Ask Sam to fix it" and the picker's own note arrive from the preview panel.
   const suggested = useSuggestedMessage(threadId);
   const [appliedSuggestion, setAppliedSuggestion] = useState<number | null>(null);
+  // A child's "Ask Sam to fix it" carries the command and output as hidden context.
+  const [fixIt, setFixIt] = useState<{
+    readonly text: string;
+    readonly problem: PreviewProblem;
+  } | null>(null);
   if (suggested !== null && suggested.nonce !== appliedSuggestion) {
     setAppliedSuggestion(suggested.nonce);
+    setFixIt(
+      suggested.problem !== undefined && suggested.mode === "replace"
+        ? { text: suggested.text, problem: suggested.problem }
+        : null,
+    );
     setText((current) =>
       suggested.mode === "append" && current.trim().length > 0
         ? `${current.trimEnd()} ${suggested.text}`
@@ -813,6 +831,8 @@ function ReplyComposer({
     setText("");
     pictures.clear();
     clearPointers(threadId);
+    setFixIt(null);
+    setSeedSent(true);
     setTypedWhileActive(false);
     setConfirmNewTurn(false);
     return true;
@@ -835,6 +855,18 @@ function ReplyComposer({
       if (cleared.dropPictures) pictures.clear();
       return;
     }
+    // The fix-it context goes on after the shield looked at the child's own words, and only
+    // while those words are still the fix-it message (their own new idea sends nothing hidden).
+    const hidden = fixIt !== null && stillFromStarter(fixIt.text, trimmed) ? fixIt.problem : null;
+    // A starter card's technical rules ride as a hidden marker while the words are still the card's.
+    const fromCard =
+      appliedSeed !== null && !seedSent && stillFromStarter(appliedSeed.text, trimmed)
+        ? appliedSeed.starterId
+        : null;
+    const message = {
+      text: withStarterMarker(withPreviewProblem(cleared.text, hidden), fromCard),
+      messageId: cleared.messageId,
+    };
     if (editing !== null) {
       // Checked again here: the conversation may have moved since Edit was pressed.
       const check = rewindFacts.check(editing.itemId);
@@ -848,11 +880,11 @@ function ReplyComposer({
       setGoBackOpen({
         target: check.target,
         choice: rewindFacts.choiceFor(check.target),
-        message: { text: cleared.text, messageId: cleared.messageId },
+        message,
       });
       return;
     }
-    await deliver(cleared, active);
+    await deliver(message, active);
   };
 
   const confirmGoBack = async (restoreFiles: boolean) => {

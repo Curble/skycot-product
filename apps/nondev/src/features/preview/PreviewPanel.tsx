@@ -5,7 +5,7 @@
 // something or uses the internet). Plain controls only: Reload, Open in browser, Close, and
 // "Point at something", which turns a click in the page into a chip in the message box.
 import type { EnvironmentId, PreviewAnnotationSubmissionResult } from "@t3tools/contracts";
-import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
+import { isLocalPreviewAddress, type PreviewProblem } from "@t3tools/skycot-rules/preview";
 import {
   AppWindow,
   ExternalLink,
@@ -45,6 +45,7 @@ import {
   type FrameControls,
 } from "./DesktopPreviewFrame";
 import {
+  fixItDetails,
   fixItMessage,
   pointerFor,
   previewSurface,
@@ -331,7 +332,7 @@ function PreviewPanelBody({
         busy={busy}
         onStart={start}
         onTryAgain={() => void tryAgain()}
-        onAsk={(text) => suggestMessage(threadId, text, "replace")}
+        onAsk={(text, problem) => suggestMessage(threadId, text, "replace", problem)}
         frame={
           status?.state === "running" && surface !== null && frameUrl !== null ? (
             <RunningFrame
@@ -458,7 +459,8 @@ function StatusBody({
   readonly busy: boolean;
   readonly onStart: (approved: boolean) => Promise<void>;
   readonly onTryAgain: () => void;
-  readonly onAsk: (text: string) => void;
+  /** `problem` is the hidden context a child's message carries (never shown to them). */
+  readonly onAsk: (text: string, problem?: PreviewProblem) => void;
   readonly frame: ReactNode;
 }) {
   const childView = useChildView();
@@ -503,7 +505,12 @@ function StatusBody({
             <Button disabled={busy} onClick={onTryAgain}>
               Try again
             </Button>
-            <Button variant="primary" onClick={() => onAsk(fixItMessage(status, childView))}>
+            <Button
+              variant="primary"
+              onClick={() =>
+                onAsk(fixItMessage(status, childView), childView ? fixItDetails(status) : undefined)
+              }
+            >
               {childView ? "Ask Sam to fix it" : `Ask ${builder} to fix it`}
             </Button>
           </span>
@@ -523,7 +530,12 @@ function StatusBody({
           <p className="fm-preview__state-title">Your preview stopped.</p>
           <p className="fm-preview__state-text">Start it again?</p>
           <span className="fm-preview__actions">
-            <Button disabled={busy} onClick={() => onAsk(fixItMessage(status, childView))}>
+            <Button
+              disabled={busy}
+              onClick={() =>
+                onAsk(fixItMessage(status, childView), childView ? fixItDetails(status) : undefined)
+              }
+            >
               {childView ? "Ask Sam to fix it" : `Ask ${builder} why`}
             </Button>
             <Button variant="primary" disabled={busy} onClick={onTryAgain}>

@@ -27,6 +27,10 @@
 //   - "How did you do that?" explain mode (`@t3tools/skycot-rules/explain`): on by default in
 //     the Family profile, off otherwise, and switched per message by the marker the client
 //     appends, which is stripped here.
+//   - Starter cards (`@t3tools/skycot-rules/starter`): a card puts only a friendly sentence in
+//     the child's message; its technical rules (one offline file, no installs) ride in a marker
+//     the client appends and the child never sees. Stripped here and turned into a rules block
+//     for the assistant, whether or not the Family profile is on.
 //
 // Plan first rides the same wrapper: while the profile is on, a turn runs in the provider's plan
 // mode (Codex's plan collaboration mode, Claude's "plan" permission mode) with a line in the
@@ -49,6 +53,7 @@ import {
   shieldApprovalId,
   type PersonalCategory,
 } from "@t3tools/skycot-rules/personal";
+import { readStarterMarker, starterRulesFor } from "@t3tools/skycot-rules/starter";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -57,6 +62,7 @@ import type * as SkycotFamily from "./SkycotFamily.ts";
 
 export const FAMILY_RULES_TAG = "skycot_family_rules";
 export const EXPLAIN_TAG = "skycot_explain";
+export const STARTER_TAG = "skycot_starter";
 const REQUEST_TAG = "user_request";
 
 // nondev-seam: skycot-child-language
@@ -89,7 +95,10 @@ export const PLAN_FIRST_NOTE =
  */
 function neutralizeTags(text: string): string {
   return text.replace(
-    new RegExp(`<\\s*/?\\s*(${FAMILY_RULES_TAG}|${EXPLAIN_TAG}|${REQUEST_TAG})\\s*>`, "gi"),
+    new RegExp(
+      `<\\s*/?\\s*(${FAMILY_RULES_TAG}|${EXPLAIN_TAG}|${STARTER_TAG}|${REQUEST_TAG})\\s*>`,
+      "gi",
+    ),
     (_match, name: string) => `[${name}]`,
   );
 }
@@ -108,11 +117,14 @@ export interface TurnInstructions {
   readonly hidden?: ReadonlyArray<PersonalCategory>;
   /** The turn runs as a plan (plan first): the rules say so. Family only. */
   readonly plan?: boolean;
+  /** The kids' starter card the message came from; its technical rules join the turn. */
+  readonly starter?: string | null;
 }
 
 /** The text a provider receives for one message. Unchanged when no instruction applies. */
 export function wrapTurnText(text: string, instructions: TurnInstructions): string {
-  if (!instructions.family && !instructions.explain) return text;
+  const starterRules = starterRulesFor(instructions.starter ?? null);
+  if (!instructions.family && !instructions.explain && starterRules === null) return text;
   const hidden = instructions.hidden ?? [];
   const rules = instructions.family
     ? block(
@@ -125,7 +137,8 @@ export function wrapTurnText(text: string, instructions: TurnInstructions): stri
       )
     : null;
   const explain = instructions.explain ? block(EXPLAIN_TAG, EXPLAIN_INSTRUCTIONS) : null;
-  return [rules, explain, block(REQUEST_TAG, neutralizeTags(text))]
+  const starter = starterRules === null ? null : block(STARTER_TAG, starterRules);
+  return [rules, explain, starter, block(REQUEST_TAG, neutralizeTags(text))]
     .filter((part): part is string => part !== null)
     .join("\n\n");
 }
@@ -244,10 +257,14 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
     : Effect.gen(function* () {
         const enabled = yield* family.value.isEnabled;
         const marked = readExplainMarker(message.text);
+        const starter = readStarterMarker(message.text);
         const explain = marked.choice === null ? explainDefault(enabled) : marked.choice === "on";
         if (!enabled) {
-          if (!explain && marked.choice === null) return message;
-          return { ...message, text: wrapTurnText(marked.text, { family: false, explain }) };
+          if (!explain && marked.choice === null && marked.text === message.text) return message;
+          return {
+            ...message,
+            text: wrapTurnText(marked.text, { family: false, explain, starter }),
+          };
         }
         const allowed = yield* takeShieldPass(message.messageId);
         const redaction = allowed
@@ -271,6 +288,7 @@ export const withFamilyRules = <M extends ProviderAdapter.ProviderAdapterV2TurnM
             explain,
             hidden: redaction.categories,
             plan: options.plan === true,
+            starter,
           }),
         };
       });

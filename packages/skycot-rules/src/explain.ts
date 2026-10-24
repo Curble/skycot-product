@@ -9,6 +9,8 @@
 // plain client hides it. Only a choice that differs from the default is sent: explanations
 // are on by default in the Family profile and off otherwise.
 
+import { stripStarterMarker } from "./starter.ts";
+
 export type ExplainChoice = "on" | "off";
 
 export const EXPLAIN_ON_MARKER = "[SKYCOT: explain how you did it]";
@@ -33,15 +35,19 @@ export function withExplainMarker(text: string, on: boolean, familyOn: boolean):
   return marker === null ? text : `${text}\n\n${marker}`;
 }
 
-/** The message without its marker, and the choice it carried (null: the default). */
+/**
+ * The message without its markers, and the explain choice it carried (null: the default). A
+ * starter card's marker (./starter.ts) sits before this one and comes off too; read it with
+ * `readStarterMarker` on the whole message.
+ */
 export function readExplainMarker(text: string): {
   readonly text: string;
   readonly choice: ExplainChoice | null;
 } {
   const match = MARKER_AT_END.exec(text);
-  if (match === null) return { text, choice: null };
+  if (match === null) return { text: stripStarterMarker(text), choice: null };
   return {
-    text: text.slice(0, match.index),
+    text: stripStarterMarker(text.slice(0, match.index)),
     choice: match[1] === "explain how you did it" ? "on" : "off",
   };
 }

@@ -4,11 +4,24 @@ import { withExplainMarker } from "@t3tools/skycot-rules/explain";
 
 import { items, NOW_ISO, turnItem } from "../../plain/fixtures.test-helpers";
 import { ASK_FOR_EXPLANATION } from "../explain/ExplainAsk";
-import { GROWN_UP_STARTERS, KID_STARTERS, starterPrompt } from "../starters/starters";
+import {
+  GROWN_UP_STARTERS,
+  KID_STARTERS,
+  starterMessageText,
+  starterPrompt,
+} from "../starters/starters";
 import { conversationEvents, creationTopics, FRESH_MESSAGE_MS, messageFacts } from "./facts";
 
 const NOW = Date.parse(NOW_ISO);
-const kid = (id: string) => KID_STARTERS.find((starter) => starter.id === id)!;
+/** What a card's message looks like once sent: the friendly words plus the hidden marker. */
+const sentFrom = (id: string, fill = false) => {
+  const starter = [...KID_STARTERS, ...GROWN_UP_STARTERS].find((card) => card.id === id)!;
+  const prompt = starterPrompt(starter, () => 0);
+  return starterMessageText(fill ? prompt.replace(/\[[^\]]+\]/g, "a dragon") : prompt, {
+    starterId: id,
+    text: prompt,
+  });
+};
 
 const user = (messageId: string, text: string, extra: Record<string, unknown> = {}) =>
   turnItem("user_message", {
@@ -24,14 +37,13 @@ const user = (messageId: string, text: string, extra: Record<string, unknown> = 
 describe("message facts", () => {
   it("knows every starter card from the words it wrote, blanks filled in or not", () => {
     for (const starter of [...KID_STARTERS, ...GROWN_UP_STARTERS]) {
-      const text = starterPrompt(starter, () => 0).replace(/\[[^\]]+\]/g, "a dragon");
-      expect(messageFacts(text, 0).starter).toBe(starter.id);
+      expect(messageFacts(sentFrom(starter.id, true), 0).starter).toBe(starter.id);
     }
     expect(messageFacts("make me a game please", 0).starter).toBeNull();
   });
 
   it("a card's own 'Please' is not the child's kind words; the child's is", () => {
-    expect(messageFacts(starterPrompt(kid("game")), 0).kindWords).toBe(false);
+    expect(messageFacts(sentFrom("game"), 0).kindWords).toBe(false);
     expect(messageFacts("can you make the cat jump please", 0).kindWords).toBe(true);
     expect(messageFacts("Thank you SKYCOT!", 0).kindWords).toBe(true);
     expect(messageFacts("make it pink", 0).kindWords).toBe(false);
@@ -68,7 +80,7 @@ describe("message facts", () => {
       story: true,
     });
     // The quiz card says "keep score"; the card decides, and a quiz is not a game sticker.
-    expect(creationTopics(starterPrompt(kid("quiz")), "quiz")).toEqual({
+    expect(creationTopics(sentFrom("quiz"), "quiz")).toEqual({
       game: false,
       animal: false,
       story: false,
@@ -79,7 +91,7 @@ describe("message facts", () => {
 describe("conversation events", () => {
   it("a finished creation is reported with its card and first-message topics", () => {
     const events = conversationEvents({
-      projection: { turnItems: [user("m1", starterPrompt(kid("pet")))] },
+      projection: { turnItems: [user("m1", sentFrom("pet"))] },
       threadId: "t1",
       title: "My pet Biscuit",
       madeSomething: true,

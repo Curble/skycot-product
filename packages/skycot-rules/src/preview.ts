@@ -3,7 +3,9 @@
 // the plain client draws it; both read "is this address on this Mac?" from here, so the screen
 // can never offer what the engine would refuse. Also the "Point at something" block: the words
 // a message carries so the assistant knows which part of the page the person means, and the
-// reader that lets the plain client show them as a chip instead.
+// reader that lets the plain client show them as a chip instead. And the "preview problem"
+// block: what the Preview printed when it would not start, which a child's "Ask Sam to fix it"
+// carries to the assistant without the child ever seeing the command or the raw text.
 
 const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/;
 /**
@@ -130,13 +132,48 @@ export function withPointing(text: string, pointers: ReadonlyArray<Pointer>): st
   return `${typed}${typed.length > 0 ? "\n\n" : ""}${blocks.join("\n\n")}\n${intro}`;
 }
 
-/** The typed words without the pointing blocks, and the chips' labels. */
+/** What the Preview said when it would not start, for the assistant and not the child. */
+export interface PreviewProblem {
+  /** "The preview didn't start." */
+  readonly what: string;
+  /** "It runs `npm run dev`." */
+  readonly how: string;
+  /** What the start printed (plain terminal text; may be empty). */
+  readonly output: string;
+}
+
+const PROBLEM_LINE = /^\[SKYCOT preview problem\]$/;
+/** Terminal text is cut to its tail (where the error is) so a noisy start cannot flood a turn. */
+export const PROBLEM_OUTPUT_MAX = 6000;
+
+/**
+ * The message the assistant receives when a child asked to fix the Preview: what they sent,
+ * then one block with the command and what it printed. Reads as plain words where it is shown
+ * raw (Advanced mode); the plain client hides it (`readPointing` cuts the message there).
+ */
+export function withPreviewProblem(text: string, problem: PreviewProblem | null): string {
+  if (problem === null) return text;
+  const said = plainTerminalText(problem.output).trim();
+  const tail = said.length > PROBLEM_OUTPUT_MAX ? `…${said.slice(-PROBLEM_OUTPUT_MAX)}` : said;
+  // A fence longer than any run of backticks inside the output cannot be closed by it.
+  const longest = Math.max(0, ...(tail.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  const typed = text.trimEnd();
+  return [
+    `${typed}${typed.length > 0 ? "\n\n" : ""}[SKYCOT preview problem]`,
+    `- ${oneLine(problem.what, 200)} ${oneLine(problem.how, 200)}`,
+    ...(tail.length > 0 ? ["- What it said:", fence, tail, fence] : []),
+    "(The person has not seen this; it is what happened when their preview did not work.)",
+  ].join("\n");
+}
+
+/** The typed words without the pointing and preview-problem blocks, and the chips' labels. */
 export function readPointing(text: string): {
   readonly text: string;
   readonly labels: ReadonlyArray<string>;
 } {
   const lines = text.split("\n");
-  const first = lines.findIndex((line) => POINTER_LINE.test(line));
+  const first = lines.findIndex((line) => POINTER_LINE.test(line) || PROBLEM_LINE.test(line));
   if (first === -1) return { text, labels: [] };
   const labels = lines.flatMap((line) => {
     const match = POINTER_LINE.exec(line);

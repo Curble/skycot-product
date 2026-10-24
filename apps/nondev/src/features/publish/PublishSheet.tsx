@@ -5,6 +5,7 @@
 // the default branch is never pushed from here (plain/git.ts guarantees it).
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { readExplainMarker } from "@t3tools/skycot-rules/explain";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -684,7 +685,11 @@ function commitMessageFor(
       item.inputIntent !== "promoted_queued_to_steer" &&
       item.inputIntent !== "queued_turn",
   )?.text;
-  return keepCommitMessage(request, summary).message;
+  // The hidden markers (explain mode, starter card) are for the engine, not a commit message.
+  return keepCommitMessage(
+    request === undefined ? request : readExplainMarker(request).text,
+    summary,
+  ).message;
 }
 
 function formatUploadTime(iso: string): string {
