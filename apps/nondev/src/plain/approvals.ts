@@ -170,6 +170,29 @@ export interface ApprovalDecisionSummary {
   readonly note?: string;
 }
 
+/** One short sentence for a child's held approval card. */
+export function childApprovalSentence(
+  card: Pick<ApprovalCard, "whatItWants" | "technical">,
+  assistantName: string,
+): string {
+  const wants = card.whatItWants.replace(/^The assistant wants to /i, "").replace(/[.!?]+$/, "");
+  if (/install\b/i.test(card.technical) && /\bthree(?:\.js)?\b/i.test(card.technical)) {
+    return `${assistantName} wants to download a 3D tool. This one needs a grown-up.`;
+  }
+  return `${assistantName} wants to ${wants}. This one needs a grown-up.`;
+}
+
+/** The two choices a child gets on an approval held for a grown-up. */
+export function childApprovalOptions(
+  options: ReadonlyArray<ApprovalOption>,
+): Array<ApprovalOption> {
+  return options.flatMap((option) => {
+    if (option.id === "accept") return [{ ...option, label: "Get a grown-up" }];
+    if (option.id === "decline") return [{ ...option, label: "No thanks" }];
+    return [];
+  });
+}
+
 /**
  * Who answered a resolved request and how to say it. The server policy signs its approvals
  * in `answers.skycot`; anything else was a person.

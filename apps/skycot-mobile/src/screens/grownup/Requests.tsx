@@ -8,7 +8,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
-import { requestHeading } from "../../../../nondev/src/features/family/people";
+import {
+  grownUpRequestSentence,
+  requestHeading,
+} from "../../../../nondev/src/features/family/people";
 import { useGrownUp, type WaitingRequest } from "../../app/grownup/GrownUpContext";
 import { useCodeLength, useMacData } from "../../data/MacData";
 import { subscribeAllow, takeAllow } from "../../faceid/allowIntent";
@@ -58,6 +61,7 @@ function RequestCard(props: {
   const [allowing, setAllowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const name = child?.name ?? "A child";
   const heading = requestHeading(request);
@@ -94,10 +98,9 @@ function RequestCard(props: {
   };
 
   const useFace = faceId.readyOn(mac);
-  const childName = child?.name ?? null;
   const allowingRef = useRef(false);
   /** Allow once: Face ID's fresh signature when it is set up; the parent code otherwise. */
-  const allow = useCallback(async () => {
+  const allow = async () => {
     if (allowingRef.current || done !== null || request.lapsed) return;
     setProblem(null);
     setCodeNote(null);
@@ -108,7 +111,7 @@ function RequestCard(props: {
     allowingRef.current = true;
     setAllowing(true);
     try {
-      const outcome = await faceId.allow(mac, request, childName);
+      const outcome = await faceId.allow(mac, request, child?.name ?? null);
       if (outcome.kind === "allowed") {
         haptic("success");
         settle(`Allowed with ${faceId.label}, this once.`);
@@ -122,7 +125,11 @@ function RequestCard(props: {
       allowingRef.current = false;
       setAllowing(false);
     }
-  }, [faceId, mac, request, childName, done, settle]);
+  };
+  const allowRef = useRef(allow);
+  useEffect(() => {
+    allowRef.current = allow;
+  }, [allow]);
 
   // "Allow once" on this card's notification: Face ID starts here, with the card on screen.
   const key = `${mac.macId}:${request.requestId}`;
@@ -132,11 +139,11 @@ function RequestCard(props: {
   }, [props.liveKeys]);
   useEffect(() => {
     const check = () => {
-      if (takeAllow(key, liveKeysRef.current)) void allow();
+      if (takeAllow(key, liveKeysRef.current)) void allowRef.current();
     };
     check();
     return subscribeAllow(check);
-  }, [key, allow]);
+  }, [key]);
 
   return (
     <Card style={{ gap: 12 }}>
@@ -149,15 +156,21 @@ function RequestCard(props: {
           </Txt>
         </View>
       </View>
-      <Txt variant="title3">{heading}</Txt>
-      {request.what.length > 0 ? (
+      {/* nondev-seam: skycot-grownup-request-sentence */}
+      <Txt variant="title3">{grownUpRequestSentence(request, name)}</Txt>
+      <Button
+        title={showDetails ? "Hide details" : "Show details"}
+        kind="plain"
+        onPress={() => setShowDetails((value) => !value)}
+      />
+      {showDetails && request.what.length > 0 ? (
         <View style={{ backgroundColor: theme.color.fill, borderRadius: 8, padding: 10 }}>
           <Txt variant="subheadline" style={{ fontFamily: "Menlo" }} selectable>
             {request.what}
           </Txt>
         </View>
       ) : null}
-      {request.why ? <Txt tone="label2">{request.why}</Txt> : null}
+      {showDetails && request.why ? <Txt tone="label2">{request.why}</Txt> : null}
       {request.lapsed ? (
         <Banner tone="warning" text="This one is waiting on the Mac now. Answer it there." />
       ) : null}

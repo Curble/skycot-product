@@ -9,7 +9,11 @@ import {
   childLabel,
   type FamilyChild,
 } from "../../../nondev/src/features/family/children";
-import { grownUpLabel, requestHeading } from "../../../nondev/src/features/family/people";
+import {
+  grownUpLabel,
+  grownUpRequestSentence,
+  requestHeading,
+} from "../../../nondev/src/features/family/people";
 import { durationPhrase, wallTimePhrase } from "../../../nondev/src/features/family-limits/limits";
 import type { MacState } from "../data/MacData";
 import type { DeviceMode, MacLink } from "../links/pairing";
@@ -101,6 +105,8 @@ export function buildWatchSnapshot(input: {
         childColour: who ? childColour(who.child) : AVATAR_COLORS.sky!.dark,
         title: `${name} needs a grown-up`,
         heading: requestHeading(request),
+        // nondev-seam: skycot-watch-request-sentence-snapshot
+        sentence: grownUpRequestSentence(request, name),
         what: request.what,
         why: request.why,
         macName: several ? mac.macName : null,

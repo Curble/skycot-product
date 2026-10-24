@@ -142,7 +142,7 @@ struct RequestRow: View {
       Avatar(initial: request.childInitial, colour: request.childColour, size: 32)
       VStack(alignment: .leading, spacing: 2) {
         Text(request.title).font(.headline).lineLimit(2)
-        Text(request.heading).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+        Text(request.sentence).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
         Text(request.lapsed ? "Waiting on the Mac" : age(request.createdAt))
           .font(.footnote).foregroundStyle(request.lapsed ? .orange : .secondary)
       }
@@ -219,17 +219,8 @@ struct RequestView: View {
         Avatar(initial: request.childInitial, colour: request.childColour, size: 28)
         Text(request.title).font(.headline).fixedSize(horizontal: false, vertical: true)
       }
-      Text(request.heading).font(.title3).fontWeight(.semibold)
-      if !request.what.isEmpty {
-        Text(request.what)
-          .font(.system(.footnote, design: .monospaced))
-          .padding(8)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.14)))
-      }
-      if let why = request.why {
-        Text(why).font(.footnote).foregroundStyle(.secondary)
-      }
+      // nondev-seam: skycot-watch-request-sentence-view
+      Text(request.sentence).font(.title3).fixedSize(horizontal: false, vertical: true)
       if let mac = request.macName {
         Label(mac, systemImage: "desktopcomputer").font(.footnote).foregroundStyle(.secondary)
       }

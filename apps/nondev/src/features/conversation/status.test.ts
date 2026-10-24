@@ -94,3 +94,20 @@ describe("describeThreadStatus after a refusal (QA-P2-2-04)", () => {
     expect(conversationPreview(stopping, status, "Sam")).toBe("Sam: Stopping…");
   });
 });
+
+describe("child waiting words", () => {
+  it("uses grown-up language for held steps and plans", () => {
+    const held = {
+      ...shell({ runStatus: "running", runtime: "running" }),
+      hasPendingApprovals: true,
+    } as EnvironmentThreadShell;
+    expect(describeThreadStatus(held, { childView: true }).headline).toBe("Waiting for a grown-up");
+    expect(describeThreadStatus(held).headline).toBe(
+      "Waiting for you · needs your OK before it carries on",
+    );
+    const plan = { ...shell({}), hasActionableProposedPlan: true } as EnvironmentThreadShell;
+    expect(describeThreadStatus(plan, { childView: true }).headline).toBe(
+      "Sam made a plan. Press Build it.",
+    );
+  });
+});

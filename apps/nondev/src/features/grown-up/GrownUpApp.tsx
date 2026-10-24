@@ -38,7 +38,12 @@ import { childLabel, type FamilyChild } from "../family/children";
 import type { FamilyResult } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
-import { grownUpLabel, requestHeading, type PendingRequest } from "../family/people";
+import {
+  grownUpLabel,
+  grownUpRequestSentence,
+  requestHeading,
+  type PendingRequest,
+} from "../family/people";
 import { refreshFamily, settleWithCode } from "../family/store";
 import { todaySummary } from "../family-limits/limits";
 import { refreshToday, useLimits } from "../family-limits/store";
@@ -215,6 +220,7 @@ function RequestCard({
   const [problem, setProblem] = useState<string | null>(null);
   const [askCode, setAskCode] = useState(false);
   const [done, setDone] = useState<"accept" | "decline" | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const send = async (decision: "accept" | "decline", proof: ApproverProof | null) => {
     setBusy(true);
@@ -268,11 +274,19 @@ function RequestCard({
           </small>
         </div>
       </div>
-      <p className="fm-grownup__card-what">
-        <span>{requestHeading(request)}</span>
-        {request.what ? <code>{request.what}</code> : null}
-      </p>
-      {request.why ? <p className="fm-grownup__card-why">{request.why}</p> : null}
+      <p className="fm-grownup__card-what">{grownUpRequestSentence(request, childName)}</p>
+      <Button size="sm" variant="plain" onClick={() => setShowDetails((value) => !value)}>
+        {showDetails ? "Hide details" : "Show details"}
+      </Button>
+      {showDetails ? (
+        <>
+          <p className="fm-grownup__card-what">
+            <span>{requestHeading(request)}</span>
+            {request.what ? <code>{request.what}</code> : null}
+          </p>
+          {request.why ? <p className="fm-grownup__card-why">{request.why}</p> : null}
+        </>
+      ) : null}
       {done !== null ? (
         <Banner tone="info">
           {done === "accept" ? "Allowed, this once." : "Declined. They see that on their screen."}

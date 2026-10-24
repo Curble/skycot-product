@@ -60,6 +60,7 @@ import {
   type RelayFile,
 } from "./relayFile.ts";
 import { makeTunnelHandler } from "./tunnelHandler.ts";
+import { approvalNotifications } from "./approvalNotifications.ts";
 
 export const RELAY_URL_ENV = "SKYCOT_RELAY_URL";
 /** Where a linked browser opens the app (Phase 2); the iOS app (Phase 3) needs no page. */
@@ -464,10 +465,12 @@ const make = Effect.gen(function* () {
 
   // What the watcher has already told devices about, so each request and each finish is one
   // notification. Kept in memory: after a restart the first look only records what it sees.
+  // nondev-seam: skycot-approval-lapse-reping
   const announced = yield* Ref.make<{
     readonly requests: ReadonlySet<string>;
+    readonly lapsed: ReadonlySet<string>;
     readonly finished: ReadonlyMap<string, number> | null;
-  }>({ requests: new Set(), finished: null });
+  }>({ requests: new Set(), lapsed: new Set(), finished: null });
 
   const watch = Effect.gen(function* () {
     yield* forgetVanished;
@@ -480,16 +483,20 @@ const make = Effect.gen(function* () {
       .map((device) => device.id);
 
     if (Option.isSome(devices) && grownUpDevices.length > 0) {
-      const pending = (yield* devices.value.approvals).filter(
-        (request) => request.needsGrownUp && !request.lapsed,
-      );
-      const seen = (yield* Ref.get(announced)).requests;
-      const fresh = pending.filter((request) => !seen.has(request.requestId));
-      if (fresh.length > 0)
+      const pending = (yield* devices.value.approvals).filter((request) => request.needsGrownUp);
+      const announcedRequests = yield* Ref.get(announced);
+      const { fresh, newlyLapsed } = approvalNotifications(pending, announcedRequests);
+      if (fresh.length > 0 || newlyLapsed.length > 0)
+        // Relay pushes are content-free; the phone opens Requests for the exact state.
         yield* notify({ familyDeviceIds: grownUpDevices, kind: "needs-grown-up" });
       yield* Ref.update(announced, (current) => ({
         ...current,
-        requests: new Set(pending.map((request) => request.requestId)),
+        requests: new Set(
+          pending.filter((request) => !request.lapsed).map((request) => request.requestId),
+        ),
+        lapsed: new Set(
+          pending.filter((request) => request.lapsed).map((request) => request.requestId),
+        ),
       }));
     }
 

@@ -136,6 +136,7 @@ export function ConversationView({
   const project =
     shell === null ? ownProject : projectForConversation(shell, ownProject, allProjects);
   const question = isQuestionsProject(project);
+  const childView = useChildView();
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
@@ -144,7 +145,9 @@ export function ConversationView({
     projection !== null && shell !== null && !active
       ? endedOnRefusal(projection, latestRunId)
       : false;
-  const status: ConversationStatus | null = shell ? describeThreadStatus(shell, { refused }) : null;
+  const status: ConversationStatus | null = shell
+    ? describeThreadStatus(shell, { refused, childView })
+    : null;
   // Tell the list, which only has the shell, that this run ended on a refusal.
   const refusedRuns = useAtomValue(refusedRunIdsAtom);
   const setRefusedRuns = useAtomSet(refusedRunIdsAtom);
@@ -161,7 +164,6 @@ export function ConversationView({
   // The mode the engine enforces: the Family rules while the profile is on (safe steps by
   // themselves, or "Ask me first" when a parent chose it for this child).
   const family = useFamily();
-  const childView = useChildView();
   const familySteps = useFamilySteps();
   const planFirst = usePlanFirst();
   const runtimeMode =

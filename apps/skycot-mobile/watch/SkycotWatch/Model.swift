@@ -15,6 +15,8 @@ struct WatchRequest: Codable, Identifiable, Hashable {
   let childColour: String
   let title: String
   let heading: String
+  // nondev-seam: skycot-watch-request-sentence-model
+  let sentence: String
   let what: String
   let why: String?
   let macName: String?

@@ -29,6 +29,8 @@ import {
   type ApprovalCard,
   type ApprovalOption,
   type ApprovalRisk,
+  childApprovalOptions,
+  childApprovalSentence,
   describeDecision,
   describeRuntimeRequest,
   toolCallInputFor,
@@ -59,6 +61,7 @@ import {
 import { Mascot } from "../../brand/Mascot";
 import { familyCopy } from "../../family/copy";
 import { useFamily, useFamilySteps } from "../../family/FamilyProvider";
+import { useChildView } from "../../../app/useChildView";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
@@ -210,6 +213,7 @@ export function RequestCard({
   ).data;
   const crew = useCrew();
   const family = useFamily();
+  const childView = useChildView();
   const card = describeRuntimeRequest(item, {
     ...(crew.named ? { assistantName: crew.builder.name } : {}),
     ...(projectName === null ? {} : { projectName }),
@@ -242,6 +246,10 @@ export function RequestCard({
         })
       : null;
   const shown = familyApplies ? familyCard(card, grownUp) : card;
+  const remoteGrownUps = family.profile.devices.some((device) => device.kind === "grown-up");
+  const grownUpNames = family.profile.grownUps
+    .map((person) => person.name)
+    .filter((name): name is string => name !== null);
   // Family: a step the child needn't be asked about is the engine's to answer (safe steps run
   // by themselves), so it shows a quiet line for a moment instead of a card with buttons.
   const steps = useFamilySteps();
@@ -339,11 +347,11 @@ export function RequestCard({
         // Outside the sober region on purpose: the card below stays plain in every theme.
         <p className="fm-mascot-kicker">
           <Mascot pose="ask-a-grown-up" size={40} decorative />
-          {familyCopy.fetchGrownUp}
+          {childView ? "A grown-up can help." : familyCopy.fetchGrownUp}
         </p>
       ) : null}
       <div className={classes} ref={cardRef} tabIndex={decided ? undefined : -1} data-sober="">
-        {crew.named && !decided ? (
+        {crew.named && !decided && !(childView && grownUp !== null) ? (
           <p className="fm-crew-kicker">
             <CrewAvatar role="builder" size="sm" />
             {item.type === "approval_request"
@@ -353,23 +361,36 @@ export function RequestCard({
                 : `${crew.builder.name} has a question`}
           </p>
         ) : null}
-        <Card label={card.title}>
+        <Card label={childView && grownUp !== null ? "A grown-up is needed" : card.title}>
           <CardHeader
             icon={Icon}
             tone={decided ? "grey" : tone}
-            title={card.title}
+            title={childView && grownUp !== null ? "A grown-up is needed" : card.title}
             subtitle={
               decided ??
-              (grownUp !== null
-                ? `${familyCopy.needsGrownUp} · waiting for a parent`
-                : card.ruleTitle
-                  ? `${card.ruleTitle} · waiting for you`
-                  : "Waiting for you · nothing is pre-selected")
+              (childView && grownUp !== null
+                ? "Waiting for a grown-up"
+                : grownUp !== null
+                  ? `${familyCopy.needsGrownUp} · waiting for a parent`
+                  : card.ruleTitle
+                    ? `${card.ruleTitle} · waiting for you`
+                    : "Waiting for you · nothing is pre-selected")
             }
           />
           <CardBody>
-            <p className="fm-approval__what">{card.whatItWants}</p>
-            {decided ? null : (
+            <p className="fm-approval__what">
+              {childView && grownUp !== null
+                ? childApprovalSentence(card, crew.named ? crew.builder.name : "Sam")
+                : card.whatItWants}
+            </p>
+            {childView && grownUp !== null && remoteGrownUps ? (
+              <p className="fm-help">
+                {grownUpNames.length > 0
+                  ? `We've let ${grownUpNames[0]} know on their phone. Or a grown-up can type the code here.`
+                  : "We've let a grown-up know on their phone. Or a grown-up can type the code here."}
+              </p>
+            ) : null}
+            {decided || (childView && grownUp !== null) ? null : (
               <dl className="fm-kv">
                 <dt>Why it matters</dt>
                 <dd>{card.whyItMatters}</dd>
@@ -387,18 +408,25 @@ export function RequestCard({
                 <dd>{card.ifYouSayNo}</dd>
               </dl>
             )}
-            {card.warning && !decided ? (
+            {card.warning && !decided && !(childView && grownUp !== null) ? (
               <p className="fm-approval__warning" role="alert">
                 <TriangleAlert size={14} strokeWidth={2} aria-hidden />
                 <span>{card.warning}</span>
               </p>
             ) : null}
-            {decided ? null : item.type === "user_input_request" ? (
+            {decided || (childView && grownUp !== null) ? null : item.type ===
+              "user_input_request" ? (
               <QuestionForm item={item} card={card} busy={busyId !== null} onChoose={choose} />
+            ) : childView && item.type === "secret_request" ? (
+              <p className="fm-help">
+                {crew.named
+                  ? `${crew.builder.name} needs something only a grown-up can give.`
+                  : "Sam needs something only a grown-up can give."}
+              </p>
             ) : item.type === "secret_request" ? (
               <SecretForm item={item} card={card} busyId={busyId} onChoose={choose} />
             ) : null}
-            {grownUp !== null && !decided ? (
+            {grownUp !== null && !decided && !(childView && grownUp !== null) ? (
               <Banner tone="info">{grownUp} A grown-up enters the parent code to allow it.</Banner>
             ) : null}
             {problem ? (
@@ -430,7 +458,10 @@ export function RequestCard({
           ) : (
             <CardFooter>
               <div className="fm-approval__actions">
-                {orderOptions(shown.options).map((option) => (
+                {(childView && grownUp !== null
+                  ? childApprovalOptions(shown.options)
+                  : orderOptions(shown.options)
+                ).map((option) => (
                   <Button
                     key={option.id}
                     size="md"

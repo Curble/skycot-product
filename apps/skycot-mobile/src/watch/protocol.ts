@@ -25,6 +25,9 @@ export interface WatchRequest {
   readonly title: string;
   /** "Run a command", as the phone's card heading. */
   readonly heading: string;
+  // nondev-seam: skycot-watch-request-sentence-protocol
+  /** One plain sentence; the Watch does not show command details. */
+  readonly sentence: string;
   /** The exact step (for example `npm install three`), as the phone shows it. */
   readonly what: string;
   readonly why: string | null;

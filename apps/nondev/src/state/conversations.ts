@@ -10,6 +10,8 @@ import {
   describeThreadStatus,
   type ConversationStatus,
 } from "../features/conversation/status";
+import { familyOn } from "../features/family/family";
+import { readFamilyView } from "../features/family/store";
 import { isQuestionsProject, projectForConversation } from "../features/questions/questions";
 import { environmentProjects } from "./projects";
 import { environmentThreadShells } from "./threads";
@@ -70,8 +72,10 @@ export function toConversationRow(
   refusedRuns: ReadonlySet<string>,
 ): ConversationRow {
   const runId = shell.latestRun?.runId ?? null;
+  const family = readFamilyView();
   const status = describeThreadStatus(shell, {
     refused: runId !== null && refusedRuns.has(runId),
+    childView: familyOn(family) && family.me.kind !== "grown-up",
   });
   const own = get(
     environmentProjects.projectAtom({

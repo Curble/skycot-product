@@ -87,6 +87,7 @@ const state = (watch: string | null): MacState => ({
 });
 
 describe("what the Watch is sent", () => {
+  // nondev-seam: skycot-watch-request-sentence-test
   it("leaves out the child's own steps: only what needs a grown-up reaches this phone", () => {
     const step = (requestId: string, needsGrownUp: boolean | undefined) => ({
       threadId: "thread-ava",
@@ -96,7 +97,7 @@ describe("what the Watch is sent", () => {
       createdAt: NOW - 60_000,
       lapsed: false,
       ...(needsGrownUp === undefined ? {} : { needsGrownUp }),
-      what: "ls",
+      what: requestId === "req-install" ? "npm install three" : "ls",
       kind: "command",
       fingerprint: `fp-${requestId}`,
     });
@@ -116,6 +117,9 @@ describe("what the Watch is sent", () => {
       "req-install",
       "req-older",
     ]);
+    expect(snapshot.requests[0]?.sentence).toBe(
+      "Ava's game wants to download a free 3D tool (three.js) from the internet.",
+    );
   });
 
   it("lists who needs a grown-up, with the phone's words, and each child's day", () => {

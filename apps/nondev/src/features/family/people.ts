@@ -253,3 +253,18 @@ export function requestHeading(request: Pick<PendingRequest, "kind">): string {
       return "Do something that needs a grown-up";
   }
 }
+
+/** A grown-up sees the plain reason first; the exact command stays available below it. */
+export function grownUpRequestSentence(
+  request: Pick<PendingRequest, "kind" | "what">,
+  childName: string,
+): string {
+  const what = request.what.toLowerCase();
+  if (request.kind === "command" && /three(?:\.js)?/.test(what)) {
+    return `${childName}'s game wants to download a free 3D tool (three.js) from the internet.`;
+  }
+  if (request.kind === "command" && /\b(download|install)\b/.test(what)) {
+    return `${childName}'s game wants to download a tool from the internet.`;
+  }
+  return `${childName}'s game needs help with one step.`;
+}
