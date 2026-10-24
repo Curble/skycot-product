@@ -16,6 +16,11 @@ Object.assign(process.env, repoEnv);
 // Mirrors apps/web/vite.config.ts: single-origin dev is signalled positively
 // because `loadRepoEnv` merges `.env` underneath the process env.
 const isSingleOriginDev = process.env.T3CODE_SINGLE_ORIGIN_DEV === "1";
+// The plain client is SKYCOT's own: the shared modules it borrows from apps/web and packages/
+// name the product from these (the same keys apps/web defines), so their messages say SKYCOT
+// even when the build runs without nondev/brand/env.cjs.
+const appBaseName = process.env.T3CODE_APP_BASE_NAME?.trim() || "SKYCOT";
+const cliName = process.env.T3CODE_CLI_NAME?.trim() || "skycot";
 
 // The dev runner hands every browser package the same PORT (the web Vite's).
 // Offset from it so `vp run dev` can start both clients side by side; an
@@ -87,6 +92,9 @@ export default defineConfig(({ command }) => {
       "import.meta.env.VITE_HOSTED_APP_CHANNEL": JSON.stringify(""),
       "import.meta.env.T3CODE_DESKTOP_UPDATE_REPOSITORY": JSON.stringify(""),
       "import.meta.env.APP_VERSION": JSON.stringify(configuredAppVersion),
+      "import.meta.env.T3CODE_APP_BASE_NAME": JSON.stringify(appBaseName),
+      "import.meta.env.T3CODE_CLI_NAME": JSON.stringify(cliName),
+      "process.env.T3CODE_APP_BASE_NAME": JSON.stringify(appBaseName),
       "import.meta.env.VITE_SKYCOT_DEV_WEB_PORT": JSON.stringify(devWebPort),
     },
     resolve: {

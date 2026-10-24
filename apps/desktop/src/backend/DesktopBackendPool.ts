@@ -24,6 +24,17 @@ import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 
 const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-desktop-data-dir-owned
+// nondev-seam: brand-sweep-desktop-data-dir-owned (upstream's text unchanged when unbranded)
+const dataDirOwnedMessage = (): readonly [string, string] =>
+  BRAND_NAME === "T3 Code"
+    ? [
+        "This T3 home is unavailable",
+        "Another T3 Code server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try `t3 update`. If the older launcher cannot update, run `t3 service uninstall` and optionally reinstall with `t3 service install` from a current CLI. Use `npx t3@latest` if `t3` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command. Then reopen T3 Code. You can also set a separate T3CODE_HOME and pair with the running server.",
+      ]
+    : [
+        `${BRAND_NAME} is already open`,
+        `Another copy of ${BRAND_NAME} is using its data folder, perhaps one started in the background. Quit it, then open ${BRAND_NAME} again. If that doesn't help, restart this Mac.`,
+      ];
 
 const { logWarning: logBackendPoolWarning } =
   DesktopObservability.makeComponentLogger("desktop-backend-pool");
@@ -181,12 +192,8 @@ export const layer = Layer.effect(
       onStateDirOwned: () =>
         electronDialog
           .showErrorBox(
-            "This T3 home is unavailable",
-            "Another " +
-              BRAND_NAME +
-              " server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try `t3 update`. If the older launcher cannot update, run `t3 service uninstall` and optionally reinstall with `t3 service install` from a current CLI. Use `npx t3@latest` if `t3` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command. Then reopen " +
-              BRAND_NAME +
-              ". You can also set a separate T3CODE_HOME and pair with the running server.",
+            // nondev-seam: brand-sweep-desktop-data-dir-owned (SKYCOT's own words and command)
+            ...dataDirOwnedMessage(),
           )
           .pipe(Effect.andThen(electronApp.quit)),
     });
