@@ -98,7 +98,7 @@ const config: ExpoConfig = {
     // Each upload to App Store Connect needs a new build number (TestFlight 0.1.0: 1 failed
     // processing, 2 the first TestFlight build, 3 the first with notifications, 4 the first
     // with Face ID to say yes).
-    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "4",
+    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "5",
     // "SKYCOT needs a grown-up" and "Sam has finished" from SKYCOT Relay, also when the app is
     // closed (iOS forwards them to a paired Apple Watch). The pushes are content-free and shown
     // by iOS itself, so no background mode is needed (UIBackgroundModes stays unset).
