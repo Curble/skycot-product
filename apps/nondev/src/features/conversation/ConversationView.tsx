@@ -491,7 +491,7 @@ export function ConversationView({
           shell={shell}
           projectName={projectName}
           trailing={
-            active && !waitingOnYou && childView && shell?.latestRun?.sourcePlanRef ? (
+            active && !waitingOnYou && childView ? (
               <BuildJourney
                 projection={projection}
                 elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}
