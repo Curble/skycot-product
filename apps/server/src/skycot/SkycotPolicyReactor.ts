@@ -2,6 +2,16 @@
 // what no hard rule matches, leaves the rest pending for the person. See SkycotPolicy.ts for
 // the design and the flag that gates both halves.
 //
+// With the Family profile on, every conversation is governed (the provider asks before every
+// step, SkycotPolicy.familyRuntimePolicy), and a step is approved here only when BOTH the hard
+// rules and the Family rules clear it (`evaluateFamilyRequest`: `needsGrownUp` false) and the
+// child it belongs to may have safe steps run by themselves (SkycotFamilyLimits.stepRuleFor:
+// their parent has not switched on "Ask before each step", and SKYCOT is awake for them).
+// First principles: a child cannot meaningfully judge "May I list these files?", so a card per
+// step adds fatigue, not safety; the safeguards are the engine's rules, the grown-up gate and
+// restore points. A step a rule holds stays pending for a grown-up (the parent code, a
+// grown-up's phone or Watch), exactly as before; nothing here can answer it.
+//
 // It also closes the door Stop leaves open: the engine only cancels a run's pending asks
 // once the provider has confirmed the interrupt, which can take a while, and until then a
 // late click on a card is still accepted. The moment the person asks to stop, every pending
@@ -15,19 +25,27 @@ import {
   type OrchestrationV2TurnItem,
   type ProjectId,
   type ProviderDriverKind,
+  type ProviderInteractionMode,
   type RunId,
   type RuntimeRequestId,
   type ThreadId,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { policyDecisionAnswers } from "@t3tools/skycot-rules/decision";
+import {
+  evaluateFamilyRequest,
+  isReadOnlyCommand,
+  type FamilyEvaluation,
+} from "@t3tools/skycot-rules/family";
 import { workRootsFor } from "@t3tools/skycot-rules/questions";
 import {
   evaluateRequest,
@@ -36,19 +54,32 @@ import {
   type RuleRequest,
 } from "@t3tools/skycot-rules/rules";
 
+import * as ServerConfig from "../config.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { appliesToRuntimeMode, requestFacts } from "./SkycotPolicy.ts";
 
 export type SkycotPolicyOutcome =
   | { readonly type: "skipped"; readonly reason: string }
-  | { readonly type: "held"; readonly evaluation: RuleEvaluation }
-  | { readonly type: "approved"; readonly evaluation: RuleEvaluation }
+  | {
+      readonly type: "held";
+      readonly evaluation: RuleEvaluation;
+      /** Family profile on: the Family rules' judgement too (its `needsGrownUp` is why). */
+      readonly family?: FamilyEvaluation;
+    }
+  | {
+      readonly type: "approved";
+      readonly evaluation: RuleEvaluation;
+      /** Family profile on: always `needsGrownUp: false` (see `mayAutoApprove`). */
+      readonly family?: FamilyEvaluation;
+    }
   /** Stop was pressed: these pending asks were answered `cancel` on the person's behalf. */
   | { readonly type: "cancelled"; readonly requestIds: ReadonlyArray<RuntimeRequestId> };
 
@@ -87,6 +118,35 @@ export function stopCommandId(threadId: ThreadId, requestId: RuntimeRequestId): 
   return CommandId.make(`server:skycot-stop:${threadId}:${requestId}`);
 }
 
+/**
+ * The one test every server-side yes passes. Outside Family: no hard rule matched. In Family:
+ * neither a hard rule nor a Family rule matched (`needsGrownUp` covers both), so a step that
+ * needs a grown-up can never be approved here, whatever else the reactor concluded.
+ */
+export function mayAutoApprove(
+  evaluation: RuleEvaluation,
+  family: FamilyEvaluation | undefined,
+): boolean {
+  if (evaluation.decision === "hold") return false;
+  if (family === undefined) return true;
+  return !family.needsGrownUp && family.base.decision !== "hold";
+}
+
+/**
+ * Plan first, in Family: while the turn is making its plan, only steps that just look run by
+ * themselves (reading files, commands that only list, print or search). A change waits for the
+ * child's card, so nothing changes before they press "Build it".
+ */
+export function onlyLooks(facts: RuleRequest): boolean {
+  if (facts.kind === "file-read") return true;
+  return (
+    facts.kind === "command" &&
+    facts.leavesSandbox !== true &&
+    facts.command !== undefined &&
+    isReadOnlyCommand(facts.command)
+  );
+}
+
 /** Only a push can be judged by branch, so only a push pays for the two git lookups. */
 export function needsBranchContext(facts: RuleRequest): boolean {
   return (
@@ -105,6 +165,39 @@ const make = Effect.gen(function* () {
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
   const familyOn = Option.isNone(family) ? Effect.succeed(false) : family.value.isEnabled;
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+  // Who a Family conversation belongs to and whether their safe steps may run by themselves.
+  // The gate's own limits service when this layer is given one (tests); otherwise a read-only
+  // reader of the same activity file, as the model fallback builds (it never counts or writes).
+  // Without either, nothing is approved in Family: every step keeps its card, as before.
+  const stepRules = yield* Effect.gen(function* () {
+    const provided = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
+    if (Option.isSome(provided) || Option.isNone(family)) return provided;
+    const config = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+    const fs = yield* Effect.serviceOption(FileSystem.FileSystem);
+    const path = yield* Effect.serviceOption(Path.Path);
+    if (Option.isNone(config) || Option.isNone(fs) || Option.isNone(path)) return Option.none();
+    return Option.some(
+      yield* SkycotFamilyLimits.makeAt(
+        path.value.join(config.value.stateDir, SkycotFamilyLimits.ACTIVITY_FILE_NAME),
+      ).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs.value),
+        Effect.provideService(Path.Path, path.value),
+        Effect.provideService(SkycotFamily.SkycotFamily, family.value),
+      ),
+    );
+  });
+  const familyStepRule = (threadId: ThreadId): Effect.Effect<SkycotFamilyLimits.FamilyStepRule> =>
+    Option.isNone(stepRules)
+      ? Effect.succeed({ type: "ask", reason: "no-child", childId: null })
+      : stepRules.value.stepRuleFor({ threadId }).pipe(
+          Effect.catchCause(() =>
+            Effect.succeed<SkycotFamilyLimits.FamilyStepRule>({
+              type: "ask",
+              reason: "no-child",
+              childId: null,
+            }),
+          ),
+        );
 
   /**
    * The branch the push would send and the branch everyone sees. A thread with a private
@@ -162,6 +255,24 @@ const make = Effect.gen(function* () {
     return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
   });
 
+  /**
+   * Whether the run is a Family turn that plans (plan first). Unknown counts as planning: the
+   * safe side only ever means one more card.
+   */
+  const runPlans = Effect.fnUntraced(function* (
+    thread: { readonly id: ThreadId; readonly interactionMode: ProviderInteractionMode },
+    runId: RunId | null,
+  ) {
+    if (runId === null) return true;
+    const records = yield* projections.getThreadRecords(thread.id, ["runs"], { runIds: [runId] });
+    const run = records.runs.find((candidate) => candidate.id === runId);
+    if (run === undefined || typeof run.userMessageId !== "string") return true;
+    return yield* SkycotFamilyInstructions.familyTurnPlans(
+      run.userMessageId,
+      thread.interactionMode,
+    );
+  });
+
   /** False once the person asked to stop the run, or the run has already settled. */
   const runStillActive = Effect.fnUntraced(function* (threadId: ThreadId, runId: RunId) {
     const records = yield* projections.getThreadRecords(threadId, ["runs", "turnItems"], {
@@ -179,10 +290,13 @@ const make = Effect.gen(function* () {
     readonly requestId: RuntimeRequestId;
     readonly driver: ProviderDriverKind | undefined;
   }) {
-    // A child's assistant asks for everything; nothing is approved on their behalf.
-    if (yield* familyOn) return skipped("family profile is on");
+    // Family: every conversation is governed, whatever mode it was made in (the provider is
+    // told to ask before every step, SkycotPolicy.familyRuntimePolicy).
+    const inFamily = yield* familyOn;
     const thread = yield* projections.getThread(input.threadId);
-    if (!appliesToRuntimeMode(thread.runtimeMode)) return skipped("runtime mode not governed");
+    if (!inFamily && !appliesToRuntimeMode(thread.runtimeMode)) {
+      return skipped("runtime mode not governed");
+    }
     if (thread.archivedAt !== null || thread.deletedAt !== null) return skipped("thread closed");
     const request = yield* projections.getRuntimeRequest(input.threadId, input.requestId);
     if (request === undefined) return skipped("request missing");
@@ -201,6 +315,12 @@ const make = Effect.gen(function* () {
       // Stop was pressed (or the run ended): never approve into a run that is going away.
       return skipped("run no longer active");
     }
+    if (inFamily) {
+      // The child's card stays when their parent wants them asked, when SKYCOT is asleep for
+      // them (the gate refuses their yes until morning), or when nobody knows whose it is.
+      const rule = yield* familyStepRule(input.threadId);
+      if (rule.type !== "auto") return skipped(`family: ${rule.reason}`);
+    }
     const toolCall = yield* toolCallFor(input.threadId, approval, input.driver);
     const facts = requestFacts(approval, toolCall, input.driver);
     if (facts === null) return skipped("request kind unknown");
@@ -209,13 +329,33 @@ const make = Effect.gen(function* () {
       ? yield* branchContextFor(thread, roots.projectRoot)
       : {};
     const evaluation = evaluateRequest(facts, { ...roots, ...branches });
-    if (evaluation.decision === "hold") {
+    // The same judgement the gate gives the child's card (SkycotFamilyGate.describeRequest):
+    // a step that needs a grown-up there needs one here.
+    const familyEvaluation = inFamily
+      ? evaluateFamilyRequest({ ...facts, toolItemType: toolCall?.type }, { ...roots, ...branches })
+      : undefined;
+    if (
+      familyEvaluation !== undefined &&
+      !familyEvaluation.needsGrownUp &&
+      !onlyLooks(facts) &&
+      (yield* runPlans(thread, approval.runId))
+    ) {
+      return skipped("family: plan first (changes wait for Build it)");
+    }
+    if (!mayAutoApprove(evaluation, familyEvaluation)) {
       yield* Effect.logInfo("skycot-policy.held", {
         threadId: input.threadId,
         requestId: input.requestId,
         rules: evaluation.matches.map((match) => match.rule.id),
+        ...(familyEvaluation === undefined
+          ? {}
+          : { familyRules: familyEvaluation.family.map((match) => match.rule.id) }),
       });
-      return { type: "held", evaluation } satisfies SkycotPolicyOutcome;
+      return {
+        type: "held",
+        evaluation,
+        ...(familyEvaluation === undefined ? {} : { family: familyEvaluation }),
+      } satisfies SkycotPolicyOutcome;
     }
     yield* engine.dispatch({
       type: "runtime-request.respond",
@@ -229,8 +369,13 @@ const make = Effect.gen(function* () {
       threadId: input.threadId,
       requestId: input.requestId,
       kind: request.kind,
+      family: inFamily,
     });
-    return { type: "approved", evaluation } satisfies SkycotPolicyOutcome;
+    return {
+      type: "approved",
+      evaluation,
+      ...(familyEvaluation === undefined ? {} : { family: familyEvaluation }),
+    } satisfies SkycotPolicyOutcome;
   });
 
   // Stop pressed: answer every pending ask of that run with `cancel` now, before the

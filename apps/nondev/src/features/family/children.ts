@@ -1,5 +1,6 @@
 // The children of a Family profile, as the engine reports them (SkycotFamily.ts, file
-// version 2): a name, a picture, a look, larger text, voice settings and limits each. Pure:
+// version 2): a name, a picture, a look, larger text, voice settings, limits and "Ask before
+// each step" each. Pure:
 // parsing, defaults and the words Settings uses. The engine checks every field again.
 export const AVATAR_POSES = [
   "hello",
@@ -38,6 +39,12 @@ export interface FamilyChild {
   readonly largerText: boolean;
   readonly voice: ChildVoice;
   readonly limits: ChildLimits;
+  /**
+   * The parent's "Ask [child] before each step" (off by default): on, the assistant asks the
+   * child before every step, as it used to. Off, safe steps run by themselves. Either way a
+   * step that needs a grown-up waits for one (the engine decides, SkycotPolicyReactor).
+   */
+  readonly askEachStep: boolean;
 }
 
 export const NO_LIMITS: ChildLimits = {
@@ -103,6 +110,7 @@ export function parseChild(value: unknown): FamilyChild | null {
       readAloud: voice["readAloud"] !== false,
     },
     limits: parseLimits(input["limits"]),
+    askEachStep: input["askEachStep"] === true,
   };
 }
 
@@ -148,4 +156,17 @@ export const COLOR_NAMES: Readonly<Record<AvatarColor, string>> = {
 export function namesList(names: ReadonlyArray<string>): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** Who a parent chose to have asked before each step, for Settings › Family's status row. */
+export function askedEachStepLine(
+  children: ReadonlyArray<Pick<FamilyChild, "name" | "askEachStep">>,
+): string {
+  const asked = children.flatMap((child, index) =>
+    child.askEachStep ? [childLabel(child, index)] : [],
+  );
+  if (asked.length === 0) {
+    return "To have a child asked before each step instead, turn it on in their settings below.";
+  }
+  return `${namesList(asked)} ${asked.length === 1 ? "is" : "are"} asked before each step, as you chose.`;
 }

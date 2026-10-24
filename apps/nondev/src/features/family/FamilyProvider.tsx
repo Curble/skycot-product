@@ -9,8 +9,15 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
-import { actionReason } from "./copy";
-import { familyOn, isFamilyLocked, purposeFor, type FamilyAction, type FamilyView } from "./family";
+import { actionReason, familySteps } from "./copy";
+import {
+  asksEachStep,
+  familyOn,
+  isFamilyLocked,
+  purposeFor,
+  type FamilyAction,
+  type FamilyView,
+} from "./family";
 import { ParentCodeEntry, useParentCodeEntry, type ParentCodeAttempt } from "./ParentCodeEntry";
 import {
   disableFamily,
@@ -133,6 +140,19 @@ export function useFamily(): FamilyApi {
   const context = useContext(FamilyContext);
   const view = useFamilyView();
   return context ?? makeApi(view, null);
+}
+
+/**
+ * How the child using SKYCOT here has their steps run while the profile is on: safe steps by
+ * themselves, or (their parent's choice) asked before each step. Null while the profile is off.
+ */
+export function useFamilySteps():
+  | (ReturnType<typeof familySteps> & { readonly askEachStep: boolean })
+  | null {
+  const view = useFamilyView();
+  if (!familyOn(view)) return null;
+  const ask = asksEachStep(view);
+  return { ...familySteps(ask), askEachStep: ask };
 }
 
 function ParentCodeSheet({ pending }: { readonly pending: Pending }) {

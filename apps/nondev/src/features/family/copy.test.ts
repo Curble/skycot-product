@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import brand from "../../../../../nondev/brand.json";
 import { CLI_NAME, PRODUCT_NAME } from "../../brand";
-import { actionReason } from "./copy";
+import { actionReason, familyCopy, familySteps } from "./copy";
 
 describe("actionReason", () => {
   // QA FK-13: every card's code sheet said "uses the internet, installs something, deletes…".
@@ -24,5 +24,35 @@ describe("brand", () => {
   it("names the command and product brand.json names", () => {
     expect(CLI_NAME).toBe(brand.cliName);
     expect(PRODUCT_NAME).toBe(brand.productName);
+  });
+});
+
+describe("how a child's steps are described (Family)", () => {
+  it("says safe steps run by themselves by default, and never promises a card for every step", () => {
+    const steps = familySteps(false);
+    expect(steps.label).toBe("Safe steps");
+    expect(steps.description).toBe(
+      "Safe steps run by themselves; anything risky waits for a grown-up.",
+    );
+    for (const line of [familyCopy.safeSteps, steps.description, ...familyCopy.does]) {
+      expect(line).not.toMatch(
+        /always asks|asks before every|before changing or running anything/i,
+      );
+    }
+  });
+
+  it("says Ask me first when a parent chose it for the child", () => {
+    const steps = familySteps(true);
+    expect(steps.label).toBe("Ask me first");
+    expect(steps.description).toMatch(/asks before each step/);
+    expect(steps.description).toMatch(/waits for a grown-up/);
+  });
+
+  it("tells a parent risky steps still wait and the plan still comes first", () => {
+    const does = familyCopy.does.join(" ");
+    expect(does).toMatch(/run by themselves/);
+    expect(does).toMatch(/waits for a grown-up/);
+    expect(does).toMatch(/Build it/);
+    expect(does).toMatch(/asked before each step/);
   });
 });

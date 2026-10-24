@@ -10,13 +10,24 @@ and types addresses, not for someone determined to break it — see
 
 When the Family profile is on:
 
-- **The assistant always asks first.** Every conversation runs in "Ask me first", whatever
-  the conversation, the default setting or the developer interface says. "Just do it,
-  carefully" and "Fully hands-off" are not offered, and the engine would run them as "Ask me
-  first" anyway. Nothing is approved on the child's behalf.
+- **Safe steps run by themselves; anything risky waits for a grown-up (24 October 2026).**
+  Every conversation's assistant is told to ask before every step, whatever the conversation,
+  the default setting or the developer interface says ("Just do it, carefully" and "Fully
+  hands-off" are not offered, and the engine would not run them). SKYCOT's engine answers each
+  ask itself (SkycotPolicyReactor): a step that neither the hard rules nor the Family rules hold
+  (looking at files, changing files in the project, running a quick check) runs without a card;
+  a step any rule holds (the internet, installs, deleting, other folders, publishing, leaving the
+  sandbox, connected apps) waits for a grown-up exactly as before. Why: a child can't
+  meaningfully judge "May I list these files?", so a card per step adds fatigue, not safety; the
+  safeguards are the engine's rules, the grown-up gate and restore points. A parent can switch
+  **Ask [child] before each step** on for a child (Settings › Family › the child's settings,
+  parent code; off by default), and that child gets a card for every step again. Steps also keep
+  their cards while SKYCOT is asleep for the child (bedtime and limits refuse them until morning),
+  for a conversation SKYCOT can't tie to a child (with siblings), and when the engine runs
+  without the SKYCOT policy flag (`T3CODE_SKYCOT_POLICY=1`, on in SKYCOT builds).
 - **A plan before anything is made (plan first).** Every request the child sends runs as a
   plan: the assistant replies with numbered steps and changes nothing. The plan card offers
-  **Build it** (the assistant carries that plan out, still asking first) and **Change the plan**
+  **Build it** (the assistant carries that plan out under the same Family rules) and **Change the plan**
   (say what's different; the answer is a new plan). The engine holds every child's turn to this,
   whatever the conversation, the browser or the developer interface says: the only turns that
   build are a **Build it** of a plan still waiting in that project, and messages from a grown-up
@@ -133,7 +144,7 @@ How the engine keeps "a plan before making anything" true:
   rules in front of the message add one line: plan only, change nothing, wait for Build it.
 - Two kinds of message are let through as they are, and the engine's own check decides both:
   a **Build it** (the message names a plan that the engine confirms is still waiting, in the same
-  project; it runs in the normal mode, so "Ask me first" still asks before each step), and a
+  project; it runs in the normal mode, under the same Family rules), and a
   message sent while a grown-up's Advanced-mode code is open on that device.
 - Building a plan uses it up: the plan is marked carried out, so the same Build it cannot run twice.
 
@@ -141,7 +152,9 @@ Limits, honestly:
 
 - **The plan mode is the AI's own.** Codex and Claude have one; with the other assistants (Cursor,
   Grok, OpenCode, Antigravity) plan first is the "plan only" line in the rules, which a model can
-  ignore. "Ask me first" still holds every change for an OK either way.
+  ignore. While a turn plans, SKYCOT's engine runs only steps that just look (reading files, and
+  commands that only list, print or search) by themselves; a change keeps its card for the child,
+  so nothing changes before Build it either way.
 - **Build it builds what the Build it message asks.** SKYCOT's button sends a fixed "go ahead
   with the plan". Something that sends its own words with a plan's Build it (another client, a raw
   call) gets those words built without a second plan.

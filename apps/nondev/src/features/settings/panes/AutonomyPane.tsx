@@ -83,9 +83,7 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
         <ListExtra>
           <div className="fm-setting-block">
             {family.enabled ? (
-              <FamilyAutonomyLock
-                note={`${familyCopy.title} · ${describeAutonomyLevel("askMeFirst", { policyEnforced })}`}
-              />
+              <FamilyAutonomyLock />
             ) : (
               <SegmentedControl
                 label="Default autonomy"
@@ -122,7 +120,7 @@ export function AutonomyPane({ environmentId }: { readonly environmentId: Enviro
         title="Plan before building"
         footer={
           planFirst.locked
-            ? `In a ${familyCopy.title}, ${PRODUCT_NAME}'s engine plans every request first, whatever is set on this device. Build it carries the plan out, still asking first.`
+            ? `In a ${familyCopy.title}, ${PRODUCT_NAME}'s engine plans every request first, whatever is set on this device. Build it carries the plan out under the same Family rules.`
             : "Applies to new requests on this device. On the plan card, Build it carries the plan out and Change the plan lets you say what's different."
         }
       >

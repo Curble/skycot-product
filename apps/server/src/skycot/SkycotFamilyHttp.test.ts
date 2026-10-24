@@ -381,6 +381,13 @@ it.layer(
       assert.equal(look.json["children"][1].look, "classic");
       assert.equal(look.json["children"][0].look, SkycotFamily.DEFAULT_LOOK);
 
+      // "Ask Leo before each step" is a parent's setting: the grown-up's yes saves it, and the
+      // child's own look route cannot switch it off.
+      const asks = yield* post("/children/update", { childId: leo, patch: { askEachStep: true } });
+      assert.isTrue(asks.json["children"][1].askEachStep);
+      const sneaky = yield* post("/look", { look: "classic", askEachStep: false });
+      assert.isTrue(sneaky.json["children"][1].askEachStep);
+
       const wrong = yield* post("/more-time", { childId: leo, kind: "extra15", code: "000000" });
       assert.equal(wrong.json["error"], "wrong-code");
       const more = yield* post("/more-time", { childId: leo, kind: "extra30", code: CODE });

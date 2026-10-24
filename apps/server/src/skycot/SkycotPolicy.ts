@@ -13,6 +13,11 @@
 //   2. `SkycotPolicyReactor` answers those requests: it approves what no hard rule matches
 //      and leaves the rest pending, so the person only sees cards for the risky steps.
 //
+// With the Family profile on, every thread is governed this way (`familyRuntimePolicy`), and
+// the reactor also applies the Family rules: a step that needs a grown-up is never approved
+// on the server. A parent can switch "Ask before each step" on per child to bring the card for
+// every step back.
+//
 // Both halves are gated by the same flag so they can never disagree. Off by default so a
 // stock T3 Code build is unchanged; `nondev/brand/env.cjs` turns it on for SKYCOT.
 
@@ -55,11 +60,19 @@ export function appliesToRuntimeMode(runtimeMode: RuntimeMode): boolean {
 export const FAMILY_RUNTIME_MODE: RuntimeMode = "approval-required";
 
 /**
- * A thread while the Family profile is on: "Ask me first", with the provider told to ask
+ * A thread while the Family profile is on: SKYCOT's governed mode. The provider is told to ask
  * before every command and edit (Codex: "untrusted" in a workspace-write sandbox, which also
- * keeps the network off; Claude: the "default" permission mode). `full-access` and
- * `auto-accept-edits` threads are downgraded here, at the point the provider is configured, so
- * no setting, old thread, MCP launch or raw RPC can start a hands-off turn.
+ * keeps the network off; Claude: the "default" permission mode with the permission callback),
+ * exactly the override `auto-accept-edits` gets, and `SkycotPolicyReactor` answers each ask:
+ * a step neither the hard rules nor the Family rules hold runs by itself, unless the child's
+ * parent switched on "Ask before each step"; a step a rule holds waits for a grown-up.
+ * `full-access` and `auto-accept-edits` threads are downgraded here, at the point the provider
+ * is configured, so no setting, old thread, MCP launch or raw RPC can start a hands-off turn.
+ *
+ * The provider-facing mode stays "approval-required" on purpose: with this override both modes
+ * configure the provider identically, but should the override ever be lost, "approval-required"
+ * falls back to asking about everything, while `auto-accept-edits` would let Claude accept
+ * edits before any SKYCOT rule saw them. The Family yes is the reactor's, never the provider's.
  */
 export function familyRuntimePolicy(
   policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy,

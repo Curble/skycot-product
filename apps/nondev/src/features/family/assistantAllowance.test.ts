@@ -85,7 +85,7 @@ describe("the allow sheet", () => {
       "SKYCOT can't switch off OpenCode's own add-ons (plugins, connectors and helper tools set up on this computer), so a child using OpenCode may reach them.",
     );
     for (const rule of [
-      "asks first",
+      "every step is checked",
       "plan first",
       "shield",
       "bedtime and limits",

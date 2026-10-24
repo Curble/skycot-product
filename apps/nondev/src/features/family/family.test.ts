@@ -6,6 +6,7 @@ import {
   EMPTY_VIEW,
   LOCKOUT_MS,
   MAX_ATTEMPTS,
+  asksEachStep,
   attemptsLeft,
   codeComplete,
   codeStrength,
@@ -529,5 +530,26 @@ describe("several children", () => {
   it("guards managing children with the settings grant", () => {
     expect(purposeFor("manageChildren")).toBe("settings");
     expect(purposeFor("switchChild")).toBe("settings");
+  });
+});
+
+describe("Ask before each step", () => {
+  const child = (id: string, askEachStep: boolean) =>
+    ({
+      id,
+      name: id,
+      avatar: { kind: "initial", color: "sky" },
+      look: "workshop",
+      largerText: true,
+      voice: { typing: false, readAloud: true },
+      limits: { bedtime: null, dailyMinutes: null, dailyTurns: null, keepAllowancePercent: null },
+      askEachStep,
+    }) as const;
+  it("follows the child using SKYCOT here, and is off while the profile is off", () => {
+    const children = [child("ava", false), child("leo", true)];
+    expect(asksEachStep({ enabled: true, children, currentChildId: "leo" })).toBe(true);
+    expect(asksEachStep({ enabled: true, children, currentChildId: "ava" })).toBe(false);
+    expect(asksEachStep({ enabled: true, children, currentChildId: null })).toBe(false);
+    expect(asksEachStep({ enabled: false, children, currentChildId: "leo" })).toBe(false);
   });
 });

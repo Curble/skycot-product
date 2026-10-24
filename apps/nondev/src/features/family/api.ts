@@ -100,6 +100,7 @@ export interface ChildPatch {
   readonly largerText?: boolean;
   readonly voice?: Partial<ChildVoice>;
   readonly limits?: Partial<ChildLimits>;
+  readonly askEachStep?: boolean;
 }
 
 function parseAdded(body: unknown) {

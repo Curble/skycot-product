@@ -103,7 +103,7 @@ export function addOnsSentence(driver: string): string {
 
 /** What still holds for an allowed assistant: SKYCOT's own Family rules. */
 export const STILL_APPLIES =
-  "SKYCOT's other Family rules still apply: it asks first, makes a plan first, keeps the shield on, keeps bedtime and limits, and needs the parent code for installs, the internet and publishing.";
+  "SKYCOT's other Family rules still apply: every step is checked against SKYCOT's rules, it makes a plan first, keeps the shield on, keeps bedtime and limits, and needs the parent code for installs, the internet and publishing.";
 
 /**
  * Words every refusal of an assistant that is not allowed contains, so the client can show

@@ -898,3 +898,116 @@ export function describeFamilyMatches(matches: ReadonlyArray<FamilyMatch>): stri
  * by the delete; it never opens anything else (unlike Advanced mode's grant).
  */
 export const deleteConversationApprovalId = (threadId: string) => `delete-conversation:${threadId}`;
+
+// ── Plan first: only looking around while the plan is made ───────────────────────────
+// While a child's turn plans (SkycotFamilyInstructions plan first), nothing may change before
+// they press "Build it". The engine runs safe steps by themselves in the Family profile, so
+// during a plan only steps that just look are allowed that way: reading files, and commands
+// that only list, print or search. Anything else keeps its card. When in doubt it is not
+// read-only: asking once too often is the safe side.
+
+/** Programs that only print, list or search, and never write a file or start another one. */
+const READ_ONLY_PROGRAMS = new Set([
+  "ls",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "pwd",
+  "stat",
+  "file",
+  "tree",
+  "du",
+  "basename",
+  "dirname",
+  "realpath",
+  "readlink",
+  "echo",
+  "printf",
+  "sort",
+  "cut",
+  "tr",
+  "diff",
+  "cmp",
+  "comm",
+  "nl",
+  "column",
+  "fold",
+  "rev",
+  "strings",
+  "md5",
+  "md5sum",
+  "shasum",
+  "sha256sum",
+  "which",
+  "true",
+  "false",
+  "test",
+  "[",
+  "whoami",
+  "uname",
+  "jq",
+  "find",
+  "sed",
+  "git",
+  "cd",
+]);
+/** Flags that make an otherwise read-only program write a file or run another program. */
+const WRITING_FLAGS: Readonly<Record<string, RegExp>> = {
+  sort: /^(-o|--output)/,
+  tree: /^-o$/,
+  file: /^-C$/,
+  rg: /^--pre(=|$)/,
+  find: /^-(exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/,
+  git: /^(--output|-O$|--open-files-in-pager|--ext-diff|--textconv)/,
+};
+const GIT_READ_ONLY = /^(status|log|diff|show|ls-files|rev-parse|blame|grep|describe|shortlog)$/;
+/** `sed -n '1,200p' file`: printing lines is all it may do. */
+const SED_PRINT_SCRIPT = /^\s*(\d+|\$)?\s*(,\s*(\d+|\$)\s*)?p\s*$/;
+const SED_QUIET_FLAGS = new Set(["-n", "--quiet", "--silent", "-E", "-r", "-u"]);
+
+function segmentOnlyReads(segment: string): boolean {
+  if (fileWriteTargets(segment).length > 0) return false;
+  const tokens = tokenize(segment);
+  const program = tokens[0];
+  // An environment assignment or a wrapper (`env`, `sudo`, `xargs`) is never "just looking".
+  if (program === undefined || program.includes("=")) return false;
+  const base = programBaseName(program).toLowerCase();
+  if (program.includes("/") && base !== program) return false;
+  if (!READ_ONLY_PROGRAMS.has(base)) return false;
+  const args = tokens.slice(1);
+  const writing = WRITING_FLAGS[base];
+  if (writing !== undefined && args.some((arg) => writing.test(arg))) return false;
+  if (base === "git") return args[0] !== undefined && GIT_READ_ONLY.test(args[0]);
+  if (base === "sed") {
+    const flags = args.filter((arg) => arg.startsWith("-"));
+    const script = args.find((arg) => !arg.startsWith("-"));
+    return (
+      flags.every((flag) => SED_QUIET_FLAGS.has(flag)) &&
+      flags.some((flag) => flag === "-n" || flag === "--quiet" || flag === "--silent") &&
+      script !== undefined &&
+      SED_PRINT_SCRIPT.test(script)
+    );
+  }
+  return true;
+}
+
+/**
+ * True when every step of the command only lists, prints or searches: no file is written, no
+ * other program is started, nothing reaches another computer. Codex's `/bin/zsh -lc "…"` is
+ * judged by the script inside. Command substitutions, here-documents, background steps and
+ * anything unknown are not read-only.
+ */
+export function isReadOnlyCommand(command: string): boolean {
+  const script = unwrapShellWrapper(command).trim();
+  if (script.length === 0) return false;
+  if (commandSubstitutions(script).length > 0 || /\$\(|`|<<|[<>]\(/.test(script)) return false;
+  // A lone `&` runs a step in the background; `&&`, `&>` and `2>&1` are not that.
+  if (/(^|[^&>])&(?![&>])/.test(script.replace(/\d>&\d/g, ""))) return false;
+  const segments = splitShellSegments(script);
+  return segments.length > 0 && segments.every(segmentOnlyReads);
+}

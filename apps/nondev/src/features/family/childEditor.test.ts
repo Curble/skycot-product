@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { draftFor, draftProblem, patchFor } from "./ChildEditorSheet";
-import { childLabel, namesList, parseChild } from "./children";
+import {
+  askEachStepHelp,
+  askEachStepTitle,
+  draftFor,
+  draftProblem,
+  patchFor,
+} from "./ChildEditorSheet";
+import { askedEachStepLine, childLabel, namesList, parseChild } from "./children";
 
 describe("the child editor", () => {
   it("starts a new child with voice typing off, read-aloud on and the next colour", () => {
@@ -38,6 +44,40 @@ describe("the child editor", () => {
     };
     expect(draftProblem(draft)).toMatch(/different times/);
     expect(draftProblem({ ...draft, bedtimeOn: false })).toBeNull();
+  });
+});
+
+describe("Ask before each step", () => {
+  it("starts off for a new child and for a child from an older engine", () => {
+    expect(draftFor(null, 0).askEachStep).toBe(false);
+    expect(parseChild({ id: "a", name: "Ava" })?.askEachStep).toBe(false);
+    expect(parseChild({ id: "a", name: "Ava", askEachStep: "yes" })?.askEachStep).toBe(false);
+  });
+
+  it("reads the engine's setting and saves exactly what the switch shows", () => {
+    const child = parseChild({ id: "a", name: "Ava", askEachStep: true })!;
+    expect(child.askEachStep).toBe(true);
+    expect(draftFor(child, 0).askEachStep).toBe(true);
+    expect(patchFor({ ...draftFor(child, 0), askEachStep: false }).askEachStep).toBe(false);
+    expect(patchFor(draftFor(child, 0)).askEachStep).toBe(true);
+  });
+
+  it("tells Settings who is asked before each step", () => {
+    expect(askedEachStepLine([{ name: "Ava", askEachStep: false }])).toMatch(/their settings/);
+    expect(
+      askedEachStepLine([
+        { name: "Ava", askEachStep: true },
+        { name: null, askEachStep: true },
+      ]),
+    ).toBe("Ava and Child 2 are asked before each step, as you chose.");
+  });
+
+  it("names the child and says what each position does", () => {
+    expect(askEachStepTitle(" Ava ")).toBe("Ask Ava before each step");
+    expect(askEachStepTitle("")).toBe("Ask them before each step");
+    expect(askEachStepHelp(false, "Ava")).toMatch(/run by themselves/);
+    expect(askEachStepHelp(false, "Ava")).toMatch(/still waits for a grown-up/);
+    expect(askEachStepHelp(true, "Ava")).toMatch(/Ava is asked before every step/);
   });
 });
 

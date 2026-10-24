@@ -156,4 +156,63 @@ it.layer(NodeServices.layer)("SkycotFamilyLimits", (it) => {
       }),
     ),
   );
+  it.effect("says whose conversation a step is and whether it may run by itself", () =>
+    withLimits(({ family, limits }) =>
+      Effect.gen(function* () {
+        const rule = (threadId: string) => limits.stepRuleFor({ threadId });
+        assert.deepEqual(yield* rule("t-1"), {
+          type: "ask",
+          reason: "profile-off",
+          childId: null,
+        });
+        const status = yield* family.enable({ code: CODE, childName: "Ava", timeZone: MELBOURNE });
+        const ava = status.children[0]!.id;
+        yield* at("2026-10-22T16:00:00+11:00");
+        // One child: an unrecorded conversation is theirs. The setting starts off.
+        assert.isUndefined(status.children[0]!.askEachStep);
+        assert.deepEqual(yield* rule("t-1"), { type: "auto", childId: ava });
+        // The parent's switch brings the card for every step back, and is kept in the file.
+        const asked = yield* family.updateChild({ childId: ava, patch: { askEachStep: true } });
+        assert.isTrue(asked.children[0]!.askEachStep);
+        assert.deepEqual(yield* rule("t-1"), {
+          type: "ask",
+          reason: "ask-each-step",
+          childId: ava,
+        });
+        // Other changes leave it alone; a non-boolean is ignored.
+        yield* family.updateChild({
+          childId: ava,
+          patch: { largerText: false, askEachStep: "yes" },
+        });
+        assert.isTrue((yield* family.status).children[0]!.askEachStep);
+        yield* family.updateChild({ childId: ava, patch: { askEachStep: false } });
+        assert.deepEqual(yield* rule("t-1"), { type: "auto", childId: ava });
+        // Asleep: the step keeps its card (the gate refuses it until morning).
+        yield* family.updateChild({
+          childId: ava,
+          patch: { limits: { bedtime: { start: "19:30", end: "07:00" } } },
+        });
+        yield* at("2026-10-22T21:00:00+11:00");
+        assert.deepEqual(yield* rule("t-1"), { type: "ask", reason: "asleep", childId: ava });
+        yield* at("2026-10-23T09:00:00+11:00");
+        // Siblings: a conversation is judged by the child who started it; nobody's keeps cards.
+        const added = yield* family.addChild({ name: "Leo", askEachStep: true });
+        yield* limits.choose({ sessionId: SESSION, childId: added.childId, grownUp: false });
+        yield* limits.recordStart({ sessionId: SESSION, threadId: "t-leo" });
+        assert.deepEqual(yield* rule("t-leo"), {
+          type: "ask",
+          reason: "ask-each-step",
+          childId: added.childId,
+        });
+        yield* limits.choose({ sessionId: SESSION, childId: ava, grownUp: false });
+        yield* limits.recordStart({ sessionId: SESSION, threadId: "t-ava" });
+        assert.deepEqual(yield* rule("t-ava"), { type: "auto", childId: ava });
+        assert.deepEqual(yield* rule("t-unknown"), {
+          type: "ask",
+          reason: "no-child",
+          childId: null,
+        });
+      }),
+    ),
+  );
 });

@@ -402,6 +402,17 @@ export function currentChild(
   return view.children.find((child) => child.id === view.currentChildId) ?? null;
 }
 
+/**
+ * Whether the child using SKYCOT here is asked before each step (their parent's setting). False
+ * while the profile is off, or while nobody is chosen yet: the engine then keeps every card
+ * itself, so the words never promise fewer questions than it asks.
+ */
+export function asksEachStep(
+  view: Pick<FamilyView, "enabled" | "children" | "currentChildId">,
+): boolean {
+  return view.enabled && currentChild(view)?.askEachStep === true;
+}
+
 export function viewFromStatus(
   status: ServerFamilyStatus,
   now: number,

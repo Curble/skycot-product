@@ -65,7 +65,7 @@ import { useRetryMade } from "../review/useRetryMade";
 import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
-import { useFamily } from "../family/FamilyProvider";
+import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
@@ -157,8 +157,10 @@ export function ConversationView({
     (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
   const crew = useCrew();
   const crewName = crew.builder.name;
-  // The mode the engine enforces: always "Ask me first" while the Family profile is on.
+  // The mode the engine enforces: the Family rules while the profile is on (safe steps by
+  // themselves, or "Ask me first" when a parent chose it for this child).
   const family = useFamily();
+  const familySteps = useFamilySteps();
   const planFirst = usePlanFirst();
   const runtimeMode =
     shell === null ? null : enforcedRuntimeMode(shell.runtimeMode, family.enabled);
@@ -332,7 +334,10 @@ export function ConversationView({
             </span>
           ) : null}
           <span className="fm-strip__dot">·</span>
-          <span>{autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}</span>
+          <span>
+            {familySteps?.label ??
+              autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}
+          </span>
           <span className="fm-strip__dot">·</span>
           <ExplainToggle threadId={threadId} />
           {publish.status && !question ? (

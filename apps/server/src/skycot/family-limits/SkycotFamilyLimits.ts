@@ -270,6 +270,21 @@ export interface SessionLimits {
   readonly sentence: string | null;
 }
 
+/**
+ * Whether a step of this conversation may run without a card for the child
+ * (SkycotPolicyReactor). "auto" only when the conversation is a known child's, that child's
+ * parent has not switched on "Ask before each step", and SKYCOT is awake for them. Any other
+ * answer leaves the step to the child's card exactly as before. This never decides a step that
+ * needs a grown-up: those wait whatever it says.
+ */
+export type FamilyStepRule =
+  | { readonly type: "auto"; readonly childId: string }
+  | {
+      readonly type: "ask";
+      readonly reason: "profile-off" | "no-child" | "ask-each-step" | "asleep";
+      readonly childId: string | null;
+    };
+
 export class SkycotFamilyLimits extends Context.Service<
   SkycotFamilyLimits,
   {
@@ -311,6 +326,11 @@ export class SkycotFamilyLimits extends Context.Service<
     readonly admitStep: (input: {
       readonly sessionId: string;
     }) => Effect.Effect<void, FamilyLimitRefusal>;
+    /**
+     * Whether this conversation's next safe step may run by itself (`FamilyStepRule`), judged by
+     * the child who started it. Reads only; never counts or writes.
+     */
+    readonly stepRuleFor: (input: { readonly threadId: string }) => Effect.Effect<FamilyStepRule>;
     /** Remembers which child started a conversation or project (the first answer stands). */
     readonly recordStart: (input: {
       readonly sessionId: string;
@@ -709,6 +729,32 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
     if (state.asleep) return yield* refuse(loaded.profile, child, state);
   });
 
+  const stepRuleFor: SkycotFamilyLimits["Service"]["stepRuleFor"] = Effect.fn(
+    "SkycotFamilyLimits.stepRuleFor",
+  )(function* (input) {
+    const ask = (
+      reason: Extract<FamilyStepRule, { type: "ask" }>["reason"],
+      childId: string | null,
+    ): FamilyStepRule => ({ type: "ask", reason, childId });
+    const loaded = yield* current;
+    if (loaded === null) return ask("profile-off", null);
+    const { profile, activity } = loaded;
+    const ownerId = activity.threads[input.threadId];
+    // A conversation nobody recorded (one from before the profile, or a tool's) is the only
+    // child's when there is one; with siblings it is nobody's, and its steps keep their cards.
+    const child =
+      profile.children.find((candidate) => candidate.id === ownerId) ??
+      (ownerId === undefined && profile.children.length === 1 ? profile.children[0] : undefined);
+    if (child === undefined) return ask("no-child", null);
+    if (SkycotFamily.childAsksEachStep(child)) return ask("ask-each-step", child.id);
+    // Asleep: the step waits on the child's card, which the gate refuses until morning
+    // ("finish the current step, then pause"), exactly as a click on it would be.
+    const state = yield* stateFor(profile, activity, child, yield* now);
+    if (state.asleep) return ask("asleep", child.id);
+    const auto: FamilyStepRule = { type: "auto", childId: child.id };
+    return auto;
+  });
+
   const recordStart: SkycotFamilyLimits["Service"]["recordStart"] = Effect.fn(
     "SkycotFamilyLimits.recordStart",
   )(function* (input) {
@@ -866,6 +912,7 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
     admitTurn,
     startableOn,
     admitStep,
+    stepRuleFor,
     recordStart,
     moreTime,
     grantMoreTime,

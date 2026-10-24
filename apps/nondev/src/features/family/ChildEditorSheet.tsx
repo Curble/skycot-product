@@ -1,5 +1,5 @@
 // Settings › Family → a child's card → Edit (or "Add another child"): name, picture, look,
-// larger text, voice, bedtime and daily limits, in one sober sheet. Opened only after the
+// larger text, voice, how steps are asked, bedtime and daily limits, in one sober sheet. Opened only after the
 // parent code (the engine refuses the save otherwise). Voice typing asks the parent to read
 // where this browser sends the child's voice before it goes on.
 import { Mic, Moon, UserRound } from "lucide-react";
@@ -46,6 +46,8 @@ export interface ChildDraft {
   readonly dailyMinutes: number | null;
   readonly dailyTurns: number | null;
   readonly keepAllowancePercent: number | null;
+  /** "Ask [child] before each step": off by default (safe steps run by themselves). */
+  readonly askEachStep: boolean;
 }
 
 export function draftFor(child: FamilyChild | null, siblings: number): ChildDraft {
@@ -67,6 +69,7 @@ export function draftFor(child: FamilyChild | null, siblings: number): ChildDraf
     dailyMinutes: limits.dailyMinutes,
     dailyTurns: limits.dailyTurns,
     keepAllowancePercent: limits.keepAllowancePercent,
+    askEachStep: child?.askEachStep ?? false,
   };
 }
 
@@ -84,7 +87,21 @@ export function patchFor(draft: ChildDraft): ChildPatch {
       dailyTurns: draft.dailyTurns,
       keepAllowancePercent: draft.keepAllowancePercent,
     },
+    askEachStep: draft.askEachStep,
   };
+}
+
+/** "Ask Ava before each step". */
+export function askEachStepTitle(name: string): string {
+  const trimmed = name.trim();
+  return `Ask ${trimmed || "them"} before each step`;
+}
+
+/** The line under the switch: what each position does, in a parent's words. */
+export function askEachStepHelp(on: boolean, who: string): string {
+  return on
+    ? `On: ${who} is asked before every step, even safe ones like looking at files. Anything risky still waits for a grown-up.`
+    : `Off: safe steps inside the project run by themselves, so ${who} isn't asked about every step. Anything risky (the internet, installs, deleting, other folders) still waits for a grown-up, and ${who} still sees the plan before anything is built.`;
 }
 
 /** Why the draft can't be saved, or null. */
@@ -157,7 +174,7 @@ export function ChildEditorSheet({
       icon={UserRound}
       iconTone="orange"
       title={child === null ? "Add another child" : `${child.name ?? "Your child"}'s settings`}
-      description="Their own picture, look, voice and limits. SKYCOT's engine keeps them on this Mac and holds every limit, whatever device they use."
+      description="Their own picture, look, voice, steps and limits. SKYCOT's engine keeps them on this Mac and holds every limit, whatever device they use."
       wide
       sober
       initialFocus="first"
@@ -300,6 +317,21 @@ export function ChildEditorSheet({
               </div>
             </div>
           ) : null}
+        </section>
+
+        <section className="fm-child-editor__section">
+          <h3>Steps</h3>
+          <div className="fm-child-editor__row">
+            <span>
+              {askEachStepTitle(draft.name)}
+              <small>{askEachStepHelp(draft.askEachStep, who)}</small>
+            </span>
+            <Switch
+              checked={draft.askEachStep}
+              onChange={(on) => change({ askEachStep: on })}
+              label={askEachStepTitle(draft.name)}
+            />
+          </div>
         </section>
 
         <section className="fm-child-editor__section">

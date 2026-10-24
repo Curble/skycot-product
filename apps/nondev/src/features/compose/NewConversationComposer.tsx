@@ -36,7 +36,7 @@ import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
-import { useFamily } from "../family/FamilyProvider";
+import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { noteStartedHere } from "../family-limits/store";
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
@@ -103,6 +103,9 @@ export function NewConversationComposer({
   const policyEnforced = config?.skycotPolicy === true;
   const [chosenKey, setChosenKey] = useState<string | null>(null);
   const family = useFamily();
+  // Family: how this child's steps run (safe steps by themselves, unless a parent chose
+  // "Ask before each step"), instead of "Ask me first … before every command".
+  const familySteps = useFamilySteps();
   // Plain surfaces offer only the levels that keep a safety promise; a stored
   // "hands-off" (from Advanced mode) shows as asking first. The Family profile
   // pins it to asking first.
@@ -274,8 +277,16 @@ export function NewConversationComposer({
           <div id={notesId}>
             {/* One sentence for the chosen level, not a paragraph about every level. */}
             <p className="fm-help" style={{ marginBottom: 6 }}>
-              <b>{autonomyLabel(autonomy)}.</b>{" "}
-              {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
+              {familySteps === null ? (
+                <>
+                  <b>{autonomyLabel(autonomy)}.</b>{" "}
+                  {describeAutonomyLevel(autonomyLevelOf(autonomy), { policyEnforced })}
+                </>
+              ) : (
+                <>
+                  <b>{familySteps.label}.</b> {familySteps.description}
+                </>
+              )}
               {planFirst.on ? (
                 <>
                   {" "}

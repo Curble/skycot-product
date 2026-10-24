@@ -398,6 +398,7 @@ const childInput = (value: unknown): SkycotFamily.ChildInput => {
     ...("largerText" in input ? { largerText: input["largerText"] } : {}),
     ...("voice" in input ? { voice: input["voice"] } : {}),
     ...("limits" in input ? { limits: input["limits"] } : {}),
+    ...("askEachStep" in input ? { askEachStep: input["askEachStep"] } : {}),
   };
 };
 

@@ -34,7 +34,13 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { GitCommandError } from "@t3tools/contracts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import { evaluateFamilyRequest } from "@t3tools/skycot-rules/family";
+import { evaluateRequest } from "@t3tools/skycot-rules/rules";
+
+import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { parseApprovedDownload, parseApprovedInstall } from "./SkycotApprovedInstalls.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import * as SkycotPolicyReactor from "./SkycotPolicyReactor.ts";
 
 const CODEX = ProviderDriverKind.make("codex");
@@ -168,8 +174,13 @@ interface Scenario {
   readonly pendingRequests?: ReadonlyArray<OrchestrationV2RuntimeRequest>;
   /** Run statuses by id, for the "run no longer active" guard. */
   readonly runs?: Readonly<Record<string, OrchestrationV2Run["status"]>>;
-  /** The Family profile is on: nothing is approved on the child's behalf. */
-  readonly family?: boolean;
+  /**
+   * The Family profile is on. `true` alone: no limits service, so nobody knows whose the
+   * conversation is. An object: the step rule the limits service gives this conversation.
+   */
+  readonly family?: boolean | { readonly stepRule: SkycotFamilyLimits.FamilyStepRule };
+  /** The user message each run answers, by run id (for plan first). */
+  readonly runMessages?: Readonly<Record<string, string>>;
 }
 
 const gitFailure = (operation: string) =>
@@ -197,7 +208,16 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
             thread: scenario.thread ?? thread("auto-accept-edits", "/work/site"),
             runs: Object.entries(scenario.runs ?? {})
               .filter(([id]) => filter?.runIds === undefined || filter.runIds.includes(id as RunId))
-              .map(([id, status]) => ({ id, status }) as unknown as OrchestrationV2Run),
+              .map(
+                ([id, status]) =>
+                  ({
+                    id,
+                    status,
+                    ...(scenario.runMessages?.[id] === undefined
+                      ? {}
+                      : { userMessageId: scenario.runMessages[id] }),
+                  }) as unknown as OrchestrationV2Run,
+              ),
             turnItems: items.filter(
               (item) =>
                 (filter?.turnItemRunIds === undefined ||
@@ -265,8 +285,17 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
             }),
           ),
       }),
-      scenario.family === true
-        ? Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) })
+      scenario.family === undefined || scenario.family === false
+        ? Layer.empty
+        : Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) }),
+      typeof scenario.family === "object"
+        ? Layer.mock(SkycotFamilyLimits.SkycotFamilyLimits)({
+            stepRuleFor: () =>
+              Effect.succeed(
+                (scenario.family as { readonly stepRule: SkycotFamilyLimits.FamilyStepRule })
+                  .stepRule,
+              ),
+          })
         : Layer.empty,
       Layer.mock(Orchestrator.OrchestratorV2)({
         dispatch: (command) =>
@@ -292,7 +321,7 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
   });
 
 describe("SkycotPolicyReactor", () => {
-  it.effect("approves nothing while the Family profile is on", () =>
+  it.effect("approves nothing in Family when it cannot tell whose conversation it is", () =>
     Effect.gen(function* () {
       const { outcome, dispatched } = yield* run(
         {
@@ -301,7 +330,7 @@ describe("SkycotPolicyReactor", () => {
         },
         requestEvent(request("command")),
       );
-      assert.deepEqual(outcome, { type: "skipped", reason: "family profile is on" });
+      assert.deepEqual(outcome, { type: "skipped", reason: "family: no-child" });
       assert.equal(dispatched.length, 0);
     }),
   );
@@ -792,4 +821,264 @@ describe("SkycotPolicyReactor", () => {
       }
     }),
   );
+  describe("Family profile: safe steps run by themselves", () => {
+    const RUN = "run-build" as RunId;
+    const MESSAGE = "message:build-it";
+    const AUTO = { stepRule: { type: "auto", childId: "c-ava" } } as const;
+    /** A build turn ("Build it" on Sam's plan): the run whose message has the plan pass. */
+    const buildTurn = (items: ReadonlyArray<OrchestrationV2TurnItem>) => ({
+      family: AUTO,
+      runs: { [RUN]: "running" as const },
+      runMessages: { [RUN]: MESSAGE },
+      items: items.map((item) =>
+        item.type === "approval_request" ? { ...item, runId: RUN } : item,
+      ),
+      // Family threads are governed whatever mode they were made in.
+      thread: thread("approval-required", "/work/site"),
+    });
+    const markBuild = SkycotFamilyInstructions.letRunWithoutPlan(MESSAGE, "builds-plan");
+
+    it.effect("approves a safe step in a build turn without a card, in any thread mode", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        for (const command of ["ls -la", "node --check game.js", "pnpm test"]) {
+          const { outcome, dispatched } = yield* run(
+            buildTurn([approvalItem("command"), commandItem(command)]),
+            requestEvent(request("command")),
+          );
+          assert.equal(outcome.type, "approved", command);
+          assert.equal(dispatched.length, 1);
+          assert.equal(dispatched[0]!.decision, "accept");
+          assert.deepEqual(dispatched[0]!.answers, {
+            skycot: { decidedBy: "policy", note: SKYCOT_POLICY_NOTE, ruleIds: [], version: 1 },
+          });
+          if (outcome.type === "approved") assert.equal(outcome.family?.needsGrownUp, false);
+        }
+        const edit = yield* run(
+          {
+            ...buildTurn([approvalItem("file-change", "update /work/site/index.html")]),
+            request: request("file-change"),
+          },
+          requestEvent(request("file-change")),
+        );
+        assert.equal(edit.outcome.type, "approved");
+        const fullAccess = yield* run(
+          {
+            ...buildTurn([approvalItem("command"), commandItem("ls")]),
+            thread: thread("full-access", "/work/site"),
+          },
+          requestEvent(request("command")),
+        );
+        assert.equal(fullAccess.outcome.type, "approved");
+      }),
+    );
+
+    it.effect("never approves a step that needs a grown-up (the safety test)", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        const roots = { projectRoot: "/work/site", projectFolder: "/projects/site" };
+        // Steps only the Family rules hold: a reactor that judged by the hard rules alone would
+        // approve these, so this test fails if the Family rules are ever skipped.
+        const familyOnly = [
+          "curl https://example.com/three.js -o three.js",
+          "npm install three",
+          "npx create-vite game",
+          "pip install requests",
+          "brew install ffmpeg",
+          "node -e \"fetch('https://example.com')\"",
+          "sudo ls",
+          "osascript -e 'beep'",
+        ];
+        for (const command of familyOnly) {
+          assert.equal(
+            evaluateRequest({ kind: "command", command }, roots).decision,
+            "allow",
+            `the hard rules alone allow: ${command}`,
+          );
+        }
+        const holds = [...familyOnly, "rm -rf src", "git push origin main", "cat ~/.ssh/id_rsa"];
+        for (const command of holds) {
+          assert.equal(
+            evaluateFamilyRequest({ kind: "command", command }, roots).needsGrownUp,
+            true,
+            command,
+          );
+          const { outcome, dispatched } = yield* run(
+            buildTurn([approvalItem("command"), commandItem(command)]),
+            requestEvent(request("command")),
+          );
+          assert.equal(outcome.type, "held", command);
+          if (outcome.type === "held") assert.equal(outcome.family?.needsGrownUp, true, command);
+          assert.deepEqual(dispatched, [], command);
+        }
+        // A web search is the internet whatever its words say.
+        const search = yield* run(
+          buildTurn([
+            approvalItem("command", "cats"),
+            {
+              ...base,
+              id: TurnItemId.make("turn-item:provider:codex:native-item:item-1"),
+              ordinal: 0,
+              status: "running",
+              type: "web_search",
+            } as unknown as OrchestrationV2TurnItem,
+          ]),
+          requestEvent(request("command")),
+        );
+        assert.equal(search.outcome.type, "held");
+        assert.deepEqual(search.dispatched, []);
+        // Outside the project, deleting files, connected apps.
+        for (const [kind, prompt] of [
+          ["file-change", "update /etc/hosts"],
+          ["file-change", "delete /work/site/book.html"],
+          ["file-read", "/Users/ava/Documents/diary.txt"],
+          ["permission", "Use GitHub"],
+        ] as const) {
+          const { outcome, dispatched } = yield* run(
+            { ...buildTurn([approvalItem(kind, prompt)]), request: request(kind) },
+            requestEvent(request(kind)),
+          );
+          assert.equal(outcome.type, "held", prompt);
+          assert.deepEqual(dispatched, [], prompt);
+        }
+      }),
+    );
+
+    it.effect("never says the yes SKYCOT's own installer acts on (installs, downloads)", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        for (const command of [
+          "npm install three",
+          "npm i -D vite",
+          "pnpm add three",
+          "bun add three@0.160.0",
+          "/bin/zsh -lc 'npm install three'",
+          "curl -L -o three.module.js https://unpkg.com/three/build/three.module.js",
+          "wget -O three.js https://example.com/three.js",
+        ]) {
+          // SkycotApprovedInstalls runs these itself, outside the sandbox, on a plain yes.
+          assert.isTrue(
+            parseApprovedInstall(command) !== null || parseApprovedDownload(command) !== null,
+            `the installer takes: ${command}`,
+          );
+          const { outcome, dispatched } = yield* run(
+            buildTurn([approvalItem("command"), commandItem(command)]),
+            requestEvent(request("command")),
+          );
+          assert.equal(outcome.type, "held", command);
+          assert.deepEqual(dispatched, [], command);
+        }
+      }),
+    );
+
+    it.effect("mayAutoApprove is false whenever a Family rule or a hard rule holds", () =>
+      Effect.sync(() => {
+        const roots = { projectRoot: "/work/site", projectFolder: "/projects/site" };
+        const install = { kind: "command", command: "npm install three" } as const;
+        const base = evaluateRequest(install, roots);
+        assert.equal(base.decision, "allow");
+        assert.equal(
+          SkycotPolicyReactor.mayAutoApprove(base, evaluateFamilyRequest(install, roots)),
+          false,
+        );
+        assert.equal(SkycotPolicyReactor.mayAutoApprove(base, undefined), true);
+        const del = { kind: "command", command: "rm -rf src" } as const;
+        assert.equal(
+          SkycotPolicyReactor.mayAutoApprove(
+            evaluateRequest(del, roots),
+            evaluateFamilyRequest(del, roots),
+          ),
+          false,
+        );
+      }),
+    );
+
+    it.effect("asks the child again when their parent turned on Ask before each step", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        for (const reason of ["ask-each-step", "asleep", "no-child", "profile-off"] as const) {
+          const { outcome, dispatched } = yield* run(
+            {
+              ...buildTurn([approvalItem("command"), commandItem("ls")]),
+              family: { stepRule: { type: "ask", reason, childId: "c-ava" } },
+            },
+            requestEvent(request("command")),
+          );
+          assert.deepEqual(outcome, { type: "skipped", reason: `family: ${reason}` });
+          assert.deepEqual(dispatched, []);
+        }
+      }),
+    );
+
+    it.effect("keeps Plan first: while planning, only looking around runs by itself", () =>
+      Effect.gen(function* () {
+        const planRun = "run-plan" as RunId;
+        const planning = (items: ReadonlyArray<OrchestrationV2TurnItem>) => ({
+          family: AUTO,
+          runs: { [planRun]: "running" as const },
+          runMessages: { [planRun]: "message:make-a-game" },
+          items: items.map((item) =>
+            item.type === "approval_request" ? { ...item, runId: planRun } : item,
+          ),
+        });
+        for (const command of [
+          "ls -la",
+          "/bin/zsh -lc \"sed -n '1,80p' index.html\"",
+          "rg score .",
+        ]) {
+          const looks = yield* run(
+            planning([approvalItem("command"), commandItem(command)]),
+            requestEvent(request("command")),
+          );
+          assert.equal(looks.outcome.type, "approved", command);
+        }
+        const read = yield* run(
+          {
+            ...planning([approvalItem("file-read", "/work/site/index.html")]),
+            request: request("file-read"),
+          },
+          requestEvent(request("file-read")),
+        );
+        assert.equal(read.outcome.type, "approved");
+        for (const command of ["echo hi > index.html", "pnpm test", "node build.js"]) {
+          const changes = yield* run(
+            planning([approvalItem("command"), commandItem(command)]),
+            requestEvent(request("command")),
+          );
+          assert.deepEqual(
+            changes.outcome,
+            { type: "skipped", reason: "family: plan first (changes wait for Build it)" },
+            command,
+          );
+          assert.deepEqual(changes.dispatched, []);
+        }
+        const edit = yield* run(
+          {
+            ...planning([approvalItem("file-change", "update /work/site/index.html")]),
+            request: request("file-change"),
+          },
+          requestEvent(request("file-change")),
+        );
+        assert.equal(edit.outcome.type, "skipped");
+        // A grown-up's step during a plan still waits for a grown-up.
+        const install = yield* run(
+          planning([approvalItem("command"), commandItem("npm install three")]),
+          requestEvent(request("command")),
+        );
+        assert.equal(install.outcome.type, "held");
+      }),
+    );
+
+    it.effect("with the profile off, a Family-style thread is not governed (unchanged)", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        const { outcome, dispatched } = yield* run(
+          { ...buildTurn([approvalItem("command"), commandItem("ls")]), family: false },
+          requestEvent(request("command")),
+        );
+        assert.deepEqual(outcome, { type: "skipped", reason: "runtime mode not governed" });
+        assert.deepEqual(dispatched, []);
+      }),
+    );
+  });
 });

@@ -56,7 +56,7 @@ function FamilySetupSheetBody({
       icon={Users}
       iconTone="orange"
       title={`Set up the ${familyCopy.title}`}
-      description="For a child you look after. SKYCOT's engine keeps the assistant on “Ask me first”, and a parent code guards the internet, installs, publishing, automations, other folders and the developer tools. The Workshop look comes on unless you've already picked another."
+      description="For a child you look after. SKYCOT's engine lets safe steps run by themselves and holds anything risky for a grown-up: a parent code guards the internet, installs, publishing, automations, other folders and the developer tools. The Workshop look comes on unless you've already picked another."
       wide
       sober
       initialFocus="first"

@@ -214,6 +214,18 @@ export function familyInteractionMode(
 }
 
 /**
+ * Whether this message's turn runs as a plan while the profile is on: the same decision
+ * `familyTurnInput` gave the provider (plan first), read back by the policy reactor so a step
+ * asked for while the plan is being made is judged as part of a plan (only looking around runs
+ * by itself; nothing changes before "Build it").
+ */
+export const familyTurnPlans = (
+  messageId: string,
+  requested: ProviderInteractionMode,
+): Effect.Effect<boolean> =>
+  Effect.map(planPassFor(messageId), (pass) => familyInteractionMode(requested, pass) === "plan");
+
+/**
  * The message a provider receives. While the Family profile is on: the rules, the shield
  * and (by default) explain mode; otherwise explain mode only when the message asked for it.
  * The same object when nothing applies. `family` is optional so upstream services that never

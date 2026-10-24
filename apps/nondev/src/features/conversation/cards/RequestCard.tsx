@@ -49,14 +49,16 @@ import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
 import {
   approves,
+  ENGINE_CHECK_GRACE_MS,
   familyCard,
   familyHoldFor,
   isFamilyRefusal,
   toolItemTypeFor,
+  waitsForEngineCheck,
 } from "../../family/cards";
 import { Mascot } from "../../brand/Mascot";
 import { familyCopy } from "../../family/copy";
-import { useFamily } from "../../family/FamilyProvider";
+import { useFamily, useFamilySteps } from "../../family/FamilyProvider";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
@@ -239,9 +241,26 @@ export function RequestCard({
         })
       : null;
   const shown = familyApplies ? familyCard(card, grownUp) : card;
+  // Family: a step the child needn't be asked about is the engine's to answer (safe steps run
+  // by themselves), so it shows a quiet line for a moment instead of a card with buttons.
+  const steps = useFamilySteps();
   const runEnded = askRunEnded(item, projection, shell);
   const decided = decidedLine(item, request, runEnded);
   const decision = request ? describeDecision(request) : null;
+  const checking = waitsForEngineCheck({
+    familyOn: familyApplies,
+    isApproval: item.type === "approval_request",
+    decided: decided !== null,
+    needsGrownUp: grownUp !== null,
+    askEachStep: steps?.askEachStep ?? true,
+    grownUpDevice: family.profile.me.kind === "grown-up",
+  });
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    if (!checking) return;
+    const timer = window.setTimeout(() => setGraceOver(true), ENGINE_CHECK_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [checking]);
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -288,6 +307,16 @@ export function RequestCard({
     setBusyId(null);
     if (result !== null) setProblem(result);
   };
+
+  if (checking && !graceOver) {
+    return (
+      <Bubble author="crew" full meta={shortTime(item.startedAt ?? item.updatedAt)}>
+        <p className="fm-help" role="status">
+          {familyCopy.checkingStep}
+        </p>
+      </Bubble>
+    );
+  }
 
   const tone = riskTone(card.risk);
   const Icon = iconFor(item, card.risk);

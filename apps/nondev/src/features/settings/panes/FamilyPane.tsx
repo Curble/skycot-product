@@ -25,7 +25,13 @@ import { StepBadge } from "../../../ui/StepBadge";
 import { TextField } from "../../../ui/TextField";
 import { ChildAvatar } from "../../family/ChildAvatar";
 import { ChildEditorSheet } from "../../family/ChildEditorSheet";
-import { childLabel, MAX_CHILDREN, namesList, type FamilyChild } from "../../family/children";
+import {
+  askedEachStepLine,
+  childLabel,
+  MAX_CHILDREN,
+  namesList,
+  type FamilyChild,
+} from "../../family/children";
 import { familyCopy } from "../../family/copy";
 import { openChildPicker } from "../../family-limits/FamilyLimitsHost";
 import { clockPhrase, limitsSummary, todaySummary } from "../../family-limits/limits";
@@ -71,7 +77,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
       <>
         <SettingsGroup
           title={familyCopy.title}
-          footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), keeps the assistant on “Ask me first”, hides the developer tools, and guards publishing and automations with a parent code."
+          footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), lets safe steps run by themselves while anything risky waits for a grown-up, hides the developer tools, and guards publishing and automations with a parent code."
         >
           <ListRow
             leading={<StepBadge state="todo" icon={Users} />}
@@ -120,6 +126,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
   const [confirmOff, setConfirmOff] = useState(false);
   const since = profile.createdAt ? formatSince(profile.createdAt) : null;
   const names = profile.children.map((child, index) => childLabel(child, index));
+  const askedLine = askedEachStepLine(profile.children);
   const openLine = openGrantsSentence(profile, useSyncExternalStore(subscribeClock, readClock));
 
   // Confirm first; the code sheet then turns it off on the engine in the same step.
@@ -156,8 +163,8 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
         </ListExtra>
         <ListRow
           leading={<StepBadge state="ok" />}
-          title="Always asks first"
-          subtitle="SKYCOT's engine runs every conversation in “Ask me first” while the profile is on, whatever a setting or an older conversation says."
+          title="Safe steps run by themselves"
+          subtitle={`Anything risky waits for a grown-up, whatever a setting or an older conversation says. ${askedLine}`}
         />
       </SettingsGroup>
 
@@ -501,7 +508,7 @@ function ChildrenGroup() {
     <>
       <SettingsGroup
         title={several ? "Children" : "Child"}
-        footer="Names, pictures, looks, voice and limits need the parent code. Choosing who's using SKYCOT doesn't, except to move away from a child it's asleep for."
+        footer="Names, pictures, looks, voice, limits and “Ask before each step” need the parent code. Choosing who's using SKYCOT doesn't, except to move away from a child it's asleep for."
       >
         <ListExtra>
           <div>
@@ -603,6 +610,11 @@ function ChildCard({
           Voice typing {child.voice.typing ? "on" : "off"} · read aloud{" "}
           {child.voice.readAloud ? "on" : "off"}
           {child.largerText ? " · larger text" : ""}
+        </span>
+        <span className="fm-child-card__line">
+          {child.askEachStep
+            ? "Asked before each step"
+            : "Safe steps run by themselves · anything risky waits for a grown-up"}
         </span>
         {state !== null ? (
           <span className="fm-child-card__today">{todaySummary(state, child.limits)}</span>

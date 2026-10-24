@@ -19,6 +19,36 @@ export function isFamilyRefusal(message: string | null): boolean {
   return message !== null && message.toLowerCase().includes(FAMILY_REFUSAL_MARK);
 }
 
+/**
+ * How long a step the child needn't be asked about shows a quiet "Checking this step…" instead
+ * of a card while SKYCOT's engine answers it (SkycotPolicyReactor runs safe steps by
+ * themselves). Still waiting after this means the engine left it to the child (a change while
+ * the plan is being made, an engine without the policy), so the ordinary card shows.
+ */
+export const ENGINE_CHECK_GRACE_MS = 4_000;
+
+/** Whether a pending card is one the engine is expected to answer itself (see above). */
+export function waitsForEngineCheck(input: {
+  readonly familyOn: boolean;
+  readonly isApproval: boolean;
+  readonly decided: boolean;
+  /** The card already says only a grown-up may allow it. */
+  readonly needsGrownUp: boolean;
+  /** The parent chose "Ask before each step" for this child. */
+  readonly askEachStep: boolean;
+  /** A grown-up's own phone only reads; it never waits for the Mac's engine. */
+  readonly grownUpDevice: boolean;
+}): boolean {
+  return (
+    input.familyOn &&
+    input.isApproval &&
+    !input.decided &&
+    !input.needsGrownUp &&
+    !input.askEachStep &&
+    !input.grownUpDevice
+  );
+}
+
 /** The tool call that shares the approval's native item, for its type (`web_search`, …). */
 export function toolItemTypeFor(
   item: Pick<ApprovalItem, "nativeItemRef">,

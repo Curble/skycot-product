@@ -159,9 +159,21 @@ const Child = Schema.Struct({
   largerText: Schema.Boolean,
   voice: ChildVoice,
   limits: ChildLimits,
+  /**
+   * "Ask [child] before each step": the child's assistant asks them before every step again,
+   * as it did before safe steps ran by themselves. Off (or missing, in a file from before it)
+   * means a step no rule holds runs without a card; a step that needs a grown-up always waits
+   * (SkycotPolicyReactor). Only a parent changes it (the parent code opens the editor).
+   */
+  askEachStep: Schema.optionalKey(Schema.Boolean),
   createdAt: Schema.String,
 });
 export type FamilyChild = typeof Child.Type;
+
+/** Whether this child's assistant asks them before every step (the parent's switch; off by default). */
+export function childAsksEachStep(child: Pick<FamilyChild, "askEachStep">): boolean {
+  return child.askEachStep === true;
+}
 
 /** A grown-up in the family: the person who set the profile up, and anyone they add. */
 const GrownUp = Schema.Struct({
@@ -397,6 +409,7 @@ export interface ChildInput {
   readonly largerText?: unknown;
   readonly voice?: unknown;
   readonly limits?: unknown;
+  readonly askEachStep?: unknown;
 }
 
 export type FamilyFailureReason =
@@ -863,6 +876,7 @@ export function applyChildInput(child: FamilyChild, input: ChildInput): FamilyCh
     largerText: typeof input.largerText === "boolean" ? input.largerText : child.largerText,
     voice: input.voice === undefined ? child.voice : cleanVoice(input.voice, child.voice),
     limits: input.limits === undefined ? child.limits : cleanLimits(input.limits, child.limits),
+    ...(typeof input.askEachStep === "boolean" ? { askEachStep: input.askEachStep } : {}),
   };
 }
 

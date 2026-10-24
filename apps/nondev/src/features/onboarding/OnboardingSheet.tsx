@@ -107,7 +107,7 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
   },
 };
 
-const FAMILY_AUTONOMY_DESCRIPTION = `Fixed by the ${familyCopy.title}: the assistant asks before every change and every command.`;
+const FAMILY_AUTONOMY_DESCRIPTION = `Fixed by the ${familyCopy.title}: safe steps run by themselves, and anything risky waits for a grown-up.`;
 
 /**
  * First-run onboarding as one macOS sheet with short steps: who it is for,
@@ -322,8 +322,8 @@ function FamilyAutonomyStep({ environmentId }: { readonly environmentId: Environ
       <List label="Autonomy">
         <ListRow
           leading={<StepBadge state="ok" icon={ShieldCheck} />}
-          title={`Always asks first (${familyCopy.title})`}
-          subtitle={`${describeAutonomyLevel("askMeFirst", { policyEnforced })} ${AUTONOMY_LEVELS.askMeFirst.hint} The riskier levels are hidden while the profile is on.`}
+          title={`Safe steps run by themselves (${familyCopy.title})`}
+          subtitle={`${familyCopy.safeSteps}, and nothing changes until the plan is built. A parent can have a child asked before each step in Settings → Family. The riskier levels are hidden while the profile is on.`}
           trailing={
             <Pill tone="neutral" size="sm">
               Fixed
@@ -625,10 +625,14 @@ function DoneStep({
         ) : null}
         <ListRow
           leading={<StepBadge state="done" />}
-          title={familyFor !== undefined ? "Ask me first" : (autonomyLabel ?? "Ask me first")}
+          title={
+            familyFor !== undefined
+              ? "Safe steps run by themselves"
+              : (autonomyLabel ?? "Ask me first")
+          }
           subtitle={
             familyFor !== undefined
-              ? `Fixed by the ${familyCopy.title}.`
+              ? `Anything risky waits for a grown-up. Fixed by the ${familyCopy.title}.`
               : "Your default autonomy. Change it in Settings → Autonomy & safety."
           }
           trailing={

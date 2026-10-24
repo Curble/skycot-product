@@ -2,7 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { describeRuntimeRequest } from "../../plain/approvals";
 import { items } from "../../plain/fixtures.test-helpers";
-import { familyCard, familyHoldFor, isFamilyRefusal, toolItemTypeFor } from "./cards";
+import {
+  familyCard,
+  familyHoldFor,
+  isFamilyRefusal,
+  toolItemTypeFor,
+  waitsForEngineCheck,
+} from "./cards";
 import { familyCopy } from "./copy";
 
 const ROOT = "/Users/kid/projects/space-game";
@@ -69,5 +75,25 @@ describe("family approval cards", () => {
     ).toBe(true);
     expect(isFamilyRefusal("That didn't go through.")).toBe(false);
     expect(isFamilyRefusal(null)).toBe(false);
+  });
+});
+
+describe("a safe step the engine answers itself (Family)", () => {
+  const base = {
+    familyOn: true,
+    isApproval: true,
+    decided: false,
+    needsGrownUp: false,
+    askEachStep: false,
+    grownUpDevice: false,
+  };
+  it("shows a quiet line instead of a card only for a pending safe step", () => {
+    expect(waitsForEngineCheck(base)).toBe(true);
+    expect(waitsForEngineCheck({ ...base, needsGrownUp: true })).toBe(false);
+    expect(waitsForEngineCheck({ ...base, askEachStep: true })).toBe(false);
+    expect(waitsForEngineCheck({ ...base, decided: true })).toBe(false);
+    expect(waitsForEngineCheck({ ...base, grownUpDevice: true })).toBe(false);
+    expect(waitsForEngineCheck({ ...base, isApproval: false })).toBe(false);
+    expect(waitsForEngineCheck({ ...base, familyOn: false })).toBe(false);
   });
 });

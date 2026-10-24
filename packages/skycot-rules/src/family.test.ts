@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { describeFamilyMatches, evaluateFamilyRequest, familyCommandMatches } from "./family.ts";
+import {
+  describeFamilyMatches,
+  evaluateFamilyRequest,
+  familyCommandMatches,
+  isReadOnlyCommand,
+} from "./family.ts";
 
 const ROOT = "/Users/me/games/space";
 const ids = (command: string) => familyCommandMatches(command).map((match) => match.rule.id);
@@ -177,5 +182,54 @@ describe("family rules — real internet use still needs a grown-up", () => {
 
   it("a heredoc writing a script still catches network programs in it", () => {
     expect(ids("cat > get.sh <<'EOF'\ncurl -s https://x.test\nEOF")).toContain("uses-internet");
+  });
+});
+
+describe("plan first — only looking around runs by itself while a plan is made", () => {
+  it.each([
+    "ls -la",
+    "cat index.html",
+    "head -n 40 game.js",
+    "sed -n '1,200p' game.js",
+    "rg score .",
+    "grep -rn 'jump' src",
+    "find . -name '*.js'",
+    "git status",
+    "git diff",
+    "wc -l *.js",
+    "cd src && ls",
+    "ls 2>&1 | head",
+    '/bin/zsh -lc "ls -la && cat index.html"',
+  ])("%s only looks", (command) => {
+    expect(isReadOnlyCommand(command)).toBe(true);
+  });
+
+  it.each([
+    "echo hi > index.html",
+    "cat a >> b",
+    "cat > page.html <<'EOF'\n<p>hi</p>\nEOF",
+    "sed -i '' 's/a/b/' game.js",
+    "sed 's/a/b/w out' game.js",
+    "find . -delete",
+    "find . -exec rm {} ;",
+    "sort -o out.txt in.txt",
+    "rg --pre=./run.sh foo",
+    "git push",
+    "git commit -m save",
+    "git diff --output=out.patch",
+    "node game.js",
+    "npm test",
+    "mkdir sprites",
+    "touch a.txt",
+    "tee notes.txt",
+    "ls &",
+    "cat $(ls)",
+    "cat `ls`",
+    "FOO=1 ls",
+    "xargs rm",
+    "./ls",
+    "",
+  ])("%s is not just looking", (command) => {
+    expect(isReadOnlyCommand(command)).toBe(false);
   });
 });
