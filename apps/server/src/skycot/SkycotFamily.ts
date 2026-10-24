@@ -219,6 +219,22 @@ const WatchKey = Schema.Struct({
 export type FamilyWatchKey = typeof WatchKey.Type;
 
 /**
+ * A grown-up's phone's own Face ID key (or Touch ID, on an iPad): a P-256 key made in that
+ * phone's Secure Enclave, usable only after Face ID for each signature. The public half only
+ * (SPKI DER, base64url). One per device; setting it up again replaces it; "Stop using Face ID"
+ * and removing the device forget it.
+ */
+const DeviceKey = Schema.Struct({
+  id: Schema.String,
+  publicKey: Schema.String,
+  /** Which of Apple's checks guards it, as the phone says: words for the log, not checked. */
+  biometry: Schema.Literals(["face-id", "touch-id", "optic-id"]),
+  createdAt: Schema.String,
+  lastUsedAt: Schema.NullOr(Schema.String),
+});
+export type FamilyDeviceKey = typeof DeviceKey.Type;
+
+/**
  * A device linked to one person. Its sign-in is T3's (a session whose subject names this id);
  * this record is what makes it a child's or a grown-up's, and removing it ends that at once.
  */
@@ -235,6 +251,8 @@ const Device = Schema.Struct({
   passkeys: Schema.Array(Passkey),
   /** A grown-up's phone only: the paired Apple Watch that may say yes through it. */
   watch: Schema.optionalKey(WatchKey),
+  /** A grown-up's device only: its own Face ID key, for saying yes on the device itself. */
+  deviceKey: Schema.optionalKey(DeviceKey),
 });
 export type FamilyDevice = typeof Device.Type;
 
@@ -369,6 +387,8 @@ export interface FamilyDeviceView {
   readonly passkeys: number;
   /** The paired Apple Watch's name, when one may say yes through this phone. */
   readonly watch: string | null;
+  /** Whether this grown-up's device may say yes with its own Face ID key. */
+  readonly faceId: boolean;
 }
 
 const deviceView = (device: FamilyDevice): FamilyDeviceView => ({
@@ -379,6 +399,7 @@ const deviceView = (device: FamilyDevice): FamilyDeviceView => ({
   createdAt: device.createdAt,
   passkeys: device.passkeys.length,
   watch: device.watch?.name ?? null,
+  faceId: device.deviceKey !== undefined,
 });
 
 /** What any signed-in client may read. Never the hash, salt or secret. */
@@ -634,6 +655,19 @@ export class SkycotFamily extends Context.Service<
       readonly keyId: string;
     }) => Effect.Effect<void, FamilyError>;
     readonly removeWatchKey: (input: {
+      readonly deviceId: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** A grown-up's device registered its own Face ID key (a new one replaces the old). */
+    readonly setDeviceKey: (input: {
+      readonly deviceId: string;
+      readonly key: FamilyDeviceKey;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** The Face ID key said yes: when is kept, for the record. */
+    readonly useDeviceKey: (input: {
+      readonly deviceId: string;
+      readonly keyId: string;
+    }) => Effect.Effect<void, FamilyError>;
+    readonly removeDeviceKey: (input: {
       readonly deviceId: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
   }
@@ -1525,6 +1559,31 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       return rest;
     });
 
+  const setDeviceKey: SkycotFamily["Service"]["setDeviceKey"] = (input) =>
+    updateDevice("setDeviceKey", input.deviceId, (current) =>
+      // Never a child's device: a Face ID yes is a grown-up's, on a grown-up's device.
+      current.kind === "grown-up" ? { ...current, deviceKey: input.key } : null,
+    );
+
+  const useDeviceKey: SkycotFamily["Service"]["useDeviceKey"] = (input) =>
+    updateDevice("useDeviceKey", input.deviceId, (current, _file, at) =>
+      current.deviceKey !== undefined && current.deviceKey.id === input.keyId
+        ? {
+            ...current,
+            deviceKey: {
+              ...current.deviceKey,
+              lastUsedAt: DateTime.formatIso(DateTime.makeUnsafe(at)),
+            },
+          }
+        : null,
+    ).pipe(Effect.asVoid);
+
+  const removeDeviceKey: SkycotFamily["Service"]["removeDeviceKey"] = (input) =>
+    updateDevice("removeDeviceKey", input.deviceId, (current) => {
+      const { deviceKey: _gone, ...rest } = current;
+      return rest;
+    });
+
   return SkycotFamily.of({
     lockAll,
     codeLength,
@@ -1541,6 +1600,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     setWatchKey,
     useWatchKey,
     removeWatchKey,
+    setDeviceKey,
+    useDeviceKey,
+    removeDeviceKey,
     status,
     openGrants,
     isEnabled,

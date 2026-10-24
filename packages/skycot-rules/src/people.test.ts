@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  biometryWords,
   childSeesProject,
   childSeesThread,
   cleanName,
   deviceIdFromSubject,
+  deviceKeyRegisterAction,
+  deviceKeySignedMessage,
   deviceSubject,
   groupLinkCode,
   isApproverDecision,
+  isDeviceKeyBiometry,
   isWatchKeyProtection,
   normaliseLinkCode,
   watchRegisterAction,
@@ -66,5 +70,20 @@ describe("who is who", () => {
     expect(watchRegisterAction("d0a1b2c3")).toBe("watch-register:d0a1b2c3");
     expect(isWatchKeyProtection("secure-enclave")).toBe(true);
     expect(isWatchKeyProtection("trust-me")).toBe(false);
+  });
+
+  it("names what the phone's Face ID key signs, with its own first line", () => {
+    expect(deviceKeySignedMessage("approve", "abc", "approve:t1:r1:f1")).toBe(
+      "SKYCOT Device Key v1\napprove\nabc\napprove:t1:r1:f1",
+    );
+    // Never the Watch's message, so one key's signature can't stand in for the other's.
+    expect(deviceKeySignedMessage("approve", "abc", "x")).not.toBe(
+      watchSignedMessage("approve", "abc", "x"),
+    );
+    expect(deviceKeyRegisterAction("d0a1b2c3")).toBe("device-key-register:d0a1b2c3");
+    expect(isDeviceKeyBiometry("face-id")).toBe(true);
+    expect(isDeviceKeyBiometry("passcode")).toBe(false);
+    expect(biometryWords("face-id")).toBe("Face ID");
+    expect(biometryWords("touch-id")).toBe("Touch ID");
   });
 });

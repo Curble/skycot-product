@@ -20,6 +20,8 @@ export interface FamilyDeviceSummary {
   readonly passkeys: number;
   /** A grown-up's phone: its Apple Watch that may say yes through it, by name. */
   readonly watch: string | null;
+  /** A grown-up's device that says yes with its own Face ID key. Older engines leave it out. */
+  readonly faceId: boolean;
 }
 
 /** Who this device is, as the engine says. */
@@ -71,6 +73,7 @@ export function parseDevices(value: unknown): ReadonlyArray<FamilyDeviceSummary>
         name: text(input["name"]) ?? "A device",
         passkeys: typeof input["passkeys"] === "number" ? input["passkeys"] : 0,
         watch: text(input["watch"]),
+        faceId: input["faceId"] === true,
       },
     ];
   });
@@ -107,6 +110,8 @@ export interface DeviceRow {
   readonly passkey: boolean;
   /** The Apple Watch that may say yes through this phone, by name. */
   readonly watch: string | null;
+  /** Says yes with its own Face ID key. */
+  readonly faceId: boolean;
 }
 
 export function parseDeviceRows(body: unknown): ReadonlyArray<DeviceRow> | null {
@@ -130,6 +135,7 @@ export function parseDeviceRows(body: unknown): ReadonlyArray<DeviceRow> | null 
         connected: input["connected"] === true,
         passkey: input["passkey"] === true,
         watch: text(input["watch"]),
+        faceId: input["faceId"] === true,
       },
     ];
   });

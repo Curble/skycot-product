@@ -281,7 +281,7 @@ export function DevicesGroup() {
               title={
                 <span className="fm-device-title">
                   {row.name}
-                  {row.passkey ? (
+                  {row.passkey || row.faceId ? (
                     <Pill tone="ok" size="sm">
                       Face ID
                     </Pill>

@@ -134,6 +134,24 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
           "This phone's Apple Watch isn't set up to say yes.",
         ),
       ),
+    deviceKeyOptions: () =>
+      Effect.succeed({
+        challenge: "c2",
+        action: "device-key-register:d",
+        purpose: "register" as const,
+      }),
+    deviceKeyRegister: (input) => {
+      answers.push(input);
+      return Effect.succeed({ keyId: "k2" });
+    },
+    deviceKeyForget: () => Effect.void,
+    deviceKeyChallenge: () =>
+      Effect.fail(
+        new SkycotFamilyDevices.DevicesError(
+          "device-key",
+          "Face ID isn't set up on this device yet.",
+        ),
+      ),
   });
   // T3's orchestration reads, standing in: the shell and one conversation.
   const layerOrchestration = Layer.mergeAll(
@@ -373,6 +391,62 @@ it.layer(
       });
       assert.equal(added.json["keyId"], "k1");
       assert.deepInclude(answers[0] as object, { name: "Mum's Apple Watch", challenge: "c1" });
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("only a grown-up's device may set up Face ID or ask for a Face ID challenge", () =>
+    Effect.gen(function* () {
+      const { send, answers } = yield* makeServer();
+      const options = "/api/skycot/family/approver/device-key/options";
+      const challenge = "/api/skycot/family/approver/device-key/challenge";
+      const register = "/api/skycot/family/approver/device-key/register";
+      const forget = "/api/skycot/family/approver/device-key/forget";
+      const card = { threadId: "thread-ava", requestId: "req-1", fingerprint: "f" };
+      // A child's iPad never gets Face ID to say yes, and nor does the Mac.
+      for (const who of ["ava", "mac"]) {
+        assert.equal((yield* send(who, "POST", options, { code: CODE })).status, 403, who);
+        assert.equal((yield* send(who, "POST", challenge, card)).status, 403, who);
+        assert.equal((yield* send(who, "POST", forget, {})).status, 403, who);
+        const sneaky = yield* send(who, "POST", register, {
+          challenge: "c2",
+          publicKey: "x",
+          signature: "y",
+          biometry: "face-id",
+        });
+        assert.equal(sneaky.status, 403, who);
+      }
+      const opened = yield* send("mum", "POST", options, { code: CODE });
+      assert.equal(opened.json["purpose"], "register");
+      assert.equal((yield* send("mum", "POST", challenge, card)).json["error"], "device-key");
+      const unknown = yield* send("mum", "POST", register, {
+        challenge: "c2",
+        publicKey: "x",
+        signature: "y",
+        biometry: "passcode",
+      });
+      assert.equal(unknown.json["error"], "invalid-request");
+      assert.equal(answers.length, 0);
+      const added = yield* send("mum", "POST", register, {
+        challenge: "c2",
+        publicKey: "x",
+        signature: "y",
+        biometry: "face-id",
+      });
+      assert.equal(added.json["keyId"], "k2");
+      assert.deepInclude(answers[0] as object, { challenge: "c2", biometry: "face-id" });
+      assert.equal((yield* send("mum", "POST", forget, {})).json["ok"], true);
+      // A Face ID yes reaches the engine as its own kind of proof, signature and all.
+      yield* send("mum", "POST", "/api/skycot/family/approver/answer", {
+        ...card,
+        decision: "accept",
+        proof: { type: "device-key", keyId: "k2", challenge: "c3", signature: "s" },
+      });
+      assert.deepEqual((answers[1] as { proof: unknown }).proof, {
+        type: "device-key",
+        keyId: "k2",
+        challenge: "c3",
+        signature: "s",
+      });
     }).pipe(Effect.scoped),
   );
 

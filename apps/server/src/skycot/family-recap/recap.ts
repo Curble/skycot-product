@@ -11,6 +11,7 @@
 // @effect-diagnostics globalDate:off
 import { localDay, nextLocalMidnight } from "@t3tools/skycot-brand/bedtime";
 import { readExplainMarker } from "@t3tools/skycot-rules/explain";
+import { biometryWords } from "@t3tools/skycot-rules/people";
 import { readPointing } from "@t3tools/skycot-rules/preview";
 import { findPersonalDetails, personalCategories } from "@t3tools/skycot-rules/personal";
 
@@ -117,8 +118,15 @@ export interface RecapReport {
     readonly shield: Readonly<Record<string, number>>;
     /** Messages a grown-up let go as typed. */
     readonly shieldAllowed: number;
-    /** Yeses given from a grown-up's own device: when, and which device (by its name then). */
-    readonly fromDevices: ReadonlyArray<{ readonly at: number; readonly device: string }>;
+    /**
+     * Yeses given from a grown-up's own device: when, which device (by its name then), and
+     * "Face ID" (or "Touch ID") when it was said with the device's own Face ID key.
+     */
+    readonly fromDevices: ReadonlyArray<{
+      readonly at: number;
+      readonly device: string;
+      readonly with?: string;
+    }>;
     /**
      * Turns moved to another company while the one in use was resting (driver ids, `from` the
      * one that ran out): the grown-ups are told, the child only saw a plain line.
@@ -339,6 +347,9 @@ export function buildRecap(input: {
                   event.by.via === undefined
                     ? event.by.deviceName
                     : `${event.by.via.name} through ${event.by.deviceName}`,
+                ...(event.by.how === "face-id"
+                  ? { with: biometryWords(event.by.biometry ?? "face-id") }
+                  : {}),
               },
             ]
           : [],

@@ -69,7 +69,12 @@ export interface RecapReport {
     readonly shield: Readonly<Record<string, number>>;
     readonly shieldAllowed: number;
     /** Yeses from a grown-up's own device. Older engines leave it out. */
-    readonly fromDevices?: ReadonlyArray<{ readonly at: number; readonly device: string }>;
+    readonly fromDevices?: ReadonlyArray<{
+      readonly at: number;
+      readonly device: string;
+      /** "Face ID" when the device's own Face ID key said yes. Older engines leave it out. */
+      readonly with?: string;
+    }>;
     /** Turns moved to another company while the one in use rested. Older engines leave it out. */
     readonly switches?: ReadonlyArray<{
       readonly at: number;
@@ -155,19 +160,26 @@ const REASON: Readonly<Record<NonNullable<MoreTimeEntry["reason"]>, string>> = {
 export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">): Array<string> {
   const { held, approved, moreTime, shield, shieldAllowed } = report.grownUp;
   const lines: Array<string> = [];
+  // Not every yes is the parent code any more: a Face ID yes says so on its own line below.
+  const withCode = (report.grownUp.fromDevices ?? []).some((entry) => entry.with)
+    ? ""
+    : " with the parent code";
   if (held > 0) {
     lines.push(
       `${plural(held, "step")} waited for a grown-up (the internet, an install, deleting, or outside the project)${
-        approved > 0
-          ? `; ${approved} ${approved === 1 ? "was" : "were"} allowed with the parent code`
-          : ""
+        approved > 0 ? `; ${approved} ${approved === 1 ? "was" : "were"} allowed${withCode}` : ""
       }.`,
     );
   } else if (approved > 0) {
-    lines.push(`A grown-up allowed ${plural(approved, "step")} with the parent code.`);
+    lines.push(`A grown-up allowed ${plural(approved, "step")}${withCode}.`);
   }
   for (const entry of report.grownUp.fromDevices ?? []) {
-    lines.push(`Approved from ${entry.device}, ${clockPhrase(entry.at, report.timeZone)}.`);
+    const when = clockPhrase(entry.at, report.timeZone);
+    lines.push(
+      typeof entry.with === "string" && entry.with.length > 0
+        ? `Approved with ${entry.with} on ${entry.device}, ${when}.`
+        : `Approved from ${entry.device}, ${when}.`,
+    );
   }
   for (const entry of moreTime) {
     const when = clockPhrase(entry.at, report.timeZone);

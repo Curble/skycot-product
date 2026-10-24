@@ -38,6 +38,7 @@ import * as SkycotRelay from "./relay/SkycotRelay.ts";
 import { deviceGate, isWatchedPath } from "./family-devices/httpVisibility.ts";
 import {
   isApproverDecision,
+  isDeviceKeyBiometry,
   isWatchKeyProtection,
   type DeviceKind,
 } from "@t3tools/skycot-rules/people";
@@ -1009,9 +1010,9 @@ const proofOf = (value: unknown): SkycotFamilyDevices.Proof | null => {
       challenge: text(input["challenge"]),
     };
   }
-  if (input["type"] === "watch") {
+  if (input["type"] === "watch" || input["type"] === "device-key") {
     return {
-      type: "watch",
+      type: input["type"],
       keyId: text(input["keyId"]),
       challenge: text(input["challenge"]),
       signature: text(input["signature"]),
@@ -1186,6 +1187,63 @@ const watchChallengeRoute = approverRoute(
       .pipe(Effect.map((issued) => json(issued))),
 );
 
+/**
+ * "Use Face ID to say yes" on a grown-up's own iPhone: the phone asks with the parent code once,
+ * makes its key in the Secure Enclave and brings back the public half with a Face ID signature
+ * over the challenge. The private key never leaves the phone's Secure Enclave.
+ */
+const deviceKeyOptionsRoute = approverRoute(
+  "POST",
+  "/approver/device-key/options",
+  ({ service, grownUp, body }) =>
+    service
+      .deviceKeyOptions({ who: grownUp, code: text(body["code"]) })
+      .pipe(Effect.map((options) => json(options))),
+);
+
+const deviceKeyRegisterRoute = approverRoute(
+  "POST",
+  "/approver/device-key/register",
+  ({ service, grownUp, body }) =>
+    Effect.gen(function* () {
+      const biometry = body["biometry"];
+      if (!isDeviceKeyBiometry(biometry)) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      return json(
+        yield* service.deviceKeyRegister({
+          who: grownUp,
+          challenge: text(body["challenge"]),
+          publicKey: text(body["publicKey"]),
+          signature: text(body["signature"]),
+          biometry,
+        }),
+      );
+    }),
+);
+
+/** "Stop using Face ID": it only takes away, so no proof. */
+const deviceKeyForgetRoute = approverRoute(
+  "POST",
+  "/approver/device-key/forget",
+  ({ service, grownUp }) => service.deviceKeyForget(grownUp).pipe(Effect.as(json({ ok: true }))),
+);
+
+/** A challenge for one yes with this device's Face ID key, for the card it shows. */
+const deviceKeyChallengeRoute = approverRoute(
+  "POST",
+  "/approver/device-key/challenge",
+  ({ service, grownUp, body }) =>
+    service
+      .deviceKeyChallenge({
+        who: grownUp,
+        threadId: text(body["threadId"]),
+        requestId: text(body["requestId"]),
+        fingerprint: text(body["fingerprint"]),
+      })
+      .pipe(Effect.map((issued) => json(issued))),
+);
+
 /** "Unlink this device", from the grown-up's device itself: it only takes away. */
 const unlinkSelfRoute = approverRoute("POST", "/devices/unlink-self", ({ service, grownUp }) =>
   service.remove(grownUp.deviceId).pipe(Effect.as(json({ ok: true }))),
@@ -1256,6 +1314,10 @@ export const layerDeviceRoutes = Layer.mergeAll(
   watchRegisterRoute,
   watchForgetRoute,
   watchChallengeRoute,
+  deviceKeyOptionsRoute,
+  deviceKeyRegisterRoute,
+  deviceKeyForgetRoute,
+  deviceKeyChallengeRoute,
   unlinkSelfRoute,
 );
 

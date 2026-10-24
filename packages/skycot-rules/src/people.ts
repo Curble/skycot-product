@@ -85,6 +85,49 @@ export function isWatchKeyProtection(value: unknown): value is WatchKeyProtectio
   return (WATCH_KEY_PROTECTIONS as ReadonlyArray<unknown>).includes(value);
 }
 
+/**
+ * Saying yes with Face ID on the grown-up's own iPhone ("the Face ID key"). The same design as
+ * the Watch's: the phone makes a P-256 key in its Secure Enclave that only signs after Face ID
+ * (or Touch ID) for that one signature, and that iOS makes useless if the enrolled faces or
+ * fingers change. It is set up once with the parent code; the Mac keeps only the public half,
+ * on that phone's device record. For each yes the Mac gives a challenge for that one action
+ * (two minutes, single use, this device only) and the phone signs this message over it.
+ *
+ * Its own first line, so a signature made for the Watch never fits as the phone's, or back.
+ */
+export const DEVICE_KEY_MESSAGE_PREFIX = "SKYCOT Device Key v1";
+export type DeviceKeyPurpose = WatchPurpose;
+
+/** The exact text the phone's Face ID key signs (ECDSA P-256, SHA-256), in the Watch's shape. */
+export function deviceKeySignedMessage(
+  purpose: DeviceKeyPurpose,
+  challenge: string,
+  action: string,
+): string {
+  return [DEVICE_KEY_MESSAGE_PREFIX, purpose, challenge, action].join("\n");
+}
+
+/** The action a phone's Face ID key is registered under: one key per grown-up's device. */
+export function deviceKeyRegisterAction(deviceId: string): string {
+  return `device-key-register:${deviceId}`;
+}
+
+/**
+ * Which of Apple's checks guards the key, as the phone says (an iPad may have Touch ID). Words
+ * for the log and the recap, never a reason to trust: the Secure Enclave's own rule is.
+ */
+export const DEVICE_KEY_BIOMETRICS = ["face-id", "touch-id", "optic-id"] as const;
+export type DeviceKeyBiometry = (typeof DEVICE_KEY_BIOMETRICS)[number];
+
+export function isDeviceKeyBiometry(value: unknown): value is DeviceKeyBiometry {
+  return (DEVICE_KEY_BIOMETRICS as ReadonlyArray<unknown>).includes(value);
+}
+
+/** "Face ID", "Touch ID", "Optic ID". */
+export function biometryWords(biometry: DeviceKeyBiometry): string {
+  return biometry === "touch-id" ? "Touch ID" : biometry === "optic-id" ? "Optic ID" : "Face ID";
+}
+
 /** Who is using SKYCOT on a signed-in device, as the engine sees it. */
 export type FamilyIdentity =
   /** The family's Mac, or any sign-in that is not a linked device: today's behaviour ("Who's using SKYCOT?"). */
