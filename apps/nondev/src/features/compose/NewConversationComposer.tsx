@@ -18,6 +18,7 @@ import {
   writeAutonomy,
   writeLastProject,
 } from "../../state/preferences";
+import { useDefaultAssistantPreference } from "../../state/defaultAssistant";
 import { providerForSelection, resolveDefaultModelSelection } from "../../state/providers";
 import { serverEnvironment } from "../../state/server";
 import { canOperateEnvironmentAtom } from "../../state/session";
@@ -382,7 +383,8 @@ function ComposerField({
 }) {
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
-  const modelSelection = resolveDefaultModelSelection(providers, project);
+  const preference = useDefaultAssistantPreference(environmentId);
+  const modelSelection = resolveDefaultModelSelection(providers, project, preference);
   const provider = providerForSelection(providers, modelSelection);
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });

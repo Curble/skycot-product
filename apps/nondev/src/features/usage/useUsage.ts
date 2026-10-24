@@ -7,6 +7,7 @@ import { useSyncExternalStore } from "react";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
+import { useDefaultAssistantPreference } from "../../state/defaultAssistant";
 import { providerForSelection, resolveDefaultModelSelection } from "../../state/providers";
 import { serverEnvironment } from "../../state/server";
 
@@ -34,7 +35,8 @@ export function useActiveUsage(): {
       ? EMPTY_PROVIDERS_ATOM
       : serverEnvironment.providersValueAtom(environmentId),
   );
-  const selection = resolveDefaultModelSelection(providers, null);
+  const preference = useDefaultAssistantPreference(environmentId);
+  const selection = resolveDefaultModelSelection(providers, null, preference);
   const active = providerForSelection(providers, selection);
   return { environmentId, providers, active, model: selection?.model ?? null };
 }

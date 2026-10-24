@@ -17,6 +17,8 @@ interface ListRowProps {
   readonly expanded?: boolean;
   /** Why the row cannot be chosen; shown as a tooltip and read with the row. */
   readonly disabledReason?: string;
+  /** One choice of several (a Settings picker): announced as a radio, ticked when true. */
+  readonly checked?: boolean;
 }
 
 /**
@@ -36,6 +38,7 @@ export function ListRow({
   disabled = false,
   expanded,
   disabledReason,
+  checked,
 }: ListRowProps) {
   const interactive = onClick !== undefined || href !== undefined;
   const classes = [
@@ -84,7 +87,11 @@ export function ListRow({
           className={classes}
           onClick={onClick}
           disabled={disabled}
-          aria-pressed={selected && expanded === undefined ? true : undefined}
+          role={checked === undefined ? undefined : "radio"}
+          aria-checked={checked}
+          aria-pressed={
+            selected && expanded === undefined && checked === undefined ? true : undefined
+          }
           aria-expanded={expanded}
         >
           {content}

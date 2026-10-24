@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -10,12 +10,15 @@ import { WELCOME_HREF, navigate } from "../../../router";
 import { familyAgeTermsNote } from "../../family/assistantAllowance";
 import { useFamily } from "../../family/FamilyProvider";
 import { UsageSettingsGroup } from "../../usage/UsageSettings";
-import { providerForSelection, resolveDefaultModelSelection } from "../../../state/providers";
+import {
+  useDefaultAssistantPreference,
+  useWriteDefaultAssistant,
+} from "../../../state/defaultAssistant";
 import { serverEnvironment } from "../../../state/server";
 import { Button } from "../../../ui/Button";
 import { ListRow } from "../../../ui/ListRow";
-import { Pill } from "../../../ui/Pill";
-import { PROVIDER_CATALOG, catalogEntryFor, providerForDriver } from "../providerCatalog";
+import { AUTOMATIC, defaultChoiceFooter, defaultChoiceModel } from "../defaultChoice";
+import { PROVIDER_CATALOG, providerForDriver } from "../providerCatalog";
 import { ProviderBadge, ProviderRow } from "../ProviderRows";
 import { SettingsGroup } from "../SettingsGroup";
 
@@ -41,12 +44,12 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
       .map((provider) => String(provider.driver))
       .filter((driver) => !PROVIDER_CATALOG.some((entry) => entry.driver === driver)),
   );
-  const defaultProvider = providerForSelection(
-    providers,
-    resolveDefaultModelSelection(providers, null),
-  );
+  const preference = useDefaultAssistantPreference(environmentId);
+  const writeDefault = useWriteDefaultAssistant(environmentId);
+  const [savingDefault, setSavingDefault] = useState<string | null>(null);
   // One name everywhere: the brand the person pays for, as the rows above say it.
-  const defaultEntry = defaultProvider ? catalogEntryFor(String(defaultProvider.driver)) : null;
+  const choice = defaultChoiceModel(providers, preference);
+  const checked = savingDefault ?? choice.checked;
 
   return (
     <>
@@ -72,27 +75,34 @@ export function AiAssistantsPane({ environmentId }: { readonly environmentId: En
       </SettingsGroup>
 
       <SettingsGroup
-        title="Used by default"
-        footer={
-          defaultEntry
-            ? `New conversations start with ${defaultEntry.brand}, the first assistant that is ready. Pick a different one for a single conversation in ${ADVANCED_MODE_LABEL}.`
-            : "Once an assistant is ready it will be used for new conversations."
-        }
+        title="Use by default"
+        footer={defaultChoiceFooter(choice, {
+          familyOn: family.enabled,
+          advancedLabel: ADVANCED_MODE_LABEL,
+        })}
       >
-        {defaultProvider && defaultEntry ? (
+        {choice.rows.map((row) => (
           <ListRow
-            leading={<ProviderBadge driver={String(defaultProvider.driver)} />}
-            title={defaultEntry.brand}
-            subtitle={`${defaultEntry.runs}. Ready.`}
+            key={row.value}
+            leading={row.driver ? <ProviderBadge driver={row.driver} /> : null}
+            title={row.title}
+            subtitle={row.subtitle}
+            checked={row.value === checked}
+            disabled={row.disabled || savingDefault !== null}
             trailing={
-              <Pill tone="provider" size="sm">
-                Default
-              </Pill>
+              row.value === checked ? (
+                <Check size={16} strokeWidth={2} className="fm-check" aria-hidden />
+              ) : null
             }
+            onClick={() => {
+              if (row.value === choice.checked) return;
+              setSavingDefault(row.value);
+              void writeDefault(row.value === AUTOMATIC ? null : row.selection).finally(() =>
+                setSavingDefault(null),
+              );
+            }}
           />
-        ) : (
-          <ListRow title="No assistant is ready yet" subtitle="Connect one above to get started." />
-        )}
+        ))}
       </SettingsGroup>
 
       <UsageSettingsGroup environmentId={environmentId} />
