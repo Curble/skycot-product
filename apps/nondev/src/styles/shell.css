@@ -149,7 +149,7 @@
   justify-content: center;
   gap: 5px;
   width: 76px;
-  min-height: 70px;
+  min-height: 78px;
   padding: 6px 2px;
   border: 2px solid transparent;
   border-radius: 16px;
@@ -162,6 +162,30 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1.1;
+}
+/* Each place its own colour, the same tiles as the Home starter cards (theme colours). */
+.fm-child-rail__tile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--fm-child-rail-tile);
+  box-shadow: 0 1px 0 color-mix(in srgb, #000 18%, transparent);
+}
+.fm-child-rail__tile--home {
+  --fm-child-rail-tile: var(--fm-glyph-blue);
+}
+.fm-child-rail__tile--makes {
+  --fm-child-rail-tile: linear-gradient(180deg, #ffe066, #ffc400);
+  color: #1d1d1f;
+}
+.fm-child-rail__tile--fridge {
+  --fm-child-rail-tile: var(--fm-glyph-green);
+}
+.fm-child-rail__tile--stickers {
+  --fm-child-rail-tile: var(--fm-glyph-purple);
 }
 .fm-child-rail__toggle:hover,
 .fm-child-rail__item:hover {

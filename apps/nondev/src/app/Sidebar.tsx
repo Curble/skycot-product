@@ -181,7 +181,9 @@ export function AppSidebar({
             navigate(HOME_HREF);
           }}
         >
-          <Home size={26} strokeWidth={1.9} aria-hidden />
+          <span className="fm-child-rail__tile fm-child-rail__tile--home" aria-hidden>
+            <Home size={24} strokeWidth={2} />
+          </span>
           <span>Home</span>
         </a>
         {/* Inside a make, so My makes is where the child is. */}
@@ -195,7 +197,9 @@ export function AppSidebar({
             setRailOpen(true);
           }}
         >
-          <Blocks size={26} strokeWidth={1.9} aria-hidden />
+          <span className="fm-child-rail__tile fm-child-rail__tile--makes" aria-hidden>
+            <Blocks size={24} strokeWidth={2} />
+          </span>
           <span>My makes</span>
         </button>
         <a
@@ -207,7 +211,9 @@ export function AppSidebar({
             navigate(FRIDGE_HREF);
           }}
         >
-          <Refrigerator size={26} strokeWidth={1.9} aria-hidden />
+          <span className="fm-child-rail__tile fm-child-rail__tile--fridge" aria-hidden>
+            <Refrigerator size={24} strokeWidth={2} />
+          </span>
           <span>Fridge</span>
         </a>
         <a
@@ -219,7 +225,9 @@ export function AppSidebar({
             navigate(STICKERS_HREF);
           }}
         >
-          <StickerOutline size={26} aria-hidden />
+          <span className="fm-child-rail__tile fm-child-rail__tile--stickers" aria-hidden>
+            <StickerOutline size={24} strokeWidth={2} />
+          </span>
           <span>Stickers</span>
         </a>
         {child ? (
