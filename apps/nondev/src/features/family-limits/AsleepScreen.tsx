@@ -4,7 +4,7 @@
 // round: the parent code, then 15 or 30 more minutes, or bedtime over for tonight. Everything
 // happens inside the screen (no sheet on top), and the code prompt is sober in every theme.
 import { useAtomValue } from "@effect/atom-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
@@ -15,13 +15,19 @@ import { useModal } from "../../ui/useModal";
 import { Mascot } from "../brand/Mascot";
 import type { FamilyChild } from "../family/children";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
-import { tryParentCode } from "../family/store";
+import { tryParentCode, useFamilyView } from "../family/store";
 import { fetchRecap } from "../recap/api";
 import type { RecapReport } from "../recap/recap";
 import { markSessionRecapSeen, SessionRecapBody } from "../recap/SessionRecap";
 import { asleepCopy, type LimitState } from "./limits";
 import { giveMoreTime } from "./store";
 import { familyApi } from "../family/api";
+import {
+  askedWho,
+  moreTimeAnswerFor,
+  moreTimeAnswerLine,
+  type MoreTimeAnswer,
+} from "./moreTimeAnswer";
 import { useChildView } from "../../app/useChildView";
 
 type Kind = "extra15" | "extra30" | "endBedtime";
@@ -99,13 +105,31 @@ export function AsleepScreen({
 }
 
 function AskMoreTimePanel({ onCancel }: { readonly onCancel: () => void }) {
-  const [asked, setAsked] = useState(false);
+  const view = useFamilyView();
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<MoreTimeAnswer | null>(null);
   const [busy, setBusy] = useState(false);
+  const who = askedWho(view.grownUps.map((person) => person.name));
+  // Waiting for the grown-up's answer: look again every few seconds (a yes also lifts this
+  // screen at the next heartbeat; a "Not tonight" only shows here).
+  useEffect(() => {
+    if (noteId === null || answer !== null) return;
+    const timer = window.setInterval(() => {
+      void familyApi.childNotes().then((result) => {
+        if (!result.ok) return;
+        const found = moreTimeAnswerFor(result.value, noteId);
+        if (found !== null) setAnswer(found);
+      });
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [noteId, answer]);
   return (
     <div className="fm-asleep__grownup">
       <p className="fm-asleep__grownup-lead">A grown-up can give you more time.</p>
-      {asked ? (
-        <p role="status">Asked Mum…</p>
+      {answer !== null ? (
+        <p role="status">{moreTimeAnswerLine(answer)}</p>
+      ) : noteId !== null ? (
+        <p role="status">Asked {who}…</p>
       ) : (
         <div className="fm-asleep__actions">
           <Button onClick={onCancel} disabled={busy}>
@@ -118,7 +142,8 @@ function AskMoreTimePanel({ onCancel }: { readonly onCancel: () => void }) {
               setBusy(true);
               void familyApi.createNote({ kind: "more-time" }).then((result) => {
                 setBusy(false);
-                if (result.ok) setAsked(true);
+                const id = (result.ok ? (result.value as { id?: unknown }) : null)?.id;
+                if (typeof id === "string") setNoteId(id);
               });
             }}
           >

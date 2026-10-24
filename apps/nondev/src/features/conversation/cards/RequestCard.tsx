@@ -62,6 +62,8 @@ import { Mascot } from "../../brand/Mascot";
 import { familyCopy } from "../../family/copy";
 import { useFamily, useFamilySteps } from "../../family/FamilyProvider";
 import { useChildView } from "../../../app/useChildView";
+import { grownUpAnswerLabel, type GrownUpAnswer } from "../../../plain/grownUpAnswers";
+import { useGrownUpAnswers } from "../useGrownUpAnswers";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
@@ -131,6 +133,7 @@ function decidedLine(
   item: RequestItem,
   request: OrchestrationV2RuntimeRequest | undefined,
   runEnded: boolean,
+  grownUpAnswer?: GrownUpAnswer,
 ): string | null {
   const when = shortTime(request?.resolvedAt ?? item.completedAt ?? null);
   const stamp = when ? ` · ${when}` : "";
@@ -153,6 +156,7 @@ function decidedLine(
     // Answered by the server's SKYCOT rules, not by a person: say so calmly;
     // the rule detail sits under "Show details".
     if (decision?.decidedBy === "policy") return `Allowed by SKYCOT rules${stamp}`;
+    if (grownUpAnswer !== undefined) return `${grownUpAnswerLabel(grownUpAnswer)}${stamp}`;
     return `${decision?.label ?? "No longer needed"}${stamp}`;
   }
   if (request?.answers !== undefined) return `You answered${stamp}`;
@@ -254,7 +258,15 @@ export function RequestCard({
   // by themselves), so it shows a quiet line for a moment instead of a card with buttons.
   const steps = useFamilySteps();
   const runEnded = askRunEnded(item, projection, shell);
-  const decided = decidedLine(item, request, runEnded);
+  // A child is told which grown-up answered ("Mum said yes · 8:42"), not "You allowed this once".
+  const answers = useGrownUpAnswers(
+    threadId,
+    request?.status ?? item.status,
+    childView && grownUp !== null && request !== undefined && request.status !== "pending",
+  );
+  const grownUpAnswer =
+    childView && item.type === "approval_request" ? answers.get(item.requestId) : undefined;
+  const decided = decidedLine(item, request, runEnded, grownUpAnswer);
   const decision = request ? describeDecision(request) : null;
   const checking = waitsForEngineCheck({
     familyOn: familyApplies,

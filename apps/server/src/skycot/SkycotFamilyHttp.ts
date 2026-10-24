@@ -35,6 +35,7 @@ import * as SkycotFamilyDevices from "./family-devices/SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
 import * as SkycotFamilyNotes from "./family-notes/SkycotFamilyNotes.ts";
+import { grownUpAnswersFor } from "./family-limits/grownUpAnswers.ts";
 import * as SkycotRelay from "./relay/SkycotRelay.ts";
 import { deviceGate, isWatchedPath } from "./family-devices/httpVisibility.ts";
 import {
@@ -536,6 +537,31 @@ const assistantSwitchesRoute = route(
         if (today.threads[threadId] !== childView.childId) return json({ switches: [] });
       }
       return json({ switches: yield* limits.switchesFor(threadId) });
+    }),
+);
+
+/**
+ * Who answered the held requests in one conversation ("Mum said yes · 8:42"). A child gets only
+ * their own conversations' answers, as a first name and a time (grownUpAnswers.ts).
+ */
+const grownUpAnswersRoute = route(
+  "GET",
+  "/grown-up-answers",
+  AuthOrchestrationReadScope,
+  ({ limits, query, childView, family }) =>
+    Effect.gen(function* () {
+      const threadId = query.get("threadId") ?? "";
+      if (threadId.length === 0) return json({ answers: [] });
+      if (childView !== null) {
+        const today = yield* limits.today;
+        if (today.threads[threadId] !== childView.childId) return json({ answers: [] });
+      }
+      const snapshot = yield* limits.snapshot;
+      if (snapshot === null) return json({ answers: [] });
+      const status = yield* family.status;
+      return json({
+        answers: grownUpAnswersFor(snapshot.activity.events, threadId, status.grownUps),
+      });
     }),
 );
 
@@ -1111,7 +1137,7 @@ const childNoteCreateRoute = route(
           .filter((device) => device.kind === "grown-up")
           .map((device) => device.id);
         yield* relay.value
-          .notify({ familyDeviceIds: adults, kind: "needs-grown-up" })
+          .notify({ familyDeviceIds: adults, kind: "family-note" })
           .pipe(Effect.ignore);
       }
       return json({ note }, 201);
@@ -1496,6 +1522,7 @@ export const layerCore = Layer.mergeAll(
   heartbeatRoute,
   todayRoute,
   assistantSwitchesRoute,
+  grownUpAnswersRoute,
   moreTimeRoute,
   allowAssistantRoute,
   stopAllowingAssistantRoute,
