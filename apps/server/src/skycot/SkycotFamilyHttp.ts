@@ -512,6 +512,27 @@ const todayRoute = route("GET", "/today", AuthOrchestrationReadScope, ({ limits,
 const ownOnly = (owners: Readonly<Record<string, string>>, childId: string) =>
   Object.fromEntries(Object.entries(owners).filter(([, owner]) => owner === childId));
 
+/**
+ * The model switches in one conversation (model-fallback), for its plain "… is resting, so …"
+ * lines. Read scope, like the conversation itself; works with the profile off too. A child's own
+ * device only reads its own conversations.
+ */
+const assistantSwitchesRoute = route(
+  "GET",
+  "/assistant-switches",
+  AuthOrchestrationReadScope,
+  ({ limits, query, childView }) =>
+    Effect.gen(function* () {
+      const threadId = query.get("threadId") ?? "";
+      if (threadId.length === 0) return json({ switches: [] });
+      if (childView !== null) {
+        const today = yield* limits.today;
+        if (today.threads[threadId] !== childView.childId) return json({ switches: [] });
+      }
+      return json({ switches: yield* limits.switchesFor(threadId) });
+    }),
+);
+
 const MORE_TIME: Readonly<Record<string, SkycotFamilyLimits.MoreTime>> = {
   extra15: { type: "extra", minutes: 15 },
   extra30: { type: "extra", minutes: 30 },
@@ -1271,6 +1292,7 @@ export const layerCore = Layer.mergeAll(
   chooseRoute,
   heartbeatRoute,
   todayRoute,
+  assistantSwitchesRoute,
   moreTimeRoute,
   allowAssistantRoute,
   stopAllowingAssistantRoute,

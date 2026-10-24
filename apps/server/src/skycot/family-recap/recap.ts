@@ -119,6 +119,15 @@ export interface RecapReport {
     readonly shieldAllowed: number;
     /** Yeses given from a grown-up's own device: when, and which device (by its name then). */
     readonly fromDevices: ReadonlyArray<{ readonly at: number; readonly device: string }>;
+    /**
+     * Turns moved to another company while the one in use was resting (driver ids, `from` the
+     * one that ran out): the grown-ups are told, the child only saw a plain line.
+     */
+    readonly switches: ReadonlyArray<{
+      readonly at: number;
+      readonly from: string;
+      readonly to: string;
+    }>;
   };
   readonly proudOf: {
     readonly threadId: string;
@@ -334,6 +343,9 @@ export function buildRecap(input: {
             ]
           : [],
       ),
+      switches: (activity.switches ?? [])
+        .filter((entry) => entry.childId === childId && inRange(entry.at))
+        .map((entry) => ({ at: entry.at, from: entry.from, to: entry.to })),
     },
     proudOf,
   };

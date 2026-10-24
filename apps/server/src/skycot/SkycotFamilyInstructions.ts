@@ -192,6 +192,15 @@ const planPassFor = (messageId: string): Effect.Effect<PlanSkip | null> =>
   });
 
 /**
+ * A message the engine sends to carry a turn on (the model fallback's "Continue where you left
+ * off.") runs in the same mode as the message whose turn it carries on: a build stays a build.
+ */
+export const carryPlanPass = (fromMessageId: string, toMessageId: string): Effect.Effect<void> =>
+  Effect.flatMap(planPassFor(fromMessageId), (reason) =>
+    reason === null ? Effect.void : letRunWithoutPlan(toMessageId, reason),
+  );
+
+/**
  * Pure: the mode a turn runs in while the Family profile is on. Building an approved plan
  * builds; a grown-up's message keeps the thread's mode; everything else plans.
  */

@@ -48,6 +48,7 @@ import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 import * as SkycotPolicy from "../skycot/SkycotPolicy.ts"; // nondev-seam: skycot-policy-runtime
 import * as SkycotApprovedInstalls from "../skycot/SkycotApprovedInstalls.ts"; // nondev-seam: skycot-approved-installs
+import * as SkycotModelFallback from "../skycot/model-fallback/SkycotModelFallback.ts"; // nondev-seam: skycot-model-fallback
 import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadLaunchService from "./ThreadLaunchService.ts";
@@ -226,7 +227,7 @@ const layerRunFinalizationServiceProvided = RunFinalizationService.layer.pipe(
   Layer.provide(Layer.merge(layerCheckpointCaptureServiceProvided, ProjectionStore.layer)),
 );
 
-const layerOrchestratorProvided = Orchestrator.layer.pipe(
+const layerOrchestratorBase = Orchestrator.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
       layerCheckpointServiceProvided,
@@ -250,6 +251,10 @@ const layerOrchestratorProvided = Orchestrator.layer.pipe(
     ),
   ),
 );
+// nondev-seam: skycot-model-fallback (a resting model's turn runs on the best usable one; identity unless T3CODE_SKYCOT_POLICY=1)
+const layerOrchestratorProvided = SkycotModelFallback.layerOrchestrator(layerOrchestratorBase, {
+  enabled: SkycotPolicy.isSkycotPolicyEnabled(process.env),
+});
 
 const layerAgentSessionImporterProvided = AgentSessionImporter.layer.pipe(
   Layer.provide(

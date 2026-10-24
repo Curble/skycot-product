@@ -32,6 +32,12 @@ import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
 import * as SkycotFamilyIdentity from "../family-devices/SkycotFamilyIdentity.ts";
 import {
+  SWITCH_FILE_NAME,
+  readSwitchFile,
+  switchesForThread,
+  type SwitchEntry,
+} from "../model-fallback/switchLog.ts";
+import {
   allowanceReading,
   applyMoreTime,
   countMinute,
@@ -151,9 +157,43 @@ export interface ActivitySnapshot {
   readonly history: Readonly<Record<string, ReadonlyArray<PastDay>>>;
   readonly log: ReadonlyArray<MoreTimeLogEntry>;
   readonly events: ReadonlyArray<FamilyEvent>;
+  /** Turns the model fallback moved to another company. Optional so older callers read unchanged. */
+  readonly switches?: ReadonlyArray<AssistantSwitchNote>;
+}
+
+/**
+ * A child's turn the engine moved to another company because the one they were using was out
+ * of allowance (model-fallback/switchLog.ts writes them; this only reads). Driver ids: the
+ * clients name the companies.
+ */
+export interface AssistantSwitchNote {
+  readonly at: number;
+  readonly childId: string;
+  readonly threadId: string;
+  readonly from: string;
+  readonly to: string;
+  /** When the first company's allowance comes back (epoch ms), when known. */
+  readonly until: number | null;
 }
 
 const decodeActivity = Schema.decodeUnknownOption(Schema.fromJsonString(ActivityFile));
+
+/**
+ * Which child started each conversation, read straight from the activity file (read only), for
+ * engine parts that run below the Family gate (the model fallback asks whose turn it is moving).
+ * Tied to the profile like everything else here: another profile's file reads as empty.
+ */
+export const readThreadOwners = Effect.fn("SkycotFamilyLimits.readThreadOwners")(function* (
+  filePath: string,
+  profileCreatedAt: string | null,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
+  const decoded = decodeActivity(raw);
+  return decoded._tag === "Some" && decoded.value.profileCreatedAt === (profileCreatedAt ?? "")
+    ? decoded.value.threads
+    : {};
+});
 const encodeActivity = Schema.encodeEffect(Schema.fromJsonString(ActivityFile));
 
 const emptyActivity = (profileCreatedAt: string): ActivityFile => ({
@@ -227,6 +267,8 @@ export interface ChildToday {
   readonly limits: LimitState;
   /** Today's "more time" from a grown-up, oldest first. */
   readonly moreTime: ReadonlyArray<MoreTimeLogEntry>;
+  /** Today's turns moved to another company while the first one was resting, oldest first. */
+  readonly switches: ReadonlyArray<AssistantSwitchNote>;
 }
 
 export interface SessionLimits {
@@ -320,6 +362,8 @@ export class SkycotFamilyLimits extends Context.Service<
       readonly threads: Readonly<Record<string, string>>;
       readonly projects: Readonly<Record<string, string>>;
     }>;
+    /** Every model switch in one conversation, for its plain "… is resting" lines. */
+    readonly switchesFor: (threadId: string) => Effect.Effect<ReadonlyArray<SwitchEntry>>;
   }
 >()("t3/skycot/family-limits/SkycotFamilyLimits") {}
 
@@ -328,6 +372,30 @@ type Profile = SkycotFamily.FamilyStatus;
 const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  // The model fallback's notes sit beside this file; read here, never written here.
+  const switchFile = readSwitchFile(path.join(path.dirname(filePath), SWITCH_FILE_NAME)).pipe(
+    Effect.provideService(FileSystem.FileSystem, fs),
+  );
+  const crossSwitches = (activity: ActivityFile) =>
+    switchFile.pipe(
+      Effect.map((file) =>
+        file.switches.flatMap((entry): ReadonlyArray<AssistantSwitchNote> => {
+          const childId = entry.crossProvider ? activity.threads[entry.threadId] : undefined;
+          return childId === undefined
+            ? []
+            : [
+                {
+                  at: entry.at,
+                  childId,
+                  threadId: entry.threadId,
+                  from: entry.from.driver,
+                  to: entry.to.driver,
+                  until: entry.until,
+                },
+              ];
+        }),
+      ),
+    );
   const family = yield* SkycotFamily.SkycotFamily;
   // Optional: without provider snapshots (tests, a stripped-down server) the allowance guard
   // simply has no reading, and the other limits still apply.
@@ -736,6 +804,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
         history: activity.history ?? {},
         log: activity.log,
         events: activity.events ?? [],
+        switches: yield* crossSwitches(activity),
       },
     };
   }).pipe(Effect.withSpan("SkycotFamilyLimits.snapshot"));
@@ -745,6 +814,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     if (loaded === null) return { children: [], threads: {}, projects: {} };
     const { profile, activity } = loaded;
     const at = yield* now;
+    const switches = yield* crossSwitches(activity);
     const children: ChildToday[] = [];
     for (const child of profile.children) {
       const limits = yield* stateFor(profile, activity, child, at);
@@ -757,10 +827,21 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
             entry.childId === child.id &&
             dayAt(undefined, entry.at, profile.timeZone).date === date,
         ),
+        switches: switches.filter(
+          (entry) =>
+            entry.childId === child.id &&
+            dayAt(undefined, entry.at, profile.timeZone).date === date,
+        ),
       });
     }
     return { children, threads: activity.threads, projects: activity.projects };
   }).pipe(Effect.withSpan("SkycotFamilyLimits.today"));
+
+  const switchesFor: SkycotFamilyLimits["Service"]["switchesFor"] = Effect.fn(
+    "SkycotFamilyLimits.switchesFor",
+  )(function* (threadId) {
+    return switchesForThread(yield* switchFile, threadId);
+  });
 
   return SkycotFamilyLimits.of({
     forSession,
@@ -774,6 +855,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     recordEvent,
     snapshot,
     today,
+    switchesFor,
   });
 });
 

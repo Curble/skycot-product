@@ -87,6 +87,25 @@ const activity: ActivitySnapshot = {
     },
     { at: at("2026-10-22T16:30:00+11:00"), childId: "leo", kind: "approved" },
   ],
+  // Claude was resting, so the model fallback carried a turn on ChatGPT (and one of Leo's).
+  switches: [
+    {
+      at: at("2026-10-22T16:40:00+11:00"),
+      childId: "ava",
+      threadId: "thread:space",
+      from: "claudeAgent",
+      to: "codex",
+      until: null,
+    },
+    {
+      at: at("2026-10-22T16:40:00+11:00"),
+      childId: "leo",
+      threadId: "thread:leo",
+      from: "claudeAgent",
+      to: "codex",
+      until: null,
+    },
+  ],
 };
 
 const threads: ReadonlyArray<RecapThreadInput> = [
@@ -285,6 +304,7 @@ describe("buildRecap", () => {
       shieldAllowed: 1,
       // That yes was typed on the Mac; one from a grown-up's phone would name the phone here.
       fromDevices: [],
+      switches: [{ at: at("2026-10-22T16:40:00+11:00"), from: "claudeAgent", to: "codex" }],
     });
     expect(today.proudOf).toEqual({
       threadId: "thread:space",

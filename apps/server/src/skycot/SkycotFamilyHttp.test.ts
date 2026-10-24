@@ -51,6 +51,7 @@ import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
+import { SWITCH_FILE_NAME, makeSwitchStore } from "./model-fallback/switchLog.ts";
 
 const CODE = "482913";
 const BEARER = "Bearer parent-device";
@@ -137,7 +138,7 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
             headers: { authorization: BEARER, ...options.headers },
           }).pipe(HttpClientRequest.bodyJsonUnsafe(options.body)),
     );
-  return { send, pinned, pins };
+  return { send, pinned, pins, dir };
 });
 
 it.layer(
@@ -389,6 +390,32 @@ it.layer(
         any
       >;
       assert.equal(today["children"][1].moreTime[0].minutes, 30);
+    }),
+  );
+
+  it.effect("answers a conversation's model switches, with the profile on or off", () =>
+    Effect.gen(function* () {
+      const { send, dir } = yield* makeClient();
+      const path = yield* Path.Path;
+      const read = (threadId: string) =>
+        send("GET", `/api/skycot/family/assistant-switches?threadId=${threadId}`).pipe(
+          Effect.flatMap((response) => response.json),
+          Effect.map((json) => (json as { readonly switches: ReadonlyArray<unknown> }).switches),
+        );
+      assert.deepStrictEqual(yield* read("thread-1"), []);
+      const store = yield* makeSwitchStore(path.join(dir, SWITCH_FILE_NAME));
+      yield* store.record({
+        at: 1,
+        threadId: "thread-1",
+        messageId: "message-1",
+        from: { instanceId: "claudeAgent", driver: "claudeAgent", model: "claude-fable-5-1" },
+        to: { instanceId: "claudeAgent", driver: "claudeAgent", model: "claude-opus-5-5" },
+        until: 2,
+        crossProvider: false,
+      });
+      const [entry] = (yield* read("thread-1")) as ReadonlyArray<Record<string, unknown>>;
+      assert.equal(entry?.["messageId"], "message-1");
+      assert.deepStrictEqual(yield* read("thread-2"), []);
     }),
   );
 

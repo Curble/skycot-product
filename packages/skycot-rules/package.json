@@ -59,6 +59,10 @@
     "./people": {
       "types": "./src/people.ts",
       "import": "./src/people.ts"
+    },
+    "./usageWindows": {
+      "types": "./src/usageWindows.ts",
+      "import": "./src/usageWindows.ts"
     }
   },
   "scripts": {
