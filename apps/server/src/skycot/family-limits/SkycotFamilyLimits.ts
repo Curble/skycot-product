@@ -178,22 +178,6 @@ export interface AssistantSwitchNote {
 
 const decodeActivity = Schema.decodeUnknownOption(Schema.fromJsonString(ActivityFile));
 
-/**
- * Which child started each conversation, read straight from the activity file (read only), for
- * engine parts that run below the Family gate (the model fallback asks whose turn it is moving).
- * Tied to the profile like everything else here: another profile's file reads as empty.
- */
-export const readThreadOwners = Effect.fn("SkycotFamilyLimits.readThreadOwners")(function* (
-  filePath: string,
-  profileCreatedAt: string | null,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
-  const decoded = decodeActivity(raw);
-  return decoded._tag === "Some" && decoded.value.profileCreatedAt === (profileCreatedAt ?? "")
-    ? decoded.value.threads
-    : {};
-});
 const encodeActivity = Schema.encodeEffect(Schema.fromJsonString(ActivityFile));
 
 const emptyActivity = (profileCreatedAt: string): ActivityFile => ({
@@ -307,6 +291,17 @@ export class SkycotFamilyLimits extends Context.Service<
       readonly childId: string;
       readonly grownUp: boolean;
     }) => Effect.Effect<SessionLimits, FamilyLimitRefusal | SkycotFamily.FamilyError>;
+    /**
+     * The providers this conversation's turn may start on right now, judged exactly as
+     * `admitTurn` judges a child's turn start (bedtime, daily time, messages a day, the
+     * allowance line on that provider), without counting anything. All of them when the profile
+     * is off or the conversation is no child's. For engine parts below the gate: the model
+     * fallback carries a stopped turn on only where the child could start one.
+     */
+    readonly startableOn: (input: {
+      readonly threadId: string;
+      readonly instanceIds: ReadonlyArray<string>;
+    }) => Effect.Effect<ReadonlySet<string>>;
     /** A turn is about to start: refuses while asleep, otherwise counts it. */
     readonly admitTurn: (input: {
       readonly sessionId: string;
@@ -369,7 +364,8 @@ export class SkycotFamilyLimits extends Context.Service<
 
 type Profile = SkycotFamily.FamilyStatus;
 
-const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string) {
+/** The service over an activity file (also built read-only by the model fallback). */
+export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   // The model fallback's notes sit beside this file; read here, never written here.
@@ -681,6 +677,26 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     });
   }, lock.withPermits(1));
 
+  const startableOn: SkycotFamilyLimits["Service"]["startableOn"] = Effect.fn(
+    "SkycotFamilyLimits.startableOn",
+  )(function* (input) {
+    const all = new Set(input.instanceIds);
+    const loaded = yield* current;
+    if (loaded === null) return all;
+    const { profile, activity } = loaded;
+    const ownerId = activity.threads[input.threadId];
+    const child = profile.children.find((candidate) => candidate.id === ownerId);
+    if (child === undefined) return all;
+    const at = yield* now;
+    const startable = new Set<string>();
+    for (const instanceId of input.instanceIds) {
+      // The same judgement as admitTurn's, so the rules live in one place (evaluateLimits).
+      const state = yield* stateFor(profile, activity, child, at, instanceId);
+      if (!state.asleep) startable.add(instanceId);
+    }
+    return startable;
+  });
+
   const admitStep: SkycotFamilyLimits["Service"]["admitStep"] = Effect.fn(
     "SkycotFamilyLimits.admitStep",
   )(function* (input) {
@@ -848,6 +864,7 @@ const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: string)
     heartbeat,
     choose,
     admitTurn,
+    startableOn,
     admitStep,
     recordStart,
     moreTime,

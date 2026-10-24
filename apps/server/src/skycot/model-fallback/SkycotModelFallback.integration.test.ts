@@ -255,7 +255,7 @@ it.layer(layerEngine)("SkycotModelFallback with the engine", (it) => {
             }),
           ]),
           store: yield* makeMemorySwitchStore,
-          moveRuleFor: () => Effect.succeed(() => true),
+          turnRuleFor: () => Effect.succeed(() => true),
         });
         yield* fallback.carryOn(threadId, String(source.id));
         yield* fallback.carryOn(threadId, String(source.id));

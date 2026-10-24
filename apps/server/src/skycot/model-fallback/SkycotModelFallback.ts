@@ -22,9 +22,13 @@
 //     recovery waits for the reset as before.
 // The person's choice always wins: the model is changed only for as long as it rests. The next
 // message after it resets goes back to it, and a model the person picks meanwhile is theirs.
-// Family rules always win: a child is only moved to an assistant the Family profile allows, and
-// never onto one whose allowance is at the child's "keep for the grown-ups" line. A move to
-// another company is noted for the grown-ups' Today and recap (switchLog.ts); no notification.
+// Family rules always win: a turn only ever runs where the child could start one right now,
+// judged exactly as the Family gate judges a turn start (SkycotFamilyLimits `startableOn`, the
+// same `evaluateLimits` as `admitTurn`: bedtime, daily time, messages a day, the allowance
+// line), and only on an assistant the profile allows. So at bedtime, or with today's messages
+// used up, a stopped turn is not carried on: it waits exactly as upstream leaves it. A
+// carried-on turn is the same turn, so it is not counted again. A move to another company is
+// noted for the grown-ups' Today and recap (switchLog.ts); no notification.
 //
 // Inert unless T3CODE_SKYCOT_POLICY=1, and without provider snapshots (tests, stripped servers).
 
@@ -62,8 +66,7 @@ import { isNativeMaintenanceCommand } from "../../orchestration-v2/CommandPolicy
 import * as Orchestrator from "../../orchestration-v2/Orchestrator.ts";
 import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import { forkParked } from "../../serverActivation.ts";
-import { allowanceReading } from "../family-limits/limits.ts";
-import { ACTIVITY_FILE_NAME, readThreadOwners } from "../family-limits/SkycotFamilyLimits.ts";
+import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
 import { carryPlanPass } from "../SkycotFamilyInstructions.ts";
 import { LOCKED_DOWN_DRIVERS } from "../SkycotFamilyLockdown.ts";
@@ -142,7 +145,7 @@ export interface JudgeInput {
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly learned: ReadonlyArray<LearnedLimit>;
   readonly now: number;
-  readonly mayMoveTo?: (provider: ServerProvider) => boolean;
+  readonly mayRunOn?: (provider: ServerProvider) => boolean;
 }
 
 export type Judgement =
@@ -167,7 +170,7 @@ export function judgeBeforeTurn(input: JudgeInput): Judgement {
     providers: input.providers,
     learned: input.learned,
     now: input.now,
-    ...(input.mayMoveTo === undefined ? {} : { mayMoveTo: input.mayMoveTo }),
+    ...(input.mayRunOn === undefined ? {} : { mayRunOn: input.mayRunOn }),
   });
   if (choice.type === "keep") {
     return onFallback
@@ -232,7 +235,7 @@ export function planContinuation(input: {
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly learned: ReadonlyArray<LearnedLimit>;
   readonly now: number;
-  readonly mayMoveTo?: (provider: ServerProvider) => boolean;
+  readonly mayRunOn?: (provider: ServerProvider) => boolean;
 }): ContinuationPlan {
   const { projection, providers, now } = input;
   const run = projection.runs.find((candidate) => String(candidate.id) === input.runId);
@@ -284,7 +287,7 @@ export function planContinuation(input: {
     learned,
     now,
     tried: new Set(chain.map((step) => modelKey(refOf(step.modelSelection)))),
-    ...(input.mayMoveTo === undefined ? {} : { mayMoveTo: input.mayMoveTo }),
+    ...(input.mayRunOn === undefined ? {} : { mayRunOn: input.mayRunOn }),
   });
   if (choice.type !== "switch") return { type: "wait", learned: [taught] };
   const chainRoot = chain[0]!;
@@ -338,10 +341,10 @@ export function failedRunOf(event: OrchestrationV2DomainEvent): string | null {
 export interface FallbackDeps {
   readonly getProviders: Effect.Effect<ReadonlyArray<ServerProvider>>;
   readonly store: SwitchStore;
-  /** The Family rule for moving this conversation's turn to another provider. */
-  readonly moveRuleFor: (
+  /** The Family rule: the providers this conversation's turn may run on now (`ChoiceInput.mayRunOn`). */
+  readonly turnRuleFor: (
     threadId: string,
-    now: number,
+    providers: ReadonlyArray<ServerProvider>,
   ) => Effect.Effect<(provider: ServerProvider) => boolean>;
 }
 
@@ -405,8 +408,8 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
     const providers = yield* deps.getProviders;
     const now = yield* Clock.currentTimeMillis;
     const learned = yield* learnedNow(now);
-    const mayMoveTo = yield* deps.moveRuleFor(threadId, now);
-    const judgement = judgeBeforeTurn({ requested, memory, providers, learned, now, mayMoveTo });
+    const mayRunOn = yield* deps.turnRuleFor(threadId, providers);
+    const judgement = judgeBeforeTurn({ requested, memory, providers, learned, now, mayRunOn });
     switch (judgement.type) {
       case "unchanged":
         if (judgement.forget) yield* deps.store.forget(threadId);
@@ -457,8 +460,8 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
       const providers = yield* deps.getProviders;
       const now = yield* Clock.currentTimeMillis;
       const learned = yield* learnedNow(now);
-      const mayMoveTo = yield* deps.moveRuleFor(threadId, now);
-      const plan = planContinuation({ projection, runId, providers, learned, now, mayMoveTo });
+      const mayRunOn = yield* deps.turnRuleFor(threadId, providers);
+      const plan = planContinuation({ projection, runId, providers, learned, now, mayRunOn });
       if (plan.type === "pending") return;
       handled.add(runId);
       if (plan.type === "ignore") return;
@@ -525,36 +528,32 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
   };
 });
 
-/** The Family rule for moving a conversation's turn: allowed assistants, and the keep line. */
-export const makeMoveRule = (input: {
+/**
+ * The Family rule for a conversation's turn: Codex and Claude, or an assistant a grown-up
+ * allowed, and only where the child could start a turn right now (SkycotFamilyLimits'
+ * `startableOn`, the gate's own judgement). Everything while the profile is off.
+ */
+export const makeTurnRule = (input: {
   readonly family: Option.Option<SkycotFamily.SkycotFamily["Service"]>;
-  readonly activityPath: string | null;
-  readonly fs: Option.Option<FileSystem.FileSystem>;
-}): FallbackDeps["moveRuleFor"] =>
-  Effect.fn("SkycotModelFallback.moveRuleFor")(function* (threadId, now) {
+  readonly limits: Option.Option<SkycotFamilyLimits.SkycotFamilyLimits["Service"]>;
+}): FallbackDeps["turnRuleFor"] =>
+  Effect.fn("SkycotModelFallback.turnRuleFor")(function* (threadId, providers) {
     if (Option.isNone(input.family)) return () => true;
     const family = input.family.value;
     if (!(yield* family.isEnabled)) return () => true;
     const status = yield* family.status.pipe(Effect.orElseSucceed(() => null));
     // Codex and Claude run locked down; any other assistant only once a grown-up allowed it.
     const allowed = new Set(status?.allowedAssistants ?? []);
-    const owners =
-      status === null || input.activityPath === null || Option.isNone(input.fs)
-        ? {}
-        : yield* readThreadOwners(input.activityPath, status.createdAt).pipe(
-            Effect.provideService(FileSystem.FileSystem, input.fs.value),
-          );
-    const owner = owners[threadId];
-    const keep =
-      status?.children.find((child) => child.id === owner)?.limits.keepAllowancePercent ?? null;
+    const instanceIds = providers.map((provider) => String(provider.instanceId));
+    const startable = Option.isNone(input.limits)
+      ? null
+      : yield* input.limits.value.startableOn({ threadId, instanceIds });
     return (provider: ServerProvider) => {
       const driver = String(provider.driver);
-      if (!LOCKED_DOWN_DRIVERS.has(ProviderDriverKind.make(driver)) && !allowed.has(driver)) {
-        return false;
-      }
-      if (keep === null) return true;
-      const reading = allowanceReading(provider, now);
-      return reading === null || reading.leftPercent > keep;
+      return (
+        (LOCKED_DOWN_DRIVERS.has(ProviderDriverKind.make(driver)) || allowed.has(driver)) &&
+        (startable === null || startable.has(String(provider.instanceId)))
+      );
     };
   });
 
@@ -584,14 +583,24 @@ const layerWrap = Layer.effect(
             Effect.provideService(FileSystem.FileSystem, files.fs),
             Effect.provideService(Path.Path, files.path),
           );
+    // A read-only reader of the Family activity file the gate keeps (it never counts or writes
+    // here), so a carried-on turn meets the child's limits exactly as a new one would.
+    const limits =
+      Option.isNone(family) || files === null
+        ? Option.none<SkycotFamilyLimits.SkycotFamilyLimits["Service"]>()
+        : Option.some(
+            yield* SkycotFamilyLimits.makeAt(
+              files.path.join(files.stateDir, SkycotFamilyLimits.ACTIVITY_FILE_NAME),
+            ).pipe(
+              Effect.provideService(FileSystem.FileSystem, files.fs),
+              Effect.provideService(Path.Path, files.path),
+              Effect.provideService(SkycotFamily.SkycotFamily, family.value),
+            ),
+          );
     const fallback = yield* makeFallback(inner, {
       getProviders: registry.value.getProviders,
       store,
-      moveRuleFor: makeMoveRule({
-        family,
-        activityPath: files === null ? null : files.path.join(files.stateDir, ACTIVITY_FILE_NAME),
-        fs,
-      }),
+      turnRuleFor: makeTurnRule({ family, limits }),
     });
     yield* fallback.start;
     return fallback.service;

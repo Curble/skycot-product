@@ -154,7 +154,7 @@ describe("choosing the model for a turn", () => {
       providers: [claude(CLAUDE_ACCOUNT_OUT), codex()],
       learned: [],
       now: NOW,
-      mayMoveTo: (provider) => String(provider.driver) !== "codex",
+      mayRunOn: (provider) => String(provider.driver) !== "codex",
     });
     assert.deepStrictEqual(choice, { type: "wait", until: NOW + 2 * HOUR });
   });

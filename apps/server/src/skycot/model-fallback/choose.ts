@@ -23,11 +23,12 @@ export interface ChoiceInput {
   /** Models this turn already ran on (`modelKey`): each is tried at most once per turn. */
   readonly tried?: ReadonlySet<string>;
   /**
-   * Providers a turn may be moved to: the Family profile's allowed assistants, and not one whose
-   * allowance is down to the child's "keep for the grown-ups" line. The requested provider is
-   * the one the person is already using, so it is not asked.
+   * Providers the turn may run on now (the Family rule): the profile's allowed assistants, on
+   * which the child could start a turn right now (bedtime, daily time and messages, the
+   * allowance line), exactly as the gate judges a turn start. Every fallback, the same company's
+   * included, must pass it; the model asked for is the gate's to judge, not this.
    */
-  readonly mayMoveTo?: (provider: ServerProvider) => boolean;
+  readonly mayRunOn?: (provider: ServerProvider) => boolean;
 }
 
 export type Choice =
@@ -63,7 +64,9 @@ export function chooseModel(input: ChoiceInput): Choice {
     return null;
   };
 
-  const sameProvider = wanted.scope === "account" ? null : pick(home, true);
+  const allowed = (provider: ServerProvider) =>
+    input.mayRunOn === undefined || input.mayRunOn(provider);
+  const sameProvider = wanted.scope === "account" || !allowed(home) ? null : pick(home, true);
   if (sameProvider !== null) {
     return {
       type: "switch",
@@ -74,7 +77,7 @@ export function chooseModel(input: ChoiceInput): Choice {
     };
   }
   for (const provider of otherReadyProviders(providers, requested.instanceId)) {
-    if (input.mayMoveTo !== undefined && !input.mayMoveTo(provider)) continue;
+    if (!allowed(provider)) continue;
     const other = pick(provider, false);
     if (other !== null) {
       return {

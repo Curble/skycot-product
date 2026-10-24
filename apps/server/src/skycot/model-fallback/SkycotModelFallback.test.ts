@@ -125,7 +125,7 @@ describe("before a turn", () => {
       providers: [claude(CLAUDE_ACCOUNT_OUT), codex()],
       learned: [],
       now: NOW,
-      mayMoveTo: () => false,
+      mayRunOn: () => false,
     });
     assert.deepStrictEqual(judgement, { type: "unchanged", forget: false });
   });
@@ -290,7 +290,7 @@ describe("the fallback in front of the engine", () => {
       const fallback = yield* makeFallback(fakeEngine({ projection: state, dispatched }), {
         getProviders: Ref.get(providers),
         store,
-        moveRuleFor: () => Effect.succeed(() => true),
+        turnRuleFor: () => Effect.succeed(() => true),
       });
 
       yield* fallback.service.dispatch(message());
@@ -337,7 +337,7 @@ describe("the fallback in front of the engine", () => {
       const fallback = yield* makeFallback(fakeEngine({ projection: state, dispatched }), {
         getProviders: Effect.succeed([claude(), codex()]),
         store,
-        moveRuleFor: () => Effect.succeed(() => true),
+        turnRuleFor: () => Effect.succeed(() => true),
       });
       yield* fallback.carryOn("thread-1" as ThreadId, "run-1");
       yield* fallback.carryOn("thread-1" as ThreadId, "run-1");
@@ -370,7 +370,7 @@ describe("the fallback in front of the engine", () => {
           codex([window("primary", "Session", 100, NOW + HOUR)]),
         ]),
         store: yield* makeMemorySwitchStore,
-        moveRuleFor: () => Effect.succeed(() => true),
+        turnRuleFor: () => Effect.succeed(() => true),
       });
       yield* fallback.carryOn("thread-1" as ThreadId, "run-1");
       assert.equal((yield* Ref.get(dispatched)).length, 0);
