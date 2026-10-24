@@ -251,7 +251,7 @@ for later phases is [WHO-IS-WHO.md](WHO-IS-WHO.md).
   iPhone asks the Mac. Children's Watches aren't part of SKYCOT yet.
 - **Each yes is one-shot and on the record.** A yes names one request and a fingerprint of the
   card the phone showed; if the card changed, or it was already answered, the engine refuses.
-  A request older than ten minutes waits on the Mac instead. Saying no needs no proof. The recap
+  A request older than 30 minutes waits on the Mac instead. Saying no needs no proof. The recap
   says "Approved from Mum's phone, 6:42 pm".
 - **Devices list and Remove.** Phones and iPads lists every linked device with its person, its
   kind, when it was last seen and whether Face ID is on. **Remove** (the parent code) signs it

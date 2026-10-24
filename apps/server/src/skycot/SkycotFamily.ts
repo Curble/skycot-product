@@ -278,6 +278,11 @@ const FamilyFile = Schema.Struct({
    * parent code (driver ids, "cursor"). Optional so files written before it read unchanged.
    */
   allowedAssistants: Schema.optionalKey(Schema.Array(Schema.String)),
+  /**
+   * "Trusted add-ons download by themselves" (Settings › Family, parent code to change). Absent
+   * means on: the default, and what files written before it get.
+   */
+  trustedAddOns: Schema.optionalKey(Schema.Boolean),
   /** The grown-ups. Optional so a file from before them reads unchanged (see `withPeople`). */
   grownUps: Schema.optionalKey(Schema.Array(GrownUp)),
   /** Devices linked to a person (a child's iPad, a grown-up's phone). */
@@ -395,6 +400,8 @@ export interface FamilyStatus {
   readonly timeZone: string;
   /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
   readonly allowedAssistants: ReadonlyArray<string>;
+  /** Trusted add-ons (three.js, p5, …) download without a grown-up. Off while the profile is off. */
+  readonly trustedAddOns: boolean;
   /** The grown-ups (at least one while the profile is on). */
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
   /** Devices linked to a person, linked or still waiting for their link. */
@@ -550,6 +557,16 @@ export class SkycotFamily extends Context.Service<
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** Whether the profile is on and lists this assistant as allowed. Cheap, like `isEnabled`. */
     readonly assistantAllowed: (driver: string) => Effect.Effect<boolean>;
+    /**
+     * "Trusted add-ons download by themselves", either way: one code attempt, counted like
+     * every other (the parent's switch; a child cannot flip it).
+     */
+    readonly setTrustedAddOns: (input: {
+      readonly code: string;
+      readonly on: boolean;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Whether the profile is on with trusted add-ons on. Cheap, like `isEnabled`. */
+    readonly trustedAddOnsOn: Effect.Effect<boolean>;
     /** Ends every grant this session holds (a parent leaving Advanced mode). */
     readonly lock: (input: { readonly sessionId: string }) => Effect.Effect<void, FamilyError>;
     /**
@@ -750,6 +767,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       children: [],
       timeZone: familyTimeZone(null),
       allowedAssistants: [],
+      trustedAddOns: false,
       grownUps: [],
       devices: [],
     };
@@ -765,6 +783,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     children: file.children,
     timeZone: familyTimeZone(file),
     allowedAssistants: allowedAssistantsOf(file),
+    trustedAddOns: file.trustedAddOns !== false,
     grownUps: file.grownUps ?? [],
     devices: (file.devices ?? []).map(deviceView),
   };
@@ -1273,6 +1292,22 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       ),
     );
 
+  const setTrustedAddOns: SkycotFamily["Service"]["setTrustedAddOns"] = Effect.fn(
+    "SkycotFamily.setTrustedAddOns",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const cleared = yield* attempt(file, input.code, at);
+    const next: FamilyFile = { ...cleared, trustedAddOns: input.on };
+    yield* save(next);
+    yield* Effect.logInfo("skycot-family.trusted-add-ons", { on: input.on });
+    return toStatus(next, at);
+  }, lock.withPermits(1));
+
+  const trustedAddOnsOn: SkycotFamily["Service"]["trustedAddOnsOn"] = load.pipe(
+    Effect.map((file) => file !== null && file.enabled && file.trustedAddOns !== false),
+  );
+
   const lockSession: SkycotFamily["Service"]["lock"] = Effect.fn("SkycotFamily.lock")(function* (
     input,
   ) {
@@ -1557,6 +1592,8 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     allowAssistant,
     stopAllowingAssistant,
     assistantAllowed,
+    setTrustedAddOns,
+    trustedAddOnsOn,
     lock: lockSession,
     allows,
     tokenAllows,

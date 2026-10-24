@@ -55,7 +55,7 @@ parent code stays the root secret, and a passkey is only ever a per-device stand
 2. Approver-only: read scope plus the approver routes; no settings, files or pairing.
 3. One card, once: the answer names one request id and a fingerprint (a hash of the request id
    and the words the phone showed). A changed card is refused; a resolved one finds nothing.
-4. Short-lived: older than ten minutes (`APPROVAL_LAPSE_MS`), it waits on the Mac.
+4. Short-lived: older than 30 minutes (`APPROVAL_LAPSE_MS`), it waits on the Mac.
 5. Proof: a passkey assertion over a challenge bound to that device and that one action
    (`approve:<thread>:<request>:<fingerprint>` hashed with a nonce, two minutes, single use), or
    the parent code, which counts towards the same five-try lockout, or (Phase 4) the

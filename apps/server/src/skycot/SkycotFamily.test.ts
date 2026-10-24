@@ -42,17 +42,39 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               children: [],
               timeZone: "engine",
               allowedAssistants: [],
+              trustedAddOns: false,
               grownUps: [],
               devices: [],
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });
+          // "Trusted add-ons download by themselves" starts on.
+          assert.isTrue(status.trustedAddOns);
           assert.isTrue(status.enabled);
           assert.equal(status.childName, "Ava");
           assert.notProperty(status, "codeHash");
           const raw = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
           assert.notInclude(raw, CODE);
           assert.isTrue(yield* family.isEnabled);
+        }),
+      ),
+    );
+
+    it.effect("trusted add-ons: on by default, the parent code changes it either way", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          assert.isFalse(yield* family.trustedAddOnsOn);
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          assert.isTrue(yield* family.trustedAddOnsOn);
+          assert.equal(
+            (yield* failureOf(family.setTrustedAddOns({ code: "000000", on: false }))).reason,
+            "wrong-code",
+          );
+          assert.isTrue(yield* family.trustedAddOnsOn);
+          const off = yield* family.setTrustedAddOns({ code: CODE, on: false });
+          assert.isFalse(off.trustedAddOns);
+          assert.isFalse(yield* family.trustedAddOnsOn);
+          assert.isTrue((yield* family.setTrustedAddOns({ code: CODE, on: true })).trustedAddOns);
         }),
       ),
     );

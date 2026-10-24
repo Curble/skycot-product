@@ -63,6 +63,7 @@ import { forkParked } from "../serverActivation.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyExtras from "./SkycotFamilyExtras.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { appliesToRuntimeMode, requestFacts } from "./SkycotPolicy.ts";
 
@@ -127,6 +128,10 @@ export function mayAutoApprove(
   evaluation: RuleEvaluation,
   family: FamilyEvaluation | undefined,
 ): boolean {
+  // A Family relief (a trusted add-on SKYCOT fetches itself, a repeat of one a grown-up allowed
+  // in this conversation, an undoable delete in the project) is the shared rules' own judgement
+  // of exactly the holds it answers; anything else that held still holds (family.ts reliefFor).
+  if (family?.relief !== undefined) return !family.needsGrownUp && family.base.decision !== "hold";
   if (evaluation.decision === "hold") return false;
   if (family === undefined) return true;
   return !family.needsGrownUp && family.base.decision !== "hold";
@@ -165,6 +170,7 @@ const make = Effect.gen(function* () {
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
   const familyOn = Option.isNone(family) ? Effect.succeed(false) : family.value.isEnabled;
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+  const familyExtras = yield* SkycotFamilyExtras.make;
   // Who a Family conversation belongs to and whether their safe steps may run by themselves.
   // The gate's own limits service when this layer is given one (tests); otherwise a read-only
   // reader of the same activity file, as the model fallback builds (it never counts or writes).
@@ -331,8 +337,17 @@ const make = Effect.gen(function* () {
     const evaluation = evaluateRequest(facts, { ...roots, ...branches });
     // The same judgement the gate gives the child's card (SkycotFamilyGate.describeRequest):
     // a step that needs a grown-up there needs one here.
+    const extras = inFamily
+      ? yield* familyExtras({
+          threadId: input.threadId,
+          driver: approval.nativeItemRef?.driver ?? input.driver,
+        })
+      : {};
     const familyEvaluation = inFamily
-      ? evaluateFamilyRequest({ ...facts, toolItemType: toolCall?.type }, { ...roots, ...branches })
+      ? evaluateFamilyRequest(
+          { ...facts, toolItemType: toolCall?.type },
+          { ...roots, ...branches, ...extras },
+        )
       : undefined;
     if (
       familyEvaluation !== undefined &&
@@ -363,13 +378,20 @@ const make = Effect.gen(function* () {
       threadId: input.threadId,
       requestId: input.requestId,
       decision: "accept",
-      answers: policyDecisionAnswers(evaluation),
+      answers:
+        familyEvaluation?.relief === undefined
+          ? policyDecisionAnswers(evaluation)
+          : policyDecisionAnswers(familyEvaluation.base, {
+              relief: familyEvaluation.relief,
+              addOns: familyEvaluation.addOns,
+            }),
     });
     yield* Effect.logInfo("skycot-policy.approved", {
       threadId: input.threadId,
       requestId: input.requestId,
       kind: request.kind,
       family: inFamily,
+      ...(familyEvaluation?.relief === undefined ? {} : { relief: familyEvaluation.relief }),
     });
     return {
       type: "approved",

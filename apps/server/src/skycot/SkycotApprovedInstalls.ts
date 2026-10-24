@@ -37,6 +37,15 @@ import * as Path from "effect/Path";
 import { FetchHttpClient, HttpClient } from "effect/http";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import {
+  addOnAskOf,
+  isTrustedAddOnAsk,
+  parseApprovedDownload,
+  parseApprovedInstall,
+  type ApprovedDownload,
+  type ApprovedInstall,
+} from "@t3tools/skycot-rules/addons";
+import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 import { workRootsFor } from "@t3tools/skycot-rules/questions";
 
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -46,169 +55,24 @@ import * as RuntimeRequestService from "../orchestration-v2/RuntimeRequestServic
 import * as ProcessRunner from "../processRunner.ts";
 import { keepAddOnsOutOfVersions, type RunGit } from "./questions/SkycotKeepOutOfVersions.ts";
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
+import { makeAddOnStore } from "./SkycotAddOnApprovals.ts";
+import * as SkycotFamily from "./SkycotFamily.ts";
+import { addOnFilePathOption } from "./SkycotFamilyExtras.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 
-export type InstallManager = "npm" | "pnpm" | "bun";
+// The parsers are the shared rules' (packages/skycot-rules/src/addons.ts), so the cards and the
+// Family rules read an add-on ask exactly as this installer does.
+export {
+  parseApprovedDownload,
+  parseApprovedInstall,
+  type ApprovedDownload,
+  type ApprovedInstall,
+  type InstallManager,
+} from "@t3tools/skycot-rules/addons";
 
-export interface ApprovedInstall {
-  readonly manager: InstallManager;
-  readonly packages: ReadonlyArray<string>;
-  readonly dev: boolean;
-}
-
-const MAX_PACKAGES = 10;
 const INSTALL_TIMEOUT = "3 minutes";
-
-// A registry name, optionally scoped, optionally with a version or tag. No paths, URLs,
-// `git:` or `file:` specs, and nothing that starts like a flag.
-const PACKAGE_SPEC =
-  /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(?:@[A-Za-z0-9][A-Za-z0-9.^~<>=*_+|-]*)?$/u;
-
-const INSTALL_VERBS: Record<string, ReadonlySet<string>> = {
-  npm: new Set(["install", "i", "add"]),
-  pnpm: new Set(["add"]),
-  bun: new Set(["add"]),
-};
-const DEV_FLAGS = new Set(["-D", "--save-dev", "--dev", "-d"]);
-// Flags that only repeat what the install does anyway.
-const HARMLESS_FLAGS = new Set(["-S", "--save", "--save-prod", "-P"]);
-
-/** `/bin/zsh -lc 'npm install three'` as Codex reports it, or the bare command. */
-function unwrapShell(command: string): string {
-  const match = /^(?:\/bin\/|\/usr\/bin\/)?(?:zsh|bash|sh)\s+-l?c\s+(['"])([\s\S]*)\1$/u.exec(
-    command.trim(),
-  );
-  return (match?.[2] ?? command).trim();
-}
-
-/**
- * The add-ons a command installs, when that is all it does; null for anything else. Pure, so
- * the rule can be read and tested on its own.
- */
-export function parseApprovedInstall(command: string | undefined): ApprovedInstall | null {
-  if (command === undefined) return null;
-  const inner = unwrapShell(command);
-  // One plain command: no chaining, pipes, redirects, substitutions or quotes.
-  if (/[;&|<>`$()'"\\\n]/u.test(inner)) return null;
-  const [program, verb, ...rest] = inner.split(/\s+/u);
-  if (program === undefined || verb === undefined) return null;
-  const verbs = INSTALL_VERBS[program];
-  if (verbs === undefined || !verbs.has(verb)) return null;
-  let dev = false;
-  const packages: Array<string> = [];
-  for (const word of rest) {
-    if (DEV_FLAGS.has(word)) dev = true;
-    else if (HARMLESS_FLAGS.has(word)) continue;
-    else if (PACKAGE_SPEC.test(word)) packages.push(word);
-    else return null;
-  }
-  if (packages.length === 0 || packages.length > MAX_PACKAGES) return null;
-  return { manager: program as InstallManager, packages, dev };
-}
-
-export interface ApprovedDownload {
-  /** The https address, exactly as asked. */
-  readonly url: string;
-  /** Where it goes, relative to the conversation's folder. */
-  readonly output: string;
-  /** Folders a leading `mkdir -p …` asked for, made inside the conversation's folder too. */
-  readonly folders?: ReadonlyArray<string>;
-}
-
 const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT = "60 seconds";
-const HTTPS_URL = /^https:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?\/[A-Za-z0-9._~%/+=,@:-]*$/u;
-// curl's quiet, fail-on-error and follow-redirects flags, alone or bundled (-fsSL); never -k.
-const CURL_SHORT_FLAGS = /^-[fsSL]+$/u;
-const CURL_LONG_FLAGS = new Set([
-  "--location",
-  "--fail",
-  "--silent",
-  "--show-error",
-  "--create-dirs",
-  "--compressed",
-]);
-const CURL_FLAGS_WITH_NUMBER = new Set(["-m", "--max-time", "--retry", "--connect-timeout"]);
-const WGET_FLAGS = new Set(["-q", "--quiet", "-nv", "--no-verbose"]);
-
-/** A file name or path inside the folder: no `..`, nothing hidden, nothing absolute. */
-function safeOutputPath(output: string): string | null {
-  if (output.length === 0 || /^[/-]/u.test(output) || output.length > 200) return null;
-  const parts = output.split("/");
-  if (
-    parts.some(
-      (part) => part.length === 0 || part.startsWith(".") || !/^[A-Za-z0-9._-]+$/u.test(part),
-    )
-  )
-    return null;
-  return parts.join("/");
-}
-
-/**
- * The one file a command downloads, when that is all it does: `curl` or `wget` of one https
- * address into one file inside the folder. Null for anything else (stdout, pipes, several
- * addresses, `-k`, uploads, headers, cookies). Pure, like parseApprovedInstall.
- */
-export function parseApprovedDownload(command: string | undefined): ApprovedDownload | null {
-  if (command === undefined) return null;
-  // `mkdir -p vendor && curl … -o vendor/three.module.js https://…` is the same one download
-  // (seen live, 24 October 2026): leading mkdirs of plain folders inside the project are allowed.
-  const steps = unwrapShell(command).split(/\s+&&\s+/u);
-  const folders: Array<string> = [];
-  for (const step of steps.slice(0, -1)) {
-    const mkdir = /^mkdir(?:\s+-p)?\s+(\S.*)$/u.exec(step);
-    if (mkdir === null) return null;
-    for (const folder of mkdir[1]!.split(/\s+/u)) {
-      const safe = safeOutputPath(folder);
-      if (safe === null) return null;
-      folders.push(safe);
-    }
-  }
-  const inner = steps[steps.length - 1]!;
-  if (/[;&|<>`$()'"\\\n]/u.test(inner)) return null;
-  const [program, ...rest] = inner.split(/\s+/u);
-  if (program !== "curl" && program !== "wget") return null;
-  let url: string | null = null;
-  let output: string | null = null;
-  let remoteName = false;
-  for (let index = 0; index < rest.length; index++) {
-    const word = rest[index]!;
-    const next = rest[index + 1];
-    if (program === "curl" && (CURL_SHORT_FLAGS.test(word) || CURL_LONG_FLAGS.has(word))) continue;
-    if (program === "curl" && CURL_FLAGS_WITH_NUMBER.has(word) && next && /^\d+$/u.test(next)) {
-      index++;
-      continue;
-    }
-    if (program === "curl" && (word === "-O" || word === "--remote-name")) {
-      remoteName = true;
-      continue;
-    }
-    if (program === "wget" && WGET_FLAGS.has(word)) continue;
-    if (
-      ((program === "curl" && (word === "-o" || word === "--output")) ||
-        (program === "wget" && word === "-O")) &&
-      next !== undefined
-    ) {
-      if (output !== null) return null;
-      output = next;
-      index++;
-      continue;
-    }
-    if (HTTPS_URL.test(word)) {
-      if (url !== null) return null;
-      url = word;
-      continue;
-    }
-    return null;
-  }
-  if (url === null) return null;
-  if (output === null && (remoteName || program === "wget")) {
-    output = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
-  }
-  const safe = output === null ? null : safeOutputPath(output);
-  if (safe === null) return null;
-  return folders.length === 0 ? { url, output: safe } : { url, output: safe, folders };
-}
 
 /** The install SKYCOT runs: the same add-ons, with their install scripts off. */
 export function installArguments(install: ApprovedInstall): ReadonlyArray<string> {
@@ -236,17 +100,32 @@ export function installArguments(install: ApprovedInstall): ReadonlyArray<string
 
 const quote = (word: string) => `'${word.replaceAll("'", "'\\''")}'`;
 
+const GROWN_UP_SAID_YES = "a grown-up said yes";
+
+/** Why SKYCOT did it, for the assistant's note: the policy's relief, else a person's yes. */
+export function becauseFor(relief: string | undefined): string {
+  switch (relief) {
+    case "trusted-add-on":
+      return "this is a trusted add-on";
+    case "approved-before":
+      return "a grown-up already said yes to it in this conversation";
+    default:
+      return "someone said yes";
+  }
+}
+
 /** What the assistant is told, in place of its own command's result. */
 export function noteForAssistant(
   install: ApprovedInstall,
   outcome: { readonly ok: true } | { readonly ok: false; readonly reason: string },
+  because: string = GROWN_UP_SAID_YES,
 ): string {
   const names = install.packages.join(", ");
   return outcome.ok
-    ? `SKYCOT note: a grown-up said yes, so SKYCOT installed ${names} into this project for you ` +
+    ? `SKYCOT note: ${because}, so SKYCOT installed ${names} into this project for you ` +
         `(${install.manager}, with install scripts off). Your own install command was skipped on ` +
         `purpose and shows as declined: do not run it again. Carry on with the plan.`
-    : `SKYCOT note: a grown-up said yes, but SKYCOT could not install ${names}: ${outcome.reason} ` +
+    : `SKYCOT note: ${because}, but SKYCOT could not install ${names}: ${outcome.reason} ` +
         `Your own install command was skipped. Carry on another way, without it.`;
 }
 
@@ -254,12 +133,13 @@ export function noteForAssistant(
 export function noteForDownload(
   download: ApprovedDownload,
   outcome: { readonly ok: true } | { readonly ok: false; readonly reason: string },
+  because: string = GROWN_UP_SAID_YES,
 ): string {
   return outcome.ok
-    ? `SKYCOT note: a grown-up said yes, so SKYCOT downloaded ${download.url} into ` +
+    ? `SKYCOT note: ${because}, so SKYCOT downloaded ${download.url} into ` +
         `${download.output} in this project for you. Your own download command was skipped on ` +
         `purpose and shows as declined: do not run it again. Carry on with the plan.`
-    : `SKYCOT note: a grown-up said yes, but SKYCOT could not download ${download.url}: ` +
+    : `SKYCOT note: ${because}, but SKYCOT could not download ${download.url}: ` +
         `${outcome.reason} Your own download command was skipped. Carry on another way, without it.`;
 }
 
@@ -341,6 +221,39 @@ export const layerRuntimeRequests = Layer.effect(
     const questionsRoot = yield* SkycotQuestions.questionsRootOption;
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
+    const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
+    const addOnFile = yield* addOnFilePathOption;
+    const addOns = addOnFile === null ? null : yield* makeAddOnStore(addOnFile);
+
+    /**
+     * Family only: remember a person's yes for this conversation ("one yes covers repeats"), or
+     * note what SKYCOT added by itself for the grown-ups' recap. A yes the child could give
+     * (a trusted add-on while the parent's switch is on) is never remembered as a grown-up's.
+     */
+    const remember = Effect.fnUntraced(function* (
+      threadId: ThreadId,
+      plan: { readonly names: ReadonlyArray<string>; readonly trusted: boolean },
+      relief: string | undefined,
+      ok: boolean,
+    ) {
+      if (addOns === null || Option.isNone(family) || plan.names.length === 0) return;
+      if (!(yield* family.value.isEnabled)) return;
+      if (relief === "trusted-add-on" || relief === "approved-before") {
+        if (ok) {
+          yield* addOns.recordAdded({
+            threadId,
+            names: plan.names,
+            how: relief === "trusted-add-on" ? "trusted" : "again",
+          });
+        }
+        return;
+      }
+      if (relief !== undefined) return;
+      const childCouldSayYes =
+        plan.trusted &&
+        (yield* family.value.trustedAddOnsOn.pipe(Effect.catchCause(() => Effect.succeed(true))));
+      if (!childCouldSayYes) yield* addOns.approve(threadId, plan.names);
+    });
 
     /** The install a yes stands for, and where it goes; null when this yes is not one. */
     const planFor = Effect.fnUntraced(function* (threadId: ThreadId, requestId: RuntimeRequestId) {
@@ -376,9 +289,11 @@ export const layerRuntimeRequests = Layer.effect(
         questionsRoot,
       });
       if (projectRoot === null) return null;
+      const names = addOnAskOf(command)?.names ?? [];
+      const trusted = isTrustedAddOnAsk(addOnAskOf(command));
       return install !== null
-        ? ({ kind: "install", install, folder: projectRoot } as const)
-        : ({ kind: "download", download: download!, folder: projectRoot } as const);
+        ? ({ kind: "install", install, folder: projectRoot, names, trusted } as const)
+        : ({ kind: "download", download: download!, folder: projectRoot, names, trusted } as const);
     });
 
     const tellAssistant = Effect.fnUntraced(function* (
@@ -416,6 +331,10 @@ export const layerRuntimeRequests = Layer.effect(
           Effect.orElseSucceed(() => null),
         );
         if (plan === null) return yield* base.respond(input);
+        const decided = readPolicyDecision(input.answers);
+        // A policy yes without a relief never reaches here for an add-on (it always needs one).
+        const because = decided === null ? GROWN_UP_SAID_YES : becauseFor(decided.relief);
+        const relief = decided === null ? undefined : (decided.relief ?? "policy");
 
         if (plan.kind === "download") {
           const fetched = yield* downloadInto(fs, path, plan.folder, plan.download).pipe(
@@ -431,7 +350,10 @@ export const layerRuntimeRequests = Layer.effect(
             ok: fetched.ok,
             ...(fetched.ok ? { bytes: fetched.bytes } : {}),
           });
-          yield* tellAssistant(input, noteForDownload(plan.download, fetched)).pipe(
+          yield* remember(input.threadId, plan, relief, fetched.ok).pipe(
+            Effect.catchCause((cause) => Effect.logWarning("skycot-installs.not-noted", { cause })),
+          );
+          yield* tellAssistant(input, noteForDownload(plan.download, fetched, because)).pipe(
             Effect.catchCause((cause) =>
               Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
             ),
@@ -475,7 +397,10 @@ export const layerRuntimeRequests = Layer.effect(
           ok: outcome.ok,
         });
         // The note first, so it is waiting when the assistant reads its declined command.
-        yield* tellAssistant(input, noteForAssistant(plan.install, outcome)).pipe(
+        yield* remember(input.threadId, plan, relief, outcome.ok).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("skycot-installs.not-noted", { cause })),
+        );
+        yield* tellAssistant(input, noteForAssistant(plan.install, outcome, because)).pipe(
           Effect.catchCause((cause) =>
             Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
           ),

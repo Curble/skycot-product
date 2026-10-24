@@ -128,6 +128,12 @@ export interface RecapReport {
       readonly from: string;
       readonly to: string;
     }>;
+    /** Add-ons SKYCOT added by itself: trusted ones, and repeats a grown-up allowed earlier. */
+    readonly addOns: ReadonlyArray<{
+      readonly at: number;
+      readonly names: ReadonlyArray<string>;
+      readonly how: "trusted" | "again";
+    }>;
   };
   readonly proudOf: {
     readonly threadId: string;
@@ -346,6 +352,9 @@ export function buildRecap(input: {
       switches: (activity.switches ?? [])
         .filter((entry) => entry.childId === childId && inRange(entry.at))
         .map((entry) => ({ at: entry.at, from: entry.from, to: entry.to })),
+      addOns: (activity.addOns ?? [])
+        .filter((entry) => entry.childId === childId && inRange(entry.at))
+        .map((entry) => ({ at: entry.at, names: entry.names, how: entry.how })),
     },
     proudOf,
   };

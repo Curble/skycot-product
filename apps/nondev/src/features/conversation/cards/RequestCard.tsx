@@ -238,6 +238,7 @@ export function RequestCard({
           projectFolder,
           toolCallInput,
           toolItemType: toolItemTypeFor(item, projection.turnItems),
+          trustedAddOns: family.profile.trustedAddOns,
         })
       : null;
   const shown = familyApplies ? familyCard(card, grownUp) : card;

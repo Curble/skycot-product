@@ -246,6 +246,7 @@ function GrownUpProbe({
   const state = Option.getOrNull(AsyncResult.value(result));
   const projection = state ? Option.getOrNull(state.data) : null;
   const report = useEffectEvent((grownUp: boolean) => onJudged(grownUp));
+  const trustedAddOns = useFamily().profile.trustedAddOns;
 
   useEffect(() => {
     if (AsyncResult.isFailure(result)) {
@@ -269,9 +270,10 @@ function GrownUpProbe({
       ...roots,
       toolCallInput: toolCallInputFor(item, projection.turnItems),
       toolItemType: toolItemTypeFor(item, projection.turnItems),
+      trustedAddOns,
     });
     report(hold !== null);
-  }, [result, projection, project, shell, requestId]);
+  }, [result, projection, project, shell, requestId, trustedAddOns]);
 
   return null;
 }

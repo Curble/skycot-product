@@ -1,6 +1,7 @@
 // The grown-up recap, pure part of the client: the engine's report (`GET
 // /api/skycot/family/recap`) in plain words. The engine already left out any words the
 // shield would catch; this file only ever names their kind.
+import { describeAddOns } from "@t3tools/skycot-rules/addons";
 import { describePersonalCategories, type PersonalCategory } from "@t3tools/skycot-rules/personal";
 
 import { describeChanges, fromCheckpointFiles } from "../../plain/changes";
@@ -75,6 +76,12 @@ export interface RecapReport {
       readonly at: number;
       readonly from: string;
       readonly to: string;
+    }>;
+    /** Add-ons SKYCOT added by itself. Older engines leave it out. */
+    readonly addOns?: ReadonlyArray<{
+      readonly at: number;
+      readonly names: ReadonlyArray<string>;
+      readonly how: "trusted" | "again";
     }>;
   };
   readonly proudOf: {
@@ -152,7 +159,10 @@ const REASON: Readonly<Record<NonNullable<MoreTimeEntry["reason"]>, string>> = {
 };
 
 /** What needed a grown-up, one sentence each; empty when nothing did. */
-export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">): Array<string> {
+export function grownUpLines(
+  report: Pick<RecapReport, "grownUp" | "timeZone">,
+  name?: string,
+): Array<string> {
   const { held, approved, moreTime, shield, shieldAllowed } = report.grownUp;
   const lines: Array<string> = [];
   if (held > 0) {
@@ -190,6 +200,13 @@ export function grownUpLines(report: Pick<RecapReport, "grownUp" | "timeZone">):
   }
   if (shieldAllowed > 0) {
     lines.push(`${plural(shieldAllowed, "message")} went as typed after a grown-up said yes.`);
+  }
+  for (const entry of report.grownUp.addOns ?? []) {
+    lines.push(
+      `SKYCOT added ${describeAddOns(entry.names)}${name ? ` for ${name}` : ""}, ${clockPhrase(entry.at, report.timeZone)} (${
+        entry.how === "trusted" ? "a trusted add-on" : "a grown-up allowed it earlier"
+      }).`,
+    );
   }
   lines.push(
     ...grownUpSwitchLines(report.grownUp.switches ?? [], (at) => clockPhrase(at, report.timeZone)),

@@ -96,6 +96,7 @@ import { filterArchivedSnapshot } from "./family-devices/visibility.ts";
 import { isInsideRoot } from "./files/SkycotFiles.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyExtras from "./SkycotFamilyExtras.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
@@ -752,6 +753,8 @@ const make = Effect.gen(function* () {
   const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
   // Optional: without it (older tests, tools) "open Questions" stays T3's own shared space.
   const questionSpaces = yield* Effect.serviceOption(SkycotQuestionSpaces.SkycotQuestionSpaces);
+  // The same extra facts the policy reactor reads (trusted add-ons, repeats, undoable deletes).
+  const familyExtras = yield* SkycotFamilyExtras.make;
 
   /**
    * Where the thread works (its private copy, else the folder), and the project's folder. A
@@ -803,7 +806,10 @@ const make = Effect.gen(function* () {
     if (facts === null) return null;
     return evaluateFamilyRequest(
       { ...facts, toolItemType: toolCall?.type },
-      yield* projectRootsFor(thread),
+      {
+        ...(yield* projectRootsFor(thread)),
+        ...(yield* familyExtras({ threadId: input.threadId, driver })),
+      },
     ) satisfies FamilyEvaluation;
   });
 
@@ -843,7 +849,10 @@ const make = Effect.gen(function* () {
       }
       const evaluation = evaluateFamilyRequest(
         { ...facts, toolItemType: toolCall?.type },
-        yield* projectRootsFor(thread),
+        {
+          ...(yield* projectRootsFor(thread)),
+          ...(yield* familyExtras({ threadId: input.threadId, driver })),
+        },
       );
       const parts = [
         describeFamilyMatches(evaluation.family),

@@ -305,6 +305,7 @@ describe("buildRecap", () => {
       // That yes was typed on the Mac; one from a grown-up's phone would name the phone here.
       fromDevices: [],
       switches: [{ at: at("2026-10-22T16:40:00+11:00"), from: "claudeAgent", to: "codex" }],
+      addOns: [],
     });
     expect(today.proudOf).toEqual({
       threadId: "thread:space",

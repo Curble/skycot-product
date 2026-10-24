@@ -76,6 +76,23 @@ describe("the recap in plain words", () => {
         grownUp: { held: 0, approved: 0, moreTime: [], shield: {}, shieldAllowed: 0 },
       }),
     ).toEqual([]);
+    // What SKYCOT added by itself, for the grown-ups.
+    expect(
+      grownUpLines(
+        {
+          timeZone: MELBOURNE,
+          grownUp: {
+            held: 0,
+            approved: 0,
+            moreTime: [],
+            shield: {},
+            shieldAllowed: 0,
+            addOns: [{ at: Date.parse("2026-10-22T04:10:00Z"), names: ["three"], how: "trusted" }],
+          },
+        },
+        "Ava",
+      ),
+    ).toEqual(["SKYCOT added three.js for Ava, 3:10 pm (a trusted add-on)."]);
     // A yes from a grown-up's own phone names the phone.
     expect(
       grownUpLines({

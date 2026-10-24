@@ -478,7 +478,7 @@ const heldItems: ReadonlyArray<OrchestrationV2TurnItem> = [
     type: "approval_request",
     requestId: REQUEST_ID,
     requestKind: "command",
-    prompt: "npm install phaser",
+    prompt: "npm install left-pad",
   },
   {
     ...itemBase,
@@ -489,7 +489,7 @@ const heldItems: ReadonlyArray<OrchestrationV2TurnItem> = [
     ordinal: 0,
     status: "running",
     type: "command_execution",
-    input: "npm install phaser",
+    input: "npm install left-pad",
   },
 ];
 

@@ -147,6 +147,8 @@ export interface ServerFamilyStatus {
    * engine from before this sends none.
    */
   readonly allowedAssistants?: ReadonlyArray<string>;
+  /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
+  readonly trustedAddOns?: boolean;
   readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
   readonly devices?: ReadonlyArray<FamilyDeviceSummary>;
   /** Who this device is; only the status read carries it (an older engine: the Mac). */
@@ -239,6 +241,9 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
       ? {}
       : { session: parseSessionLimits(record["session"])! }),
     allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
+    ...(typeof record["trustedAddOns"] === "boolean"
+      ? { trustedAddOns: record["trustedAddOns"] }
+      : {}),
     grownUps: parseGrownUps(record["grownUps"]),
     devices: parseDevices(record["devices"]),
     ...("me" in record ? { me: parseMe(record["me"]) } : {}),
@@ -342,6 +347,8 @@ export interface FamilyView {
   readonly legacy: boolean;
   /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
   readonly allowedAssistants: ReadonlyArray<string>;
+  /** Trusted add-ons (three.js, p5, …) download without a grown-up; the engine decides. */
+  readonly trustedAddOns: boolean;
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
   readonly devices: ReadonlyArray<FamilyDeviceSummary>;
   /** Who this device is: the family's Mac, a child's own device, or a grown-up's device. */
@@ -367,6 +374,7 @@ export const EMPTY_VIEW: FamilyView = {
   source: "cache",
   legacy: false,
   allowedAssistants: [],
+  trustedAddOns: false,
   grownUps: [],
   devices: [],
   me: SHARED_ME,
@@ -445,6 +453,7 @@ export function viewFromStatus(
     // Once the engine has a profile, the browser copy is history.
     legacy: legacy && !status.enabled,
     allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
+    trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],
     // Answers other than the status read carry no `me`: keep what was known.

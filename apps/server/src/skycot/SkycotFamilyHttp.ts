@@ -590,6 +590,22 @@ const stopAllowingAssistantRoute = route(
       .pipe(Effect.map((status) => json(status))),
 );
 
+/**
+ * "Trusted add-ons download by themselves": the parent's switch, either way with the code (one
+ * try, counted like every other). The engine keeps it; nothing stays open.
+ */
+const trustedAddOnsRoute = route(
+  "POST",
+  "/trusted-add-ons",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    typeof body["on"] !== "boolean"
+      ? Effect.fail(new SkycotFamily.FamilyError({ reason: "invalid-request" }))
+      : family
+          .setTrustedAddOns({ code: text(body["code"]), on: body["on"] })
+          .pipe(Effect.map((status) => json(status))),
+);
+
 const lockRoute = route("POST", "/lock", AuthOrchestrationOperateScope, ({ family, sessionId }) =>
   family.lock({ sessionId }).pipe(
     Effect.andThen(family.status),
@@ -1297,6 +1313,7 @@ export const layerCore = Layer.mergeAll(
   moreTimeRoute,
   allowAssistantRoute,
   stopAllowingAssistantRoute,
+  trustedAddOnsRoute,
   lockRoute,
 );
 

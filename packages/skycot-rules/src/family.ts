@@ -5,8 +5,10 @@
 // parent code before it can be allowed; the server refuses the "Allow" otherwise, and the
 // card says "Ask a grown-up". Pure functions over strings, shared by server and client.
 
+import { addOnAskOf, isTrustedAddOnAsk } from "./addons.ts";
 import {
   evaluateRequest,
+  type HardRuleId,
   type RuleContext,
   type RuleEvaluation,
   type RuleRequest,
@@ -56,12 +58,39 @@ export interface FamilyRequest extends RuleRequest {
   readonly toolItemType?: string | undefined;
 }
 
+/**
+ * Why a step that would need a grown-up is the child's after all (beta 5, "make it more
+ * seamless"): a trusted add-on SKYCOT fetches itself, an add-on a grown-up already said yes to
+ * in this conversation, or a delete inside the project that a restore point can undo.
+ */
+export type FamilyRelief = "trusted-add-on" | "approved-before" | "undoable-delete";
+
+/** What the engine knows about the conversation beyond its folders. Unknown: no relief. */
+export interface FamilyContext extends RuleContext {
+  /**
+   * SKYCOT itself does an accepted add-on install or download for this conversation (Codex:
+   * SkycotApprovedInstalls), so the assistant's own command never runs. Without it no add-on
+   * is relieved: the assistant's own install would run, scripts and all.
+   */
+  readonly skycotFetchesAddOns?: boolean | undefined;
+  /** The parent's "Trusted add-ons download by themselves" (on unless they turned it off). */
+  readonly trustedAddOns?: boolean | undefined;
+  /** Add-on names a grown-up already said yes to in this conversation (unexpired). */
+  readonly approvedAddOns?: ReadonlyArray<string> | undefined;
+  /** The conversation's folder keeps versions (SKYCOT restore points), so a delete can be undone. */
+  readonly keepsVersions?: boolean | undefined;
+}
+
 export interface FamilyEvaluation {
   /** True when only a grown-up may allow this request. */
   readonly needsGrownUp: boolean;
-  /** The ordinary hard-rule evaluation (its holds count too). */
+  /** The ordinary hard-rule evaluation (its holds count too). Allow-clean when relieved. */
   readonly base: RuleEvaluation;
   readonly family: ReadonlyArray<FamilyMatch>;
+  /** Set when a rule would have held it but a relief makes it the child's step. */
+  readonly relief?: FamilyRelief;
+  /** The add-ons a relieved add-on ask names ("three"). */
+  readonly addOns?: ReadonlyArray<string>;
 }
 
 const FAMILY_BY_ID: ReadonlyMap<FamilyRuleId, FamilyRule> = new Map(
@@ -871,7 +900,7 @@ export function familyCommandMatches(command: string): Array<FamilyMatch> {
  */
 export function evaluateFamilyRequest(
   request: FamilyRequest,
-  ctx: RuleContext = {},
+  ctx: FamilyContext = {},
 ): FamilyEvaluation {
   const base = evaluateRequest(request, ctx);
   const family: Array<FamilyMatch> = [];
@@ -882,7 +911,150 @@ export function evaluateFamilyRequest(
     family.push(...familyCommandMatches(request.command));
   }
   const matches = unique(family);
-  return { needsGrownUp: base.decision === "hold" || matches.length > 0, base, family: matches };
+  const needsGrownUp = base.decision === "hold" || matches.length > 0;
+  if (needsGrownUp && request.toolItemType !== "web_search") {
+    const relieved = reliefFor(request, ctx, base, matches);
+    if (relieved !== null) {
+      return {
+        needsGrownUp: false,
+        base: { decision: "allow", risk: "low", matches: [] },
+        family: [],
+        ...relieved,
+      };
+    }
+  }
+  return { needsGrownUp, base, family: matches };
+}
+
+// ── Reliefs: held by a rule, the child's step all the same ────────────────────────────
+// Each one is narrow on purpose: it applies only when everything that held the step is the one
+// thing the relief answers. An add-on ask that also leaves the project, a delete that also
+// reaches the internet, anything with a rule the relief does not cover: a grown-up, as before.
+
+/** Codex asks to leave its sandbox for an install; SKYCOT's own install makes that moot. */
+const ADD_ON_HARD_RULES: ReadonlySet<HardRuleId> = new Set(["leaves-sandbox"]);
+const ADD_ON_FAMILY_RULES: ReadonlySet<FamilyRuleId> = new Set([
+  "uses-internet",
+  "installs-software",
+]);
+const DELETE_HARD_RULES: ReadonlySet<HardRuleId> = new Set([
+  "deletes-files",
+  "destructive-command",
+]);
+
+function reliefFor(
+  request: FamilyRequest,
+  ctx: FamilyContext,
+  base: RuleEvaluation,
+  matches: ReadonlyArray<FamilyMatch>,
+): { readonly relief: FamilyRelief; readonly addOns?: ReadonlyArray<string> } | null {
+  if (request.kind === "command" && request.command !== undefined) {
+    const ask = ctx.skycotFetchesAddOns === true ? addOnAskOf(request.command) : null;
+    if (
+      ask !== null &&
+      ask.names.length > 0 &&
+      base.matches.every((match) => ADD_ON_HARD_RULES.has(match.rule.id)) &&
+      matches.every((match) => ADD_ON_FAMILY_RULES.has(match.rule.id))
+    ) {
+      if (ctx.trustedAddOns === true && isTrustedAddOnAsk(ask)) {
+        return { relief: "trusted-add-on", addOns: ask.names };
+      }
+      const approved = new Set(ctx.approvedAddOns ?? []);
+      if (ask.names.every((name) => approved.has(name))) {
+        return { relief: "approved-before", addOns: ask.names };
+      }
+    }
+  }
+  if (
+    ctx.keepsVersions === true &&
+    matches.length === 0 &&
+    request.leavesSandbox !== true &&
+    base.matches.every((match) => DELETE_HARD_RULES.has(match.rule.id)) &&
+    isUndoableProjectDelete(request, ctx)
+  ) {
+    return { relief: "undoable-delete" };
+  }
+  return null;
+}
+
+// ── Deleting inside the project, when a restore point can bring it back ────────────────
+// Only the plainest shapes: `rm`, `rm -r`, `rm -rf`, `rmdir` of named files and folders inside
+// the conversation's own folder, or the assistant's own file delete there. Never the folder
+// itself, `.git` or any hidden name, `..`, `~`, an absolute path elsewhere, a wildcard, a
+// variable, a substitution, a pipe, `find -delete`, `xargs rm`, or anything else on the line.
+
+const DELETE_FLAG = /^-[rRfdv]+$|^--(?:recursive|force|dir|verbose)$/u;
+/** Characters that could make a delete reach further than the words say. */
+const ESCAPING = /[*?[\]{}~$`()<>|&;!\\'"\n#=]/u;
+
+function normalizeRoot(root: string): string {
+  return root.replace(/\/+$/u, "");
+}
+
+/** The path inside the project, as plain steps (`src/old.js` → ["src", "old.js"]); null if not. */
+function projectSteps(path: string, root: string): ReadonlyArray<string> | null {
+  if (path.length === 0 || ESCAPING.test(path) || path.includes("\\")) return null;
+  let relative = path;
+  if (path.startsWith("/")) {
+    const prefix = `${normalizeRoot(root)}/`;
+    if (!path.startsWith(prefix)) return null;
+    relative = path.slice(prefix.length);
+  }
+  const steps = relative.split("/").filter((step, index) => !(index === 0 && step === "."));
+  const named = steps.filter((step, index) => !(index === steps.length - 1 && step === ""));
+  if (named.length === 0) return null;
+  // Hidden names (.git, .env, .skycot), `.` and `..` anywhere: a grown-up.
+  if (named.some((step) => step.length === 0 || step.startsWith("."))) return null;
+  return named;
+}
+
+function undoableDeleteCommand(command: string, root: string): boolean {
+  const script = unwrapShellWrapper(command.trim()).trim();
+  if (script.length === 0 || /[|<>`$()\n]|(^|[^&])&(?!&)/u.test(script)) return false;
+  const steps = script.split(/\s*(?:&&|;)\s*/u);
+  return steps.every((step) => {
+    const words = step.split(/\s+/u).filter((word) => word.length > 0);
+    const [program, ...rest] = words;
+    if (program !== "rm" && program !== "rmdir") return false;
+    let paths = 0;
+    let endOfFlags = false;
+    for (const word of rest) {
+      if (!endOfFlags && word === "--") {
+        endOfFlags = true;
+        continue;
+      }
+      if (!endOfFlags && word.startsWith("-")) {
+        if (!DELETE_FLAG.test(word)) return false;
+        continue;
+      }
+      if (projectSteps(word, root) === null) return false;
+      paths += 1;
+    }
+    return paths > 0;
+  });
+}
+
+/**
+ * True when the request only deletes named files or folders inside the conversation's own
+ * folder (`ctx.projectRoot`), never the folder itself or a hidden path. Pure; the caller says
+ * whether the folder keeps versions.
+ */
+export function isUndoableProjectDelete(request: RuleRequest, ctx: RuleContext): boolean {
+  const root = ctx.projectRoot;
+  if (typeof root !== "string" || !root.startsWith("/") || normalizeRoot(root).length === 0) {
+    return false;
+  }
+  if (request.kind === "command") {
+    return request.command !== undefined && undoableDeleteCommand(request.command, root);
+  }
+  if (request.kind === "file-change") {
+    const files = request.files ?? [];
+    return (
+      files.some((file) => file.operation === "remove") &&
+      files.every((file) => file.path.startsWith("/") && projectSteps(file.path, root) !== null)
+    );
+  }
+  return false;
 }
 
 /** "uses the internet and installs something" for the card. */

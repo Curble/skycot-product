@@ -1,3 +1,4 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
   EventId,
@@ -17,8 +18,10 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
@@ -29,6 +32,7 @@ import * as CodexSchema from "effect-codex-app-server/schema";
 import { SKYCOT_POLICY_NOTE } from "@t3tools/skycot-rules/decision";
 import { UNKNOWN_BRANCH_PUSH } from "@t3tools/skycot-rules/rules";
 
+import * as ServerConfig from "../config.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
@@ -38,6 +42,7 @@ import { evaluateFamilyRequest } from "@t3tools/skycot-rules/family";
 import { evaluateRequest } from "@t3tools/skycot-rules/rules";
 
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
+import { ADD_ON_FILE_NAME, withApproval, type AddOnFile } from "./SkycotAddOnApprovals.ts";
 import { parseApprovedDownload, parseApprovedInstall } from "./SkycotApprovedInstalls.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
@@ -181,6 +186,12 @@ interface Scenario {
   readonly family?: boolean | { readonly stepRule: SkycotFamilyLimits.FamilyStepRule };
   /** The user message each run answers, by run id (for plan first). */
   readonly runMessages?: Readonly<Record<string, string>>;
+  /** The parent's "Trusted add-ons download by themselves"; unset: unreadable (no relief). */
+  readonly trustedAddOns?: boolean;
+  /** The conversation's restore points, for undoable deletes. */
+  readonly checkpoints?: ReadonlyArray<{ readonly status: string }>;
+  /** SKYCOT's add-on memory, written to a temporary engine home first. */
+  readonly addOnFile?: AddOnFile;
 }
 
 const gitFailure = (operation: string) =>
@@ -196,6 +207,18 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
   Effect.gen(function* () {
     const dispatched = yield* Ref.make<ReadonlyArray<RespondCommand>>([]);
     const items = scenario.items ?? [];
+    const home =
+      scenario.addOnFile === undefined
+        ? null
+        : yield* Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            const dir = yield* fs.makeTempDirectory({ prefix: "skycot-reactor-" });
+            yield* fs.writeFileString(
+              `${dir}/${ADD_ON_FILE_NAME}`,
+              JSON.stringify(scenario.addOnFile),
+            );
+            return dir;
+          }).pipe(Effect.provide(NodeServices.layer));
     const layerDependencies = Layer.mergeAll(
       Layer.mock(ProjectionStore.ProjectionStoreV2)({
         getThread: () =>
@@ -218,6 +241,7 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
                       : { userMessageId: scenario.runMessages[id] }),
                   }) as unknown as OrchestrationV2Run,
               ),
+            checkpoints: scenario.checkpoints ?? [],
             turnItems: items.filter(
               (item) =>
                 (filter?.turnItemRunIds === undefined ||
@@ -287,7 +311,18 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
       }),
       scenario.family === undefined || scenario.family === false
         ? Layer.empty
-        : Layer.mock(SkycotFamily.SkycotFamily)({ isEnabled: Effect.succeed(true) }),
+        : Layer.mock(SkycotFamily.SkycotFamily)({
+            isEnabled: Effect.succeed(true),
+            ...(scenario.trustedAddOns === undefined
+              ? {}
+              : { trustedAddOnsOn: Effect.succeed(scenario.trustedAddOns) }),
+          }),
+      home === null
+        ? Layer.empty
+        : Layer.merge(
+            NodeServices.layer,
+            Layer.succeed(ServerConfig.ServerConfig, { stateDir: home, baseDir: home } as never),
+          ),
       typeof scenario.family === "object"
         ? Layer.mock(SkycotFamilyLimits.SkycotFamilyLimits)({
             stepRuleFor: () =>
@@ -1068,6 +1103,180 @@ describe("SkycotPolicyReactor", () => {
         assert.equal(install.outcome.type, "held");
       }),
     );
+
+    describe("beta 5: smoother Family", () => {
+      const held = (outcome: SkycotPolicyReactor.SkycotPolicyOutcome) => outcome.type === "held";
+
+      it.effect("a trusted add-on is accepted by the engine itself, never another", () =>
+        Effect.gen(function* () {
+          yield* markBuild;
+          for (const command of [
+            "npm install three",
+            "/bin/zsh -lc 'pnpm add p5@1.9.0'",
+            "curl -L -o vendor/three.module.js https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "wget -O confetti.js https://unpkg.com/canvas-confetti",
+          ]) {
+            const { outcome, dispatched } = yield* run(
+              {
+                ...buildTurn([approvalItem("command"), commandItem(command)]),
+                trustedAddOns: true,
+              },
+              requestEvent(request("command")),
+            );
+            assert.equal(outcome.type, "approved", command);
+            assert.equal(dispatched[0]?.decision, "accept", command);
+            // SkycotApprovedInstalls reads this note and does the install itself.
+            const note = (dispatched[0]?.answers as { skycot?: { relief?: string } } | undefined)
+              ?.skycot;
+            assert.equal(note?.relief, "trusted-add-on", command);
+          }
+          // Safety: an untrusted package, or a trusted name from another host, still waits.
+          for (const command of [
+            "npm install left-pad",
+            "npm install three left-pad",
+            "curl -L -o three.js https://example.com/three.js",
+            "curl -L -o three.js https://cdn.jsdelivr.net/gh/mrdoob/three.js/build/three.module.js",
+          ]) {
+            const { outcome, dispatched } = yield* run(
+              {
+                ...buildTurn([approvalItem("command"), commandItem(command)]),
+                trustedAddOns: true,
+              },
+              requestEvent(request("command")),
+            );
+            assert.isTrue(held(outcome), command);
+            assert.deepEqual(dispatched, [], command);
+          }
+          // The parent's switch off: as before.
+          const off = yield* run(
+            {
+              ...buildTurn([approvalItem("command"), commandItem("npm install three")]),
+              trustedAddOns: false,
+            },
+            requestEvent(request("command")),
+          );
+          assert.isTrue(held(off.outcome));
+          assert.deepEqual(off.dispatched, []);
+        }),
+      );
+
+      it.effect("Ask before each step ON still asks the child, even for a trusted add-on", () =>
+        Effect.gen(function* () {
+          yield* markBuild;
+          for (const command of ["ls", "npm install three", "rm -rf dist"]) {
+            const { outcome, dispatched } = yield* run(
+              {
+                ...buildTurn([approvalItem("command"), commandItem(command)]),
+                family: { stepRule: { type: "ask", reason: "ask-each-step", childId: "c-ava" } },
+                trustedAddOns: true,
+                checkpoints: [{ status: "ready" }],
+              },
+              requestEvent(request("command")),
+            );
+            assert.deepEqual(outcome, { type: "skipped", reason: "family: ask-each-step" });
+            assert.deepEqual(dispatched, []);
+          }
+        }),
+      );
+
+      it.effect("one yes covers the same add-on in the same conversation only", () =>
+        Effect.gen(function* () {
+          yield* markBuild;
+          // The engine's clock (the test clock here), as SkycotFamilyExtras reads it.
+          const now = yield* Clock.currentTimeMillis;
+          const remembered = withApproval(
+            { version: 1, approvals: {}, added: [] },
+            THREAD_ID,
+            ["dayjs"],
+            now,
+          );
+          const again = yield* run(
+            {
+              ...buildTurn([approvalItem("command"), commandItem("npm install dayjs@1.11.0")]),
+              trustedAddOns: true,
+              addOnFile: remembered,
+            },
+            requestEvent(request("command")),
+          );
+          assert.equal(again.outcome.type, "approved");
+          const note = (
+            again.dispatched[0]?.answers as { skycot?: { relief?: string } } | undefined
+          )?.skycot;
+          assert.equal(note?.relief, "approved-before");
+          // Another package, a non-add-on command, or another conversation's yes: a grown-up.
+          for (const [command, file] of [
+            ["npm install lodash", remembered],
+            ["npx dayjs", remembered],
+            [
+              "npm install dayjs",
+              withApproval(
+                { version: 1, approvals: {}, added: [] },
+                "thread:other",
+                ["dayjs"],
+                now,
+              ),
+            ],
+            [
+              "npm install dayjs",
+              withApproval(
+                { version: 1, approvals: {}, added: [] },
+                THREAD_ID,
+                ["dayjs"],
+                now - 8 * 24 * 60 * 60_000,
+              ),
+            ],
+          ] as const) {
+            const { outcome, dispatched } = yield* run(
+              {
+                ...buildTurn([approvalItem("command"), commandItem(command)]),
+                trustedAddOns: true,
+                addOnFile: file,
+              },
+              requestEvent(request("command")),
+            );
+            assert.isTrue(held(outcome), command);
+            assert.deepEqual(dispatched, [], command);
+          }
+        }),
+      );
+
+      it.effect("a delete inside the project runs by itself only when it can be undone", () =>
+        Effect.gen(function* () {
+          yield* markBuild;
+          const versions = { checkpoints: [{ status: "ready" }] };
+          for (const command of ["rm -rf dist", "rm old.html", "rm -r /work/site/levels/old"]) {
+            const { outcome, dispatched } = yield* run(
+              { ...buildTurn([approvalItem("command"), commandItem(command)]), ...versions },
+              requestEvent(request("command")),
+            );
+            assert.equal(outcome.type, "approved", command);
+            const note = (dispatched[0]?.answers as { skycot?: { relief?: string } } | undefined)
+              ?.skycot;
+            assert.equal(note?.relief, "undoable-delete", command);
+          }
+          // Safety: .git, the project root, outside, home, wildcards, or no versions.
+          for (const [command, scenario] of [
+            ["rm -rf .git", versions],
+            ["rm -rf /work/site", versions],
+            ["rm -rf .", versions],
+            ["rm -rf ../x", versions],
+            ["rm -rf ~/x", versions],
+            ["rm -rf src/*", versions],
+            ["find . -delete", versions],
+            ["ls | xargs rm", versions],
+            ["rm -rf dist", { checkpoints: [] }],
+            ["rm -rf dist", { checkpoints: [{ status: "missing" }] }],
+          ] as const) {
+            const { outcome, dispatched } = yield* run(
+              { ...buildTurn([approvalItem("command"), commandItem(command)]), ...scenario },
+              requestEvent(request("command")),
+            );
+            assert.isTrue(held(outcome), command);
+            assert.deepEqual(dispatched, [], command);
+          }
+        }),
+      );
+    });
 
     it.effect("with the profile off, a Family-style thread is not governed (unchanged)", () =>
       Effect.gen(function* () {

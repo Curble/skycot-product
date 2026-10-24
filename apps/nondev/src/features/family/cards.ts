@@ -91,11 +91,20 @@ export function familyHoldFor(
     readonly projectFolder?: string | null;
     readonly toolCallInput?: string | undefined;
     readonly toolItemType?: string | undefined;
+    /** The parent's "Trusted add-ons download by themselves" (the family view's). */
+    readonly trustedAddOns?: boolean | undefined;
   },
 ): string | null {
+  // The engine also knows this conversation's earlier yeses and restore points; the card does
+  // not, so it may ask for a grown-up where the engine would not: never the other way round.
   const evaluation = evaluateFamilyRequest(
     { ...factsFor(item, ctx.toolCallInput), toolItemType: ctx.toolItemType },
-    { projectRoot: ctx.projectRoot ?? null, projectFolder: ctx.projectFolder ?? null },
+    {
+      projectRoot: ctx.projectRoot ?? null,
+      projectFolder: ctx.projectFolder ?? null,
+      skycotFetchesAddOns: item.nativeItemRef?.driver === "codex",
+      trustedAddOns: ctx.trustedAddOns === true,
+    },
   );
   if (!evaluation.needsGrownUp) return null;
   const parts = [describeFamilyMatches(evaluation.family), describeMatches(evaluation.base.matches)]
