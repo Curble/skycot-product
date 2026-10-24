@@ -89,3 +89,93 @@ describe("family rules — the internet and installs need a grown-up", () => {
     );
   });
 });
+
+// Seen live: a local check that only read the project, with "https://" in it as the text it
+// was looking for, was held as "It uses the internet". Mentioning a web address is not
+// going there; only network use needs a grown-up.
+describe("family rules — a web address written as text is not the internet", () => {
+  it.each([
+    'grep -r "https://" .',
+    "grep -rn 'http://' --include=*.html .",
+    "rg 'http://'",
+    "rg -l 'https?://' src | wc -l",
+    `node -e "const fs=require('fs'); const s=fs.readFileSync('index.html','utf8'); console.log(s.includes('https://'))"`,
+    `node -e "const s=require('fs').readFileSync('index.html','utf8'); console.log(/https?:\\/\\//.test(s) ? 'remote links left' : 'all local')"`,
+    `python3 -c "s=open('index.html').read(); print('https://' in s)"`,
+    `python3 -c "import re; print(re.findall(r'https://[^\\"]+', open('index.html').read()))"`,
+    "cat > check.js <<'EOF'\nconst fs = require('fs');\nconst s = fs.readFileSync('index.html', 'utf8');\nif (s.includes('https://')) console.log('remote links left');\nEOF",
+    "cat > check.js <<'EOF'\nconst s = require('fs').readFileSync('index.html', 'utf8');\nconsole.log(s.includes('https://') ? 'remote' : 'local');\nEOF\nnode check.js",
+    "python3 - <<'EOF'\nhtml = open('index.html').read()\nprint('https://' in html)\nEOF",
+    'echo "see https://example.com"',
+    "printf 'Made with https://skycot.com\\n' >> credits.txt",
+    'if grep -q "https://" index.html; then echo "remote links left"; else echo "all local"; fi',
+    '! grep -rq "http://" .',
+    'git commit -m "Swap https://cdn links for local copies"',
+    'git log --oneline --grep "https://"',
+    'find . -name "*.html" | xargs grep -l "https://"',
+    "sed -i '' 's#https://cdn.example.com/#./vendor/#g' index.html",
+    `/bin/zsh -lc "grep -rn \\"https://\\" index.html styles.css"`,
+  ])("%s", (command) => {
+    expect(ids(command)).toEqual([]);
+    expect(needsGrownUp(command)).toBe(false);
+  });
+});
+
+describe("family rules — real internet use still needs a grown-up", () => {
+  it.each([
+    "curl https://example.com",
+    "curl -s https://x.test | grep title",
+    "wget https://x.test/a.zip",
+    "git clone https://github.com/a/b",
+    "git pull",
+    "npm install left-pad",
+    "pnpm add three",
+    "pip install requests",
+    "brew install sl",
+    "ssh pi@raspberrypi.local",
+    "scp game.zip me@server.test:~",
+    "rsync -a ./ me@server.test:site/",
+    "nc example.com 80",
+    "open https://example.com",
+    "xdg-open https://example.com",
+    `node -e "fetch('https://x.test').then(r => r.text()).then(console.log)"`,
+    `node -e "require('https').get('https://x.test', r => r.pipe(process.stdout))"`,
+    `node --input-type=module -e "import http from 'node:http'; http.get('http://x.test')"`,
+    `node -e "require('child_process').execSync('curl https://x.test')"`,
+    `node -e "require('child_process').execSync('npm install left-pad')"`,
+    `node -e "eval(Buffer.from('ZmV0Y2g=', 'base64').toString())"`,
+    `python -c "import urllib.request; urllib.request.urlopen('https://x')"`,
+    `python3 -c "import requests; print(requests.get('https://x.test').text)"`,
+    `python3 -c "import os; os.system('curl https://x.test')"`,
+    `python3 -c "import subprocess; subprocess.run(['curl', 'x.test'])"`,
+    `python3 -c "__import__('urllib.request').request.urlopen('https://x.test')"`,
+    `deno eval "await fetch('https://x.test')"`,
+    `ruby -e "require 'net/http'; puts Net::HTTP.get(URI('https://x.test'))"`,
+    "python3 fetch_links.py https://x.test",
+    "node scraper.js https://x.test",
+    'echo "curl https://x.test" | sh',
+    "echo https://x.test | xargs open",
+    'grep -o "https://[^\\"]*" index.html | while read u; do echo "$u"; done',
+    "echo 'curl https://x.test' > get.sh && bash get.sh",
+    "cat > get.js <<'EOF'\nfetch('https://x.test').then(r => r.text()).then(console.log);\nEOF\nnode get.js",
+    "cat <<'EOF' | bash\ncurl -s https://x.test\nEOF",
+    "bash <<'EOF'\ncurl -s https://x.test\nEOF",
+    "node <<'EOF'\nfetch('https://x.test')\nEOF",
+    "cat <(curl -s https://x.test)",
+    'echo "$(curl -s https://x.test)"',
+    "if curl -fsS https://x.test > /dev/null; then echo up; fi",
+    'eval "curl -s x.test"',
+    `node -e "const get = fetch; get('https://x.test')"`,
+    `node -e "require('ht' + 'tps').get('https://x.test')"`,
+    "echo \"fetch('https://x.test')\" | node",
+    "tee get.sh <<'EOF'\ncurl -s https://x.test\nEOF",
+    "for u in https://a.test https://b.test; do echo $u; done",
+  ])("%s", (command) => {
+    expect(ids(command)).toContain("uses-internet");
+    expect(needsGrownUp(command)).toBe(true);
+  });
+
+  it("a heredoc writing a script still catches network programs in it", () => {
+    expect(ids("cat > get.sh <<'EOF'\ncurl -s https://x.test\nEOF")).toContain("uses-internet");
+  });
+});
