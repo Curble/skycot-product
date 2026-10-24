@@ -101,13 +101,17 @@ const config: ExpoConfig = {
       // address the app opens is one a grown-up linked at the Mac (see src/transport).
       NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true },
       NSLocalNetworkUsageDescription:
-        "SKYCOT talks to your family's Mac over your home Wi-Fi. Nothing goes anywhere else.",
+        "SKYCOT finds and talks to your family's Mac on your home Wi-Fi.",
       NSSpeechRecognitionUsageDescription:
         "Lets you talk instead of type. Your voice is turned into words on this device and is never sent anywhere.",
       NSMicrophoneUsageDescription:
         "Lets you talk instead of type, when a grown-up has turned talking on.",
       NSSupportsLiveActivities: true,
-      ITSAppUsesNonExemptEncryption: false,
+      // ITSAppUsesNonExemptEncryption is left out on purpose: the relay tunnel seals traffic with
+      // SKYCOT's own Noise_IK_25519_ChaChaPoly_SHA256 (standard algorithms, @noble), so "false"
+      // (only Apple's encryption) would be untrue, and "true" needs a compliance code from filed
+      // documentation (upload error 90592). Without the key, App Store Connect asks the export
+      // questions for each build, answered by the account holder.
     },
     // The iPhone app's own privacy manifest, made at prebuild (React Native's pod install adds
     // the reasons its libraries need). Declared here so it exists before the Watch app's own
