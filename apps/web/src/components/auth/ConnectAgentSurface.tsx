@@ -16,6 +16,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { PrimaryEnvironmentHttpClient } from "~/environments/primary/httpClient";
 import { runPrimaryHttp } from "~/lib/runtime";
 import { cn } from "~/lib/utils";
+import { CLI_COMMAND_NAME } from "~/branding"; // nondev-seam: brand-advanced-connect-agent-surface
 import { runtimeModeConfig } from "../chat/runtimeModeConfig";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -235,8 +236,8 @@ export function ConnectAgentSurface() {
               value={pairingCode}
             />
             <p className="text-xs text-muted-foreground">
-              Create one in Settings → Connections, or run <code>t3 auth pairing create</code> on
-              this machine.
+              Create one in Settings → Connections, or run{" "}
+              <code>{CLI_COMMAND_NAME} auth pairing create</code> on this machine.
             </p>
           </div>
         )}

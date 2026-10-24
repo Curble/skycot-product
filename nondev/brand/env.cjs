@@ -38,8 +38,12 @@ function resolveBrandEnv(b, host) {
     // State directory for desktop + embedded server + CLI (upstream default ~/.t3). Keeps the fork
     // off the operator's live T3 Code database. Already env-driven upstream: no seam needed.
     T3CODE_HOME: NodePath.join(host.homedir, b.homeDirName),
-    // Display name used in menus, window title, about panel (seam: brand-app-name).
+    // Display name used in menus, window title, about panel (seam: brand-app-name), and in
+    // Advanced mode and the command-line tool (seams brand-advanced-*, brand-cli-*).
     T3CODE_APP_BASE_NAME: b.productName,
+    // The command Advanced settings installs and every `… pair` / `… update` hint names
+    // (seam: brand-cli-name). Never "t3": that is a real T3 Code's command on the same Mac.
+    T3CODE_CLI_NAME: b.cliName,
     // Renderer + deep-link scheme; dev builds use `${scheme}-dev` (seams: brand-scheme*).
     T3CODE_DESKTOP_SCHEME: b.protocolScheme,
     // macOS bundle id / Windows AppUserModelID (seam: brand-app-id; AppUserModelID already env-driven).

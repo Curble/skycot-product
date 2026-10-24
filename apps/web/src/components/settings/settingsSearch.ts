@@ -1,4 +1,4 @@
-import { HOSTED_APP_CHANNEL } from "~/branding";
+import { APP_BASE_NAME, CLI_COMMAND_NAME, HOSTED_APP_CHANNEL } from "~/branding"; // nondev-seam: brand-advanced-settings-search
 import { isElectron } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
 import { STATIC_KEYBINDING_COMMANDS, type KeybindingCommand } from "@t3tools/contracts";
@@ -539,7 +539,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "cli-command",
-    title: "t3 command",
+    title: `${CLI_COMMAND_NAME} command`,
     to: "/settings/general",
     searchTerms: ["cli terminal shell path install command line"],
     desktopOnly: true,
@@ -766,7 +766,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "Open pull requests in T3 Code",
+    title: `Open pull requests in ${APP_BASE_NAME}`,
     to: "/settings/integrations",
     searchTerms: ["pr links github browser external click default pull request view panel"],
   },

@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { APP_BASE_NAME, CLI_COMMAND_NAME } from "~/branding"; // nondev-seam: brand-advanced-cli-command-settings-row
 
 export function CliCommandSettingsRow() {
   const bridge = typeof window === "undefined" ? undefined : window.desktopBridge?.cliCommand;
@@ -34,7 +35,10 @@ export function CliCommandSettingsRow() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: action === "install" ? "Could not install t3" : "Could not remove t3",
+            title:
+              action === "install"
+                ? `Could not install ${CLI_COMMAND_NAME}`
+                : `Could not remove ${CLI_COMMAND_NAME}`,
             description: error instanceof Error ? error.message : "Something went wrong.",
           }),
         );
@@ -44,13 +48,17 @@ export function CliCommandSettingsRow() {
 
   if (!bridge || !state?.supported) return null;
   const installed = state.installedPath !== null;
+  // nondev-seam: brand-advanced-cli-command-settings-row (an older build's own `t3`, replaced on Install)
+  const replaces = !installed && state.replaces ? state.replaces : null;
   const description = state.shadowedBy
-    ? `Another t3 at ${state.shadowedBy} runs first in a new terminal. Remove it to use T3 Code's.`
-    : !installed
-      ? "Run T3 Code's CLI as `t3` from any terminal."
-      : state.onPath
-        ? `Installed at ${state.installedPath}. Open a new terminal to use it.`
-        : `Installed at ${state.installedPath}, which is not on your PATH yet. Add its folder to your PATH to run \`t3\`.`;
+    ? `Another ${CLI_COMMAND_NAME} at ${state.shadowedBy} runs first in a new terminal. Remove it to use ${APP_BASE_NAME}'s.`
+    : replaces
+      ? `An older version of ${APP_BASE_NAME} installed its command as \`t3\` at ${replaces}. Replace it with \`${CLI_COMMAND_NAME}\` so it never clashes with another app's \`t3\`.`
+      : !installed
+        ? `Run ${APP_BASE_NAME}'s CLI as \`${CLI_COMMAND_NAME}\` from any terminal.`
+        : state.onPath
+          ? `Installed at ${state.installedPath}. Open a new terminal to use it.`
+          : `Installed at ${state.installedPath}, which is not on your PATH yet. Add its folder to your PATH to run \`${CLI_COMMAND_NAME}\`.`;
 
   return (
     <SettingsRow
@@ -63,7 +71,7 @@ export function CliCommandSettingsRow() {
           disabled={pending}
           onClick={() => change(installed ? "uninstall" : "install")}
         >
-          {installed ? "Remove" : "Install"}
+          {installed ? "Remove" : replaces ? "Replace" : "Install"}
         </Button>
       }
     />

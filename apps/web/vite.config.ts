@@ -1,4 +1,8 @@
 import * as NodeZlib from "node:zlib";
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodeFS from "node:fs"; // nondev-seam: brand-advanced-web-define
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodePath from "node:path";
 
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -47,6 +51,9 @@ const configuredDesktopUpdateRepository =
   process.env.T3CODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
   process.env.GITHUB_REPOSITORY?.trim() ||
   "";
+// nondev-seam: brand-advanced-web-define (product + command name for Advanced mode; unset upstream)
+const configuredAppBaseName = process.env.T3CODE_APP_BASE_NAME?.trim() || "";
+const configuredCliName = process.env.T3CODE_CLI_NAME?.trim() || "";
 const configuredHostedAppUrl = (() => {
   const explicitHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim();
   if (explicitHostedAppUrl) {
@@ -156,6 +163,24 @@ const devProxyTarget = resolveDevProxyTarget(process.env.T3CODE_PORT, configured
 
 // Brotli quality 5 keeps encode time in the hundreds of ms; the default
 // (quality 11) would trade the transfer stall for an equally long encode stall.
+// nondev-seam: brand-advanced-web-define (the splash, first title and web-app manifest name the product)
+function brandNamePlugin(): Plugin {
+  let manifestPath: string | undefined;
+  return {
+    name: "t3code:brand-name",
+    configResolved: (config) => {
+      manifestPath = NodePath.join(config.root, config.build.outDir, "manifest.webmanifest");
+    },
+    transformIndexHtml: (html) =>
+      configuredAppBaseName ? html.replaceAll("T3 Code", configuredAppBaseName) : html,
+    closeBundle: () => {
+      if (!configuredAppBaseName || !manifestPath || !NodeFS.existsSync(manifestPath)) return;
+      const manifest = NodeFS.readFileSync(manifestPath, "utf8");
+      NodeFS.writeFileSync(manifestPath, manifest.replaceAll("T3 Code", configuredAppBaseName));
+    },
+  };
+}
+
 function devCompressionPlugin(): Plugin {
   return {
     name: "t3code:dev-compression",
@@ -184,6 +209,7 @@ export default defineConfig(() => {
     assetsInclude: ["**/*.wasm"],
     plugins: [
       devCompressionPlugin(),
+      brandNamePlugin(), // nondev-seam: brand-advanced-web-define
       thirdPartyLicensesPlugin({
         bundleName: "web",
         configFile: new URL("../../third-party-licenses.config.json", import.meta.url),
@@ -235,6 +261,11 @@ export default defineConfig(() => {
         configuredDesktopUpdateRepository,
       ),
       "import.meta.env.APP_VERSION": JSON.stringify(configuredAppVersion),
+      "import.meta.env.T3CODE_APP_BASE_NAME": JSON.stringify(configuredAppBaseName), // nondev-seam: brand-advanced-web-define
+      "import.meta.env.T3CODE_CLI_NAME": JSON.stringify(configuredCliName),
+      // packages/shared promptLinks.ts and packages/contracts browserImport.ts read the server's
+      // variable; in the browser bundle it is this literal ("" upstream, so they keep "T3 Code").
+      "process.env.T3CODE_APP_BASE_NAME": JSON.stringify(configuredAppBaseName),
     },
     resolve: {
       tsconfigPaths: true,
