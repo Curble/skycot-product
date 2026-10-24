@@ -144,6 +144,28 @@ describe("SkycotApprovedInstalls downloads", () => {
     }
   });
 
+  it("reads a download that first makes its folders inside the project", () => {
+    assert.deepStrictEqual(
+      parseApprovedDownload(
+        "/bin/zsh -lc 'mkdir -p vendor && curl -fsSL -o vendor/three.module.js https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js'",
+      ),
+      {
+        url: "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        output: "vendor/three.module.js",
+        folders: ["vendor"],
+      },
+    );
+    for (const command of [
+      "mkdir -p ../out && curl -o ../out/x.js https://example.com/x.js",
+      "mkdir -p .hidden && curl -o .hidden/x.js https://example.com/x.js",
+      "rm -rf vendor && curl -o vendor/x.js https://example.com/x.js",
+      "mkdir -p vendor && curl -o vendor/x.js https://example.com/x.js && rm -rf ~",
+      "mkdir -p /tmp/x && curl -o x.js https://example.com/x.js",
+    ]) {
+      assert.isNull(parseApprovedDownload(command), command);
+    }
+  });
+
   it("tells the assistant the file is there and not to download it again", () => {
     const download = { url: "https://example.com/three.module.js", output: "three.module.js" };
     assert.match(

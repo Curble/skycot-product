@@ -111,6 +111,8 @@ export interface ApprovedDownload {
   readonly url: string;
   /** Where it goes, relative to the conversation's folder. */
   readonly output: string;
+  /** Folders a leading `mkdir -p …` asked for, made inside the conversation's folder too. */
+  readonly folders?: ReadonlyArray<string>;
 }
 
 const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
@@ -149,7 +151,20 @@ function safeOutputPath(output: string): string | null {
  */
 export function parseApprovedDownload(command: string | undefined): ApprovedDownload | null {
   if (command === undefined) return null;
-  const inner = unwrapShell(command);
+  // `mkdir -p vendor && curl … -o vendor/three.module.js https://…` is the same one download
+  // (seen live, 24 October 2026): leading mkdirs of plain folders inside the project are allowed.
+  const steps = unwrapShell(command).split(/\s+&&\s+/u);
+  const folders: Array<string> = [];
+  for (const step of steps.slice(0, -1)) {
+    const mkdir = /^mkdir(?:\s+-p)?\s+(\S.*)$/u.exec(step);
+    if (mkdir === null) return null;
+    for (const folder of mkdir[1]!.split(/\s+/u)) {
+      const safe = safeOutputPath(folder);
+      if (safe === null) return null;
+      folders.push(safe);
+    }
+  }
+  const inner = steps[steps.length - 1]!;
   if (/[;&|<>`$()'"\\\n]/u.test(inner)) return null;
   const [program, ...rest] = inner.split(/\s+/u);
   if (program !== "curl" && program !== "wget") return null;
@@ -191,7 +206,8 @@ export function parseApprovedDownload(command: string | undefined): ApprovedDown
     output = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
   }
   const safe = output === null ? null : safeOutputPath(output);
-  return safe === null ? null : { url, output: safe };
+  if (safe === null) return null;
+  return folders.length === 0 ? { url, output: safe } : { url, output: safe, folders };
 }
 
 /** The install SKYCOT runs: the same add-ons, with their install scripts off. */
@@ -275,6 +291,17 @@ const downloadInto = Effect.fn("SkycotApprovedInstalls.download")(function* (
   const body = new Uint8Array(yield* response.arrayBuffer);
   if (body.byteLength > MAX_DOWNLOAD_BYTES) {
     return { ok: false, reason: "the file is too big." } as DownloadOutcome;
+  }
+  for (const name of download.folders ?? []) {
+    const made = path.resolve(folder, name);
+    const inside = path.relative(folder, made);
+    if (inside.startsWith("..") || path.isAbsolute(inside)) {
+      return {
+        ok: false,
+        reason: "a folder would have gone outside this project.",
+      } as DownloadOutcome;
+    }
+    yield* fs.makeDirectory(made, { recursive: true });
   }
   yield* fs.makeDirectory(path.dirname(target), { recursive: true });
   yield* fs.writeFile(target, body);
