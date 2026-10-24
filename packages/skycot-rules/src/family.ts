@@ -25,7 +25,7 @@ import {
   unwrapShellWrapper,
 } from "./shell.ts";
 
-export type FamilyRuleId = "uses-internet" | "installs-software" | "admin-rights";
+export type FamilyRuleId = "uses-internet" | "installs-software" | "admin-rights" | "opaque-code";
 
 export interface FamilyRule {
   readonly id: FamilyRuleId;
@@ -38,6 +38,11 @@ export interface FamilyRule {
 export const FAMILY_RULES: ReadonlyArray<FamilyRule> = [
   { id: "uses-internet", title: "Using the internet", held: "uses the internet" },
   { id: "installs-software", title: "Installing apps or add-ons", held: "installs something" },
+  {
+    id: "opaque-code",
+    title: "Code SKYCOT can't read",
+    held: "SKYCOT can't read exactly what this does",
+  },
   {
     id: "admin-rights",
     title: "Changing how the Mac itself is set up",
@@ -381,7 +386,8 @@ function stringLiterals(code: string): Array<string> {
 function codeMatches(code: string, language: Language, detail: string, depth: number) {
   const internet = [{ rule: familyRule("uses-internet"), detail }];
   if (language === "js") {
-    if (JS_NETWORK.test(code) || JS_OPAQUE.test(code)) return internet;
+    if (JS_NETWORK.test(code)) return internet;
+    if (JS_OPAQUE.test(code)) return [{ rule: familyRule("opaque-code"), detail }];
     if (!JS_SPAWN.test(code)) return [];
   } else {
     const imports = pythonImports(code);
@@ -736,10 +742,10 @@ function segmentMatches(segment: string, ctx: SegmentContext): Array<FamilyMatch
   // here the wrapper is the point.
   const words = tokenize(segment);
   const raw = words.map((token) => programBaseName(token).toLowerCase());
-  if (raw.some((token) => ADMIN_PROGRAMS.has(token))) hit("admin-rights");
   const first = raw.findIndex((token) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token));
   const head = first >= 0 ? raw[first] : undefined;
   const second = first >= 0 ? raw[first + 1] : undefined;
+  if (head !== undefined && ADMIN_PROGRAMS.has(head)) hit("admin-rights");
   if (
     (head !== undefined && DOWNLOADING_RUNNERS.has(head)) ||
     ((head === "pnpm" || head === "yarn") && second === "dlx") ||

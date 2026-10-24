@@ -1,3 +1,4 @@
+// nondev-seam: skycot-hard-rules-batch4-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -189,6 +190,14 @@ describe("evaluateCommand — live, money, data out, scripts", () => {
 });
 
 describe("evaluateCommand — outside the project and secrets", () => {
+  it("treats a URL inside a sed replacement as text", () => {
+    expect(
+      evaluateCommand("sed -i '' 's#https://cdn.example.com/#./vendor/#g' index.html", {
+        projectRoot: ROOT,
+      }).matches.map((match) => match.rule.id),
+    ).toEqual([]);
+  });
+
   it("holds writes and runs outside the project as high, reads as medium", () => {
     const write = evaluateCommand("cp menu.html /Users/me/Desktop/menu.html", {
       projectRoot: ROOT,

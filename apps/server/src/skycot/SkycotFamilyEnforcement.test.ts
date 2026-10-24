@@ -125,7 +125,10 @@ it.layer(NodeServices.layer)("Family profile enforcement", (it) => {
               const resolved = yield* resolveMode({ policyFlag, family: true }, mode);
               assert.equal(resolved.runtimeMode, "approval-required", `${mode} flag=${policyFlag}`);
               assert.equal(resolved.approvalPolicy, "untrusted");
-              assert.deepEqual(resolved.sandboxPolicy, { type: "workspaceWrite" });
+              assert.deepEqual(resolved.sandboxPolicy, {
+                type: "workspaceWrite",
+                networkAccess: false,
+              });
               assert.equal(resolved.cwd, "/work/game");
             }
           }

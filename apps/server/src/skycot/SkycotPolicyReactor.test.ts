@@ -1,3 +1,4 @@
+// nondev-seam: skycot-policy-reactor-network-guard-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -49,6 +50,7 @@ import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 import * as SkycotPolicyReactor from "./SkycotPolicyReactor.ts";
 
 const CODEX = ProviderDriverKind.make("codex");
+const CLAUDE = ProviderDriverKind.make("claudeAgent");
 const NOW = DateTime.makeUnsafe("2026-10-21T09:00:00.000Z");
 const THREAD_ID = ThreadId.make("thread:skycot");
 const PROJECT_ID = ProjectId.make("project:skycot");
@@ -920,7 +922,6 @@ describe("SkycotPolicyReactor", () => {
           "npx create-vite game",
           "pip install requests",
           "brew install ffmpeg",
-          "node -e \"fetch('https://example.com')\"",
           "sudo ls",
           "osascript -e 'beep'",
         ];
@@ -979,6 +980,55 @@ describe("SkycotPolicyReactor", () => {
       }),
     );
 
+    it.effect("runs the node:vm self-check only inside Codex's network-locked sandbox", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        const selfCheck =
+          "node <<'NODE'\nconst vm = require('node:vm');\nvm.runInNewContext('1 + 1');\nNODE";
+        const codex = yield* run(
+          buildTurn([approvalItem("command", selfCheck), commandItem(selfCheck)]),
+          requestEvent(request("command")),
+        );
+        assert.equal(codex.outcome.type, "approved");
+        assert.equal(codex.dispatched[0]?.decision, "accept");
+
+        const claudeApproval = {
+          ...approvalItem("command", selfCheck),
+          nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
+        };
+        const claude = yield* run(
+          buildTurn([claudeApproval, commandItem(selfCheck)]),
+          requestEvent(request("command")),
+        );
+        assert.equal(claude.outcome.type, "held");
+        assert.deepEqual(claude.dispatched, []);
+      }),
+    );
+
+    it.effect("lets Codex try internet-only work inside its network-locked sandbox", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        const command = `node -e "fetch('https://example.com')"`;
+        const codex = yield* run(
+          buildTurn([approvalItem("command", command), commandItem(command)]),
+          requestEvent(request("command")),
+        );
+        assert.equal(codex.outcome.type, "approved");
+        assert.equal(codex.dispatched[0]?.decision, "accept");
+
+        const claudeApproval = {
+          ...approvalItem("command", command),
+          nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
+        };
+        const claude = yield* run(
+          buildTurn([claudeApproval, commandItem(command)]),
+          requestEvent(request("command")),
+        );
+        assert.equal(claude.outcome.type, "held");
+        assert.deepEqual(claude.dispatched, []);
+      }),
+    );
+
     it.effect("never says the yes SKYCOT's own installer acts on (installs, downloads)", () =>
       Effect.gen(function* () {
         yield* markBuild;
@@ -1003,6 +1053,36 @@ describe("SkycotPolicyReactor", () => {
           assert.equal(outcome.type, "held", command);
           assert.deepEqual(dispatched, [], command);
         }
+      }),
+    );
+
+    it.effect("never runs an internet step Codex asked to take outside its sandbox", () =>
+      Effect.sync(() => {
+        const roots = { projectRoot: "/work/site", projectFolder: "/projects/site" };
+        const command = `node -e "fetch('https://example.com')"`;
+        const inside = { kind: "command", command } as const;
+        const outside = {
+          ...inside,
+          leavesSandbox: true,
+          sandboxReason: "Needs network access to fetch the page",
+        } as const;
+        const options = { codexNetworkLocked: true, command };
+        // Inside the network-locked sandbox it may try (it simply can't reach the internet).
+        assert.isTrue(
+          SkycotPolicyReactor.mayAutoApprove(
+            evaluateRequest(inside, roots),
+            evaluateFamilyRequest(inside, roots),
+            options,
+          ),
+        );
+        // Escalated out of the sandbox, a yes would put it online: a grown-up decides.
+        assert.isFalse(
+          SkycotPolicyReactor.mayAutoApprove(
+            evaluateRequest(outside, roots),
+            evaluateFamilyRequest(outside, roots),
+            options,
+          ),
+        );
       }),
     );
 

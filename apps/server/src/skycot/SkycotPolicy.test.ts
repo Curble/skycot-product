@@ -1,3 +1,4 @@
+// nondev-seam: skycot-policy-network-lock-test
 import { assert, describe, it } from "@effect/vitest";
 import {
   type ModelSelection,
@@ -82,8 +83,15 @@ describe("SkycotPolicy.layerRuntimePolicy", () => {
       const careful = yield* resolveWith(true, "auto-accept-edits");
       assert.equal(careful.runtimeMode, "auto-accept-edits");
       assert.equal(careful.approvalPolicy, "untrusted");
-      assert.deepEqual(careful.sandboxPolicy, { type: "workspaceWrite" });
+      assert.deepEqual(careful.sandboxPolicy, { type: "workspaceWrite", networkAccess: false });
       assert.equal(careful.cwd, "/work/site");
+
+      const family = SkycotPolicy.familyRuntimePolicy({
+        runtimeMode: "approval-required",
+        interactionMode: "default",
+        cwd: "/work/site",
+      });
+      assert.deepEqual(family.sandboxPolicy, { type: "workspaceWrite", networkAccess: false });
 
       for (const mode of ["approval-required", "auto", "full-access"] as const) {
         const untouched = yield* resolveWith(true, mode);
