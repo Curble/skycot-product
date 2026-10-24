@@ -23,6 +23,7 @@ import {
   catalogEntryFor,
   flowFor,
   isProviderReady,
+  isStillChecking,
   readiness,
   statusSentence,
 } from "./providerCatalog";
@@ -70,10 +71,14 @@ export function ProviderRow({
   const ready = isProviderReady(provider);
   const state = readiness(provider);
   const flow = flowFor(provider, driver);
-  const checking = state === "checking" && provider === undefined && driver !== "codex";
+  // Until the engine has answered, nothing is promised: no "Ready", no sign-in button. Codex
+  // without a snapshot is the exception: its managed sign-in is what creates the snapshot.
+  const checking = isStillChecking(provider, driver);
 
   const subtitle = connect.message ?? (entry.summary || statusSentence(provider));
-  const detail = ready || connect.message ? statusSentence(provider) : null;
+  // The row says where it stands in words too, not only by its button: "Signed in as …",
+  // "Installed. Needs you to sign in." (honest even when the summary leads).
+  const detail = ready || connect.message || state === "signIn" ? statusSentence(provider) : null;
 
   const trailing = ready ? (
     <>
@@ -115,6 +120,10 @@ export function ProviderRow({
         Turn on
       </Button>
     </>
+  ) : checking ? (
+    <Pill tone="neutral" size="sm">
+      Checking…
+    </Pill>
   ) : flow === "instructions" ? (
     <Button
       size="sm"
@@ -124,10 +133,6 @@ export function ProviderRow({
     >
       {state === "install" ? "Show me how" : state === "signIn" ? "Sign in…" : "Show me how"}
     </Button>
-  ) : checking ? (
-    <Pill tone="neutral" size="sm">
-      Checking…
-    </Pill>
   ) : (
     <Button
       size="sm"

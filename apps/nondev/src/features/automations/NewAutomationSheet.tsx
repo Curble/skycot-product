@@ -9,6 +9,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { CREW_NAME } from "../../brand";
 import { readLastProject } from "../../state/preferences";
 import { environmentProjects } from "../../state/projects";
+import { useDefaultAssistantPreference } from "../../state/defaultAssistant";
 import { resolveDefaultModelSelection } from "../../state/providers";
 import { serverEnvironment } from "../../state/server";
 import { environmentThreadShells } from "../../state/threads";
@@ -46,6 +47,7 @@ export function NewAutomationSheet({
     (project) => project.environmentId === environmentId,
   );
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
+  const preference = useDefaultAssistantPreference(environmentId);
   const threadIndex = useAtomValue(
     environmentThreadShells.environmentThreadIndexAtom(environmentId),
   );
@@ -73,7 +75,7 @@ export function NewAutomationSheet({
   const [phase, setPhase] = useState<"form" | "code">("form");
 
   const project = projects.find((entry) => entry.id === projectId) ?? null;
-  const modelSelection = resolveDefaultModelSelection(providers, project);
+  const modelSelection = resolveDefaultModelSelection(providers, project, preference);
   const threads = [...threadIndex.values()]
     .filter((thread) => thread.projectId === projectId)
     .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))

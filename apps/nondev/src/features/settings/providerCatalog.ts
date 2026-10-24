@@ -106,6 +106,16 @@ export function isProviderReady(provider: ServerProvider | undefined): boolean {
   return readiness(provider) === "ready";
 }
 
+/**
+ * True while the engine has not answered for this assistant yet (no snapshot, or the pending
+ * one a server start publishes): the row says "Checking…" instead of guessing. Codex with no
+ * snapshot at all is not "checking": its managed sign-in is what makes the snapshot appear.
+ */
+export function isStillChecking(provider: ServerProvider | undefined, driver: string): boolean {
+  if (provider === undefined) return driver !== "codex";
+  return readiness(provider) === "checking";
+}
+
 export function anyProviderReady(providers: ReadonlyArray<ServerProvider> | null): boolean {
   return (providers ?? []).some(isProviderReady);
 }

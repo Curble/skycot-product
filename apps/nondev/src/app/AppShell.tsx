@@ -34,6 +34,7 @@ import { HOME_HREF, NEW_HREF, navigate, type Route } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { environmentProjects, projectAtomOrEmpty } from "../state/projects";
 import { projectForConversation } from "../features/questions/questions";
+import { useDefaultAssistantPreference } from "../state/defaultAssistant";
 import { resolveDefaultModelSelection, providerForSelection } from "../state/providers";
 import { serverEnvironment } from "../state/server";
 import { environmentThreadShells } from "../state/threads";
@@ -267,8 +268,12 @@ function ProviderPill() {
       ? EMPTY_PROVIDERS_ATOM
       : serverEnvironment.providersValueAtom(environmentId),
   );
+  const preference = useDefaultAssistantPreference(environmentId);
   if (environmentId === null || providers === null) return null;
-  const provider = providerForSelection(providers, resolveDefaultModelSelection(providers, null));
+  const provider = providerForSelection(
+    providers,
+    resolveDefaultModelSelection(providers, null, preference),
+  );
   if (provider === null) return null;
   return (
     <span className="fm-usage-status">

@@ -275,6 +275,12 @@
   color: var(--fm-label-2);
 }
 
+/* The tick on the chosen row of a Settings picker (Use by default) */
+.fm-check {
+  color: var(--fm-accent);
+  flex: none;
+}
+
 /* The two-step "how to" card under a provider row */
 .fm-howto {
   display: flex;
