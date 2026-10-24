@@ -32,6 +32,8 @@ import {
 } from "@t3tools/provider-core/server/snapshotProbe";
 import { resolveUsageLimitsAfterProbe } from "@t3tools/provider-core/server/usageLimits";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-antigravity-status
+
 const EMPTY_MODEL_CAPABILITIES = createModelCapabilities({ optionDescriptors: [] });
 const MAX_WORKSPACE_SNAPSHOTS = 32;
 const HEALTH_CHECK_TIMEOUT = "90 seconds";
@@ -148,7 +150,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
         auth: { status: "unknown", ...(options.auth ? { type: options.auth.type } : {}) },
         message: settings.enabled
           ? "Checking Antigravity availability."
-          : "Antigravity is disabled in T3 Code settings.",
+          : `Antigravity is disabled in ${BRAND_NAME} settings.`,
       },
     }),
     setup: { canAuthenticate: true, canInstall: true },

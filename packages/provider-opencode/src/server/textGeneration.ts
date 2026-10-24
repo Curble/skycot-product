@@ -10,6 +10,8 @@ import * as TextGenerationOperations from "@t3tools/provider-core/server/textGen
 import * as OpenCodeRuntime from "./OpenCodeRuntime.ts";
 import * as OpenCodeServerOwner from "./OpenCodeServerOwner.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-opencode-session-title
+
 const OpenCodeTextGenerationOperation = Schema.Literals([
   "generateCommitMessage",
   "generatePrContent",
@@ -189,7 +191,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
           try: (signal) =>
             client.session.create(
               {
-                title: `T3 Code ${input.operation}`,
+                title: `${BRAND_NAME} ${input.operation}`,
                 permission: [{ permission: "*", pattern: "*", action: "deny" }],
               },
               { signal },

@@ -31,6 +31,8 @@ import {
   toJsonSchemaObject,
 } from "@t3tools/provider-core/server/textGenerationUtils";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-muse-text
+
 const SessionStarted = Schema.Struct({ session: Schema.Struct({ sessionId: Schema.String }) });
 const ItemNotification = Schema.Struct({
   sessionId: Schema.String,
@@ -112,7 +114,7 @@ async function generateMuseText(
       await host.connection.command("userInput/cancel", {
         sessionId,
         userInputId: request.userInputId,
-        reason: "T3 Code text generation cannot request user input.",
+        reason: `${BRAND_NAME} text generation cannot request user input.`,
       });
     }
   };
@@ -156,7 +158,7 @@ async function generateMuseText(
   });
   host.connection.onProtocolError(rejectCompletion);
   host.connection.onServerRequest(async () => {
-    const error = new Error("T3 Code text generation cannot approve interactive requests.");
+    const error = new Error(`${BRAND_NAME} text generation cannot approve interactive requests.`);
     rejectCompletion(error);
     throw error;
   });

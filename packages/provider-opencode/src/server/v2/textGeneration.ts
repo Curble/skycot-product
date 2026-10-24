@@ -16,6 +16,8 @@ import * as OpenCode2Server from "./OpenCode2Server.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-opencode2-session-title
+
 const isTextGenerationError = Schema.is(TextGenerationError);
 
 const GENERATION_TIMEOUT = "3 minutes";
@@ -121,7 +123,7 @@ const runOnServer = Effect.fn("Opencode2TextGeneration.runOnServer")(function* (
     Effect.forkScoped,
   );
   const session = yield* client.session.create({
-    title: `T3 Code ${input.operation}`,
+    title: `${BRAND_NAME} ${input.operation}`,
     location: Location.PublicRef.make({ directory: AbsolutePath.make(input.cwd) }),
     model: Model.Ref.make({
       providerID: Provider.ID.make(parsed.providerID),

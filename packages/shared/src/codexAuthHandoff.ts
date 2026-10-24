@@ -119,7 +119,11 @@ export function codexAuthDeliveryUrl(input: CodexAuthHandoff, callbackUrl: strin
   const request = codexAuthorizationRequest(input.authorizationUrl);
   codexCallbackUrl(callbackUrl, request.redirectUri, request.state);
   const destination = providerAuthReturnUrl(input.returnUrl);
-  if (!destination) throw new Error("Invalid T3 Code return address.");
+  if (!destination)
+    // nondev-seam: brand-sweep-codex-handoff
+    throw new Error(
+      `Invalid ${globalThis.process?.env?.T3CODE_APP_BASE_NAME ?? "T3 Code"} return address.`,
+    );
   const url = new URL(destination);
   const delivery = {
     environmentId: input.environmentId,

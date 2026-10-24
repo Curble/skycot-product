@@ -92,6 +92,8 @@ import {
 import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import { museItemStatus, museToolPresentation } from "./itemPresentation.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-muse-adapter
+
 const MUSE_PROVIDER = ProviderDriverKind.make("muse");
 const isOpenSessionError = Schema.is(ProviderAdapter.ProviderAdapterOpenSessionError);
 const isProtocolError = Schema.is(ProviderAdapter.ProviderAdapterProtocolError);
@@ -2342,7 +2344,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
               driver: MUSE_PROVIDER,
               providerThreadId: args.providerThread.id,
               checkpointId: args.target.checkpointId,
-              cause: "Muse Code does not support conversation rollback in T3 Code.",
+              cause: `Muse Code does not support conversation rollback in ${BRAND_NAME}.`,
             }),
           ),
         forkThread: (args) =>
@@ -2350,7 +2352,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
             new ProviderAdapter.ProviderAdapterForkThreadError({
               driver: MUSE_PROVIDER,
               providerThreadId: args.sourceProviderThread.id,
-              cause: "Muse Code does not support native forks in T3 Code.",
+              cause: `Muse Code does not support native forks in ${BRAND_NAME}.`,
             }),
           ),
       };

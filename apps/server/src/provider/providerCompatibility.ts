@@ -81,13 +81,14 @@ export function resolveProviderCompatibility(
       ? (policy.ranges.find((entry) => satisfiesSemverRange(stable, entry.range))?.status ??
         "unknown")
       : "unknown";
+  const app = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-provider-compat
   const message =
     status === "broken"
-      ? "This provider version is known to be incompatible with this T3 Code release."
+      ? `This provider version is known to be incompatible with this ${app} release.`
       : status === "unsupported"
-        ? "This provider version is outside the supported range for this T3 Code release."
+        ? `This provider version is outside the supported range for this ${app} release.`
         : status === "graceful"
-          ? "This provider version has limited compatibility with this T3 Code release."
+          ? `This provider version has limited compatibility with this ${app} release.`
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;

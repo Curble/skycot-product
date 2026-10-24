@@ -6,6 +6,8 @@ import type * as AcpSchema from "effect-acp/compat";
 
 import { responsePayloads } from "@t3tools/shared/mcpResponsePayloads";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-acp-mcp-over-acp
+
 const MAX_CONNECTIONS = 16;
 const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
@@ -128,7 +130,9 @@ export const makeAcpMcpOverAcpBridge = Effect.fn("AcpMcpOverAcpBridge.make")(fun
             () => response.body?.cancel().catch(() => undefined) ?? Promise.resolve(),
           );
           return yield* Effect.fail(
-            new AcpMcpOverAcpError(`T3 Code MCP endpoint responded with HTTP ${response.status}.`),
+            new AcpMcpOverAcpError(
+              `${BRAND_NAME} MCP endpoint responded with HTTP ${response.status}.`,
+            ),
           );
         }
         const payloads = [...(yield* Stream.runCollect(responsePayloads(response, bridgeError)))];
@@ -164,7 +168,7 @@ export const makeAcpMcpOverAcpBridge = Effect.fn("AcpMcpOverAcpBridge.make")(fun
       if (!response.ok && response.status !== 404) {
         return yield* Effect.fail(
           new AcpMcpOverAcpError(
-            `T3 Code MCP endpoint rejected disconnect with HTTP ${response.status}.`,
+            `${BRAND_NAME} MCP endpoint rejected disconnect with HTTP ${response.status}.`,
           ),
         );
       }

@@ -18,6 +18,8 @@ import {
 } from "@t3tools/provider-core/server/usageLimits";
 import * as CursorKeychain from "./CursorKeychain.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-cursor-usage
+
 const CursorCredentials = Schema.Struct({ accessToken: Schema.optional(Schema.String) });
 const DEFAULT_CURSOR_API_ENDPOINT = "https://api2.cursor.sh";
 const decodeCredentials = Schema.decodeEffect(Schema.fromJsonString(CursorCredentials));
@@ -94,7 +96,7 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
         return makeUnavailableUsageLimits({
           checkedAt,
           reason: "unsupported",
-          message: "Enable Cursor account usage in T3 Code to read its Keychain login.",
+          message: `Enable Cursor account usage in ${BRAND_NAME} to read its Keychain login.`,
         });
       }
       if (endpoint !== DEFAULT_CURSOR_API_ENDPOINT) {

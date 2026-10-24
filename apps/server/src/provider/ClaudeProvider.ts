@@ -53,6 +53,8 @@ import {
   resolveClaudeUpdateRequiredModels,
 } from "./ClaudeModelCatalog.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-claude-status
+
 const DEFAULT_CLAUDE_MODEL_CAPABILITIES: ModelCapabilities = createModelCapabilities({
   optionDescriptors: [],
 });
@@ -508,7 +510,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude is disabled in T3 Code settings.",
+        message: `Claude is disabled in ${BRAND_NAME} settings.`,
       },
     });
   }
@@ -724,7 +726,7 @@ export const makePendingClaudeProvider = Effect.fn("ClaudeProvider.makePendingCl
           version: null,
           status: "warning",
           auth: { status: "unknown" },
-          message: "Claude is disabled in T3 Code settings.",
+          message: `Claude is disabled in ${BRAND_NAME} settings.`,
         },
       });
     }

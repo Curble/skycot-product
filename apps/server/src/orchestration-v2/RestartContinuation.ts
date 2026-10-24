@@ -28,6 +28,8 @@ import {
   restartContinuationNote,
 } from "./RestartBackgroundNote.ts";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-restart-note
+
 const CONTINUE_PROMPT = "Continue where you left off.";
 
 const MAX_CONTINUATION_CHAIN = 3;
@@ -291,8 +293,8 @@ export const continueRestartedRun = Effect.fn("RestartContinuation.continueResta
           source: { kind: "system" },
           outcome: "updated",
           summary: note.settled
-            ? "T3 Code restarted and stopped background work"
-            : "T3 Code restarted and resumed this turn",
+            ? `${BRAND_NAME} restarted and stopped background work`
+            : `${BRAND_NAME} restarted and resumed this turn`,
           detail: text,
         },
         attachments: [],

@@ -17,6 +17,9 @@ export const T3_PI_MCP_EXTENSION_PATH_ENV = "T3_PI_MCP_EXTENSION_PATH";
  */
 export const PI_FILE_CHANGE_TOOLS = ["edit", "write"] as const;
 
+// The name in the generated extension's "declined in …" reason, filled in when it is written.
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-pi-extension
+
 export const PI_T3_MCP_EXTENSION_SOURCE = `\
 import { stripFrontmatter, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as NodeFSP from "node:fs/promises";
@@ -329,7 +332,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
       { signal: ctx.signal },
     );
     if (!approved) {
-      return { block: true, reason: \`\${event.toolName} was declined in T3 Code.\` };
+      return { block: true, reason: \`\${event.toolName} was declined in ${BRAND_NAME}.\` };
     }
   });
 

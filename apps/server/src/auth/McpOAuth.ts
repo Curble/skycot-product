@@ -77,7 +77,7 @@ export const protectedResourceMetadata = (
   authorization_servers: [urls.issuer],
   scopes_supported: MCP_OAUTH_SCOPES,
   bearer_methods_supported: ["header"],
-  resource_name: "T3 Code",
+  resource_name: process.env.T3CODE_APP_BASE_NAME ?? "T3 Code", // nondev-seam: brand-sweep-mcp-oauth (what an agent's sign-in calls this app)
 });
 
 export const authorizationServerMetadata = (

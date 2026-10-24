@@ -20,6 +20,8 @@ import {
   type ProviderProbeResult,
 } from "@t3tools/provider-core/server/snapshotProbe";
 
+const BRAND_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code"; // nondev-seam: brand-sweep-muse-status
+
 const MUSE_PRESENTATION = {
   displayName: "Muse Code",
   showInteractionModeToggle: false,
@@ -47,7 +49,7 @@ export const makePendingMuseProvider = Effect.fn("makePendingMuseProvider")(func
       auth: { status: "unknown" },
       message: settings.enabled
         ? "Checking Muse Code CLI availability..."
-        : "Muse Code is disabled in T3 Code settings.",
+        : `Muse Code is disabled in ${BRAND_NAME} settings.`,
     },
   });
 });

@@ -12,6 +12,10 @@ export class CodexAuthCallbackError extends Schema.TaggedError<CodexAuthCallback
   }
 }
 
+// nondev-seam: brand-sweep-codex-callback-page (the page the browser shows after ChatGPT sign-in)
+const APP_NAME = process.env.T3CODE_APP_BASE_NAME ?? "T3 Code";
+const APP_NAME_HTML = APP_NAME.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
 const listeners = new Map<string, AbortController>();
 
 export function cancelCodexAuthCallback(authorizationUrl: string) {
@@ -55,11 +59,9 @@ export async function receiveCodexAuthCallback(
           "content-security-policy",
           "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
         );
-        response
-          .writeHead(200, { "content-type": "text/html; charset=utf-8" })
-          .end(
-            '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>T3 Code</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>Return to T3 Code</h1><p>Your sign-in response has been received. T3 Code is finishing the connection. You can close this tab.</p></main></body></html>',
-          );
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(
+          `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${APP_NAME_HTML}</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>Return to ${APP_NAME_HTML}</h1><p>Your sign-in response has been received. ${APP_NAME_HTML} is finishing the connection. You can close this tab.</p></main></body></html>`, // nondev-seam: brand-sweep-codex-callback-page
+        );
       }
       callback.resolve(url);
     } catch {
@@ -79,7 +81,7 @@ export async function receiveCodexAuthCallback(
       server.once("error", () =>
         reject(
           new Error(
-            "The ChatGPT callback port is in use on this computer. Close the other sign-in and try again, or paste the redirect URL in T3 Code.",
+            `The ChatGPT callback port is in use on this computer. Close the other sign-in and try again, or paste the redirect URL in ${APP_NAME}.`, // nondev-seam: brand-sweep-codex-callback-page
           ),
         ),
       );
