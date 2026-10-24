@@ -88,8 +88,15 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: variant.iosBundleIdentifier,
     appleTeamId: SKYCOT_APPLE_TEAM_ID,
+    // Each upload to App Store Connect needs a new build number (TestFlight 0.1.0: 1 failed
+    // processing, 2 onwards).
+    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "2",
     infoPlist: {
       CFBundleDisplayName: variant.appName,
+      // SKYCOT never asks for the photo library; Expo's file-system module (part of expo itself)
+      // has a photo-copy function, so Apple's scan requires the sentence (upload error 90683).
+      NSPhotoLibraryUsageDescription:
+        "SKYCOT never looks through your photos. It only opens a picture you choose to share.",
       UISupportedInterfaceOrientations: ["UIInterfaceOrientationPortrait"],
       "UISupportedInterfaceOrientations~ipad": [
         "UIInterfaceOrientationPortrait",
