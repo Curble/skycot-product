@@ -19,6 +19,7 @@ import {
 
 import { describeFile, humanizeFileName } from "./changes";
 import { errors, progress } from "./copy";
+import { kidNouns, kidStep, kidTestOutcome, type KidThing } from "./kidWords";
 import { describeOwnTool, isOwnToolServer, ownToolName, withSkycotName } from "./ownTools";
 
 /** "use Linear", or for one of SKYCOT's own tools what it does ("open your page to check it"). */
@@ -90,6 +91,10 @@ export interface NarrationContext {
    * from the command it is about, never from the provider's reason or title.
    */
   readonly commandInputs?: ReadonlyMap<string, string>;
+  /** The viewer is a child: progress lines use kid words ("Testing your game"). */
+  readonly kid?: boolean;
+  /** What the child is making, for "Testing your game" or "Testing your page". */
+  readonly kidThing?: KidThing;
 }
 
 type NativeItemRef = OrchestrationV2TurnItem["nativeItemRef"];
@@ -1733,7 +1738,9 @@ export function describeTurnItem(
   item: OrchestrationV2TurnItem,
   ctx: NarrationContext = {},
 ): Narration {
-  const narration = narrateTurnItem(item, ctx);
+  const narrated = narrateTurnItem(item, ctx);
+  const narration =
+    ctx.kid === true ? { ...narrated, headline: kidNouns(narrated.headline) } : narrated;
   if (!narration.headline.startsWith(DID_NOT_RUN)) return narration;
   const what = narration.headline.slice(DID_NOT_RUN.length);
   return {
@@ -1889,20 +1896,20 @@ function narrateTurnItem(item: OrchestrationV2TurnItem, ctx: NarrationContext): 
       }
       const classified = classifyCommand(item.input);
       const status = narrationStatus(item.status);
-      const bare = tense(
-        status,
-        classified.past,
-        classified.present,
-        `About to ${classified.infinitive}`,
-      );
+      // A child's lines say "Testing your game", not "Running a short node program".
+      const kid = ctx.kid === true ? kidStep(classified, ctx.kidThing ?? "page") : null;
+      const said = kid ?? classified;
+      const bare = tense(status, said.past, said.present, `About to ${said.infinitive}`);
       const headline =
         classified.kind === "test" && status !== "pending" && status !== "running"
-          ? withOutcome(bare, status, item)
+          ? kid !== null
+            ? kidTestOutcome(bare, status, item)
+            : withOutcome(bare, status, item)
           : status === "done" && (item.exitCode ?? 0) !== 0
             ? `${bare} (didn't go to plan)`
             : status === "failed"
               ? // "Started a local preview" must not be said of a server the sandbox blocked.
-                `Tried to ${classified.infinitive} — it didn't work`
+                `Tried to ${said.infinitive} — it didn't work`
               : bare;
       return {
         headline,

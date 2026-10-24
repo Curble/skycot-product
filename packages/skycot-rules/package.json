@@ -64,6 +64,10 @@
       "types": "./src/addons.ts",
       "import": "./src/addons.ts"
     },
+    "./starter": {
+      "types": "./src/starter.ts",
+      "import": "./src/starter.ts"
+    },
     "./usageWindows": {
       "types": "./src/usageWindows.ts",
       "import": "./src/usageWindows.ts"

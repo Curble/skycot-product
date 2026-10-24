@@ -14,6 +14,7 @@ import type {
 import * as DateTime from "effect/DateTime";
 import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
+import { useChildView } from "../../app/useChildView";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { describeDecision } from "../../plain/approvals";
 import { filesFromPrompt } from "../../plain/changes";
@@ -28,6 +29,7 @@ import {
   summarizeRun,
   type NarrationContext,
 } from "../../plain/narration";
+import { asksForGame } from "../badges/facts";
 import { isAssistantRefusal } from "../family/assistantAllowance";
 import { Bubble } from "../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
@@ -36,6 +38,8 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Disclosure, TechnicalList } from "./cards/Disclosure";
 import type { WorkGroup } from "./cards/grouping";
 import { shortTime, toIso } from "./cards/time";
+import { elapsedCopy, estimateCopy } from "../../plain/estimate";
+import { estimateForRun } from "./runEstimate";
 
 const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "preparing",
@@ -103,6 +107,7 @@ export function WorkingCard({
   readonly threadId: ThreadId;
   readonly projectName: string | null;
 }) {
+  const childView = useChildView();
   // environmentId / threadId stay in the signature for the stream's call site;
   // the card itself no longer dispatches anything (Stop moved to the header).
   void environmentId;
@@ -121,7 +126,20 @@ export function WorkingCard({
         : [],
     ),
   );
+  // A child's lines use kid words; "Testing your game" when the first ask was for a game.
+  const kid = useChildView();
+  const firstAsk = kid
+    ? projection.turnItems
+        .filter((item) => item.type === "user_message" && item.createdBy === "user")
+        .reduce<(typeof projection.turnItems)[number] | undefined>(
+          (first, item) => (first === undefined || item.ordinal < first.ordinal ? item : first),
+          undefined,
+        )
+    : undefined;
+  const kidThing =
+    firstAsk?.type === "user_message" && asksForGame(firstAsk.text) ? "game" : "page";
   const ctx: NarrationContext = {
+    ...(kid ? { kid: true, kidThing } : {}),
     ...(projectName === null ? {} : { projectName }),
     runtimeRequests: requests,
     ...(stopped ? { stopped: true } : {}),
@@ -139,9 +157,13 @@ export function WorkingCard({
             item.runId === group.runId &&
             (item.type === "approval_request" || item.type === "user_input_request"),
         );
-  const active = run
+  const runActive = run
     ? ACTIVE_RUN.has(run.status)
     : group.items.some((item) => describeTurnItem(item, ctx).status === "running");
+  const pendingAsk = runAsks.some(
+    (item) => item.type === "approval_request" && requests.get(item.requestId)?.resolvedAt === null,
+  );
+  const active = runActive && !(childView && pendingAsk);
   const narrated = group.items.map((item) => {
     const narration = describeTurnItem(item, ctx);
     // A run that was stopped leaves its unfinished steps "about to …": they never ran.
@@ -203,25 +225,40 @@ export function WorkingCard({
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
   const doneSoFar = checklist.done.length;
-  const subtitleParts = active
-    ? [
-        total > 0
-          ? `Step ${stepNow} of ${total}`
-          : doneSoFar > 0
-            ? `${doneSoFar} ${doneSoFar === 1 ? "step" : "steps"} done so far`
-            : genericHint
-              ? "Just started"
-              : hint.replace(/[.…]+$/, ""),
-        elapsed,
-      ]
-    : [
-        refused || (stopped && stepCount === 0)
-          ? "Nothing was changed"
-          : stepCount === 0
-            ? "No files touched"
-            : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
-        elapsed,
-      ];
+  const { phase, range } = estimateForRun(run);
+  const estimate = childView && run ? estimateCopy(phase, range) : null;
+  const childElapsed =
+    childView && run && startMillis
+      ? elapsedCopy(
+          Math.max(0, Date.now() - Date.parse(startMillis) - waited),
+          phase,
+          range,
+          hint.replace(/[.…]+$/, "") || "Building it",
+        )
+      : null;
+  const subtitleParts =
+    pendingAsk && childView
+      ? []
+      : active
+        ? [
+            total > 0
+              ? `Step ${stepNow} of ${total}`
+              : doneSoFar > 0
+                ? `${doneSoFar} ${doneSoFar === 1 ? "step" : "steps"} done so far`
+                : genericHint
+                  ? "Just started"
+                  : hint.replace(/[.…]+$/, ""),
+            childElapsed ?? estimate,
+            childView ? null : elapsed,
+          ]
+        : [
+            refused || (stopped && stepCount === 0)
+              ? "Nothing was changed"
+              : stepCount === 0
+                ? "No files touched"
+                : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
+            elapsed,
+          ];
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
   const detailLines = askBeforeItsStep(narrated).map(({ item, narration }) => {
@@ -257,26 +294,32 @@ export function WorkingCard({
 
   // A limit stopped it and SKYCOT carried the turn on with another model (plain line below).
   const carriedOn = !active && run?.status === "failed" && wasCarriedOn(projection, run.id);
-  const headerTone = active
-    ? "blue"
-    : carriedOn
+  const headerTone =
+    pendingAsk && childView
       ? "orange"
-      : run?.status === "failed" && !refusedByFamily(projection, run.id)
-        ? "red"
-        : failed > 0 || refused || run?.status === "failed"
+      : active
+        ? "blue"
+        : carriedOn
           ? "orange"
-          : "green";
+          : run?.status === "failed" && !refusedByFamily(projection, run.id)
+            ? "red"
+            : failed > 0 || refused || run?.status === "failed"
+              ? "orange"
+              : "green";
   // The Family profile turned the assistant away before it started (nobody allowed it): the
   // grown-up card below says so, so this card is a calm note, not "something went wrong".
   const awaitingGrownUp =
     !active && run?.status === "failed" && refusedByFamily(projection, run.id);
-  const title = active
-    ? "Working on it"
-    : awaitingGrownUp
-      ? "Waiting for a grown-up"
-      : carriedOn
-        ? "Paused here, carried on below"
-        : finishedTitle(run?.status, refused);
+  const title =
+    pendingAsk && childView
+      ? "Paused — waiting for a grown-up"
+      : active
+        ? "Working on it"
+        : awaitingGrownUp
+          ? "Waiting for a grown-up"
+          : carriedOn
+            ? "Paused here, carried on below"
+            : finishedTitle(run?.status, refused);
   const icon = carriedOn
     ? Hammer
     : awaitingGrownUp

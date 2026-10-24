@@ -22,6 +22,8 @@ import type { ApnsEnvironment, PushKind, PushTokenType } from "@t3tools/skycot-r
 export const ALERT_TEXT: Readonly<Record<PushKind, string | null>> = {
   "needs-grown-up": "SKYCOT needs a grown-up",
   finished: "Sam has finished",
+  "family-note": "Someone in your family has something for you",
+  recap: "See what your family made today",
   "activity-update": null,
   "activity-end": null,
 };

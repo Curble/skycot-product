@@ -3,7 +3,7 @@
 // to fix it"). Kept in memory for this tab: the preview is a view, and the engine stops a site
 // nobody looks at.
 import type { EnvironmentId } from "@t3tools/contracts";
-import type { Pointer } from "@t3tools/skycot-rules/preview";
+import type { Pointer, PreviewProblem } from "@t3tools/skycot-rules/preview";
 import { MAX_POINTERS } from "@t3tools/skycot-rules/preview";
 import { useSyncExternalStore } from "react";
 
@@ -40,6 +40,11 @@ export interface SuggestedMessage {
   /** "replace" fills the box; "append" adds to what is already typed (the picker's own note). */
   readonly mode: "replace" | "append";
   readonly nonce: number;
+  /**
+   * A child's "Ask Sam to fix it": the command and output the child does not see, sent as
+   * hidden context with the message while the child's words are still that message.
+   */
+  readonly problem?: PreviewProblem;
 }
 
 let state: State = {
@@ -160,10 +165,11 @@ export function suggestMessage(
   threadId: string,
   text: string,
   mode: SuggestedMessage["mode"],
+  problem?: PreviewProblem,
 ): void {
   nonce += 1;
   const composerText = new Map(state.composerText);
-  composerText.set(threadId, { text, mode, nonce });
+  composerText.set(threadId, { text, mode, nonce, ...(problem ? { problem } : {}) });
   update({ ...state, composerText });
 }
 

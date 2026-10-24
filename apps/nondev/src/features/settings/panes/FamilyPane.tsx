@@ -11,11 +11,10 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 
 import { AdvancedModeSheet } from "../../../app/AdvancedModeSheet";
 import { navigate, recapHref } from "../../../router";
-import { ADVANCED_MODE_LABEL } from "../../../brand";
 import { Banner } from "../../../ui/Banner";
 import { Button } from "../../../ui/Button";
 import { Sheet } from "../../../ui/Sheet";
@@ -32,7 +31,12 @@ import {
   namesList,
   type FamilyChild,
 } from "../../family/children";
-import { familyCopy } from "../../family/copy";
+import {
+  codeChangeWarning,
+  codeChangedNotice,
+  familyCopy,
+  grownUpPlainNames,
+} from "../../family/copy";
 import { openChildPicker } from "../../family-limits/FamilyLimitsHost";
 import { clockPhrase, limitsSummary, todaySummary } from "../../family-limits/limits";
 import { refreshToday, useLimits, type ChildToday } from "../../family-limits/store";
@@ -41,7 +45,6 @@ import {
   codeStrength,
   digitsOnly,
   isValidCode,
-  openGrantsSentence,
   setupProblem,
   strengthHint,
   type FamilySetupDraft,
@@ -54,7 +57,7 @@ import { useFamily } from "../../family/FamilyProvider";
 import { DevicesGroup, GrownUpsGroup, ThisDeviceRow } from "../../family/PeopleAndDevices";
 import { RelayGroup } from "../../family/RelayGroup";
 import { ParentCodeEntry, useParentCodeEntry } from "../../family/ParentCodeEntry";
-import { changeParentCode, lockFamilyGrants, moveLegacyProfile } from "../../family/store";
+import { changeParentCode, moveLegacyProfile } from "../../family/store";
 import { speechService } from "../../voice/browser";
 import { whereVoiceGoes } from "../../voice/copy";
 import { useFamilyVoiceTypingOff, writeFamilyVoiceTypingOff } from "../localPrefs";
@@ -110,15 +113,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
   return <FamilyOnPane environmentId={environmentId} />;
 }
 
-type Row = "code" | "off" | null;
-
-// "14 more minutes" only changes once a minute: a coarse clock, read every 30 seconds.
-const CLOCK_STEP_MS = 30_000;
-const readClock = () => Math.floor(Date.now() / CLOCK_STEP_MS) * CLOCK_STEP_MS;
-const subscribeClock = (onChange: () => void) => {
-  const timer = window.setInterval(onChange, CLOCK_STEP_MS);
-  return () => window.clearInterval(timer);
-};
+type Row = "code" | "reset" | "off" | null;
 
 function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const { profile, requireParentCode } = useFamily();
@@ -128,7 +123,6 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
   const since = profile.createdAt ? formatSince(profile.createdAt) : null;
   const names = profile.children.map((child, index) => childLabel(child, index));
   const askedLine = askedEachStepLine(profile.children);
-  const openLine = openGrantsSentence(profile, useSyncExternalStore(subscribeClock, readClock));
 
   // Confirm first; the code sheet then turns it off on the engine in the same step.
   const turnOff = async () => {
@@ -196,6 +190,35 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
             <ChangeCodeForm onDone={() => setOpenRow(null)} />
           </ListExtra>
         ) : null}
+        <ListRow
+          leading={<StepBadge state="todo" icon={KeyRound} />}
+          title="Forgot the code?"
+          subtitle="Follow the reset steps on this Mac. This turns the Family profile off."
+          expanded={openRow === "reset"}
+          onClick={() => setOpenRow(openRow === "reset" ? null : "reset")}
+        />
+        {openRow === "reset" ? (
+          <ListExtra>
+            <div className="fm-family-inline">
+              <p>To start again without the old code:</p>
+              <ol>
+                <li>Quit SKYCOT.</li>
+                <li>In Finder, choose Go → Go to Folder…</li>
+                <li>
+                  Open <code>~/.skycot/userdata</code>.
+                </li>
+                <li>
+                  Move <code>skycot-family.json</code> to the Bin.
+                </li>
+                <li>Open SKYCOT and set up the Family profile again.</li>
+              </ol>
+              <Banner tone="warning">
+                This removes the children, grown-ups, limits and linked grown-up devices from this
+                Mac.
+              </Banner>
+            </div>
+          </ListExtra>
+        ) : null}
       </SettingsGroup>
 
       <FamilyVoiceGroup childName={profile.childName} />
@@ -203,29 +226,15 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
       {profile.me.kind === "shared" ? (
         <SettingsGroup
           title="Developer tools"
-          footer={`${ADVANCED_MODE_LABEL} is hidden from the sidebar and Settings while the profile is on, and the engine sends its address back here unless a parent has entered the code. A parent can still open it from here.`}
+          footer="The full workshop is hidden from the sidebar and Settings while the profile is on. A parent can still open it here."
         >
           <ListRow
             leading={<StepBadge state="todo" icon={Wrench} />}
-            title={`Open ${ADVANCED_MODE_LABEL} (parent code)`}
-            subtitle="The full developer interface. The code opens it on this device for 15 minutes; publishing and approvals there are allowed for that time too."
+            title={`${grownUpPlainNames.advanced} (parent code)`}
+            subtitle="The full developer interface. It stays open on this device for 15 minutes."
             trailing={
               <Button size="sm" onClick={() => setAdvancedOpen(true)}>
                 Open…
-              </Button>
-            }
-          />
-          <ListRow
-            leading={<StepBadge state="todo" icon={KeyRound} />}
-            title="Lock again now"
-            subtitle={
-              openLine === null
-                ? "Nothing is open on this device. Every “yes” the parent code gives ends on its own, or here."
-                : `${openLine} Ends every “yes” the parent code gave on this device before it runs out.`
-            }
-            trailing={
-              <Button size="sm" onClick={() => void lockFamilyGrants()}>
-                Lock
               </Button>
             }
           />
@@ -329,7 +338,7 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
   if (saved) {
     return (
       <div className="fm-family-inline" data-sober="">
-        <Banner tone="info">The parent code has been changed.</Banner>
+        <Banner tone="info">{codeChangedNotice}</Banner>
         <div className="fm-family-inline__actions">
           <Button size="sm" onClick={onDone}>
             Done
@@ -391,6 +400,7 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
 
   return (
     <div className="fm-family-inline" data-sober="">
+      <Banner tone="warning">{codeChangeWarning}</Banner>
       <div className="fm-family-inline__row">
         <TextField
           label="New parent code"

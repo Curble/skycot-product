@@ -34,6 +34,8 @@ import * as SkycotUpdatesHttp from "./updates/SkycotUpdatesHttp.ts";
 import * as SkycotFamilyDevices from "./family-devices/SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
+import * as SkycotFamilyNotes from "./family-notes/SkycotFamilyNotes.ts";
+import { grownUpAnswersFor } from "./family-limits/grownUpAnswers.ts";
 import * as SkycotRelay from "./relay/SkycotRelay.ts";
 import { deviceGate, isWatchedPath } from "./family-devices/httpVisibility.ts";
 import {
@@ -103,6 +105,7 @@ type Handler = (input: {
   readonly request: HttpServerRequest.HttpServerRequest;
   /** SKYCOT Relay, when the server has it. */
   readonly relay: Option.Option<SkycotRelay.SkycotRelay["Service"]>;
+  readonly notes: Option.Option<SkycotFamilyNotes.SkycotFamilyNotes["Service"]>;
 }) => Effect.Effect<HttpServerResponse.HttpServerResponse, SkycotFamily.FamilyError, never>;
 
 const route = (
@@ -120,6 +123,7 @@ const route = (
       const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
       const devices = yield* Effect.serviceOption(SkycotFamilyDevices.SkycotFamilyDevices);
       const relay = yield* Effect.serviceOption(SkycotRelay.SkycotRelay);
+      const notes = yield* Effect.serviceOption(SkycotFamilyNotes.SkycotFamilyNotes);
       return HttpRouter.add(
         method,
         `${FAMILY_ROUTE}${path}`,
@@ -187,6 +191,7 @@ const route = (
             childView,
             request,
             relay,
+            notes,
           }).pipe(
             Effect.catchTags({
               SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
@@ -532,6 +537,31 @@ const assistantSwitchesRoute = route(
         if (today.threads[threadId] !== childView.childId) return json({ switches: [] });
       }
       return json({ switches: yield* limits.switchesFor(threadId) });
+    }),
+);
+
+/**
+ * Who answered the held requests in one conversation ("Mum said yes · 8:42"). A child gets only
+ * their own conversations' answers, as a first name and a time (grownUpAnswers.ts).
+ */
+const grownUpAnswersRoute = route(
+  "GET",
+  "/grown-up-answers",
+  AuthOrchestrationReadScope,
+  ({ limits, query, childView, family }) =>
+    Effect.gen(function* () {
+      const threadId = query.get("threadId") ?? "";
+      if (threadId.length === 0) return json({ answers: [] });
+      if (childView !== null) {
+        const today = yield* limits.today;
+        if (today.threads[threadId] !== childView.childId) return json({ answers: [] });
+      }
+      const snapshot = yield* limits.snapshot;
+      if (snapshot === null) return json({ answers: [] });
+      const status = yield* family.status;
+      return json({
+        answers: grownUpAnswersFor(snapshot.activity.events, threadId, status.grownUps),
+      });
     }),
 );
 
@@ -1042,6 +1072,121 @@ const approverRequestsRoute = approverRoute("GET", "/approver/requests", ({ serv
   service.approvals.pipe(Effect.map((requests) => json({ requests }))),
 );
 
+/** A child can leave only a small note for their own grown-ups; the relay gets only its kind. */
+const childNotesRoute = route(
+  "GET",
+  "/notes/child",
+  AuthOrchestrationReadScope,
+  ({ who, sessionId, limits, notes }) =>
+    Effect.gen(function* () {
+      const childId =
+        who.kind === "child"
+          ? who.childId
+          : who.kind === "shared"
+            ? (yield* limits.forSession({ sessionId })).childId
+            : null;
+      if (childId === null) return json({ error: "forbidden" }, 403);
+      if (Option.isNone(notes)) return json({ notes: [] });
+      return json({ notes: yield* notes.value.own(childId) });
+    }),
+);
+
+const childNoteCreateRoute = route(
+  "POST",
+  "/notes/child",
+  AuthOrchestrationOperateScope,
+  ({ who, sessionId, body, family, limits, notes, relay }) =>
+    Effect.gen(function* () {
+      const childId =
+        who.kind === "child"
+          ? who.childId
+          : who.kind === "shared"
+            ? (yield* limits.forSession({ sessionId })).childId
+            : null;
+      if (childId === null) return json({ error: "forbidden" }, 403);
+      if (Option.isNone(notes)) return json({ error: "unavailable" }, 503);
+      const kind = body["kind"];
+      if (kind !== "shown" && kind !== "more-time") return json({ error: "invalid-request" }, 400);
+      const status = yield* family.status;
+      if (!status.enabled || !status.children.some((child) => child.id === childId))
+        return json({ error: "not-enabled" }, 409);
+      if (
+        kind === "shown" &&
+        (typeof body["threadId"] !== "string" || typeof body["title"] !== "string")
+      )
+        return json({ error: "invalid-request" }, 400);
+      if (kind === "shown" && (yield* limits.today).threads[text(body["threadId"])] !== childId)
+        return json({ error: "forbidden" }, 403);
+      const repeat = (yield* notes.value.own(childId)).find((note) =>
+        SkycotFamilyNotes.sameOpenNote(note, {
+          kind,
+          childId,
+          ...(kind === "shown" ? { threadId: text(body["threadId"]) } : {}),
+        }),
+      );
+      if (repeat !== undefined) return json({ note: repeat });
+      const note = yield* notes.value.create({
+        kind,
+        childId,
+        ...(kind === "shown"
+          ? { threadId: text(body["threadId"]), title: text(body["title"]) }
+          : {}),
+      });
+      if (Option.isSome(relay)) {
+        const adults = status.devices
+          .filter((device) => device.kind === "grown-up")
+          .map((device) => device.id);
+        yield* relay.value
+          .notify({ familyDeviceIds: adults, kind: "family-note" })
+          .pipe(Effect.ignore);
+      }
+      return json({ note }, 201);
+    }),
+);
+
+/** Requests at the top of a grown-up's inbox. Child identities never enter these handlers. */
+const familyNotesRoute = approverRoute("GET", "/approver/notes", ({ notes }) =>
+  Option.isSome(notes)
+    ? notes.value.open.pipe(Effect.map((notes) => json({ notes })))
+    : Effect.succeed(json({ notes: [] })),
+);
+
+const familyNoteSeenRoute = approverRoute("POST", "/approver/notes/seen", ({ notes, body }) =>
+  Option.isSome(notes)
+    ? notes.value.seen(text(body["id"])).pipe(Effect.map((ok) => json({ ok })))
+    : Effect.succeed(json({ error: "unavailable" }, 503)),
+);
+
+const familyNoteAnswerRoute = approverRoute(
+  "POST",
+  "/approver/notes/answer",
+  ({ notes, body, grownUp, family, service, sessionId, origin }) =>
+    Effect.gen(function* () {
+      if (Option.isNone(notes)) return json({ error: "unavailable" }, 503);
+      const id = text(body["id"]);
+      const minutes = body["minutes"];
+      if (minutes !== 0 && minutes !== 15 && minutes !== 30)
+        return json({ error: "invalid-request" }, 400);
+      const match = (yield* notes.value.open).find(
+        (note) => note.id === id && note.kind === "more-time",
+      );
+      if (match === undefined || match.kind !== "more-time") return json({ error: "gone" }, 409);
+      if (minutes !== 0) {
+        yield* service.moreTime({
+          who: grownUp,
+          sessionId,
+          origin,
+          childId: match.childId,
+          kind: minutes === 15 ? "extra15" : "extra30",
+          proof: proofOf(body["proof"]),
+        });
+      }
+      const person = (yield* family.status).grownUps.find((entry) => entry.id === grownUp.personId);
+      const answer = yield* notes.value.answer({ id, minutes, by: person?.name ?? "A grown-up" });
+      return answer === null ? json({ error: "gone" }, 409) : json({ note: answer });
+    }),
+);
+
 /** A passkey challenge for one yes, or for more time. */
 const approverChallengeRoute = approverRoute(
   "POST",
@@ -1319,6 +1464,11 @@ export const layerDeviceRoutes = Layer.mergeAll(
   peopleUpdateRoute,
   peopleRemoveRoute,
   approverRequestsRoute,
+  childNotesRoute,
+  childNoteCreateRoute,
+  familyNotesRoute,
+  familyNoteSeenRoute,
+  familyNoteAnswerRoute,
   approverChallengeRoute,
   approverAnswerRoute,
   approverMoreTimeRoute,
@@ -1372,6 +1522,7 @@ export const layerCore = Layer.mergeAll(
   heartbeatRoute,
   todayRoute,
   assistantSwitchesRoute,
+  grownUpAnswersRoute,
   moreTimeRoute,
   allowAssistantRoute,
   stopAllowingAssistantRoute,
@@ -1399,6 +1550,7 @@ export const layer = Layer.mergeAll(
   // SKYCOT Relay rides along here too (off until a grown-up turns it on): no wiring line in
   // upstream's server.ts.
   Layer.provide(SkycotRelay.layer),
+  Layer.provide(SkycotFamilyNotes.layer),
   Layer.provide(
     SkycotFamilyDevices.layer.pipe(
       Layer.provide(Layer.merge(ProjectionStore.layer, ProjectStore.layer)),

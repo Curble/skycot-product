@@ -10,8 +10,9 @@
 //      overrides the provider policy so the provider asks before every command and file
 //      change (Codex: approvalPolicy "untrusted" in a workspace-write sandbox; Claude: the
 //      "default" permission mode with the permission callback installed).
-//   2. `SkycotPolicyReactor` answers those requests: it approves what no hard rule matches
-//      and leaves the rest pending, so the person only sees cards for the risky steps.
+//   2. `SkycotPolicyReactor` answers those requests: it approves safe steps and leaves risky
+//      ones pending. A Codex command held only for internet or opaque code stays inside an
+//      explicitly offline sandbox, so it can run without a parent card.
 //
 // With the Family profile on, every thread is governed this way (`familyRuntimePolicy`), and
 // the reactor also applies the Family rules: a step that needs a grown-up is never approved
@@ -49,7 +50,7 @@ export function isSkycotPolicyEnabled(env: Readonly<Record<string, string | unde
  */
 export const SKYCOT_RUNTIME_POLICY_OVERRIDE: RuntimePolicy.RuntimePolicyV2Override = {
   approvalPolicy: "untrusted",
-  sandboxPolicy: { type: "workspaceWrite" },
+  sandboxPolicy: { type: "workspaceWrite", networkAccess: false },
 };
 
 export function appliesToRuntimeMode(runtimeMode: RuntimeMode): boolean {
@@ -61,11 +62,12 @@ export const FAMILY_RUNTIME_MODE: RuntimeMode = "approval-required";
 
 /**
  * A thread while the Family profile is on: SKYCOT's governed mode. The provider is told to ask
- * before every command and edit (Codex: "untrusted" in a workspace-write sandbox, which also
- * keeps the network off; Claude: the "default" permission mode with the permission callback),
+ * before every command and edit (Codex: "untrusted" in a workspace-write sandbox with network
+ * access explicitly off; Claude: the "default" permission mode with the permission callback),
  * exactly the override `auto-accept-edits` gets, and `SkycotPolicyReactor` answers each ask:
  * a step neither the hard rules nor the Family rules hold runs by itself, unless the child's
- * parent switched on "Ask before each step"; a step a rule holds waits for a grown-up.
+ * parent switched on "Ask before each step"; a held step waits for a grown-up except for
+ * internet-only or opaque commands contained by Codex's explicitly offline sandbox.
  * `full-access` and `auto-accept-edits` threads are downgraded here, at the point the provider
  * is configured, so no setting, old thread, MCP launch or raw RPC can start a hands-off turn.
  *

@@ -104,8 +104,9 @@ struct RequestsPage: View {
 
   var body: some View {
     let waiting = snapshot.requests
+    let notes = snapshot.notes ?? []
     Group {
-      if waiting.isEmpty {
+      if waiting.isEmpty && notes.isEmpty {
         ScrollView {
           VStack(spacing: 8) {
             Image(systemName: "checkmark.shield.fill")
@@ -126,6 +127,13 @@ struct RequestsPage: View {
               RequestRow(request: request)
             }
           }
+          ForEach(notes) { note in
+            NavigationLink {
+              NoteView(key: note.id)
+            } label: {
+              NoteRow(note: note)
+            }
+          }
           PhoneStatus(snapshot: snapshot).listRowBackground(Color.clear)
         }
       }
@@ -142,13 +150,149 @@ struct RequestRow: View {
       Avatar(initial: request.childInitial, colour: request.childColour, size: 32)
       VStack(alignment: .leading, spacing: 2) {
         Text(request.title).font(.headline).lineLimit(2)
-        Text(request.heading).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+        Text(request.sentence).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
         Text(request.lapsed ? "Waiting on the Mac" : age(request.createdAt))
           .font(.footnote).foregroundStyle(request.lapsed ? .orange : .secondary)
       }
     }
     .padding(.vertical, 4)
     .accessibilityElement(children: .combine)
+  }
+}
+
+struct NoteRow: View {
+  let note: WatchNote
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Avatar(initial: note.childInitial, colour: note.childColour, size: 32)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(note.title).font(.headline).lineLimit(2)
+        Text(age(note.createdAt)).font(.footnote).foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 4)
+    .accessibilityElement(children: .combine)
+  }
+}
+
+/// One family note. "Shown" is a line (the thing itself is on the iPhone). "More time" has 15
+/// minutes, 30 minutes and Not tonight. Not tonight needs no proof, as Decline needs none, but
+/// like every answer from the Watch it runs the wrist check first. 15 and 30 minutes are never
+/// given from here: the Mac accepts them only with the parent code, which the Watch can't take,
+/// and a Watch signature is accepted for a yes to a request only. So they point to the iPhone.
+struct NoteView: View {
+  let key: String
+  @EnvironmentObject private var phone: PhoneLink
+  @State private var kept: WatchNote?
+  @State private var stage: RequestView.Stage = .ready
+
+  var body: some View {
+    let note = phone.snapshot?.notes?.first { $0.id == key } ?? kept
+    ScrollView {
+      if let note {
+        card(note)
+      } else {
+        Notice(symbol: "checkmark.circle", title: "All done", text: "That one has been answered.")
+      }
+    }
+    .navigationTitle(note?.childName ?? "Note")
+    .onAppear { if kept == nil { kept = note } }
+    .onChange(of: note) { _, fresh in if let fresh { kept = fresh } }
+  }
+
+  @ViewBuilder private func card(_ note: WatchNote) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Avatar(initial: note.childInitial, colour: note.childColour, size: 28)
+        Text(note.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+      }
+      if let mac = note.macName {
+        Label(mac, systemImage: "desktopcomputer").font(.footnote).foregroundStyle(.secondary)
+      }
+      if note.kind == "shown" {
+        Label(note.sentence, systemImage: "iphone").font(.body)
+          .fixedSize(horizontal: false, vertical: true)
+      } else {
+        Text(note.sentence).font(.body).fixedSize(horizontal: false, vertical: true)
+        outcome(note)
+      }
+    }
+    .padding(.horizontal, 2)
+  }
+
+  @ViewBuilder private func outcome(_ note: WatchNote) -> some View {
+    switch stage {
+    case .working(let words):
+      HStack(spacing: 8) {
+        ProgressView()
+        Text(words).font(.footnote).foregroundStyle(.secondary)
+      }
+      .padding(.top, 6)
+    case .done(let words):
+      Label(words, systemImage: "checkmark.circle.fill")
+        .font(.headline).foregroundStyle(.green).padding(.top, 6)
+    case .openOnIPhone(let words):
+      VStack(alignment: .leading, spacing: 4) {
+        Label("Answer on your iPhone", systemImage: "iphone").font(.headline)
+        Text(words).font(.footnote).foregroundStyle(.secondary)
+      }
+      .padding(.top, 6)
+    case .ready, .problem:
+      if case .problem(let words) = stage {
+        Label(words, systemImage: "exclamationmark.triangle.fill")
+          .font(.footnote).foregroundStyle(.orange)
+      }
+      Button {
+        stage = .openOnIPhone(
+          "More time needs the parent code, on your iPhone. \(note.childName)'s note is waiting there."
+        )
+      } label: {
+        Label("15 minutes", systemImage: "clock").frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.bordered)
+      .padding(.top, 6)
+      Button {
+        stage = .openOnIPhone(
+          "More time needs the parent code, on your iPhone. \(note.childName)'s note is waiting there."
+        )
+      } label: {
+        Label("30 minutes", systemImage: "clock.badge.plus").frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.bordered)
+      Button {
+        Task { await notTonight(note) }
+      } label: {
+        Label("Not tonight", systemImage: "moon.zzz").frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.bordered)
+      if let simulated = WristCheck.simulatorNote {
+        Text(simulated).font(.caption2).foregroundStyle(.tertiary)
+      }
+    }
+  }
+
+  private func notTonight(_ note: WatchNote) async {
+    switch await WristCheck.confirm(reason: "Say not tonight to \(note.childName)") {
+    case .cancelled: return
+    case .openOnIPhone(let words):
+      stage = .openOnIPhone(words)
+      return
+    case .confirmed: break
+    }
+    stage = .working("Telling your iPhone…")
+    do {
+      let answered = try await phone.send(.noteNotTonight(note))
+      if answered.ok {
+        stage = .done(answered.sentence ?? "Said not tonight.")
+        tap(.success)
+      } else {
+        stage = .problem(answered.sentence ?? "That didn't work. Try again.")
+        tap(.failure)
+      }
+    } catch {
+      stage = .openOnIPhone("Your Watch can't reach your iPhone right now.")
+    }
   }
 }
 
@@ -219,17 +363,8 @@ struct RequestView: View {
         Avatar(initial: request.childInitial, colour: request.childColour, size: 28)
         Text(request.title).font(.headline).fixedSize(horizontal: false, vertical: true)
       }
-      Text(request.heading).font(.title3).fontWeight(.semibold)
-      if !request.what.isEmpty {
-        Text(request.what)
-          .font(.system(.footnote, design: .monospaced))
-          .padding(8)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.14)))
-      }
-      if let why = request.why {
-        Text(why).font(.footnote).foregroundStyle(.secondary)
-      }
+      // nondev-seam: skycot-watch-request-sentence-view
+      Text(request.sentence).font(.title3).fixedSize(horizontal: false, vertical: true)
       if let mac = request.macName {
         Label(mac, systemImage: "desktopcomputer").font(.footnote).foregroundStyle(.secondary)
       }

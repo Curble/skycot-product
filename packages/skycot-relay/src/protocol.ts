@@ -81,6 +81,10 @@ export const CONNECTION_ID_PATTERN = /^[0-9a-f]{16}$/;
 export const PUSH_KINDS = [
   "needs-grown-up",
   "finished",
+  // A child's family note ("Show a grown-up", "more time") and the evening recap: plain words,
+  // no Allow buttons.
+  "family-note",
+  "recap",
   "activity-update",
   "activity-end",
 ] as const;

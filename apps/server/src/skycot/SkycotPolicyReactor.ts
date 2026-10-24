@@ -1,16 +1,18 @@
+// nondev-seam: skycot-policy-reactor-network-guard
 // Answers the provider's approval requests for threads the SKYCOT policy governs: approves
 // what no hard rule matches, leaves the rest pending for the person. See SkycotPolicy.ts for
 // the design and the flag that gates both halves.
 //
 // With the Family profile on, every conversation is governed (the provider asks before every
 // step, SkycotPolicy.familyRuntimePolicy), and a step is approved here only when BOTH the hard
-// rules and the Family rules clear it (`evaluateFamilyRequest`: `needsGrownUp` false) and the
-// child it belongs to may have safe steps run by themselves (SkycotFamilyLimits.stepRuleFor:
+// rules and the Family rules clear it (`evaluateFamilyRequest`: `needsGrownUp` false), or Codex's
+// offline sandbox contains an internet/opaque-code-only hold; and the child it belongs to may
+// have safe steps run by themselves (SkycotFamilyLimits.stepRuleFor:
 // their parent has not switched on "Ask before each step", and SKYCOT is awake for them).
 // First principles: a child cannot meaningfully judge "May I list these files?", so a card per
 // step adds fatigue, not safety; the safeguards are the engine's rules, the grown-up gate and
-// restore points. A step a rule holds stays pending for a grown-up (the parent code, a
-// grown-up's phone or Watch), exactly as before; nothing here can answer it.
+// restore points. Other held steps stay pending for a grown-up (the parent code, a grown-up's
+// phone or Watch); the offline sandbox cannot contain them.
 //
 // It also closes the door Stop leaves open: the engine only cancels a run's pending asks
 // once the provider has confirmed the interrupt, which can take a while, and until then a
@@ -41,6 +43,7 @@ import * as Stream from "effect/Stream";
 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { policyDecisionAnswers } from "@t3tools/skycot-rules/decision";
+import { parseApprovedDownload, parseApprovedInstall } from "@t3tools/skycot-rules/addons";
 import {
   evaluateFamilyRequest,
   isReadOnlyCommand,
@@ -120,18 +123,45 @@ export function stopCommandId(threadId: ThreadId, requestId: RuntimeRequestId): 
 }
 
 /**
- * The one test every server-side yes passes. Outside Family: no hard rule matched. In Family:
- * neither a hard rule nor a Family rule matched (`needsGrownUp` covers both), so a step that
- * needs a grown-up can never be approved here, whatever else the reactor concluded.
+ * The one test every server-side yes passes. A Codex command held only for internet access or
+ * unreadable code can pass only when this governed turn's workspace sandbox is explicitly
+ * network-off. Install/download commands and every other hard or Family hold still need a person.
  */
 export function mayAutoApprove(
   evaluation: RuleEvaluation,
   family: FamilyEvaluation | undefined,
+  options: {
+    readonly codexNetworkLocked?: boolean;
+    readonly command?: string | undefined;
+    readonly webSearch?: boolean | undefined;
+  } = {},
 ): boolean {
   // A Family relief (a trusted add-on SKYCOT fetches itself, a repeat of one a grown-up allowed
   // in this conversation, an undoable delete in the project) is the shared rules' own judgement
   // of exactly the holds it answers; anything else that held still holds (family.ts reliefFor).
   if (family?.relief !== undefined) return !family.needsGrownUp && family.base.decision !== "hold";
+  if (options.codexNetworkLocked && family !== undefined) {
+    const familyIds = family.family.map((match) => match.rule.id);
+    const internetContained =
+      familyIds.length === 1 &&
+      (familyIds[0] === "uses-internet" || familyIds[0] === "opaque-code");
+    // No hard rule at all, and above all not "leaves-sandbox": that is Codex asking to run the
+    // command OUTSIDE its sandbox, where a yes would put it on the internet.
+    const staysInSandbox = evaluation.matches.length === 0 && family.base.matches.length === 0;
+    const isInstallerOrDownload =
+      options.command !== undefined &&
+      (parseApprovedInstall(options.command) !== null ||
+        parseApprovedDownload(options.command) !== null);
+    if (
+      internetContained &&
+      options.webSearch !== true &&
+      options.command !== undefined &&
+      !isInstallerOrDownload &&
+      staysInSandbox
+    ) {
+      return true;
+    }
+  }
   if (evaluation.decision === "hold") return false;
   if (family === undefined) return true;
   return !family.needsGrownUp && family.base.decision !== "hold";
@@ -357,7 +387,18 @@ const make = Effect.gen(function* () {
     ) {
       return skipped("family: plan first (changes wait for Build it)");
     }
-    if (!mayAutoApprove(evaluation, familyEvaluation)) {
+    const driver = approval.nativeItemRef?.driver ?? input.driver;
+    // These are exactly the modes familyRuntimePolicy and the policy override send to the
+    // adapter, which puts networkAccess:false on each Codex turn/start request.
+    const codexNetworkLocked =
+      driver === "codex" && (inFamily || appliesToRuntimeMode(thread.runtimeMode));
+    if (
+      !mayAutoApprove(evaluation, familyEvaluation, {
+        codexNetworkLocked,
+        command: facts.kind === "command" ? facts.command : undefined,
+        webSearch: toolCall?.type === "web_search",
+      })
+    ) {
       yield* Effect.logInfo("skycot-policy.held", {
         threadId: input.threadId,
         requestId: input.requestId,

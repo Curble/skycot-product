@@ -78,6 +78,6 @@ describe("SkycotAddOnApprovals", () => {
       noteForAssistant(install, { ok: true }, becauseFor("trusted-add-on")),
       "this is a trusted add-on, so SKYCOT installed three",
     );
-    assert.include(noteForAssistant(install, { ok: true }), "a grown-up said yes");
+    assert.include(noteForAssistant(install, { ok: true }), "it was approved");
   });
 });

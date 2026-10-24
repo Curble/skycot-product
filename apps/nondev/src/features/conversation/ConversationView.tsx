@@ -12,8 +12,14 @@ import type {
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
+import { orchestrationV2RunWorkStartedAt } from "@t3tools/contracts";
 import { withExplainMarker } from "@t3tools/skycot-rules/explain";
-import { withPointing } from "@t3tools/skycot-rules/preview";
+import { withStarterMarker } from "@t3tools/skycot-rules/starter";
+import {
+  withPointing,
+  withPreviewProblem,
+  type PreviewProblem,
+} from "@t3tools/skycot-rules/preview";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
@@ -29,7 +35,7 @@ import {
   ShieldAlert,
   Square,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -56,16 +62,23 @@ import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
 import { requestMode, usePlanFirst } from "../compose/planFirst";
 import { useEnsureInteractionMode } from "../compose/turnMode";
-import { firstBlank } from "../starters/starters";
+import { firstBlank, stillFromStarter } from "../starters/starters";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
-import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
+import {
+  PublishButton,
+  PublishSheet,
+  PublishStatusPill,
+  ShowGrownUpButton,
+  usePublishOverview,
+} from "../publish";
 import { latestReviewable } from "../review";
 import { useRetryMade } from "../review/useRetryMade";
 import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
+import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
@@ -96,6 +109,12 @@ import {
 import { conversationTitle, describeThreadStatus, type ConversationStatus } from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
+import { BuildJourney } from "../journey/BuildJourney";
+import { withoutAssistantPlumbing } from "../../plain/plumbing";
+import { recordBuildTime } from "./buildTimes";
+import { starterIdFromText } from "../badges/facts";
+import { elapsedCopy } from "../../plain/estimate";
+import { estimateForRun } from "./runEstimate";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -135,15 +154,26 @@ export function ConversationView({
   const project =
     shell === null ? ownProject : projectForConversation(shell, ownProject, allProjects);
   const question = isQuestionsProject(project);
+  const childView = useChildView();
   const state = Option.getOrNull(AsyncResult.value(result));
-  const projection = state ? Option.getOrNull(state.data) : null;
+  const fullProjection = state ? Option.getOrNull(state.data) : null;
+  // A child never sees the assistant's own housekeeping (plan-mode notes, tool look-ups).
+  const projection = useMemo(
+    () =>
+      fullProjection !== null && childView
+        ? { ...fullProjection, turnItems: withoutAssistantPlumbing(fullProjection.turnItems) }
+        : fullProjection,
+    [fullProjection, childView],
+  );
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const latestRunId = shell?.latestRun?.runId ?? null;
   const refused =
     projection !== null && shell !== null && !active
       ? endedOnRefusal(projection, latestRunId)
       : false;
-  const status: ConversationStatus | null = shell ? describeThreadStatus(shell, { refused }) : null;
+  const status: ConversationStatus | null = shell
+    ? describeThreadStatus(shell, { refused, childView })
+    : null;
   // Tell the list, which only has the shell, that this run ended on a refusal.
   const refusedRuns = useAtomValue(refusedRunIdsAtom);
   const setRefusedRuns = useAtomSet(refusedRunIdsAtom);
@@ -155,6 +185,7 @@ export function ConversationView({
   const waitingOnYou =
     shell !== null &&
     (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
+  const waitingForGrownUp = shell?.hasPendingApprovals ?? false;
   const crew = useCrew();
   const crewName = crew.builder.name;
   // The mode the engine enforces: the Family rules while the profile is on (safe steps by
@@ -206,8 +237,21 @@ export function ConversationView({
       ? runStart
       : new Date(Date.parse(runStart) + waited).toISOString(),
     shell?.latestRun?.completedAt ?? null,
-    active,
+    active && !(childView && waitingOnYou),
   );
+  // The run's own record carries `sourcePlanRef`; the shell summary does not.
+  const { phase: runPhase, range: runEstimate } = estimateForRun(
+    projection?.runs.find((run) => run.id === latestRunId),
+  );
+  const timeLine =
+    childView && active && !waitingOnYou && runStart
+      ? elapsedCopy(
+          Math.max(0, Date.now() - Date.parse(runStart) - waited),
+          runPhase,
+          runEstimate,
+          status?.headline ?? "Building it",
+        )
+      : elapsed;
 
   const projectName = project?.title ?? null;
 
@@ -228,6 +272,35 @@ export function ConversationView({
   }, [latestId, seenLatest]);
   const startNote = useStartNote(threadId);
   useBadgeWatcher({ threadId, shell, projection, active, retryMade });
+  const recordedRuns = useRef(new Set<string>());
+  useEffect(() => {
+    if (!childView || !projection) return;
+    for (const run of projection.runs) {
+      if (!run.completedAt || recordedRuns.current.has(run.id) || run.status !== "completed")
+        continue;
+      recordedRuns.current.add(run.id);
+      const start = DateTime.toEpochMillis(orchestrationV2RunWorkStartedAt(run));
+      const end = DateTime.toEpochMillis(run.completedAt);
+      const runAsks = projection.turnItems.filter(
+        (item): item is AskItem =>
+          item.runId === run.id &&
+          (item.type === "approval_request" || item.type === "user_input_request"),
+      );
+      const requestMap = new Map(
+        projection.runtimeRequests.map((request) => [request.id, request]),
+      );
+      const duration = end - start - waitedMillis(runAsks, requestMap);
+      if (Number.isFinite(duration) && duration > 0) {
+        const message = projection.messages.find((entry) => entry.id === run.userMessageId);
+        recordBuildTime({
+          kind: starterIdFromText(message?.text ?? "") ?? "other",
+          model: run.modelSelection.model,
+          phase: run.sourcePlanRef ? "build" : "plan",
+          milliseconds: duration,
+        });
+      }
+    }
+  }, [childView, projection]);
 
   const rewindFacts = useRewindFacts({ environmentId, threadId, shell, projection, archived });
   const [publishOpen, setPublishOpen] = useState(false);
@@ -235,6 +308,7 @@ export function ConversationView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [makeProjectOpen, setMakeProjectOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const [journeyNote, setJourneyNote] = useState<string | null>(null);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
     environmentId,
@@ -269,7 +343,7 @@ export function ConversationView({
                 ? "Put away in Old conversations"
                 : question
                   ? `${status.presence.split(" · ")[0]} · ${JUST_ASK_COPY.presence}`
-                  : shell?.worktreePath && project === ownProject
+                  : !childView && shell?.worktreePath && project === ownProject
                     ? // The private copy is the reassurance that matters; keep the
                       // first clause ("Working", "Waiting for you") and drop the rest.
                       `${status.presence.split(" · ")[0]} · in a private copy of your project`
@@ -291,7 +365,10 @@ export function ConversationView({
             />
           ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
-          {archived || question || family.profile.me.kind === "grown-up" ? null : (
+          {/* nondev-seam: skycot-show-grown-up-button */}
+          {childView && shell && !archived ? (
+            <ShowGrownUpButton threadId={threadId} title={shell.title} />
+          ) : archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
           {shell && canOperate ? (
@@ -327,10 +404,10 @@ export function ConversationView({
               Ready to look at
             </Pill>
           ) : null}
-          {elapsed ? (
+          {timeLine ? (
             <span className="fm-strip__time">
               <Clock size={13} strokeWidth={1.8} aria-hidden />
-              {elapsed}
+              {waitingForGrownUp && childView ? "Paused — waiting for a grown-up" : timeLine}
             </span>
           ) : null}
           <span className="fm-strip__dot">·</span>
@@ -346,7 +423,7 @@ export function ConversationView({
               <PublishStatusPill status={publish.status} />
             </>
           ) : null}
-          {active ? (
+          {active && !childView ? (
             <span className="fm-strip__grow">
               <ProgressBar value={1} max={1} thin label="Working" tone="accent" />
             </span>
@@ -419,11 +496,27 @@ export function ConversationView({
           shell={shell}
           projectName={projectName}
           trailing={
-            active &&
-            !waitingOnYou &&
-            !projection.turnItems.some(
-              (item) => item.type === "assistant_message" && item.streaming,
-            ) ? (
+            childView &&
+            ((active && !waitingOnYou) ||
+              // After a build: its Finish page stays until the child sends something new.
+              (!active &&
+                !waitingForGrownUp &&
+                latestRunId !== null &&
+                projection.turnItems.at(-1)?.type !== "user_message" &&
+                projection.turnItems.some(
+                  (item) => item.type === "file_change" && item.runId === latestRunId,
+                ))) ? (
+              <BuildJourney
+                projection={projection}
+                elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}
+                finished={!active}
+                onTellSam={setJourneyNote}
+              />
+            ) : active &&
+              !waitingOnYou &&
+              !projection.turnItems.some(
+                (item) => item.type === "assistant_message" && item.streaming,
+              ) ? (
               <TypingIndicator meta={`${crewName} is working…`} />
             ) : null
           }
@@ -448,6 +541,8 @@ export function ConversationView({
           seed={seed}
           projection={projection}
           rewindFacts={rewindFacts}
+          journeyNote={journeyNote}
+          onJourneyNoteHandled={() => setJourneyNote(null)}
         />
       )}
 
@@ -645,6 +740,8 @@ function ReplyComposer({
   seed,
   projection,
   rewindFacts,
+  journeyNote,
+  onJourneyNoteHandled,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -654,7 +751,10 @@ function ReplyComposer({
   readonly seed: ComposerSeed | null;
   readonly projection: OrchestrationV2ThreadProjection | null;
   readonly rewindFacts: ReturnType<typeof useRewindFacts>;
+  readonly journeyNote: string | null;
+  readonly onJourneyNoteHandled: () => void;
 }) {
+  const childView = useChildView();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const ensureMode = useEnsureInteractionMode();
@@ -673,8 +773,11 @@ function ReplyComposer({
   const [explainOn] = useExplainMode(threadId, family.enabled);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
+  // A card's hidden rules go with the one message it started, not with later follow-ups.
+  const [seedSent, setSeedSent] = useState(false);
   if (seed !== appliedSeed) {
     setAppliedSeed(seed);
+    setSeedSent(false);
     if (seed !== null) setText(seed.text);
   }
   useEffect(() => {
@@ -687,8 +790,18 @@ function ReplyComposer({
   // "Ask Sam to fix it" and the picker's own note arrive from the preview panel.
   const suggested = useSuggestedMessage(threadId);
   const [appliedSuggestion, setAppliedSuggestion] = useState<number | null>(null);
+  // A child's "Ask Sam to fix it" carries the command and output as hidden context.
+  const [fixIt, setFixIt] = useState<{
+    readonly text: string;
+    readonly problem: PreviewProblem;
+  } | null>(null);
   if (suggested !== null && suggested.nonce !== appliedSuggestion) {
     setAppliedSuggestion(suggested.nonce);
+    setFixIt(
+      suggested.problem !== undefined && suggested.mode === "replace"
+        ? { text: suggested.text, problem: suggested.problem }
+        : null,
+    );
     setText((current) =>
       suggested.mode === "append" && current.trim().length > 0
         ? `${current.trimEnd()} ${suggested.text}`
@@ -799,6 +912,8 @@ function ReplyComposer({
     setText("");
     pictures.clear();
     clearPointers(threadId);
+    setFixIt(null);
+    setSeedSent(true);
     setTypedWhileActive(false);
     setConfirmNewTurn(false);
     return true;
@@ -821,6 +936,18 @@ function ReplyComposer({
       if (cleared.dropPictures) pictures.clear();
       return;
     }
+    // The fix-it context goes on after the shield looked at the child's own words, and only
+    // while those words are still the fix-it message (their own new idea sends nothing hidden).
+    const hidden = fixIt !== null && stillFromStarter(fixIt.text, trimmed) ? fixIt.problem : null;
+    // A starter card's technical rules ride as a hidden marker while the words are still the card's.
+    const fromCard =
+      appliedSeed !== null && !seedSent && stillFromStarter(appliedSeed.text, trimmed)
+        ? appliedSeed.starterId
+        : null;
+    const message = {
+      text: withStarterMarker(withPreviewProblem(cleared.text, hidden), fromCard),
+      messageId: cleared.messageId,
+    };
     if (editing !== null) {
       // Checked again here: the conversation may have moved since Edit was pressed.
       const check = rewindFacts.check(editing.itemId);
@@ -834,12 +961,23 @@ function ReplyComposer({
       setGoBackOpen({
         target: check.target,
         choice: rewindFacts.choiceFor(check.target),
-        message: { text: cleared.text, messageId: cleared.messageId },
+        message,
       });
       return;
     }
-    await deliver(cleared, active);
+    await deliver(message, active);
   };
+
+  useEffect(() => {
+    if (journeyNote === null) return;
+    const answer = journeyNote;
+    onJourneyNoteHandled();
+    void (async () => {
+      const cleared = await shield.clear(answer, 0);
+      if (cleared.kind !== "send") return;
+      await deliver({ text: cleared.text, messageId: cleared.messageId }, true);
+    })();
+  }, [journeyNote, onJourneyNoteHandled, shield]);
 
   const confirmGoBack = async (restoreFiles: boolean) => {
     if (goBackOpen === null) return;
@@ -961,14 +1099,19 @@ function ReplyComposer({
               ? editing !== null
                 ? "Change your message…"
                 : active
-                  ? "Add a note while it works… (“also add a vegan option”)"
-                  : "Reply, change course, or ask for something else…"
+                  ? childView
+                    ? "Tell Sam what to change… (“make the cat blue”)"
+                    : "Add a note while it works… (“also add a vegan option”)"
+                  : childView
+                    ? "Tell Sam what to change…"
+                    : "Reply, change course, or ask for something else…"
               : "This connection can read but not reply"
           }
           label={editing !== null ? "Your changed message" : "Reply"}
           foot={{
-            left:
-              editing !== null
+            left: childView
+              ? ""
+              : editing !== null
                 ? "Return to go back and send · Shift-Return for a new line"
                 : active
                   ? `Replies while ${crew.builder.name} is working get picked up at the next step.`

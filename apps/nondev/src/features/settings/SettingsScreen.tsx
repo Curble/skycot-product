@@ -1,8 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { ChevronLeft, Laptop } from "lucide-react";
+import { ChevronLeft, Laptop, Lock } from "lucide-react";
 
-import { useColumns } from "../../app/useColumns";
+import { useColumns, type Columns } from "../../app/useColumns";
 import {
   HOME_HREF,
   SETTINGS_HREF,
@@ -29,6 +29,8 @@ import { SharingPane } from "./panes/SharingPane";
 import { VoicePane } from "./panes/VoicePane";
 import { YourMacPane } from "./panes/YourMacPane";
 import { SECTIONS } from "./sections";
+import { useChildView } from "../../app/useChildView";
+import { grownUpSettingsOpen } from "../family/family";
 
 export { SECTIONS } from "./sections";
 
@@ -49,9 +51,13 @@ export function SettingsScreen({
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
   const family = useFamily();
+  const childView = useChildView();
   // The Family profile hides the developer-tools section; Settings › Family keeps the one way in.
-  const sections = family.enabled ? SECTIONS.filter((entry) => entry.id !== "advanced") : SECTIONS;
-  const active: SettingsSection | null = section ?? (columns === 1 ? null : "assistants");
+  // A parent's code ("Grown-up settings…") opens the grown-up sections on a child's view until it lapses.
+  const grownUpOpen = grownUpSettingsOpen(family.profile, Date.now());
+  const sections = visibleSettingsSections(family.enabled, childView && !grownUpOpen);
+  const active: SettingsSection | null =
+    section ?? (columns === 1 ? null : childView && !grownUpOpen ? "appearance" : "assistants");
   const meta = sections.find((entry) => entry.id === active) ?? null;
 
   // The only way out of Settings used to be the browser's Back button.
@@ -61,27 +67,7 @@ export function SettingsScreen({
     </Button>
   );
 
-  const nav = (
-    <nav className="fm-settings__nav" aria-label="Settings sections">
-      <List plain label="Settings sections">
-        {sections.map((entry) => (
-          <ListRow
-            key={entry.id}
-            leading={
-              <span className={`fm-settings__glyph fm-settings__glyph--${entry.tone}`} aria-hidden>
-                <entry.icon size={15} strokeWidth={1.9} />
-              </span>
-            }
-            title={entry.label}
-            subtitle={columns === 1 ? entry.summary : undefined}
-            selected={entry.id === active}
-            href={settingsHref(entry.id)}
-            chevron={columns === 1}
-          />
-        ))}
-      </List>
-    </nav>
-  );
+  const nav = <SettingsSectionList sections={sections} columns={columns} active={active} />;
 
   const hiddenAdvanced = family.enabled && active === "advanced";
   const detail =
@@ -131,6 +117,24 @@ export function SettingsScreen({
           )}
         </div>
       </section>
+    ) : active !== null && childView ? (
+      // A grown-up page reached while the code is locked: say so, and offer the way in.
+      <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
+        <header className="fm-settings__header">
+          <h2 id="fm-settings-title" className="fm-settings__title">
+            For grown-ups
+          </h2>
+          <span className="fm-settings__header-spacer" />
+          {done}
+        </header>
+        <div className="fm-settings__panes">
+          <EmptyState icon={Lock} title="This part is for grown-ups">
+            <Button onClick={() => void family.requireParentCode("aiSettings")}>
+              Grown-up settings…
+            </Button>
+          </EmptyState>
+        </div>
+      </section>
     ) : null;
 
   // The nav and the detail keep their child positions at every width, so a
@@ -148,6 +152,46 @@ export function SettingsScreen({
       {columns === 1 && active !== null ? null : nav}
       {detail}
     </div>
+  );
+}
+
+export function visibleSettingsSections(familyEnabled: boolean, childView: boolean) {
+  return childView
+    ? SECTIONS.filter((entry) => entry.id === "appearance" || entry.id === "voice")
+    : familyEnabled
+      ? SECTIONS.filter((entry) => entry.id !== "advanced")
+      : SECTIONS;
+}
+
+export function SettingsSectionList({
+  sections,
+  columns,
+  active,
+}: {
+  readonly sections: typeof SECTIONS;
+  readonly columns: Columns;
+  readonly active: SettingsSection | null;
+}) {
+  return (
+    <nav className="fm-settings__nav" aria-label="Settings sections">
+      <List plain label="Settings sections">
+        {sections.map((entry) => (
+          <ListRow
+            key={entry.id}
+            leading={
+              <span className={`fm-settings__glyph fm-settings__glyph--${entry.tone}`} aria-hidden>
+                <entry.icon size={15} strokeWidth={1.9} />
+              </span>
+            }
+            title={entry.label}
+            subtitle={columns === 1 ? entry.summary : undefined}
+            selected={entry.id === active}
+            href={settingsHref(entry.id)}
+            chevron={columns === 1}
+          />
+        ))}
+      </List>
+    </nav>
   );
 }
 

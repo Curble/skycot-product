@@ -533,6 +533,36 @@ export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: 
   return view.lockedUntil === null ? 0 : Math.max(0, view.lockedUntil - now);
 }
 
+/** True while the parent code has Family and AI settings (or Advanced mode) open on this device. */
+export function grownUpSettingsOpen(view: Pick<FamilyView, "openUntil">, now: number): boolean {
+  return [view.openUntil.settings, view.openUntil.advanced].some(
+    (until) => until !== undefined && until > now,
+  );
+}
+
+/** Whether this device already has the engine grant needed for an action. */
+export function familyGrantOpen(
+  view: Pick<FamilyView, "openUntil">,
+  action: FamilyAction,
+  now: number,
+): boolean {
+  const purpose = purposeFor(action);
+  if (purpose === null || action === "approve" || action === "deleteConversation") return false;
+  const grants: ReadonlyArray<FamilyPurpose> =
+    action === "seeRecap"
+      ? ["recap", "settings", "advanced"]
+      : purpose === "settings"
+        ? ["settings", "advanced"]
+        : [purpose, "advanced"];
+  return grants.some((grant) => (view.openUntil[grant] ?? 0) > now);
+}
+
+/** Whole minutes left in the shared Mac's grown-up mode bar. */
+export function grownUpMinutesLeft(view: Pick<FamilyView, "openUntil">, now: number): number {
+  const until = Math.max(view.openUntil.settings ?? 0, view.openUntil.advanced ?? 0);
+  return until <= now ? 0 : Math.ceil((until - now) / 60_000);
+}
+
 const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
   ["advanced", "Advanced mode"],
   ["settings", "Family and AI settings"],

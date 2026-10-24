@@ -5,8 +5,8 @@ import type {
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@t3tools/contracts";
-import { Upload } from "lucide-react";
-import { useId } from "react";
+import { Share, Upload } from "lucide-react";
+import { useId, useState } from "react";
 
 import { Button } from "../../ui/Button";
 import { Pill } from "../../ui/Pill";
@@ -18,6 +18,7 @@ import {
   type PublishStatus,
 } from "./model";
 import { usePublishData } from "./usePublishData";
+import { familyApi } from "../family/api";
 
 export interface PublishOverview {
   readonly readiness: PublishReadiness;
@@ -93,6 +94,37 @@ export function PublishButton({
         </span>
       )}
     </span>
+  );
+}
+
+/** A finished child's work goes to the grown-up's Requests list, not the public web. */
+// nondev-seam: skycot-show-grown-up-publish
+export function ShowGrownUpButton({
+  threadId,
+  title,
+}: {
+  readonly threadId: string;
+  readonly title: string;
+}) {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="primary"
+      size="sm"
+      icon={Share}
+      disabled={sent || busy}
+      onClick={() => {
+        if (busy || sent) return;
+        setBusy(true);
+        void familyApi.createNote({ kind: "shown", threadId, title }).then((result) => {
+          setBusy(false);
+          if (result.ok) setSent(true);
+        });
+      }}
+    >
+      {sent ? "Sent to a grown-up! ✓" : busy ? "Sending…" : "Show a grown-up"}
+    </Button>
   );
 }
 

@@ -45,6 +45,8 @@ export interface ThreadStatusOptions {
    * conversation view knows; the list learns it once the thread was opened).
    */
   readonly refused?: boolean;
+  /** Child wording is selected by the view, keeping grown-up devices unchanged. */
+  readonly childView?: boolean;
 }
 
 /** The Crew's own words for "you said no": providers close a refused run with a statement. */
@@ -116,8 +118,12 @@ export function describeThreadStatus(
   if (shell.hasPendingApprovals) {
     return {
       kind: "waiting",
-      headline: "Waiting for you · needs your OK before it carries on",
-      presence: "Waiting for you · nothing runs until you answer",
+      headline: options.childView
+        ? "Waiting for a grown-up"
+        : "Waiting for you · needs your OK before it carries on",
+      presence: options.childView
+        ? "Waiting for a grown-up"
+        : "Waiting for you · nothing runs until you answer",
       tone: "waiting",
       attention: "waiting",
     };
@@ -134,8 +140,10 @@ export function describeThreadStatus(
   if (shell.hasActionableProposedPlan) {
     return {
       kind: "waiting",
-      headline: "Waiting for you · the plan is ready to approve",
-      presence: "Waiting for you · plan ready",
+      headline: options.childView
+        ? "Sam made a plan. Press Build it."
+        : "Waiting for you · the plan is ready to approve",
+      presence: options.childView ? "Plan ready · press Build it" : "Waiting for you · plan ready",
       tone: "waiting",
       attention: "waiting",
     };

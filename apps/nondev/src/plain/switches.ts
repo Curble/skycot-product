@@ -95,8 +95,10 @@ export function switchLine(input: {
   readonly now: number;
   readonly timeZone: string;
   readonly crewName: string | null;
+  readonly childView?: boolean;
 }): string {
   const { change, providers } = input;
+  if (input.childView) return "Sam took a short rest, so a helper stepped in.";
   const who = input.crewName ?? "SKYCOT";
   const until = restingUntilPhrase(change.until, input.now, input.timeZone);
   const resting = `is resting${until ? ` ${until}` : ""}`;

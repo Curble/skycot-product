@@ -16,7 +16,11 @@ import type { ModelSelection } from "@t3tools/contracts";
 import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, TextInput, View } from "react-native";
 
-import { KID_STARTERS, starterPrompt } from "../../../../nondev/src/features/starters/starters";
+import {
+  KID_STARTERS,
+  starterMessageText,
+  starterPrompt,
+} from "../../../../nondev/src/features/starters/starters";
 import { JUST_ASK_COPY } from "../../../../nondev/src/features/questions/questions";
 import type { StackRoutes } from "../../app/routes";
 import { useChild } from "../../app/child/ChildContext";
@@ -98,7 +102,11 @@ export function NewConversationScreen() {
         projectId,
         title:
           starter && words === starterPrompt(starter).trim() ? starter.title : titleFrom(words),
-        text: words,
+        // The card's technical rules travel hidden, as on the Mac, while the words are the card's.
+        text: starterMessageText(
+          words,
+          starter ? { starterId: starter.id, text: starterPrompt(starter) } : null,
+        ),
         modelSelection: model,
         runtimeMode: "approval-required",
         interactionMode: "plan",

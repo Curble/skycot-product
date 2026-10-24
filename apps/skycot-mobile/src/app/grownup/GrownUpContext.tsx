@@ -6,12 +6,18 @@
 import type { FamilyChild } from "../../../../nondev/src/features/family/children";
 import { grownUpLabel } from "../../../../nondev/src/features/family/people";
 import { useMacData } from "../../data/MacData";
-import type { PendingRequest } from "../../family/api";
+import type { FamilyNote, PendingRequest } from "../../family/api";
 import { useLinks, type Mac } from "../../links/store";
 
 export interface WaitingRequest {
   readonly mac: Mac;
   readonly request: PendingRequest;
+  readonly child: FamilyChild | null;
+}
+
+export interface WaitingFamilyNote {
+  readonly mac: Mac;
+  readonly note: FamilyNote;
   readonly child: FamilyChild | null;
 }
 
@@ -36,6 +42,16 @@ export function useGrownUp() {
     })),
   );
   waiting.sort((a, b) => b.request.createdAt - a.request.createdAt);
+  const notes: Array<WaitingFamilyNote> = macs.flatMap((mac) =>
+    (byMac[mac.macId]?.notes ?? [])
+      .filter((note) => note.status === "open")
+      .map((note) => ({
+        mac,
+        note,
+        child: childrenOn(mac).find((child) => child.id === note.childId) ?? null,
+      })),
+  );
+  notes.sort((a, b) => b.note.createdAt.localeCompare(a.note.createdAt));
   return {
     macs,
     byMac,
@@ -43,6 +59,7 @@ export function useGrownUp() {
     nameOn,
     childrenOn,
     waiting,
+    notes,
     loaded: macs.every(
       (mac) => byMac[mac.macId]?.requests !== null && byMac[mac.macId]?.requests !== undefined,
     ),

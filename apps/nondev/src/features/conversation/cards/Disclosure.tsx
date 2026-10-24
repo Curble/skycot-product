@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { renderInline } from "./Markdown";
+import { useChildView } from "../../../app/useChildView";
 
 /**
  * "Show details (for your developer)": the one place a card exposes raw paths,
@@ -15,6 +16,7 @@ export function Disclosure({
   readonly summary?: ReactNode;
   readonly children: ReactNode;
 }) {
+  if (useChildView()) return null;
   return (
     <details className="fm-details">
       <summary className="fm-details__summary">

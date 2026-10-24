@@ -1,3 +1,4 @@
+// nondev-seam: skycot-codex-network-lock-test
 import { historyResponseItems } from "@t3tools/provider-core/server/handoffBudget";
 import {
   makeProviderTextDeltaCoalescer,
@@ -170,6 +171,26 @@ describe("CodexAdapterV2 runtime policy", () => {
       assert.equal(fullAccess.approvalPolicy, "never");
       assert.equal(fullAccess.approvalsReviewer, "user");
       assert.equal(fullAccess.sandboxPolicy?.type, "dangerFullAccess");
+
+      const skycot = yield* CodexAdapterV2.buildCodexTurnStartParams({
+        nativeThreadId: "native-skycot-network-lock",
+        codexInput: [{ type: "text", text: "test" }],
+        runtimePolicy: {
+          runtimeMode: "approval-required",
+          interactionMode: "default",
+          cwd: null,
+          approvalPolicy: "untrusted",
+          sandboxPolicy: { type: "workspaceWrite", networkAccess: false },
+        },
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "gpt-5.4",
+        },
+      });
+      assert.deepEqual(skycot.sandboxPolicy, {
+        type: "workspaceWrite",
+        networkAccess: false,
+      });
     }),
   );
 

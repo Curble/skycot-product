@@ -20,6 +20,7 @@ import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { homeTip } from "./tip";
 import { summarySentence } from "./summary";
+import { greeting as greetingForHour } from "./greeting";
 
 /**
  * Home: a greeting, the starter cards, every live or attention-needing job in one sentence
@@ -72,7 +73,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
               <h2 className="fm-home__greeting">
                 <span className="fm-marker-underline">
-                  {greeting()}
+                  {greetingForHour(new Date().getHours())}
                   {family.enabled && family.profile.childName
                     ? `, ${family.profile.childName}`
                     : ""}
@@ -80,7 +81,14 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                 </span>
               </h2>
               <p className="fm-home__sub">
-                {summarySentence(working, waiting, ready, rows.length, connected)}
+                {summarySentence(
+                  working,
+                  waiting,
+                  ready,
+                  rows.length,
+                  connected,
+                  family.enabled && family.profile.me.kind !== "grown-up",
+                )}
               </p>
             </div>
           </div>
@@ -96,21 +104,41 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
           />
           <div className="fm-home__grid">
             <div className="fm-home__main">
-              <Card label="Today, across every project">
+              <Card
+                label={
+                  family.enabled && family.profile.me.kind !== "grown-up"
+                    ? "Your things"
+                    : "Today, across every project"
+                }
+              >
                 <CardHeader
                   icon={ListTodo}
-                  title="Today, across every project"
+                  title={
+                    family.enabled && family.profile.me.kind !== "grown-up"
+                      ? "Your things"
+                      : "Today, across every project"
+                  }
                   subtitle={
                     active.length === 0
                       ? connected
-                        ? "Nothing is running or waiting on you right now."
+                        ? family.enabled && family.profile.me.kind !== "grown-up"
+                          ? "Sam isn't making anything right now."
+                          : "Nothing is running or waiting on you right now."
                         : "Your jobs appear once your Mac is reachable."
-                      : "Tap any row to open its conversation."
+                      : family.enabled && family.profile.me.kind !== "grown-up"
+                        ? "Tap any thing to see it."
+                        : "Tap any row to open its conversation."
                   }
                 />
                 {active.length > 0 ? (
                   <CardBody>
-                    <List label="Jobs">
+                    <List
+                      label={
+                        family.enabled && family.profile.me.kind !== "grown-up"
+                          ? "Things Sam is making"
+                          : "Jobs"
+                      }
+                    >
                       {active.map((row) => (
                         <JobRow key={`${row.shell.environmentId}:${row.shell.id}`} row={row} />
                       ))}
@@ -159,14 +187,6 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
       href={threadHref(row.shell.environmentId, row.shell.id)}
     />
   );
-}
-
-function greeting(now = new Date()): string {
-  const hour = now.getHours();
-  if (hour < 5) return "Good evening";
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
 }
 
 function lowerFirst(text: string): string {

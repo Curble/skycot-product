@@ -7,18 +7,22 @@
 import type { BadgeEvent, CreationTopics } from "@t3tools/skycot-rules/badges";
 import { parseExplanation, readExplainMarker } from "@t3tools/skycot-rules/explain";
 import { readPointing } from "@t3tools/skycot-rules/preview";
+import { readStarterMarker } from "@t3tools/skycot-rules/starter";
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { GROWN_UP_RULES, GROWN_UP_STARTERS, KID_STARTERS } from "../starters/starters";
 
-/** The starter card a message came from, read from the words the card wrote. */
-export function starterIdFromText(text: string): string | null {
-  for (const starter of KID_STARTERS) {
-    if (starter.fileName && text.includes(`Make it one new file called ${starter.fileName},`)) {
-      return starter.id;
-    }
-  }
+/**
+ * The starter card a message came from. A kids' card travels as a hidden marker at the end of
+ * the whole message (`marked`, read for you from `text` when it is the whole message); a
+ * grown-up card is read from the words it wrote.
+ */
+export function starterIdFromText(
+  text: string,
+  marked: string | null = readStarterMarker(text),
+): string | null {
+  if (marked !== null && KID_STARTERS.some((starter) => starter.id === marked)) return marked;
   if (!text.includes(GROWN_UP_RULES)) return null;
   const trimmed = text.trimStart();
   for (const starter of GROWN_UP_STARTERS) {
@@ -47,6 +51,13 @@ export function creationTopics(text: string, starter: string | null): CreationTo
   return { game: GAME.test(words), animal: ANIMAL.test(words), story: STORY.test(words) };
 }
 
+/** Whether a child's first message asks for a game (the game card, or their own words). */
+export function asksForGame(text: string): boolean {
+  const starter = readStarterMarker(text);
+  if (starter !== null) return starter === "game";
+  return GAME.test(readPointing(readExplainMarker(text).text).text);
+}
+
 export interface MessageFacts {
   readonly starter: string | null;
   readonly picture: boolean;
@@ -57,7 +68,7 @@ export interface MessageFacts {
 
 export function messageFacts(text: string, pictures: number): MessageFacts {
   const words = readPointing(readExplainMarker(text).text).text;
-  const starter = starterIdFromText(words);
+  const starter = starterIdFromText(words, readStarterMarker(text));
   return {
     starter,
     picture: pictures > 0,
@@ -125,7 +136,10 @@ export function conversationEvents(input: {
     });
   }
   if (input.madeSomething && first !== undefined && !automated) {
-    const starter = starterIdFromText(readExplainMarker(first.text).text);
+    const starter = starterIdFromText(
+      readExplainMarker(first.text).text,
+      readStarterMarker(first.text),
+    );
     events.push({
       type: "made",
       threadId: input.threadId,

@@ -9,6 +9,10 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { ProjectSheet, type ProjectSheetFocus } from "../features/projects/ProjectSheet";
 import { AdvancedModeSheet } from "./AdvancedModeSheet";
 import { OpenFolderSheet } from "./OpenFolderSheet";
+import { Button } from "../ui/Button";
+import { Sheet } from "../ui/Sheet";
+import { navigate, settingsHref } from "../router";
+import { useFamily } from "../features/family/FamilyProvider";
 
 interface FolderRequest {
   readonly environmentId: EnvironmentId;
@@ -18,6 +22,7 @@ interface FolderRequest {
 type Open =
   | { readonly kind: "folder"; readonly request: FolderRequest }
   | { readonly kind: "advanced" }
+  | { readonly kind: "child-settings" }
   | {
       readonly kind: "project";
       readonly project: EnvironmentProject;
@@ -27,6 +32,7 @@ type Open =
 export interface SidebarSheets {
   readonly openFolder: (request: FolderRequest) => void;
   readonly openAdvanced: () => void;
+  readonly openChildSettings: () => void;
   /** Rename… or Change icon… for a project (one sheet, focused on the name or the icons). */
   readonly editProject: (project: EnvironmentProject, focus: ProjectSheetFocus) => void;
 }
@@ -39,6 +45,7 @@ export function SidebarSheetsHost({ children }: { readonly children: ReactNode }
     () => ({
       openFolder: (request) => setOpen({ kind: "folder", request }),
       openAdvanced: () => setOpen({ kind: "advanced" }),
+      openChildSettings: () => setOpen({ kind: "child-settings" }),
       editProject: (project, focus) => setOpen({ kind: "project", project, focus }),
     }),
     [],
@@ -56,6 +63,7 @@ export function SidebarSheetsHost({ children }: { readonly children: ReactNode }
         />
       ) : null}
       <AdvancedModeSheet open={open?.kind === "advanced"} onClose={close} />
+      <ChildSettingsSheet open={open?.kind === "child-settings"} onClose={close} />
       <ProjectSheet
         key={open?.kind === "project" ? `${open.project.environmentId}:${open.project.id}` : "none"}
         project={open?.kind === "project" ? open.project : null}
@@ -63,6 +71,49 @@ export function SidebarSheetsHost({ children }: { readonly children: ReactNode }
         onClose={close}
       />
     </SidebarSheetsContext.Provider>
+  );
+}
+
+function ChildSettingsSheet({
+  open,
+  onClose,
+}: {
+  readonly open: boolean;
+  readonly onClose: () => void;
+}) {
+  const family = useFamily();
+  const grownUpSettings = async () => {
+    const allowed = await family.requireParentCode("aiSettings");
+    if (!allowed) return;
+    onClose();
+    navigate(settingsHref("family"));
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Settings" actions={null}>
+      <div className="fm-sidebar-settings">
+        <Button
+          block
+          onClick={() => {
+            onClose();
+            navigate(settingsHref("appearance"));
+          }}
+        >
+          Appearance
+        </Button>
+        <Button
+          block
+          onClick={() => {
+            onClose();
+            navigate(settingsHref("voice"));
+          }}
+        >
+          Voice
+        </Button>
+        <Button block onClick={() => void grownUpSettings()}>
+          Grown-up settings…
+        </Button>
+      </div>
+    </Sheet>
   );
 }
 

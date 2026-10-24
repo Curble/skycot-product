@@ -5,8 +5,10 @@ import {
   isLocalPreviewAddress,
   localAddressFromOutput,
   plainTerminalText,
+  PROBLEM_OUTPUT_MAX,
   readPointing,
   withPointing,
+  withPreviewProblem,
   type Pointer,
 } from "./preview.ts";
 
@@ -108,5 +110,68 @@ describe("pointing blocks", () => {
   it("leaves a message without pointing alone", () => {
     expect(readPointing("just words")).toEqual({ text: "just words", labels: [] });
     expect(withPointing("just words", [])).toBe("just words");
+  });
+});
+
+describe("preview problem block", () => {
+  const problem = {
+    what: "The preview didn't start.",
+    how: "It runs `npm run dev`.",
+    output: "\u001b[31mError\u001b[0m: Cannot find module 'server.js'\n  at main (app.js:1)",
+  };
+
+  it("hands the assistant the command and what it printed", () => {
+    const sent = withPreviewProblem("The preview didn't work. Can you fix it?", problem);
+    expect(
+      sent.startsWith("The preview didn't work. Can you fix it?\n\n[SKYCOT preview problem]"),
+    ).toBe(true);
+    expect(sent).toContain("The preview didn't start. It runs `npm run dev`.");
+    expect(sent).toContain("Error: Cannot find module 'server.js'");
+    expect(sent).not.toContain("\u001b");
+  });
+
+  it("is hidden from the child's bubble, with the explain marker after it", () => {
+    const sent = withExplainMarker(
+      withPreviewProblem("The preview didn't work. Can you fix it?", problem),
+      false,
+      true,
+    );
+    expect(readPointing(readExplainMarker(sent).text)).toEqual({
+      text: "The preview didn't work. Can you fix it?",
+      labels: [],
+    });
+  });
+
+  it("sits alongside a pointing chip: both are cut from the words", () => {
+    const sent = withPreviewProblem(
+      withPointing("fix this", [
+        {
+          label: "the title",
+          pageUrl: "http://localhost:1/",
+          tagName: "h1",
+          selector: null,
+          html: "<h1>x</h1>",
+        },
+      ]),
+      problem,
+    );
+    expect(readPointing(sent)).toEqual({ text: "fix this", labels: ["the title"] });
+  });
+
+  it("sends nothing extra when there is no problem, and skips an empty output", () => {
+    expect(withPreviewProblem("hi", null)).toBe("hi");
+    const quiet = withPreviewProblem("hi", { ...problem, output: "  " });
+    expect(quiet).not.toContain("What it said");
+    expect(readPointing(quiet).text).toBe("hi");
+  });
+
+  it("keeps the end of a very long output and cannot be closed early by backticks", () => {
+    const long = `${"x".repeat(PROBLEM_OUTPUT_MAX)}END`;
+    const sent = withPreviewProblem("hi", { ...problem, output: long });
+    expect(sent).toContain("…");
+    expect(sent).toContain("END");
+    expect(sent.length).toBeLessThan(PROBLEM_OUTPUT_MAX + 600);
+    const fenced = withPreviewProblem("hi", { ...problem, output: "a ```` b" });
+    expect(fenced).toContain("`````\na ```` b\n`````");
   });
 });

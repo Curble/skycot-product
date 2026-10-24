@@ -95,7 +95,7 @@ export function StarterCards({
           </h3>
           <p className="fm-starters__sub">
             {kids
-              ? `Tap a card, change the words if you like, then press Send. ${crew.builder.name} builds it right here, no internet needed.`
+              ? `Tap a card, change the words if you like, then press Send. ${crew.builder.name} builds it right here on your Mac.`
               : "Tap one to fill in the message. You can change every word before it's sent."}
           </p>
         </div>

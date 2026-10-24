@@ -23,7 +23,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { OpenFolderSheet } from "../../app/OpenFolderSheet";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { CREW_NAME, PRODUCT_NAME } from "../../brand";
-import { HOME_HREF, navigate } from "../../router";
+import { HOME_HREF, navigate, settingsHref } from "../../router";
 import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/preferences";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
@@ -129,6 +129,7 @@ export function OnboardingSheet({
   const [step, setStep] = useState<Step>("who");
   const [finishing, setFinishing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [skipWarning, setSkipWarning] = useState(false);
   const enableFamily = useEnableFamilyWithDefaults(environmentId);
   const steps = onboardingSteps(audience, family.enabled);
   const index = Math.max(0, steps.indexOf(step));
@@ -139,9 +140,30 @@ export function OnboardingSheet({
     onClose();
     navigate(HOME_HREF);
   };
+  const linkPhone = () => {
+    writeOnboardingState("done");
+    onClose();
+    navigate(settingsHref("family"));
+  };
   // Escape and the backdrop cancel: they never turn an earlier "done" into
   // "skipped", and a first run that is cancelled simply stays skippable.
   const cancel = () => finish(readOnboardingState() === "done" ? "done" : "skipped");
+  const continueStep = async () => {
+    if (step === "family" && childPath && !family.enabled) {
+      setFinishing(true);
+      setProblem(null);
+      const failure = await enableFamily({ childName: draft.childName, code: draft.code });
+      setFinishing(false);
+      if (failure !== null) {
+        setProblem(failure);
+        return;
+      }
+      setSkipWarning(false);
+      setStep("assistant");
+      return;
+    }
+    setStep(steps[index + 1]!);
+  };
   // Only the final button turns the Family profile on; skipping half-way leaves nothing locked.
   const complete = async () => {
     if (finishing) return;
@@ -189,8 +211,17 @@ export function OnboardingSheet({
             ))}
           </span>
           {step !== "done" ? (
-            <Button variant="quiet" onClick={() => finish("skipped")}>
-              Skip for now
+            <Button
+              variant="quiet"
+              onClick={() => {
+                if (childPath && !family.enabled && !skipWarning) {
+                  setSkipWarning(true);
+                  return;
+                }
+                finish("skipped");
+              }}
+            >
+              {skipWarning ? "Skip without protection" : "Skip for now"}
             </Button>
           ) : null}
           {index > 0 && step !== "done" ? (
@@ -204,7 +235,7 @@ export function OnboardingSheet({
             <Button
               variant="primary"
               disabled={!canContinue(step, audience, setupReady(draft))}
-              onClick={() => setStep(steps[index + 1]!)}
+              onClick={() => void continueStep()}
             >
               Continue
             </Button>
@@ -215,7 +246,15 @@ export function OnboardingSheet({
       {step === "who" ? (
         <WhoStep audience={audience} onAudience={setAudience} familyEnabled={family.enabled} />
       ) : null}
-      {step === "family" ? <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus /> : null}
+      {step === "family" ? (
+        <>
+          <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus />
+          <p className="fm-help">
+            Bedtime and daily time limits start off. Set them in Settings → Family before your child
+            uses SKYCOT.
+          </p>
+        </>
+      ) : null}
       {step === "assistant" ? (
         <AssistantStep environmentId={environmentId} forChild={childPath} />
       ) : null}
@@ -228,10 +267,16 @@ export function OnboardingSheet({
         )
       ) : null}
       {step === "look" ? <LookStep preselectWorkshop={childPath} /> : null}
-      {step === "done" && problem ? <Banner tone="warning">{problem}</Banner> : null}
+      {problem ? <Banner tone="warning">{problem}</Banner> : null}
+      {skipWarning ? (
+        <Banner tone="warning">
+          This child won't be protected by a parent code until you finish the Family set-up.
+        </Banner>
+      ) : null}
       {step === "done" ? (
         <DoneStep
           environmentId={environmentId}
+          {...(childPath ? { onLinkPhone: linkPhone } : {})}
           {...(childPath
             ? { familyFor: family.profile.childName ?? (draft.childName.trim() || null) }
             : {})}
@@ -274,6 +319,11 @@ function WhoStep({
           The {familyCopy.title} is on {audience === "child" ? "on this Mac" : ""}. To set{" "}
           {PRODUCT_NAME} up for yourself, turn it off first in Settings → Family (parent code).
         </Banner>
+      ) : audience === "child" ? (
+        <details className="fm-help">
+          <summary>How this works</summary>
+          <p>{familyCopy.honesty}</p>
+        </details>
       ) : (
         <p className="fm-help">{familyCopy.honesty}</p>
       )}
@@ -572,8 +622,10 @@ function LookStep({ preselectWorkshop }: { readonly preselectWorkshop: boolean }
 function DoneStep({
   environmentId,
   familyFor,
+  onLinkPhone,
 }: {
   readonly environmentId: EnvironmentId;
+  readonly onLinkPhone?: () => void;
   /** Undefined off the child path; the child's name (or null for none) on it. */
   readonly familyFor?: string | null;
 }) {
@@ -647,6 +699,20 @@ function DoneStep({
           subtitle="Your theme. Change it in Settings → Appearance."
         />
       </List>
+      {familyFor !== undefined && onLinkPhone ? (
+        <List label="Next">
+          <ListRow
+            leading={<StepBadge state="todo" icon={Users} />}
+            title="Link your phone now"
+            subtitle="Open Family settings to link a grown-up's phone or Watch."
+            trailing={
+              <Button size="sm" onClick={onLinkPhone}>
+                Link…
+              </Button>
+            }
+          />
+        </List>
+      ) : null}
     </div>
   );
 }

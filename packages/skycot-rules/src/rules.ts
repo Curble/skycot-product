@@ -433,6 +433,41 @@ function pathTokens(args: ReadonlyArray<string>): Array<string> {
     .filter((candidate) => candidate.length > 0 && isPathLike(candidate));
 }
 
+/**
+ * The words that can be files, for programs whose first word is their own little script:
+ * `sed -n '/<script>/,/<\/script>/p' page.html` searches page.html; the pattern is not a path
+ * (live false alarm, 25 October 2026). A script given with -e is skipped the same way; a script
+ * file given with -f is still a file.
+ */
+function withoutScripts(base: string, args: ReadonlyArray<string>): ReadonlyArray<string> {
+  if (base !== "sed" && base !== "gsed" && base !== "awk" && base !== "gawk") return args;
+  const files: Array<string> = [];
+  let scripted = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
+    if (arg === "-e" || arg === "--expression") {
+      index += 1;
+      scripted = true;
+    } else if (arg.startsWith("--expression=")) {
+      scripted = true;
+    } else if (arg === "-f" || arg === "--file") {
+      if (args[index + 1] !== undefined) files.push(args[index + 1]!);
+      index += 1;
+      scripted = true;
+    } else if (arg === "-i" && args[index + 1] === "") {
+      // BSD sed's `-i ''`: no backup suffix.
+      index += 1;
+    } else if (arg.startsWith("-") || arg.length === 0) {
+      files.push(arg);
+    } else if (!scripted) {
+      scripted = true;
+    } else {
+      files.push(arg);
+    }
+  }
+  return files;
+}
+
 function hasRemoteTarget(args: ReadonlyArray<string>): boolean {
   return args.some(
     (arg) =>
@@ -668,7 +703,10 @@ function evaluateSegment(segment: string, ctx: RuleContext, namesOnly = false): 
   // Outside the project. The assistant reading its own plugin and skill instructions is not
   // the person's business, as long as the step only looks.
   const onlyLooks = looksWithoutWriting(base, args, segment);
-  const outside = [...(base === "cd" ? positional.slice(0, 1) : []), ...pathTokens(args)].filter(
+  const outside = [
+    ...(base === "cd" ? positional.slice(0, 1) : []),
+    ...pathTokens(withoutScripts(base, args)),
+  ].filter(
     (candidate) =>
       isOutsideProject(candidate, projectRoots(ctx)) &&
       !(onlyLooks && isProviderInstructionPath(candidate)),

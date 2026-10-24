@@ -2,6 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   approvalNeedsBranch,
+  childApprovalOptions,
+  childApprovalSentence,
   describeDecision,
   describeRuntimeRequest,
   isDestructiveCommand,
@@ -143,6 +145,25 @@ describe("describeRuntimeRequest — commands", () => {
     expect(card.options).toHaveLength(1);
     expect(card.options[0]!.decision).toEqual({ type: "run.interrupt" });
     expect(card.warning).toMatch(/gone away/);
+  });
+});
+
+describe("childApprovalSentence", () => {
+  it("turns a held add-on ask into one short child-facing sentence", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "npm install three" }));
+    expect(childApprovalSentence(card, "Sam")).toBe(
+      "Sam wants to download a 3D tool. This one needs a grown-up.",
+    );
+  });
+});
+
+describe("childApprovalOptions", () => {
+  it("keeps just Get a grown-up and No thanks", () => {
+    const card = describeRuntimeRequest(items.approval("command", { prompt: "npm install three" }));
+    expect(childApprovalOptions(card.options).map((option) => option.label)).toEqual([
+      "Get a grown-up",
+      "No thanks",
+    ]);
   });
 });
 

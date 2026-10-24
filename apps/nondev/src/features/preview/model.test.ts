@@ -1,8 +1,11 @@
+import { readPointing, withPreviewProblem } from "@t3tools/skycot-rules/preview";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   colorName,
   describePickedElement,
+  CHILD_FIX_IT_MESSAGE,
+  fixItDetails,
   fixItMessage,
   parsePreviewStatus,
   pointerFor,
@@ -139,6 +142,39 @@ describe("words", () => {
     expect(message).toContain("The preview didn't start.");
     expect(message).toContain("`npm run dev`");
     expect(message).toContain("Error: Cannot find module 'server.js'");
+  });
+
+  it("keeps raw preview output out of the child's message", () => {
+    const message = fixItMessage(
+      { state: "failed", command, reason: "exited", output: "private output" },
+      true,
+    );
+    expect(message).toBe("The preview didn't work. Can you fix it?");
+    expect(message).toBe(CHILD_FIX_IT_MESSAGE);
+    expect(message).not.toContain("private output");
+    expect(message).not.toContain("npm run dev");
+  });
+
+  it("keeps the command and output for the hidden context a child's message carries", () => {
+    const details = fixItDetails({
+      state: "failed",
+      command,
+      reason: "exited",
+      output: "  Error: Cannot find module 'server.js'\n",
+    });
+    expect(details).toEqual({
+      what: "The preview didn't start.",
+      how: "It runs `npm run dev`.",
+      output: "Error: Cannot find module 'server.js'",
+    });
+    const sent = withPreviewProblem(CHILD_FIX_IT_MESSAGE, details);
+    expect(readPointing(sent).text).toBe(CHILD_FIX_IT_MESSAGE);
+    expect(sent).toContain("npm run dev");
+    expect(sent).toContain("Cannot find module 'server.js'");
+    // The grown-up message is built from the same words.
+    const grownUp = fixItMessage({ state: "failed", command, reason: "exited", output: "x" });
+    expect(grownUp).toContain(details.what);
+    expect(grownUp).toContain(details.how);
   });
 
   it("knows a plain web page, and says what it shows rather than a command it runs", () => {

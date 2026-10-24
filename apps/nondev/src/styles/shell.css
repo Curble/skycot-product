@@ -113,6 +113,167 @@
   justify-content: flex-start;
 }
 
+/* The child's slim rail inside a make (N1 mockup): four places, the current one a paper card. */
+.fm-body--child-make {
+  position: relative;
+  /* Every layout rule (versions strip, preview, inspector) sizes the sidebar by this. */
+  --fm-sidebar-width: 92px;
+}
+.fm-child-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 8px 16px;
+  color: var(--fm-label);
+  background: var(--fm-bg-sidebar);
+  border-right: 1px solid var(--fm-sidebar-line);
+}
+.fm-child-rail__toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  margin-bottom: 10px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--fm-label-2);
+  background: transparent;
+  cursor: pointer;
+}
+.fm-child-rail__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 76px;
+  min-height: 78px;
+  padding: 6px 2px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  color: inherit;
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fm-child-rail__item span {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+/* Each place its own colour, the same tiles as the Home starter cards (theme colours). */
+.fm-child-rail__tile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--fm-child-rail-tile);
+  box-shadow: 0 1px 0 color-mix(in srgb, #000 18%, transparent);
+}
+.fm-child-rail__tile--home {
+  --fm-child-rail-tile: var(--fm-glyph-blue);
+}
+.fm-child-rail__tile--makes {
+  --fm-child-rail-tile: linear-gradient(180deg, #ffe066, #ffc400);
+  color: #1d1d1f;
+}
+.fm-child-rail__tile--fridge {
+  --fm-child-rail-tile: var(--fm-glyph-green);
+}
+.fm-child-rail__tile--stickers {
+  --fm-child-rail-tile: var(--fm-glyph-purple);
+}
+.fm-child-rail__toggle:hover,
+.fm-child-rail__item:hover {
+  background: var(--fm-sidebar-hover);
+}
+.fm-child-rail__item--current,
+.fm-child-rail__item--current:hover {
+  color: var(--fm-ink, var(--fm-label));
+  background: var(--fm-bg-card);
+  border-color: var(--fm-ink, var(--fm-label));
+  box-shadow: 3px 4px 0 color-mix(in srgb, var(--fm-ink, #000) 22%, transparent);
+}
+.fm-child-rail__toggle:focus-visible,
+.fm-child-rail__item:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+.fm-child-rail__avatar {
+  margin-top: auto;
+}
+.fm-sidebar--child-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 0 auto 0 0;
+  width: min(280px, calc(100vw - 64px));
+  box-shadow: var(--fm-shadow-sheet);
+}
+.fm-child-rail__close {
+  align-self: flex-start;
+  min-height: 38px;
+  margin: 2px 4px 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--fm-sep);
+  border-radius: 8px;
+  color: var(--fm-label);
+  background: var(--fm-bg-card);
+}
+
+.fm-child-makes {
+  padding: 4px 4px 8px;
+}
+.fm-child-makes__heading,
+.fm-child-makes__row,
+.fm-child-makes__all {
+  display: flex;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fm-label);
+  text-align: left;
+  cursor: pointer;
+}
+.fm-child-makes__heading {
+  justify-content: space-between;
+  padding: 7px 8px;
+  font-weight: 700;
+}
+.fm-child-makes__heading span {
+  color: var(--fm-label-3);
+  font-size: 11px;
+}
+.fm-child-makes__row {
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.fm-child-makes__row:hover,
+.fm-child-makes__all:hover {
+  background: var(--fm-sidebar-hover);
+}
+.fm-child-makes__title {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-child-makes__row small {
+  color: var(--fm-label-3);
+  font-size: 10px;
+}
+.fm-child-makes__all {
+  padding: 8px;
+  color: var(--fm-accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+
 .fm-list-column {
   display: flex;
   flex-direction: column;
@@ -647,9 +808,16 @@ html.dark .fm-standalone__foot {
 .fm-shell[data-columns="2"] .fm-body--no-list {
   grid-template-columns: minmax(0, 1fr);
 }
+.fm-shell[data-columns="2"] .fm-body--child-make,
+.fm-shell[data-columns="1"] .fm-body--child-make {
+  grid-template-columns: var(--fm-sidebar-width) minmax(0, 1fr);
+}
 .fm-shell[data-columns="1"] .fm-body,
 .fm-shell[data-columns="1"] .fm-body--no-list {
   grid-template-columns: minmax(0, 1fr);
+}
+.fm-shell[data-columns="1"] .fm-body.fm-body--child-make {
+  grid-template-columns: var(--fm-sidebar-width) minmax(0, 1fr);
 }
 .fm-shell[data-columns="1"] .fm-list-column {
   border-right: 0;

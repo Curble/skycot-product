@@ -5,15 +5,26 @@
  * card's fingerprint and the proof every time, and logs who said yes and how (Phase 1's
  * approver routes).
  */
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
-import { requestHeading } from "../../../../nondev/src/features/family/people";
-import { useGrownUp, type WaitingRequest } from "../../app/grownup/GrownUpContext";
+import {
+  grownUpRequestSentence,
+  requestHeading,
+} from "../../../../nondev/src/features/family/people";
+import type { StackRoutes } from "../../app/routes";
+import {
+  useGrownUp,
+  type WaitingFamilyNote,
+  type WaitingRequest,
+} from "../../app/grownup/GrownUpContext";
 import { useCodeLength, useMacData } from "../../data/MacData";
 import { subscribeAllow, takeAllow } from "../../faceid/allowIntent";
 import { useFaceId } from "../../faceid/FaceIdProvider";
 import { familyApi } from "../../family/api";
+import { shownNoteTarget } from "../../family/noteTarget";
 import {
   Avatar,
   Banner,
@@ -41,6 +52,127 @@ export function countSentence(count: number): string {
   return count === 1 ? "1 request needs a grown-up." : `${count} requests need a grown-up.`;
 }
 
+function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const { refresh } = useMacData();
+  const codeLength = useCodeLength(item.mac.macId);
+  const [minutes, setMinutes] = useState<0 | 15 | 30 | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const name = item.child?.name ?? "A child";
+  const note = item.note;
+  const settle = async (
+    value: 0 | 15 | 30,
+    proof?: { readonly type: "code"; readonly code: string },
+  ) => {
+    setBusy(true);
+    const result =
+      note.kind === "shown" && value === 0
+        ? await familyApi.seenFamilyNote(item.mac.transport, note.id)
+        : await familyApi.answerFamilyNote(item.mac.transport, {
+            id: note.id,
+            minutes: value,
+            ...(proof ? { proof } : {}),
+          });
+    setBusy(false);
+    if (result.ok) {
+      setMinutes(null);
+      void refresh(item.mac.macId);
+    } else setProblem(result.message);
+  };
+  // "Open it": what they made, inside SKYCOT, then the note is marked seen.
+  const openIt = async () => {
+    setBusy(true);
+    setProblem(null);
+    const fridge = await familyApi.fridge(item.mac.transport);
+    const target = shownNoteTarget(item.mac.macId, note, fridge.ok ? fridge.value : null);
+    if (target === null) {
+      setBusy(false);
+      setProblem("That one can't be opened here. Have a look on the Mac.");
+      return;
+    }
+    if (target.name === "Page") navigation.navigate("Page", target.params);
+    else navigation.navigate("Conversation", target.params);
+    await familyApi.seenFamilyNote(item.mac.transport, note.id);
+    setBusy(false);
+    void refresh(item.mac.macId);
+  };
+  return (
+    <Card style={{ gap: 10 }}>
+      <Txt variant="headline">
+        {note.kind === "shown"
+          ? `${name} made something. Have a look`
+          : `${name} asked for more time`}
+      </Txt>
+      {note.kind === "shown" ? <Txt variant="subheadline">{note.title}</Txt> : null}
+      {problem ? <Banner tone="warning" text={problem} /> : null}
+      {note.kind === "shown" ? (
+        <ButtonRow minWidthEach={95}>
+          <Button
+            title="Open it"
+            kind="filled"
+            busy={busy}
+            onPress={() => void openIt()}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Seen"
+            kind="grey"
+            busy={busy}
+            onPress={() => void settle(0)}
+            style={{ flex: 1 }}
+          />
+        </ButtonRow>
+      ) : (
+        <ButtonRow minWidthEach={95}>
+          <Button
+            title="15 min"
+            kind="grey"
+            busy={busy}
+            onPress={() => setMinutes(15)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="30 min"
+            kind="grey"
+            busy={busy}
+            onPress={() => setMinutes(30)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Not tonight"
+            kind="grey"
+            busy={busy}
+            onPress={() => void settle(0)}
+            style={{ flex: 1 }}
+          />
+        </ButtonRow>
+      )}
+      <ParentCodeSheet
+        visible={minutes !== null}
+        title="Give more time?"
+        description={`Enter the parent code to give ${name} ${minutes ?? ""} more minutes.`}
+        actionLabel="Give more time"
+        length={codeLength}
+        onClose={() => setMinutes(null)}
+        onCode={async (code) => {
+          const chosen = minutes;
+          if (chosen === null) return null;
+          const result = await familyApi.answerFamilyNote(item.mac.transport, {
+            id: note.id,
+            minutes: chosen,
+            proof: { type: "code", code },
+          });
+          if (!result.ok) return result.message;
+          setMinutes(null);
+          void refresh(item.mac.macId);
+          return null;
+        }}
+      />
+    </Card>
+  );
+}
+
 function RequestCard(props: {
   readonly waiting: WaitingRequest;
   readonly showMac: boolean;
@@ -58,6 +190,7 @@ function RequestCard(props: {
   const [allowing, setAllowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const name = child?.name ?? "A child";
   const heading = requestHeading(request);
@@ -94,10 +227,9 @@ function RequestCard(props: {
   };
 
   const useFace = faceId.readyOn(mac);
-  const childName = child?.name ?? null;
   const allowingRef = useRef(false);
   /** Allow once: Face ID's fresh signature when it is set up; the parent code otherwise. */
-  const allow = useCallback(async () => {
+  const allow = async () => {
     if (allowingRef.current || done !== null || request.lapsed) return;
     setProblem(null);
     setCodeNote(null);
@@ -108,7 +240,7 @@ function RequestCard(props: {
     allowingRef.current = true;
     setAllowing(true);
     try {
-      const outcome = await faceId.allow(mac, request, childName);
+      const outcome = await faceId.allow(mac, request, child?.name ?? null);
       if (outcome.kind === "allowed") {
         haptic("success");
         settle(`Allowed with ${faceId.label}, this once.`);
@@ -122,7 +254,11 @@ function RequestCard(props: {
       allowingRef.current = false;
       setAllowing(false);
     }
-  }, [faceId, mac, request, childName, done, settle]);
+  };
+  const allowRef = useRef(allow);
+  useEffect(() => {
+    allowRef.current = allow;
+  }, [allow]);
 
   // "Allow once" on this card's notification: Face ID starts here, with the card on screen.
   const key = `${mac.macId}:${request.requestId}`;
@@ -132,11 +268,11 @@ function RequestCard(props: {
   }, [props.liveKeys]);
   useEffect(() => {
     const check = () => {
-      if (takeAllow(key, liveKeysRef.current)) void allow();
+      if (takeAllow(key, liveKeysRef.current)) void allowRef.current();
     };
     check();
     return subscribeAllow(check);
-  }, [key, allow]);
+  }, [key]);
 
   return (
     <Card style={{ gap: 12 }}>
@@ -149,15 +285,21 @@ function RequestCard(props: {
           </Txt>
         </View>
       </View>
-      <Txt variant="title3">{heading}</Txt>
-      {request.what.length > 0 ? (
+      {/* nondev-seam: skycot-grownup-request-sentence */}
+      <Txt variant="title3">{grownUpRequestSentence(request, name)}</Txt>
+      <Button
+        title={showDetails ? "Hide details" : "Show details"}
+        kind="plain"
+        onPress={() => setShowDetails((value) => !value)}
+      />
+      {showDetails && request.what.length > 0 ? (
         <View style={{ backgroundColor: theme.color.fill, borderRadius: 8, padding: 10 }}>
           <Txt variant="subheadline" style={{ fontFamily: "Menlo" }} selectable>
             {request.what}
           </Txt>
         </View>
       ) : null}
-      {request.why ? <Txt tone="label2">{request.why}</Txt> : null}
+      {showDetails && request.why ? <Txt tone="label2">{request.why}</Txt> : null}
       {request.lapsed ? (
         <Banner tone="warning" text="This one is waiting on the Mac now. Answer it there." />
       ) : null}
@@ -239,7 +381,7 @@ export function RequestsScreen() {
       </View>
       {!grownUp.loaded ? (
         <Spinner />
-      ) : grownUp.waiting.length === 0 ? (
+      ) : grownUp.waiting.length === 0 && grownUp.notes.length === 0 ? (
         <EmptyState
           symbol="checkmark.shield"
           title="All quiet"
@@ -247,6 +389,9 @@ export function RequestsScreen() {
         />
       ) : (
         <View style={{ gap: 14, marginHorizontal: 16, marginTop: 20 }}>
+          {grownUp.notes.map((item) => (
+            <FamilyNoteCard key={`${item.mac.macId}:${item.note.id}`} item={item} />
+          ))}
           {grownUp.waiting.map((waiting) => (
             <RequestCard
               key={`${waiting.mac.macId}:${waiting.request.requestId}`}

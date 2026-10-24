@@ -121,6 +121,32 @@ export interface Today {
   readonly threads: Readonly<Record<string, string>>;
 }
 
+export type FamilyNote = {
+  readonly id: string;
+  readonly kind: "shown" | "more-time";
+  readonly childId: string;
+  readonly createdAt: string;
+  readonly status: "open" | "done";
+  readonly threadId?: string;
+  readonly title?: string;
+  readonly answer?: { readonly minutes: 0 | 15 | 30; readonly by: string; readonly at: string };
+};
+
+function parseFamilyNotes(body: unknown): ReadonlyArray<FamilyNote> | null {
+  const notes = record(body).notes;
+  if (!Array.isArray(notes)) return null;
+  return notes.filter((value): value is FamilyNote => {
+    const note = record(value);
+    return (
+      typeof note.id === "string" &&
+      typeof note.childId === "string" &&
+      typeof note.createdAt === "string" &&
+      (note.kind === "shown" || note.kind === "more-time") &&
+      (note.status === "open" || note.status === "done")
+    );
+  });
+}
+
 function parseToday(body: unknown): Today | null {
   const input = record(body);
   if (!Array.isArray(input.children)) return null;
@@ -205,6 +231,23 @@ export const familyApi = {
       transport,
       { method: "GET", path: `${FAMILY_API_PATH}/approver/requests` },
       parsePendingRequests,
+    ),
+  familyNotes: (transport: MacTransport) =>
+    call(transport, { method: "GET", path: `${FAMILY_API_PATH}/approver/notes` }, parseFamilyNotes),
+  answerFamilyNote: (
+    transport: MacTransport,
+    input: { readonly id: string; readonly minutes: 0 | 15 | 30; readonly proof?: ApproverProof },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/notes/answer`, body: input },
+      ok,
+    ),
+  seenFamilyNote: (transport: MacTransport, id: string) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/notes/seen`, body: { id } },
+      ok,
     ),
   answerRequest: (
     transport: MacTransport,

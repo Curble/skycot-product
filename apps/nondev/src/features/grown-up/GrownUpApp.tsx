@@ -38,7 +38,12 @@ import { childLabel, type FamilyChild } from "../family/children";
 import type { FamilyResult } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
-import { grownUpLabel, requestHeading, type PendingRequest } from "../family/people";
+import {
+  grownUpLabel,
+  grownUpRequestSentence,
+  requestHeading,
+  type PendingRequest,
+} from "../family/people";
 import { refreshFamily, settleWithCode } from "../family/store";
 import { todaySummary } from "../family-limits/limits";
 import { refreshToday, useLimits } from "../family-limits/store";
@@ -125,16 +130,27 @@ function GrownUpHome() {
 
 interface RequestsState {
   readonly list: ReadonlyArray<PendingRequest> | null;
+  readonly notes: ReadonlyArray<FamilyNote>;
   /** When the list was read (this device's clock), for "2 minutes ago". */
   readonly readAt: number;
   readonly problem: string | null;
   readonly refresh: () => void;
 }
 
+interface FamilyNote {
+  readonly id: string;
+  readonly kind: "shown" | "more-time";
+  readonly childId: string;
+  readonly status: "open" | "done";
+  readonly title?: string;
+  readonly threadId?: string;
+}
+
 function usePendingRequests(): RequestsState {
   const [list, setList] = useState<ReadonlyArray<PendingRequest> | null>(null);
   const [readAt, setReadAt] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
+  const [notes, setNotes] = useState<ReadonlyArray<FamilyNote>>([]);
   const refresh = useCallback(() => {
     void familyApi.pendingRequests().then((result) => {
       setReadAt(Date.now());
@@ -143,22 +159,38 @@ function usePendingRequests(): RequestsState {
         setProblem(null);
       } else setProblem(result.message);
     });
+    void familyApi.familyNotes().then((result) => {
+      if (result.ok)
+        setNotes(
+          result.value.filter((note): note is FamilyNote => {
+            if (typeof note !== "object" || note === null) return false;
+            const item = note as Record<string, unknown>;
+            return (
+              typeof item.id === "string" &&
+              typeof item.childId === "string" &&
+              (item.kind === "shown" || item.kind === "more-time") &&
+              item.status === "open"
+            );
+          }),
+        );
+    });
   }, []);
   useEffect(() => {
     refresh();
     const timer = window.setInterval(refresh, REQUESTS_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
-  return { list, readAt, problem, refresh };
+  return { list, notes, readAt, problem, refresh };
 }
 
 function RequestsTab({ requests }: { readonly requests: RequestsState }) {
   const { profile } = useFamily();
+  const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   if (requests.problem && requests.list === null) {
     return <Banner tone="warning">{requests.problem}</Banner>;
   }
   if (requests.list === null) return <p className="fm-help">Checking…</p>;
-  if (requests.list.length === 0) {
+  if (requests.list.length === 0 && requests.notes.length === 0) {
     return (
       <EmptyState icon={ShieldCheck} title="All quiet">
         When a child's work needs a grown-up (the internet, an install, deleting files), it shows
@@ -168,6 +200,39 @@ function RequestsTab({ requests }: { readonly requests: RequestsState }) {
   }
   return (
     <div className="fm-grownup__cards">
+      {requests.notes.map((note) => {
+        const childName = nameOf(profile.children, note.childId);
+        return (
+          <section className="fm-grownup__request" key={note.id}>
+            <h2>
+              {note.kind === "shown"
+                ? `${childName} made something. Have a look`
+                : `${childName} asked for more time`}
+            </h2>
+            {note.kind === "shown" && note.title ? <p>{note.title}</p> : null}
+            {note.kind === "shown" ? (
+              <div className="fm-grownup__actions">
+                {note.threadId && environmentIds[0] ? (
+                  <Button
+                    onClick={() =>
+                      navigate(threadHref(environmentIds[0]!, note.threadId as ThreadId))
+                    }
+                  >
+                    Open it
+                  </Button>
+                ) : null}
+                <Button
+                  onClick={() => void familyApi.seenFamilyNote(note.id).then(requests.refresh)}
+                >
+                  Seen
+                </Button>
+              </div>
+            ) : (
+              <FamilyNoteMoreTime note={note} onDone={requests.refresh} />
+            )}
+          </section>
+        );
+      })}
       {requests.list.map((request) => (
         <RequestCard
           key={`${request.threadId}:${request.requestId}`}
@@ -185,6 +250,57 @@ function RequestsTab({ requests }: { readonly requests: RequestsState }) {
 function nameOf(children: ReadonlyArray<FamilyChild>, childId: string | null): string {
   const index = children.findIndex((child) => child.id === childId);
   return index < 0 ? "A child" : childLabel(children[index]!, index);
+}
+
+function FamilyNoteMoreTime({
+  note,
+  onDone,
+}: {
+  readonly note: FamilyNote;
+  readonly onDone: () => void;
+}) {
+  const [minutes, setMinutes] = useState<15 | 30 | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const entry = useParentCodeEntry(
+    async (code) => {
+      return minutes === null
+        ? familyApi.answerFamilyNote({ id: note.id, minutes: 0 })
+        : familyApi.answerFamilyNote({ id: note.id, minutes, proof: { type: "code", code } });
+    },
+    () => {
+      setMinutes(null);
+      onDone();
+    },
+  );
+  return (
+    <>
+      <div className="fm-grownup__actions">
+        <Button onClick={() => setMinutes(15)}>15 min</Button>
+        <Button onClick={() => setMinutes(30)}>30 min</Button>
+        <Button
+          onClick={() =>
+            void familyApi.answerFamilyNote({ id: note.id, minutes: 0 }).then((result) => {
+              if (result.ok) onDone();
+              else setProblem(result.message);
+            })
+          }
+        >
+          Not tonight
+        </Button>
+      </div>
+      {minutes !== null ? (
+        <div>
+          <p>Enter the parent code to give {minutes} more minutes.</p>
+          <ParentCodeEntry entry={entry} />
+          <Button disabled={!entry.canSubmit} onClick={() => void entry.submit()}>
+            {entry.busy ? "Checking…" : "Give more time"}
+          </Button>
+          <Button onClick={() => setMinutes(null)}>Cancel</Button>
+        </div>
+      ) : null}
+      {problem ? <Banner tone="warning">{problem}</Banner> : null}
+    </>
+  );
 }
 
 function ageOf(at: number, now: number): string {
@@ -215,6 +331,7 @@ function RequestCard({
   const [problem, setProblem] = useState<string | null>(null);
   const [askCode, setAskCode] = useState(false);
   const [done, setDone] = useState<"accept" | "decline" | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const send = async (decision: "accept" | "decline", proof: ApproverProof | null) => {
     setBusy(true);
@@ -268,11 +385,19 @@ function RequestCard({
           </small>
         </div>
       </div>
-      <p className="fm-grownup__card-what">
-        <span>{requestHeading(request)}</span>
-        {request.what ? <code>{request.what}</code> : null}
-      </p>
-      {request.why ? <p className="fm-grownup__card-why">{request.why}</p> : null}
+      <p className="fm-grownup__card-what">{grownUpRequestSentence(request, childName)}</p>
+      <Button size="sm" variant="plain" onClick={() => setShowDetails((value) => !value)}>
+        {showDetails ? "Hide details" : "Show details"}
+      </Button>
+      {showDetails ? (
+        <>
+          <p className="fm-grownup__card-what">
+            <span>{requestHeading(request)}</span>
+            {request.what ? <code>{request.what}</code> : null}
+          </p>
+          {request.why ? <p className="fm-grownup__card-why">{request.why}</p> : null}
+        </>
+      ) : null}
       {done !== null ? (
         <Banner tone="info">
           {done === "accept" ? "Allowed, this once." : "Declined. They see that on their screen."}

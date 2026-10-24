@@ -1,10 +1,14 @@
 // One-tap starter cards: the words a card puts in the message box. Pure data and string
-// building, so the prompts are tested and the cards stay dumb. Every kid prompt asks for one
+// building, so the prompts are tested and the cards stay dumb. Every kid card asks for one
 // small, offline, single-file page in the current project: one file is what the What-changed
 // card can open in its preview (features/starters/PreviewSheet.tsx), and "offline, no installs"
 // is what the Family profile's engine rules ask for anyway, so the request never starts a fight
-// with them. Blanks are written `[like this]`; the composer selects the first one so a child
-// can type straight over it.
+// with them. The child sees and sends only the friendly sentence; those technical rules travel
+// as a hidden marker (`@t3tools/skycot-rules/starter`) the engine turns into instructions.
+// Blanks are written `[like this]`; the composer selects the first one so a child can type
+// straight over it.
+
+import { withStarterMarker } from "@t3tools/skycot-rules/starter";
 
 export type StarterAudience = "kids" | "grown-ups";
 
@@ -41,19 +45,13 @@ export interface Starter {
   readonly blurb: string;
   readonly icon: StarterIcon;
   readonly tone: StarterTone;
-  /** The ask, with `[blanks]`; the shared rules are appended by `starterPrompt`. */
+  /** The ask, with `[blanks]`; a grown-up card's shared rules are appended by `starterPrompt`. */
   readonly ask: string;
-  /** Kids' cards name the one file the page goes in, so "Open it" has one thing to open. */
+  /**
+   * Kids' cards name the one file the page goes in, so "Open it" has one thing to open. The
+   * engine's rules for the card (`STARTER_FILE_NAMES`) name the same file.
+   */
   readonly fileName?: string;
-}
-
-/** Appended to every kid prompt: one file, offline, nothing to install. */
-export function kidRules(fileName: string): string {
-  return [
-    `Make it one new file called ${fileName}, with the HTML, CSS and JavaScript all inside that one file.`,
-    "It must work offline: no internet, no installs, and no pictures, sounds or fonts from websites (draw with CSS, SVG or emoji).",
-    "Then tell me in one short, friendly sentence what you made.",
-  ].join(" ");
 }
 
 /** Appended to every grown-up prompt: the files already here, nothing new to install. */
@@ -157,7 +155,7 @@ export const SURPRISE_IDEAS: ReadonlyArray<string> = [
   "a pretend aquarium where fish swim over to wherever I click",
   "a big dice I can roll with a button, with a little rolling wobble",
   "a night sky where I click to add stars and join them into my own constellations",
-  "a drum pad I can play with the keyboard, making the sounds with the Web Audio API instead of sound files",
+  "a drum pad I can play with the keyboard, making its own sounds",
   "a page that tells a different silly joke every time I press the button",
   "a magic 8-ball that answers my questions",
 ];
@@ -256,13 +254,47 @@ export function startersFor(options: {
   return options.family || options.playful ? KID_STARTERS : GROWN_UP_STARTERS;
 }
 
-/** `random` is injectable so "Surprise me" is testable; it must return [0, 1). */
+/**
+ * The words a card puts in the box. A kids' card is the friendly sentence alone (its technical
+ * rules go as a hidden marker, see `starterMessageText`); a grown-up card ends with its rules.
+ * `random` is injectable so "Surprise me" is testable; it must return [0, 1).
+ */
 export function starterPrompt(starter: Starter, random: () => number = Math.random): string {
   const ask =
     starter.kind === "surprise" ? starter.ask.replace("{idea}", pickSurprise(random)) : starter.ask;
-  const rules =
-    starter.audience === "kids" ? kidRules(starter.fileName ?? "my-page.html") : GROWN_UP_RULES;
-  return `${ask}\n\n${rules}`;
+  return starter.audience === "kids" ? ask : `${ask}\n\n${GROWN_UP_RULES}`;
+}
+
+/** The fixed words of a prompt: everything outside its `[blanks]`, as lower-case words. */
+function fixedWords(prompt: string): ReadonlySet<string> {
+  const outside = prompt.replace(/\[[^\]\n]+\]/g, " ").toLowerCase();
+  return new Set(outside.match(/[a-z']{3,}/g) ?? []);
+}
+
+/**
+ * Whether the box still holds the card's words: the child may fill the blanks and change
+ * some words, but if they cleared it and typed their own idea the card no longer applies.
+ */
+export function stillFromStarter(seedText: string, text: string): boolean {
+  const fixed = fixedWords(seedText);
+  if (fixed.size === 0) return false;
+  const typed = new Set(text.toLowerCase().match(/[a-z']{3,}/g) ?? []);
+  let kept = 0;
+  for (const word of fixed) if (typed.has(word)) kept += 1;
+  return kept / fixed.size >= 0.6;
+}
+
+/**
+ * The message to send for what is in the box: the child's words, plus the card's hidden
+ * marker while those words are still the card's. Own words (or a grown-up card, which shows
+ * its rules) send no marker.
+ */
+export function starterMessageText(
+  text: string,
+  seed: { readonly starterId: string; readonly text: string } | null,
+): string {
+  if (seed === null || !stillFromStarter(seed.text, text)) return text;
+  return withStarterMarker(text, seed.starterId);
 }
 
 export function pickSurprise(random: () => number): string {

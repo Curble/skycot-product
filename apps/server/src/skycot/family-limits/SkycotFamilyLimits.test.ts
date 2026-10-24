@@ -14,6 +14,16 @@ const SESSION = "session-kid";
 const MELBOURNE = "Australia/Melbourne";
 const at = (iso: string) => TestClock.setTime(Date.parse(iso));
 
+// nondev-seam: skycot-child-limit-copy-test
+it.effect("uses child words for an allowance rest", () =>
+  Effect.sync(() => {
+    assert.equal(
+      SkycotFamilyLimits.asleepSentence("allowance", null, null, MELBOURNE),
+      "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
+    );
+  }),
+);
+
 const withLimits = <A, E, R>(
   use: (input: {
     readonly family: SkycotFamily.SkycotFamily["Service"];

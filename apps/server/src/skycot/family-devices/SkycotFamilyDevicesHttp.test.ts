@@ -33,6 +33,7 @@ import * as SkycotFamilyHttp from "../SkycotFamilyHttp.ts";
 import * as SkycotFamilyDevices from "./SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
+import * as SkycotFamilyNotes from "../family-notes/SkycotFamilyNotes.ts";
 
 const CODE = "482913";
 const AVA_IPAD = "d1111111111";
@@ -70,6 +71,7 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
     JSON.stringify({ version: 1, pins: {} }),
   );
   const answers: Array<unknown> = [];
+  const moreTimeAnswers: Array<unknown> = [];
   const layerFamily = SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME));
   const layerAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth)({
     authenticateHttpRequest: (request) => {
@@ -118,6 +120,14 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
       return Effect.void;
     },
     approvals: Effect.succeed([]),
+    moreTime: (input) => {
+      if (input.proof === null)
+        return Effect.fail(
+          new SkycotFamilyDevices.DevicesError("proof-needed", "Use the parent code."),
+        );
+      moreTimeAnswers.push(input);
+      return Effect.void;
+    },
     list: Effect.succeed([]),
     endVanished: () => Effect.void,
     endAll: Effect.void,
@@ -182,6 +192,7 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
   ).pipe(
     Layer.provide(SkycotFamilyHttp.layerApiGate),
     Layer.provide(layerDevices),
+    Layer.provide(SkycotFamilyNotes.layerAt(path.join(dir, SkycotFamilyNotes.FILE_NAME))),
     Layer.provideMerge(NodeHttpPlatform.layer),
   );
   const services = yield* Layer.build(
@@ -245,7 +256,7 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
   yield* limits.choose({ sessionId: "mac", childId: leoId, grownUp: false });
   yield* limits.recordStart({ sessionId: "mac", threadId: "thread-leo" });
   yield* limits.recordStart({ sessionId: "ava-ipad", threadId: "thread-ava" });
-  return { send, answers, avaId };
+  return { send, answers, avaId, leoId, moreTimeAnswers };
 });
 
 it.layer(
@@ -275,6 +286,92 @@ it.layer(
       assert.deepEqual((mum.json["me"] as { permissions: Array<string> }).permissions, [
         "family:approver",
       ]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("family notes stay child-scoped and only a grown-up device can answer", () =>
+    Effect.gen(function* () {
+      const { send, avaId, leoId, moreTimeAnswers } = yield* makeServer();
+      const create = "/api/skycot/family/notes/child";
+      const adults = "/api/skycot/family/approver/notes";
+      const childCreated = yield* send("ava", "POST", create, {
+        kind: "shown",
+        threadId: "thread-ava",
+        title: "Maze",
+      });
+      assert.equal(childCreated.status, 201);
+      const shown = childCreated.json["note"] as { id: string };
+      const moreCreated = yield* send("ava", "POST", create, { kind: "more-time" });
+      assert.equal(moreCreated.status, 201);
+      const more = moreCreated.json["note"] as { id: string };
+      assert.equal(
+        (yield* send("ava", "POST", create, {
+          kind: "shown",
+          threadId: "thread-leo",
+          title: "Other child's thing",
+        })).status,
+        403,
+      );
+      const own = yield* send("ava", "GET", create);
+      assert.equal(
+        (own.json["notes"] as ReadonlyArray<{ childId: string }>).every(
+          (note) => note.childId === avaId,
+        ),
+        true,
+      );
+      assert.equal((yield* send("ava", "GET", adults)).status, 403);
+      const macRequest = yield* send("mac", "POST", create, { kind: "more-time" });
+      assert.equal(macRequest.status, 201);
+      assert.equal((macRequest.json["note"] as { childId: string }).childId, leoId);
+      assert.equal(
+        (yield* send("ava", "POST", "/api/skycot/family/approver/notes/answer", {
+          id: more.id,
+          minutes: 0,
+        })).status,
+        403,
+      );
+      const grownUpList = yield* send("mum", "GET", adults);
+      assert.equal((grownUpList.json["notes"] as ReadonlyArray<{ id: string }>).length, 3);
+      assert.equal(
+        (yield* send("mum", "POST", "/api/skycot/family/approver/notes/seen", { id: shown.id }))
+          .status,
+        200,
+      );
+      assert.equal(
+        (yield* send("mum", "POST", "/api/skycot/family/approver/notes/answer", {
+          id: more.id,
+          minutes: 0,
+        })).status,
+        200,
+      );
+      const foreign = yield* send("mum", "POST", "/api/skycot/family/approver/notes/answer", {
+        id: "foreign-note",
+        minutes: 0,
+      });
+      assert.equal(foreign.status, 409);
+      // The same grown-up-only service path handles the 15-minute grant and requires its proof.
+      const moreAgain = yield* send("ava", "POST", create, { kind: "more-time" });
+      const extraId = (moreAgain.json["note"] as { id: string }).id;
+      assert.equal(
+        (yield* send("mum", "POST", "/api/skycot/family/approver/notes/answer", {
+          id: extraId,
+          minutes: 15,
+        })).json["error"],
+        "proof-needed",
+      );
+      assert.equal(
+        (yield* send("mum", "POST", "/api/skycot/family/approver/notes/answer", {
+          id: extraId,
+          minutes: 15,
+          proof: { type: "code", code: CODE },
+        })).status,
+        200,
+      );
+      assert.equal(moreTimeAnswers.length, 1);
+      const after = yield* send("ava", "GET", create);
+      const notes = after.json["notes"] as ReadonlyArray<{ id: string; status: string }>;
+      assert.equal(notes.find((note) => note.id === shown.id)?.status, "done");
+      assert.equal(notes.find((note) => note.id === more.id)?.status, "done");
     }).pipe(Effect.scoped),
   );
 

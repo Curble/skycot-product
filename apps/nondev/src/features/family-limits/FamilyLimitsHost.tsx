@@ -10,10 +10,11 @@ import { readActiveThemeId, setActiveTheme, themeById, useActiveTheme } from "..
 import { useTextSize, writeTextSize } from "../settings/localPrefs";
 import { useFamily } from "../family/FamilyProvider";
 import { currentChild } from "../family/family";
-import { saveOwnLook } from "../family/store";
+import { readFamilyView, saveOwnLook } from "../family/store";
 import { SessionRecapHost } from "../recap/SessionRecap";
 import { AsleepScreen } from "./AsleepScreen";
 import { ChildPicker } from "./ChildPicker";
+import { pickerAfterIdle, PICKER_IDLE_MS } from "./idlePicker";
 import { startLimitsClock, useLimits } from "./store";
 
 const PICKED_KEY = "skycot:family:picked";
@@ -51,6 +52,7 @@ export function childPickerRequested(): boolean {
 function closeRequestedPicker() {
   pickerRequested = false;
   for (const listener of pickerListeners) listener();
+  window.dispatchEvent(new Event("skycot:child-picker-closed"));
 }
 
 function usePickerRequested(): boolean {
@@ -80,6 +82,47 @@ export function FamilyLimitsHost() {
   const [picked, setPicked] = useState(pickedThisWindow);
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const engineKnown = view.source === "engine" && view.enabled;
+
+  useEffect(() => {
+    if (!engineKnown || view.me.kind !== "shared" || view.children.length < 2) return;
+    let lastInputAt = Date.now();
+    let timer: number | null = null;
+    const checkIdle = () => {
+      if (!pickerAfterIdle(lastInputAt, Date.now())) return;
+      const current = readFamilyView();
+      const grantUntil = Math.max(current.openUntil.settings ?? 0, current.openUntil.advanced ?? 0);
+      const waitForGrant = grantUntil - Date.now();
+      if (waitForGrant > 0) {
+        timer = window.setTimeout(checkIdle, waitForGrant + 50);
+        return;
+      }
+      openChildPicker();
+    };
+    const arm = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = null;
+      if (childPickerRequested()) return;
+      const delay = Math.max(0, PICKER_IDLE_MS - (Date.now() - lastInputAt));
+      timer = window.setTimeout(checkIdle, delay);
+    };
+    const onInput = () => {
+      lastInputAt = Date.now();
+      arm();
+    };
+    const onPickerClosed = () => {
+      lastInputAt = Date.now();
+      arm();
+    };
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    for (const event of events) window.addEventListener(event, onInput, { passive: true });
+    window.addEventListener("skycot:child-picker-closed", onPickerClosed);
+    arm();
+    return () => {
+      for (const event of events) window.removeEventListener(event, onInput);
+      window.removeEventListener("skycot:child-picker-closed", onPickerClosed);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [engineKnown, view.children.length, view.me.kind]);
 
   useEffect(() => {
     if (!engineKnown) return;

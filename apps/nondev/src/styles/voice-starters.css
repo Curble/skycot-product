@@ -401,6 +401,25 @@ html[data-flavour-borders="sketch"] .fm-readaloud[data-speaking] {
   /* The page draws its own background; white is what a browser would show. */
   background: #fff;
 }
+.fm-preview-frame-wrap {
+  position: relative;
+}
+.fm-preview-frame-loading {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  border-radius: var(--fm-radius-md);
+  background: var(--fm-bg-window);
+  color: var(--fm-label-2);
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-preview-frame-loading p {
+  margin: 0;
+}
 html[data-flavour-borders="sketch"] .fm-preview-frame {
   border: 2px solid var(--fm-ink);
 }

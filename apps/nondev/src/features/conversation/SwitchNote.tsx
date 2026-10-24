@@ -13,6 +13,7 @@ import { useCrew } from "../../themes/useCrew";
 import { Bubble } from "../../ui/Bubble";
 import { engineRequest } from "../family/api";
 import { localTimeZone } from "../usage/useUsage";
+import { useChildView } from "../../app/useChildView";
 
 const SWITCHES_PATH = "/api/skycot/family/assistant-switches";
 
@@ -65,6 +66,7 @@ export function SwitchNote({
   readonly providers: ReadonlyArray<ServerProvider>;
 }) {
   const crew = useCrew();
+  const childView = useChildView();
   // Measured when the line first shows: "until Tuesday" stays put while it is on screen.
   const [now] = useState(() => Date.now());
   return (
@@ -75,6 +77,7 @@ export function SwitchNote({
         now,
         timeZone: localTimeZone(),
         crewName: crew.named ? crew.builder.name : null,
+        childView,
       })}
     </Bubble>
   );

@@ -5,7 +5,7 @@ import { readDesktopPrimaryBearerToken } from "~/environments/primary/desktopAut
 import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target";
 
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
-import type { ChildAvatar, ChildLimits, ChildVoice } from "./children";
+import type { ChildAvatar, ChildLimits, ChildVoice, ReadingLevel } from "./children";
 import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
 import { parseRelayStatus } from "./relay";
 import {
@@ -101,6 +101,7 @@ export interface ChildPatch {
   readonly voice?: Partial<ChildVoice>;
   readonly limits?: Partial<ChildLimits>;
   readonly askEachStep?: boolean;
+  readonly readingLevel?: ReadingLevel;
 }
 
 function parseAdded(body: unknown) {
@@ -120,6 +121,43 @@ function browserZone(): string | null {
 }
 
 export const familyApi = {
+  familyNotes: () =>
+    request("GET", "/approver/notes", undefined, (body) => {
+      const notes = (body as { notes?: unknown } | null)?.notes;
+      return Array.isArray(notes) ? notes : null;
+    }),
+  answerFamilyNote: (input: {
+    readonly id: string;
+    readonly minutes: 0 | 15 | 30;
+    readonly proof?: { readonly type: "code"; readonly code: string };
+  }) =>
+    request(
+      "POST",
+      "/approver/notes/answer",
+      input,
+      (body) => body !== null && typeof body === "object",
+    ),
+  seenFamilyNote: (id: string) =>
+    request(
+      "POST",
+      "/approver/notes/seen",
+      { id },
+      (body) => body !== null && typeof body === "object",
+    ),
+  createNote: (input: {
+    readonly kind: "shown" | "more-time";
+    readonly threadId?: string;
+    readonly title?: string;
+  }) =>
+    request("POST", "/notes/child", input, (body) => {
+      const note = (body as { note?: unknown } | null)?.note;
+      return typeof note === "object" && note !== null ? note : null;
+    }),
+  childNotes: () =>
+    request("GET", "/notes/child", undefined, (body) => {
+      const notes = (body as { notes?: unknown } | null)?.notes;
+      return Array.isArray(notes) ? notes : null;
+    }),
   status: () => request("GET", "", undefined, parseServerStatus),
   enable: (input: { readonly code: string; readonly childName: string | null }) =>
     request("POST", "/enable", { ...input, timeZone: browserZone() }, parseServerStatus),

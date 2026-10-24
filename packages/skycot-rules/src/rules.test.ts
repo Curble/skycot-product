@@ -1,3 +1,4 @@
+// nondev-seam: skycot-hard-rules-batch4-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -189,6 +190,26 @@ describe("evaluateCommand — live, money, data out, scripts", () => {
 });
 
 describe("evaluateCommand — outside the project and secrets", () => {
+  it("treats a URL inside a sed replacement as text", () => {
+    expect(
+      evaluateCommand("sed -i '' 's#https://cdn.example.com/#./vendor/#g' index.html", {
+        projectRoot: ROOT,
+      }).matches.map((match) => match.rule.id),
+    ).toEqual([]);
+  });
+
+  it("reads a sed or awk script as a script, not a file (live false alarm, 25 Oct)", () => {
+    const ids = (command: string) =>
+      evaluateCommand(command, { projectRoot: ROOT }).matches.map((match) => match.rule.id);
+    expect(ids("sed -n '/<script>/,/<\\/script>/p' fireworks/index.html")).toEqual([]);
+    expect(ids("sed -e '/^\\/\\//d' game.js")).toEqual([]);
+    expect(ids("awk '/score/ { print }' game.js")).toEqual([]);
+    // Real files outside the project are still caught, whichever word they are.
+    expect(ids("sed -n '1,5p' /etc/passwd")).toContain("reads-outside-project");
+    expect(ids("sed -f /Users/me/evil.sed game.js")).toContain("reads-outside-project");
+    expect(ids("awk '{ print }' /Users/me/Desktop/notes.txt")).toContain("reads-outside-project");
+  });
+
   it("holds writes and runs outside the project as high, reads as medium", () => {
     const write = evaluateCommand("cp menu.html /Users/me/Desktop/menu.html", {
       projectRoot: ROOT,

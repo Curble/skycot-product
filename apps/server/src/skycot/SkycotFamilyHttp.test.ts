@@ -426,6 +426,20 @@ it.layer(
     }),
   );
 
+  it.effect("answers who said yes in a conversation only from the family log", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const read = (query: string) =>
+        send("GET", `/api/skycot/family/grown-up-answers${query}`).pipe(
+          Effect.flatMap((response) => response.json),
+          Effect.map((json) => (json as { readonly answers: ReadonlyArray<unknown> }).answers),
+        );
+      // No conversation named, or nothing logged (the profile is off): nothing to tell.
+      assert.deepStrictEqual(yield* read(""), []);
+      assert.deepStrictEqual(yield* read("?threadId=thread-1"), []);
+    }),
+  );
+
   it.effect("refuses a device that is not signed in", () =>
     Effect.gen(function* () {
       const { send } = yield* makeClient();

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { canContinue, onboardingSteps, shouldShowOnboarding, welcomeEntry } from "./onboarding";
 
 describe("onboardingSteps", () => {
-  it("always starts with who, adds the Family step on the child path only", () => {
+  it("puts the parent code and child's name before the child setup", () => {
     expect(onboardingSteps(null)).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
     expect(onboardingSteps("me")).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
     expect(onboardingSteps("child")).toEqual([
@@ -11,7 +11,6 @@ describe("onboardingSteps", () => {
       "family",
       "assistant",
       "work",
-      "autonomy",
       "look",
       "done",
     ]);
@@ -19,7 +18,7 @@ describe("onboardingSteps", () => {
 
   it("skips the Family set-up when a profile is already on", () => {
     expect(onboardingSteps("child", true)).not.toContain("family");
-    expect(onboardingSteps("child", true)[0]).toBe("who");
+    expect(onboardingSteps("child", true)).toEqual(["who", "assistant", "work", "look", "done"]);
   });
 });
 

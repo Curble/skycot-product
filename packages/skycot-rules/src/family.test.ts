@@ -1,3 +1,4 @@
+// nondev-seam: skycot-family-rules-batch4-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -22,11 +23,25 @@ describe("family rules — ordinary project work stays with the child", () => {
     "python3 game.py",
     "git status",
     "git add -A && git commit -m 'save'",
+    'grep "sudo" index.html',
     "mkdir sprites",
     "echo hello > notes.txt",
   ])("%s", (command) => {
     expect(ids(command)).toEqual([]);
     expect(needsGrownUp(command)).toBe(false);
+  });
+});
+
+describe("family rules — unreadable code has its own reason", () => {
+  const selfCheck =
+    "node <<'NODE'\nconst vm = require('node:vm');\nvm.runInNewContext('1 + 1');\nNODE";
+
+  it("labels the node:vm self-check without calling it internet use", () => {
+    expect(ids(selfCheck)).toEqual(["opaque-code"]);
+    expect(
+      evaluateFamilyRequest({ kind: "command", command: selfCheck }, { projectRoot: ROOT })
+        .family[0]?.rule.held,
+    ).toBe("SKYCOT can't read exactly what this does");
   });
 });
 
@@ -148,7 +163,6 @@ describe("family rules — real internet use still needs a grown-up", () => {
     `node --input-type=module -e "import http from 'node:http'; http.get('http://x.test')"`,
     `node -e "require('child_process').execSync('curl https://x.test')"`,
     `node -e "require('child_process').execSync('npm install left-pad')"`,
-    `node -e "eval(Buffer.from('ZmV0Y2g=', 'base64').toString())"`,
     `python -c "import urllib.request; urllib.request.urlopen('https://x')"`,
     `python3 -c "import requests; print(requests.get('https://x.test').text)"`,
     `python3 -c "import os; os.system('curl https://x.test')"`,
@@ -171,7 +185,6 @@ describe("family rules — real internet use still needs a grown-up", () => {
     "if curl -fsS https://x.test > /dev/null; then echo up; fi",
     'eval "curl -s x.test"',
     `node -e "const get = fetch; get('https://x.test')"`,
-    `node -e "require('ht' + 'tps').get('https://x.test')"`,
     "echo \"fetch('https://x.test')\" | node",
     "tee get.sh <<'EOF'\ncurl -s https://x.test\nEOF",
     "for u in https://a.test https://b.test; do echo $u; done",
@@ -182,6 +195,14 @@ describe("family rules — real internet use still needs a grown-up", () => {
 
   it("a heredoc writing a script still catches network programs in it", () => {
     expect(ids("cat > get.sh <<'EOF'\ncurl -s https://x.test\nEOF")).toContain("uses-internet");
+  });
+
+  it.each([
+    `node -e "eval(Buffer.from('ZmV0Y2g=', 'base64').toString())"`,
+    `node -e "require('ht' + 'tps').get('https://x.test')"`,
+  ])("keeps opaque code held with its own reason: %s", (command) => {
+    expect(ids(command)).toContain("opaque-code");
+    expect(ids(command)).not.toContain("uses-internet");
   });
 });
 

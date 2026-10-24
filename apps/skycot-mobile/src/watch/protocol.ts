@@ -25,6 +25,9 @@ export interface WatchRequest {
   readonly title: string;
   /** "Run a command", as the phone's card heading. */
   readonly heading: string;
+  // nondev-seam: skycot-watch-request-sentence-protocol
+  /** One plain sentence; the Watch does not show command details. */
+  readonly sentence: string;
   /** The exact step (for example `npm install three`), as the phone shows it. */
   readonly what: string;
   readonly why: string | null;
@@ -35,6 +38,29 @@ export interface WatchRequest {
   readonly lapsed: boolean;
   /** This phone's Watch is set up to say yes on that Mac. */
   readonly watchCanSayYes: boolean;
+}
+
+/**
+ * One family note the Watch lists ("Ava asked for more time", "Ava made something"). It never
+ * carries what the child made or its title: a "shown" note says only that there is something to
+ * see on the phone.
+ */
+export interface WatchNote {
+  /** `<macId>:<noteId>`: unique across a family's Macs. */
+  readonly id: string;
+  readonly macId: string;
+  readonly noteId: string;
+  readonly kind: "more-time" | "shown";
+  readonly childName: string;
+  readonly childInitial: string;
+  readonly childColour: string;
+  /** "Ava asked for more time" or "Ava made something". */
+  readonly title: string;
+  /** One plain sentence under the title. */
+  readonly sentence: string;
+  /** The Mac's name, when the family has more than one. */
+  readonly macName: string | null;
+  readonly createdAt: number;
 }
 
 /** One child's day, in the words the phone's Children page uses. */
@@ -67,6 +93,11 @@ export interface WatchSnapshot {
   readonly state: WatchSnapshotState;
   readonly grownUpName: string;
   readonly requests: ReadonlyArray<WatchRequest>;
+  /**
+   * Open family notes. Added after protocol 1 shipped without changing it: a Watch that
+   * doesn't know the field ignores it, and one that gets a snapshot without it shows none.
+   */
+  readonly notes: ReadonlyArray<WatchNote>;
   readonly children: ReadonlyArray<WatchChild>;
   /** Set up to say yes from this Watch on every linked Mac. */
   readonly watchSetUp: boolean;
@@ -100,7 +131,13 @@ export type WatchMessage =
         readonly signature: string;
       } | null;
     }
-  | { readonly type: "lock" };
+  | { readonly type: "lock" }
+  /**
+   * "Not tonight" on a note asking for more time. It needs no proof, as a no to a request needs
+   * none. There is no 15 or 30 minutes here: more time stays with the parent code on the phone
+   * (the Mac refuses a Watch's signature for it), so nothing in this message can give any.
+   */
+  | { readonly type: "noteNotTonight"; readonly macId: string; readonly noteId: string };
 
 /** The phone's reply to any message. */
 export type WatchReply =
@@ -147,6 +184,11 @@ export function parseWatchMessage(json: string): WatchMessage | null {
       return { type: "hello" };
     case "lock":
       return { type: "lock" };
+    case "noteNotTonight": {
+      const macId = text(input.macId);
+      const noteId = text(input.noteId);
+      return macId === null || noteId === null ? null : { type: "noteNotTonight", macId, noteId };
+    }
     case "challenge":
     case "answer": {
       const macId = text(input.macId);

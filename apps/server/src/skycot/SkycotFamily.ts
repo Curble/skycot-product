@@ -150,6 +150,10 @@ const ChildVoice = Schema.Struct({
 });
 export type ChildVoice = typeof ChildVoice.Type;
 
+export const READING_LEVELS = ["little-makers", "makers", "big-makers"] as const;
+export type ReadingLevel = (typeof READING_LEVELS)[number];
+export const DEFAULT_READING_LEVEL: ReadingLevel = "makers";
+
 const Child = Schema.Struct({
   id: Schema.String,
   name: Schema.NullOr(Schema.String),
@@ -166,6 +170,7 @@ const Child = Schema.Struct({
    * (SkycotPolicyReactor). Only a parent changes it (the parent code opens the editor).
    */
   askEachStep: Schema.optionalKey(Schema.Boolean),
+  readingLevel: Schema.optionalKey(Schema.Literals(READING_LEVELS)),
   createdAt: Schema.String,
 });
 export type FamilyChild = typeof Child.Type;
@@ -438,6 +443,7 @@ export interface ChildInput {
   readonly voice?: unknown;
   readonly limits?: unknown;
   readonly askEachStep?: unknown;
+  readonly readingLevel?: unknown;
 }
 
 export type FamilyFailureReason =
@@ -930,6 +936,9 @@ export function applyChildInput(child: FamilyChild, input: ChildInput): FamilyCh
     voice: input.voice === undefined ? child.voice : cleanVoice(input.voice, child.voice),
     limits: input.limits === undefined ? child.limits : cleanLimits(input.limits, child.limits),
     ...(typeof input.askEachStep === "boolean" ? { askEachStep: input.askEachStep } : {}),
+    readingLevel: (READING_LEVELS as ReadonlyArray<unknown>).includes(input.readingLevel)
+      ? (input.readingLevel as ReadingLevel)
+      : (child.readingLevel ?? DEFAULT_READING_LEVEL),
   };
 }
 
@@ -944,6 +953,7 @@ function newChild(input: ChildInput, siblings: number, createdAt: string): Famil
       largerText: true,
       voice: DEFAULT_VOICE,
       limits: NO_LIMITS,
+      readingLevel: DEFAULT_READING_LEVEL,
       createdAt,
     },
     input,
