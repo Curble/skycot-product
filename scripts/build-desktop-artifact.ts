@@ -55,6 +55,13 @@ import {
 } from "../packages/skycot-brand/src/macBuild.ts";
 // nondev-seam: skycot-mac-dmg-notarize
 import { finishSkycotMacDmgs, resolveSkycotDmgRelease } from "../nondev/scripts/mac-dmg-release.ts";
+// nondev-seam: skycot-stage-lockfile
+import {
+  STAGE_FROZEN_INSTALL_FLAG,
+  STAGE_LOCKFILE_ARGS,
+  assertStageLockfileTested,
+  writeStageSeedLockfile,
+} from "../nondev/scripts/stage-lockfile.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -1670,10 +1677,11 @@ export function createStagePatchedDependencies(
 
 // nondev-seam: skycot-stage-pin-patched
 /**
- * The staged install has no lockfile, so a range like `^1.2.0-beta.15` takes whatever is newest
- * on the day; a patch written for 1.2.0-beta.15 then fails the install (ERR_PNPM_UNUSED_PATCH,
- * beta 3, 24 October 2026) or, worse, ships an unpatched newer copy. Each patched dependency is
- * pinned to the exact version its patch names.
+ * A range like `^1.2.0-beta.15` resolved without a lockfile takes whatever is newest on the day;
+ * a patch written for 1.2.0-beta.15 then fails the install (ERR_PNPM_UNUSED_PATCH, beta 3,
+ * 24 October 2026) or, worse, ships an unpatched newer copy. Each patched dependency is pinned to
+ * the exact version its patch names. skycot-stage-lockfile now holds every staged package to the
+ * repo lockfile; this stays because a patch fits exactly one version whatever the lockfile says.
  */
 export function pinnedPatchedDependencies(
   patchedDependencies: Record<string, string>,
@@ -1854,6 +1862,62 @@ const runCommand = Effect.fn("runCommand")(function* (
       ...(stderr.trim() ? { stderrTail: stderr } : {}),
     });
   }
+});
+
+// nondev-seam: skycot-stage-lockfile
+export class StageLockfileError extends Schema.TaggedError<StageLockfileError>()(
+  "StageLockfileError",
+  { stageDir: Schema.String, detail: Schema.String },
+) {
+  override get message(): string {
+    return this.detail;
+  }
+}
+
+// nondev-seam: skycot-stage-lockfile
+/**
+ * Release builds install exactly the versions the repo was tested with: the stage gets a lockfile
+ * cut from the repo's, pnpm settles peers and the stage's own config against it without
+ * installing anything, and the result must not hold a package or link the repo lockfile lacks.
+ * The install that follows runs with --frozen-lockfile, so it is that checked lockfile exactly.
+ */
+export const lockStageToRepoLockfile = Effect.fn("lockStageToRepoLockfile")(function* (input: {
+  readonly repoRoot: string;
+  readonly stageDir: string;
+  /** Repo workspaces whose resolutions the stage takes, first match wins. */
+  readonly importers: readonly string[];
+  readonly label: string;
+  readonly verbose: boolean;
+}) {
+  const fail = (cause: unknown) =>
+    new StageLockfileError({
+      stageDir: input.stageDir,
+      detail: cause instanceof Error ? cause.message : String(cause),
+    });
+  const seed = yield* Effect.try({
+    try: () => writeStageSeedLockfile(input),
+    catch: fail,
+  });
+  if (seed.unseeded.length > 0) {
+    yield* Effect.log(
+      `[desktop-artifact] No repo lockfile entry to seed, so resolved fresh and then checked: ${seed.unseeded.join(", ")}`,
+    );
+  }
+  const lockCommand = yield* resolveSpawnCommand("vp", [...STAGE_LOCKFILE_ARGS]);
+  yield* runCommand(
+    ChildProcess.make(lockCommand.command, lockCommand.args, {
+      cwd: input.stageDir,
+      shell: lockCommand.shell,
+    }),
+    { label: `vp install --lockfile-only (${input.label})`, verbose: input.verbose },
+  );
+  const checked = yield* Effect.try({
+    try: () => assertStageLockfileTested({ ...input, seeded: seed.seeded }),
+    catch: fail,
+  });
+  yield* Effect.log(
+    `[desktop-artifact] ${input.label}: ${String(checked.packageCount)} packages, all at the repo lockfile's versions.`,
+  );
 });
 
 export class DesktopBuildAlreadyRunningError extends Schema.TaggedError<DesktopBuildAlreadyRunningError>()(
@@ -3271,7 +3335,18 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
   }
 
   yield* Effect.log("[desktop-artifact] Installing server sidecar runtime externals...");
-  const installCommand = yield* resolveSpawnCommand("vp", [...STAGE_INSTALL_ARGS]);
+  // nondev-seam: skycot-stage-lockfile (the sidecar installs the repo's tested versions only)
+  yield* lockStageToRepoLockfile({
+    repoRoot: input.repoRoot,
+    stageDir: serverStageDir,
+    importers: ["apps/server"],
+    label: "server sidecar",
+    verbose: input.verbose,
+  });
+  const installCommand = yield* resolveSpawnCommand("vp", [
+    ...STAGE_INSTALL_ARGS,
+    STAGE_FROZEN_INSTALL_FLAG, // nondev-seam: skycot-stage-lockfile
+  ]);
   yield* runCommand(
     ChildProcess.make(installCommand.command, installCommand.args, {
       cwd: serverStageDir,
@@ -4050,7 +4125,18 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   }
 
   yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
-  const installCommand = yield* resolveSpawnCommand("vp", [...STAGE_INSTALL_ARGS]);
+  // nondev-seam: skycot-stage-lockfile (the app installs the repo's tested versions only)
+  yield* lockStageToRepoLockfile({
+    repoRoot,
+    stageDir: stageAppDir,
+    importers: ["apps/desktop", "apps/server"],
+    label: "staged app",
+    verbose: options.verbose,
+  });
+  const installCommand = yield* resolveSpawnCommand("vp", [
+    ...STAGE_INSTALL_ARGS,
+    STAGE_FROZEN_INSTALL_FLAG, // nondev-seam: skycot-stage-lockfile
+  ]);
   yield* runCommand(
     ChildProcess.make(installCommand.command, installCommand.args, {
       cwd: stageAppDir,
