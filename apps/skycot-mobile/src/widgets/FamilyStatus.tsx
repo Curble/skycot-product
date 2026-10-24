@@ -45,7 +45,8 @@ function FamilyStatus(
       alignment="leading"
       spacing={accessory ? 2 : 6}
       modifiers={[
-        widgetURL("skycot://"),
+        // The app's own link name (app.config.ts): "skycot" belongs to another app.
+        widgetURL("skycot-family://"),
         ...(accessory ? [] : [containerBackground(light ? "#FFF6E6" : "#171A45", "widget")]),
       ]}
     >

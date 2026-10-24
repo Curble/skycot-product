@@ -4,6 +4,10 @@ import { parseDeepLink } from "./deepLinkParse";
 
 describe("SKYCOT's links", () => {
   it("opens a section, a conversation and the Macs screen", () => {
+    // The production app's own name, which another app's "skycot" can never take over.
+    expect(parseDeepLink("skycot-family://section/fridge", false)).toEqual(
+      parseDeepLink("skycot://section/fridge", false),
+    );
     expect(parseDeepLink("skycot://section/fridge", false)).toEqual({
       kind: "section",
       id: "fridge",

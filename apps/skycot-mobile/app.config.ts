@@ -39,7 +39,9 @@ const VARIANT_CONFIG = {
   },
   production: {
     appName: "SKYCOT",
-    scheme: "skycot",
+    // Not "skycot": the unrelated "SKYCOT Merchant" app on the same phone claims it, and iOS
+    // opened that app from our notifications (TestFlight build 4, 24 Oct 2026).
+    scheme: "skycot-family",
     iosBundleIdentifier: "com.skycot.app.ios",
     // TestFlight and the App Store use Apple's production push service.
     apsEnvironment: "production",

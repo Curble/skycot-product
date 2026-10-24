@@ -18,7 +18,7 @@ export type DeepLink =
 
 export function parseDeepLink(url: string, development: boolean): DeepLink | null {
   // Read by hand: React Native's URL class is only partly there, and this must never throw.
-  const match = /^skycot(?:-dev)?:\/\/([^?#]*)(?:\?([^#]*))?/u.exec(url.trim());
+  const match = /^skycot(?:-family|-dev)?:\/\/([^?#]*)(?:\?([^#]*))?/u.exec(url.trim());
   if (match === null) return null;
   const parts = (match[1] ?? "").split("/").filter((part) => part.length > 0);
   const query = new Map<string, string>();

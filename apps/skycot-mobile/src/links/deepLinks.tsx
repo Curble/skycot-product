@@ -1,7 +1,7 @@
 /**
- * Links that open SKYCOT at a place: the widget and Live Activity (`skycot://`), a section
- * (`skycot://section/fridge`), a conversation (`skycot://conversation/<mac>/<thread>`), and a
- * link code (`skycot://link?code=7KQ3M9XD2HPA&address=192.168.1.20:3773`), which only fills in
+ * Links that open SKYCOT at a place: the widget and Live Activity (`skycot-family://`), a section
+ * (`skycot-family://section/fridge`), a conversation (`skycot-family://conversation/<mac>/<thread>`), and a
+ * link code (`skycot-family://link?code=7KQ3M9XD2HPA&address=192.168.1.20:3773`), which only fills in
  * the "Type the code" sheet: linking still needs a tap on Link, and the code still has to come
  * from the family's Mac, once, within five minutes.
  *

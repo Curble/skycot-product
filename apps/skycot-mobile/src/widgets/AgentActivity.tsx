@@ -54,7 +54,7 @@ export function AgentActivity(
   const stale = environment.isStale === true;
   const headline = stale ? "SKYCOT" : props.headline;
   const detail = stale ? "Open SKYCOT to see what's new." : props.detail;
-  const link = props.deepLink.startsWith("/") ? `skycot://${props.deepLink.slice(1)}` : null;
+  const link = props.deepLink.startsWith("/") ? `skycot-family://${props.deepLink.slice(1)}` : null;
   const links = link ? [widgetURL(link)] : [];
 
   type SFName = NonNullable<ComponentProps<typeof Image>["systemName"]>;

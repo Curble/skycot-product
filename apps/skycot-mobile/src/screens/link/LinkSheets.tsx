@@ -78,7 +78,7 @@ export function TypeCodeSheet(props: {
   readonly visible: boolean;
   readonly onClose: () => void;
   readonly onLinked: (outcome: LinkOutcome) => void;
-  /** From a `skycot://link` link: fills the sheet in (and, in development builds, links). */
+  /** From a `skycot-family://link` link: fills the sheet in (and, in development builds, links). */
   readonly prefill?: {
     readonly code: string;
     readonly address: string;
