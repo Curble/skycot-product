@@ -44,7 +44,7 @@ export const LINK_TTL_MS = 5 * 60_000;
  * A request the grown-up's phone has not answered in this long lapses there; the card stays on
  * the Mac, where the parent code still works (the approval contract, rule 4).
  */
-export const APPROVAL_LAPSE_MS = 10 * 60_000;
+export const APPROVAL_LAPSE_MS = 30 * 60_000;
 /** How long a passkey challenge stays open (registering one, or saying yes with Face ID). */
 export const PASSKEY_CHALLENGE_TTL_MS = 2 * 60_000;
 

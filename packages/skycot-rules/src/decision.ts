@@ -14,15 +14,27 @@ export interface SkycotPolicyDecision {
   /** Rules that matched; empty when the request was allowed. */
   readonly ruleIds: ReadonlyArray<HardRuleId>;
   readonly version: 1;
+  /**
+   * Family: why a step a rule would hold was the child's after all (a trusted add-on, one a
+   * grown-up already allowed in this conversation, an undoable delete). Absent otherwise.
+   */
+  readonly relief?: string;
+  /** The add-ons a relieved add-on step named ("three"). */
+  readonly addOns?: ReadonlyArray<string>;
 }
 
 /** The `answers` payload the policy attaches to an auto-approved request. */
-export function policyDecisionAnswers(evaluation: RuleEvaluation): Record<string, unknown> {
+export function policyDecisionAnswers(
+  evaluation: RuleEvaluation,
+  relieved?: { readonly relief: string; readonly addOns?: ReadonlyArray<string> | undefined },
+): Record<string, unknown> {
   const decision: SkycotPolicyDecision = {
     decidedBy: "policy",
     note: SKYCOT_POLICY_NOTE,
     ruleIds: evaluation.matches.map((match) => match.rule.id),
     version: 1,
+    ...(relieved === undefined ? {} : { relief: relieved.relief }),
+    ...(relieved?.addOns === undefined ? {} : { addOns: [...relieved.addOns] }),
   };
   return { [SKYCOT_ANSWERS_KEY]: decision };
 }
@@ -38,5 +50,15 @@ export function readPolicyDecision(
   const ruleIds = Array.isArray(record.ruleIds)
     ? record.ruleIds.filter((id): id is HardRuleId => typeof id === "string")
     : [];
-  return { decidedBy: "policy", note: record.note, ruleIds, version: 1 };
+  const addOns = Array.isArray(record.addOns)
+    ? record.addOns.filter((name): name is string => typeof name === "string")
+    : undefined;
+  return {
+    decidedBy: "policy",
+    note: record.note,
+    ruleIds,
+    version: 1,
+    ...(typeof record.relief === "string" ? { relief: record.relief } : {}),
+    ...(addOns === undefined ? {} : { addOns }),
+  };
 }

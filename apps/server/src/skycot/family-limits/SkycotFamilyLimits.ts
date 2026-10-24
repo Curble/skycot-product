@@ -37,6 +37,7 @@ import {
   switchesForThread,
   type SwitchEntry,
 } from "../model-fallback/switchLog.ts";
+import { ADD_ON_FILE_NAME, readAddOnFile } from "../SkycotAddOnApprovals.ts";
 import {
   allowanceReading,
   applyMoreTime,
@@ -163,6 +164,17 @@ export interface ActivitySnapshot {
   readonly events: ReadonlyArray<FamilyEvent>;
   /** Turns the model fallback moved to another company. Optional so older callers read unchanged. */
   readonly switches?: ReadonlyArray<AssistantSwitchNote>;
+  /** Add-ons SKYCOT added by itself (SkycotAddOnApprovals writes them). Optional, as above. */
+  readonly addOns?: ReadonlyArray<AddOnNote>;
+}
+
+/** "SKYCOT added three.js for Ava": a trusted add-on, or one a grown-up allowed earlier. */
+export interface AddOnNote {
+  readonly at: number;
+  readonly childId: string;
+  readonly threadId: string;
+  readonly names: ReadonlyArray<string>;
+  readonly how: "trusted" | "again";
 }
 
 /**
@@ -411,6 +423,27 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
                   from: entry.from.driver,
                   to: entry.to.driver,
                   until: entry.until,
+                },
+              ];
+        }),
+      ),
+    );
+  // SKYCOT's add-on notes sit beside this file too; read here, never written here.
+  const addOnNotes = (activity: ActivityFile) =>
+    readAddOnFile(path.join(path.dirname(filePath), ADD_ON_FILE_NAME)).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.map((file) =>
+        file.added.flatMap((entry): ReadonlyArray<AddOnNote> => {
+          const childId = activity.threads[entry.threadId];
+          return childId === undefined
+            ? []
+            : [
+                {
+                  at: entry.at,
+                  childId,
+                  threadId: entry.threadId,
+                  names: entry.names,
+                  how: entry.how,
                 },
               ];
         }),
@@ -871,6 +904,7 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
         log: activity.log,
         events: activity.events ?? [],
         switches: yield* crossSwitches(activity),
+        addOns: yield* addOnNotes(activity),
       },
     };
   }).pipe(Effect.withSpan("SkycotFamilyLimits.snapshot"));

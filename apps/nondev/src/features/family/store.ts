@@ -207,6 +207,14 @@ export function allowAssistant(
   return settle(familyApi.allowAssistant({ driver, code }), applyStatus);
 }
 
+/** The parent's "Trusted add-ons download by themselves", with the parent code. */
+export function setTrustedAddOns(
+  on: boolean,
+  code: string,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.setTrustedAddOns({ on, code }), applyStatus);
+}
+
 /** Takes an allowance back (no code). That assistant's next Family turn is refused. */
 export function stopAllowingAssistant(driver: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.stopAllowingAssistant({ driver }), applyStatus);

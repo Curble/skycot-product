@@ -60,6 +60,10 @@
       "types": "./src/people.ts",
       "import": "./src/people.ts"
     },
+    "./addons": {
+      "types": "./src/addons.ts",
+      "import": "./src/addons.ts"
+    },
     "./usageWindows": {
       "types": "./src/usageWindows.ts",
       "import": "./src/usageWindows.ts"

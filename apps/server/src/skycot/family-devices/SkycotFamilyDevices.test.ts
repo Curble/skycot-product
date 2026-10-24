@@ -839,14 +839,14 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
     ),
   );
 
-  it.effect("saying no needs no proof; a request older than ten minutes waits on the Mac", () =>
+  it.effect("saying no needs no proof; a request older than 30 minutes waits on the Mac", () =>
     withDevices((world) =>
       Effect.gen(function* () {
         const { devices, recorded, request } = world;
         // The engine's clock (a test clock here) is what a request's age is read on.
         yield* TestClock.setTime(EPOCH);
         const [pending] = yield* devices.approvals;
-        request.createdAt = DateTime.makeUnsafe(EPOCH - 11 * 60_000);
+        request.createdAt = DateTime.makeUnsafe(EPOCH - 31 * 60_000);
         assert.isTrue(
           yield* refused(
             devices.answer({

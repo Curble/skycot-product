@@ -158,7 +158,7 @@ export interface PendingApproval {
   readonly threadTitle: string;
   readonly projectTitle: string | null;
   readonly createdAt: number;
-  /** Older than ten minutes: it waits on the Mac now (the approval contract, rule 4). */
+  /** Older than 30 minutes: it waits on the Mac now (the approval contract, rule 4). */
   readonly lapsed: boolean;
   /** Always true in `approvals` (kept on the wire for older phones, which filter on it). */
   readonly needsGrownUp: boolean;

@@ -54,7 +54,7 @@ export function RecapReportView({
 }) {
   const openIt = useOpenIt(environmentId);
   const week = report.range === "week";
-  const lines = grownUpLines(report);
+  const lines = grownUpLines(report, name);
   const made = compact ? report.made.slice(0, 3) : report.made;
   const asks = compact ? report.asks.slice(0, 3) : report.asks;
   const span = week ? "this week" : "today";

@@ -31,7 +31,7 @@ export interface WatchRequest {
   /** The Mac's name, when the family has more than one. */
   readonly macName: string | null;
   readonly createdAt: number;
-  /** Older than ten minutes: it waits on the Mac now. */
+  /** Older than 30 minutes: it waits on the Mac now. */
   readonly lapsed: boolean;
   /** This phone's Watch is set up to say yes on that Mac. */
   readonly watchCanSayYes: boolean;

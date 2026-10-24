@@ -30,6 +30,26 @@ describe("family approval cards", () => {
     expect(allowLabels(card)).not.toContain(familyCopy.askGrownUp);
   });
 
+  it("a trusted add-on is the child's only when SKYCOT fetches it and the switch is on", () => {
+    const codex = {
+      ...items.approval("command", { prompt: "npm install three" }),
+      nativeItemRef: { driver: "codex", nativeId: "item-1", strength: "strong" },
+    } as Parameters<typeof familyHoldFor>[0];
+    expect(familyHoldFor(codex, { projectRoot: ROOT, trustedAddOns: true })).toBeNull();
+    expect(familyHoldFor(codex, { projectRoot: ROOT, trustedAddOns: false })).toMatch(/internet/);
+    // Another assistant runs its own install, scripts and all: a grown-up, as before.
+    const claude = {
+      ...codex,
+      nativeItemRef: { driver: "claudeAgent", nativeId: "item-1", strength: "strong" },
+    } as Parameters<typeof familyHoldFor>[0];
+    expect(familyHoldFor(claude, { projectRoot: ROOT, trustedAddOns: true })).not.toBeNull();
+    const untrusted = {
+      ...codex,
+      prompt: "npm install left-pad",
+    } as Parameters<typeof familyHoldFor>[0];
+    expect(familyHoldFor(untrusted, { projectRoot: ROOT, trustedAddOns: true })).not.toBeNull();
+  });
+
   it("says 'Ask a grown-up' for the internet, installs and deleting", () => {
     for (const prompt of [
       "npm install react-datepicker",
