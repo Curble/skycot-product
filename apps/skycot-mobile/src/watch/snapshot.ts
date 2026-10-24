@@ -1,7 +1,8 @@
 /**
  * The Watch's snapshot, made from what the phone already read from its Macs (src/data/MacData).
  * Only what the Watch shows goes: the waiting requests (which child, the phone's one-line
- * heading and the exact step), each child's time today and bedtime, and the lock. Never
+ * heading and the exact step), the open family notes (who, and what kind: never what they made),
+ * each child's time today and bedtime, and the lock. Never
  * conversations, projects, sign-ins or the Mac's address.
  */
 import {
@@ -18,7 +19,13 @@ import { durationPhrase, wallTimePhrase } from "../../../nondev/src/features/fam
 import type { MacState } from "../data/MacData";
 import type { DeviceMode, MacLink } from "../links/pairing";
 import { AVATAR_COLORS } from "../ui/avatarColours";
-import { WATCH_PROTOCOL, type WatchChild, type WatchRequest, type WatchSnapshot } from "./protocol";
+import {
+  WATCH_PROTOCOL,
+  type WatchChild,
+  type WatchNote,
+  type WatchRequest,
+  type WatchSnapshot,
+} from "./protocol";
 
 /** A mascot picture has no colour of its own: the Watch shows its letter on SKYCOT's sky blue. */
 export function childColour(child: Pick<FamilyChild, "avatar">): string {
@@ -57,6 +64,7 @@ export function buildWatchSnapshot(input: {
     at: input.now,
     grownUpName: "Grown-up",
     requests: [],
+    notes: [],
     children: [],
     watchSetUp: false,
     lockedAt: input.lockedAt,
@@ -68,6 +76,7 @@ export function buildWatchSnapshot(input: {
 
   const several = input.macs.length > 1;
   const requests: Array<WatchRequest> = [];
+  const notes: Array<WatchNote> = [];
   const children: Array<WatchChild> = [];
   let grownUpName: string | null = null;
   let setUpEverywhere = input.macs.length > 0;
@@ -115,6 +124,27 @@ export function buildWatchSnapshot(input: {
         watchCanSayYes,
       });
     }
+    for (const note of state?.notes ?? []) {
+      if (note.status !== "open") continue;
+      const who = named(note.childId);
+      const name = who?.label ?? "A child";
+      notes.push({
+        id: `${mac.macId}:${note.id}`,
+        macId: mac.macId,
+        noteId: note.id,
+        kind: note.kind,
+        childName: name,
+        childInitial: who ? avatarLetter(who.child) : "★",
+        childColour: who ? childColour(who.child) : AVATAR_COLORS.sky!.dark,
+        title: note.kind === "shown" ? `${name} made something` : `${name} asked for more time`,
+        sentence:
+          note.kind === "shown"
+            ? `${name} made something — see it on your phone`
+            : `${name} would like more time on SKYCOT.`,
+        macName: several ? mac.macName : null,
+        createdAt: Date.parse(note.createdAt) || input.now,
+      });
+    }
     family.forEach((child, index) => {
       const today =
         state?.today?.children.find((entry) => entry.childId === child.id)?.limits ?? null;
@@ -132,11 +162,13 @@ export function buildWatchSnapshot(input: {
     });
   }
   requests.sort((a, b) => b.createdAt - a.createdAt);
+  notes.sort((a, b) => b.createdAt - a.createdAt);
   return {
     ...base,
     state: "ready",
     grownUpName: grownUpName ?? "Grown-up",
     requests,
+    notes,
     children,
     watchSetUp: setUpEverywhere,
     reachable,

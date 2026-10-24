@@ -25,6 +25,22 @@ struct WatchRequest: Codable, Identifiable, Hashable {
   let watchCanSayYes: Bool
 }
 
+/// A family note: "Ava asked for more time" or "Ava made something". Never what they made.
+struct WatchNote: Codable, Identifiable, Hashable {
+  let id: String
+  let macId: String
+  let noteId: String
+  /// "more-time" or "shown".
+  let kind: String
+  let childName: String
+  let childInitial: String
+  let childColour: String
+  let title: String
+  let sentence: String
+  let macName: String?
+  let createdAt: Double
+}
+
 struct WatchChild: Codable, Identifiable, Hashable {
   let id: String
   let macId: String
@@ -44,6 +60,8 @@ struct WatchSnapshot: Codable, Equatable {
   let state: String
   let grownUpName: String
   let requests: [WatchRequest]
+  /// Added after protocol 1 shipped: a snapshot from an older iPhone has none.
+  let notes: [WatchNote]?
   let children: [WatchChild]
   let watchSetUp: Bool
   let lockedAt: Double?
@@ -71,9 +89,12 @@ enum WatchMessage: Encodable {
   case lock
   case challenge(WatchRequest)
   case answer(WatchRequest, decision: String, proof: Proof?)
+  /// "Not tonight" to a note asking for more time. No proof, and no minutes: the Watch can't
+  /// give more time (the Mac needs the parent code, on the iPhone).
+  case noteNotTonight(WatchNote)
 
   private enum Keys: String, CodingKey {
-    case type, macId, threadId, requestId, fingerprint, decision, proof
+    case type, macId, threadId, requestId, fingerprint, decision, proof, noteId
   }
 
   func encode(to encoder: Encoder) throws {
@@ -97,6 +118,10 @@ enum WatchMessage: Encodable {
       try out.encode(request.fingerprint, forKey: .fingerprint)
       try out.encode(decision, forKey: .decision)
       try out.encodeIfPresent(proof, forKey: .proof)
+    case .noteNotTonight(let note):
+      try out.encode("noteNotTonight", forKey: .type)
+      try out.encode(note.macId, forKey: .macId)
+      try out.encode(note.noteId, forKey: .noteId)
     }
   }
 }

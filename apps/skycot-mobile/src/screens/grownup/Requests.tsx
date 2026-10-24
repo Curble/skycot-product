@@ -5,6 +5,8 @@
  * card's fingerprint and the proof every time, and logs who said yes and how (Phase 1's
  * approver routes).
  */
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
@@ -12,6 +14,7 @@ import {
   grownUpRequestSentence,
   requestHeading,
 } from "../../../../nondev/src/features/family/people";
+import type { StackRoutes } from "../../app/routes";
 import {
   useGrownUp,
   type WaitingFamilyNote,
@@ -21,6 +24,7 @@ import { useCodeLength, useMacData } from "../../data/MacData";
 import { subscribeAllow, takeAllow } from "../../faceid/allowIntent";
 import { useFaceId } from "../../faceid/FaceIdProvider";
 import { familyApi } from "../../family/api";
+import { shownNoteTarget } from "../../family/noteTarget";
 import {
   Avatar,
   Banner,
@@ -49,6 +53,7 @@ export function countSentence(count: number): string {
 }
 
 function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
   const { refresh } = useMacData();
   const codeLength = useCodeLength(item.mac.macId);
   const [minutes, setMinutes] = useState<0 | 15 | 30 | null>(null);
@@ -75,6 +80,23 @@ function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
       void refresh(item.mac.macId);
     } else setProblem(result.message);
   };
+  // "Open it": what they made, inside SKYCOT, then the note is marked seen.
+  const openIt = async () => {
+    setBusy(true);
+    setProblem(null);
+    const fridge = await familyApi.fridge(item.mac.transport);
+    const target = shownNoteTarget(item.mac.macId, note, fridge.ok ? fridge.value : null);
+    if (target === null) {
+      setBusy(false);
+      setProblem("That one can't be opened here. Have a look on the Mac.");
+      return;
+    }
+    if (target.name === "Page") navigation.navigate("Page", target.params);
+    else navigation.navigate("Conversation", target.params);
+    await familyApi.seenFamilyNote(item.mac.transport, note.id);
+    setBusy(false);
+    void refresh(item.mac.macId);
+  };
   return (
     <Card style={{ gap: 10 }}>
       <Txt variant="headline">
@@ -85,7 +107,22 @@ function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
       {note.kind === "shown" ? <Txt variant="subheadline">{note.title}</Txt> : null}
       {problem ? <Banner tone="warning" text={problem} /> : null}
       {note.kind === "shown" ? (
-        <Button title="Seen" kind="grey" busy={busy} onPress={() => void settle(0)} />
+        <ButtonRow minWidthEach={95}>
+          <Button
+            title="Open it"
+            kind="filled"
+            busy={busy}
+            onPress={() => void openIt()}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Seen"
+            kind="grey"
+            busy={busy}
+            onPress={() => void settle(0)}
+            style={{ flex: 1 }}
+          />
+        </ButtonRow>
       ) : (
         <ButtonRow minWidthEach={95}>
           <Button

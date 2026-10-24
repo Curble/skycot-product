@@ -60,6 +60,7 @@ const state = (watch: string | null): MacState => ({
   status: status(watch),
   shell: null,
   requests,
+  notes: [],
   today: {
     children: [
       {
@@ -184,6 +185,99 @@ describe("what the Watch is sent", () => {
     });
     expect(child.state).toBe("child-device");
     expect(child.requests).toEqual([]);
+  });
+});
+
+describe("family notes on the Watch", () => {
+  const notes = [
+    {
+      id: "n-shown",
+      kind: "shown" as const,
+      childId: "ava",
+      createdAt: "2026-10-24T09:20:00.000Z",
+      status: "open" as const,
+      threadId: "thread-ava",
+      title: "Space game",
+    },
+    {
+      id: "n-time",
+      kind: "more-time" as const,
+      childId: "leo",
+      createdAt: "2026-10-24T09:25:00.000Z",
+      status: "open" as const,
+    },
+    {
+      id: "n-old",
+      kind: "more-time" as const,
+      childId: "ava",
+      createdAt: "2026-10-24T08:00:00.000Z",
+      status: "done" as const,
+      answer: { minutes: 15 as const, by: "Mum", at: "2026-10-24T08:05:00.000Z" },
+    },
+  ];
+  const snapshot = (macState: MacState = { ...state("Mum's Apple Watch"), notes }) =>
+    buildWatchSnapshot({
+      mode: "grown-up",
+      macs: [mac],
+      byMac: { "mac-1": macState },
+      lockedAt: null,
+      now: NOW,
+    });
+
+  it("lists open notes, newest first, in plain words", () => {
+    expect(snapshot().notes.map((note) => [note.id, note.kind, note.title, note.sentence])).toEqual(
+      [
+        [
+          "mac-1:n-time",
+          "more-time",
+          "Leo asked for more time",
+          "Leo would like more time on SKYCOT.",
+        ],
+        [
+          "mac-1:n-shown",
+          "shown",
+          "Ava made something",
+          "Ava made something — see it on your phone",
+        ],
+      ],
+    );
+    expect(snapshot().notes[1]).toMatchObject({ childInitial: "A", macName: null });
+  });
+
+  it("has no notes before the Mac has been read", () => {
+    expect(snapshot({ ...state(null), notes: null }).notes).toEqual([]);
+    expect(snapshot({ ...state(null), notes: [] }).notes).toEqual([]);
+  });
+
+  it("never sends what they made: no conversation, title or project", () => {
+    const json = JSON.stringify(snapshot().notes);
+    expect(json).not.toContain("Space game");
+    expect(json).not.toContain("thread-ava");
+  });
+
+  it("reads 'Not tonight' from the Watch, and nothing that gives time", () => {
+    const base = { type: "noteNotTonight", macId: "mac-1", noteId: "n-time" };
+    expect(parseWatchMessage(JSON.stringify(base))).toEqual(base);
+    expect(parseWatchMessage(JSON.stringify({ ...base, noteId: "" }))).toBeNull();
+    expect(
+      parseWatchMessage(JSON.stringify({ type: "noteNotTonight", macId: "mac-1" })),
+    ).toBeNull();
+    // More time stays with the parent code on the phone: the Watch has no message for it, even
+    // with a signature, and a "minutes" field on this one is ignored.
+    for (const type of ["noteAnswer", "noteMoreTime"]) {
+      expect(
+        parseWatchMessage(
+          JSON.stringify({
+            type,
+            macId: "mac-1",
+            noteId: "n-time",
+            minutes: 15,
+            proof: { keyId: "k", challenge: "c", signature: "s" },
+          }),
+        ),
+      ).toBeNull();
+    }
+    expect(parseWatchMessage(JSON.stringify({ ...base, minutes: 30 }))).toEqual(base);
   });
 });
 

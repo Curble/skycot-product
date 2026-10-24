@@ -19,7 +19,9 @@ import {
   demoOptions,
   ConversationRoute,
   MacsRoute,
+  PageRoute,
   conversationOptions,
+  pageOptions,
 } from "../screens";
 import { Shell, type ShellScreen, type ShellSection } from "../Shell";
 
@@ -34,6 +36,7 @@ const SCREENS: ReadonlyArray<ShellScreen> = [
   },
   { name: "Recap", component: RecapScreen, options: recapOptions },
   { name: "Conversation", component: ConversationRoute, options: conversationOptions as never },
+  { name: "Page", component: PageRoute, options: pageOptions as never },
   { name: "Macs", component: MacsRoute, options: { title: "Linked Macs" } },
   { name: "About", component: AboutRoute, options: { title: "About SKYCOT" } },
   ...(__DEV__ ? [{ name: "Demo" as const, component: DemoRoute, options: demoOptions }] : []),
