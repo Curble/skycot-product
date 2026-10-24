@@ -35,7 +35,7 @@ import {
   ShieldAlert,
   Square,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -110,6 +110,7 @@ import { conversationTitle, describeThreadStatus, type ConversationStatus } from
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
 import { BuildJourney } from "../journey/BuildJourney";
+import { withoutAssistantPlumbing } from "../../plain/plumbing";
 import { recordBuildTime } from "./buildTimes";
 import { starterIdFromText } from "../badges/facts";
 import { elapsedCopy, estimateBuildTime } from "../../plain/estimate";
@@ -155,7 +156,15 @@ export function ConversationView({
   const question = isQuestionsProject(project);
   const childView = useChildView();
   const state = Option.getOrNull(AsyncResult.value(result));
-  const projection = state ? Option.getOrNull(state.data) : null;
+  const fullProjection = state ? Option.getOrNull(state.data) : null;
+  // A child never sees the assistant's own housekeeping (plan-mode notes, tool look-ups).
+  const projection = useMemo(
+    () =>
+      fullProjection !== null && childView
+        ? { ...fullProjection, turnItems: withoutAssistantPlumbing(fullProjection.turnItems) }
+        : fullProjection,
+    [fullProjection, childView],
+  );
   const active = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const latestRunId = shell?.latestRun?.runId ?? null;
   const refused =
