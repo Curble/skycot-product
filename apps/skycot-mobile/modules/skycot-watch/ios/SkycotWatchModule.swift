@@ -1,4 +1,4 @@
-// SKYCOT on a grown-up's Apple Watch, the iPhone side (Curble Pty Ltd). Two jobs:
+// SKYCOT on a grown-up's Apple Watch, the iPhone side (Curble Pty Ltd). Three jobs:
 //
 // 1. WatchConnectivity with the SKYCOT Watch app. The phone is the grown-up's linked device and
 //    holds the only sign-in to the Mac; the Watch has none. The phone sends the Watch a small
@@ -7,6 +7,11 @@
 // 2. The "Ava needs a grown-up" notification with Allow once and Decline. Content-free: a name
 //    and "needs a grown-up", never what the request is. Allow once opens SKYCOT (on the phone,
 //    or on the Watch for a notification the Watch shows), so the grown-up sees what they allow.
+//
+// 3. Apple's push token for SKYCOT Relay's notifications ("SKYCOT needs a grown-up", "Sam has
+//    finished"), shown by iOS when SKYCOT is closed and forwarded to a paired Watch. The relay's
+//    pushes are content-free: a "needs a grown-up" push carries the same category (so the same
+//    Allow once and Decline) but no request, so the app fetches what is waiting from the Mac.
 //
 // Messages and answers that arrive before JavaScript is listening (the phone woken in the
 // background by the Watch, or by a notification answer) are kept here until it is.
@@ -17,6 +22,8 @@ import WatchConnectivity
 let skycotRequestCategory = "SKYCOT_REQUEST"
 let skycotAllowAction = "ALLOW_ONCE"
 let skycotDeclineAction = "DECLINE"
+/// The relay's `thread-id` for a "needs a grown-up" push (infra/skycot-relay/src/push.ts).
+let skycotPushedRequestThread = "needs-grown-up"
 
 final class SkycotWatchHub: NSObject, WCSessionDelegate, UNUserNotificationCenterDelegate, @unchecked Sendable {
   static let shared = SkycotWatchHub()
@@ -192,13 +199,16 @@ final class SkycotWatchHub: NSObject, WCSessionDelegate, UNUserNotificationCente
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    let info = response.notification.request.content.userInfo
-    guard response.notification.request.content.categoryIdentifier == skycotRequestCategory,
-      let key = info["requestKey"] as? String
-    else {
+    let content = response.notification.request.content
+    // A local notification names its request; a push from the relay names none (requestKey "":
+    // JavaScript asks the Mac what is waiting, and a yes still needs the card and Face ID, the
+    // parent code or the Watch key, exactly as on the Requests screen).
+    let pushed = content.threadIdentifier == skycotPushedRequestThread
+    guard content.categoryIdentifier == skycotRequestCategory || pushed else {
       completionHandler()
       return
     }
+    let key = content.userInfo["requestKey"] as? String ?? ""
     let action: String
     switch response.actionIdentifier {
     case skycotAllowAction: action = "allow"
@@ -214,6 +224,74 @@ final class SkycotWatchHub: NSObject, WCSessionDelegate, UNUserNotificationCente
       }
     }
     emit("onNotificationAnswer", ["id": id, "action": action, "requestKey": key])
+  }
+}
+
+/// Apple's push token for this app, for SKYCOT Relay (src/push in JavaScript hands it over).
+final class SkycotPushHub: @unchecked Sendable {
+  static let shared = SkycotPushHub()
+
+  private var waiting: [Promise] = []
+  private var latest: [String: String]?
+
+  /// Asks iOS for the token (no prompt: showing alerts is the separate notification permission).
+  /// iOS answers through the app delegate below, at every launch, with the current token.
+  func register(promise: Promise) {
+    DispatchQueue.main.async {
+      self.waiting.append(promise)
+      UIApplication.shared.registerForRemoteNotifications()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+        guard !self.waiting.isEmpty else { return }
+        let late = self.waiting
+        self.waiting.removeAll()
+        if let latest = self.latest {
+          for promise in late { promise.resolve(latest) }
+        } else {
+          for promise in late { promise.reject("PushUnavailable", "iOS didn't give a push token.") }
+        }
+      }
+    }
+  }
+
+  func registered(deviceToken: Data) {
+    let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+    let answer = ["token": token, "environment": Self.environment()]
+    DispatchQueue.main.async {
+      self.latest = answer
+      let ready = self.waiting
+      self.waiting.removeAll()
+      for promise in ready { promise.resolve(answer) }
+    }
+  }
+
+  func failed(error: Error) {
+    DispatchQueue.main.async {
+      let ready = self.waiting
+      self.waiting.removeAll()
+      for promise in ready { promise.reject("PushUnavailable", error.localizedDescription) }
+    }
+  }
+
+  /// Which of Apple's push services issued the token. App Store and TestFlight builds carry no
+  /// provisioning profile and always use production; a build signed with a profile (Xcode's
+  /// development builds, ad hoc) says which in the profile's own aps-environment.
+  static func environment() -> String {
+    #if targetEnvironment(simulator)
+      return "development"
+    #else
+      guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+        let data = try? Data(contentsOf: url),
+        let text = String(data: data, encoding: .isoLatin1),
+        let start = text.range(of: "<?xml"),
+        let end = text.range(of: "</plist>"),
+        let xml = String(text[start.lowerBound..<end.upperBound]).data(using: .isoLatin1),
+        let profile = try? PropertyListSerialization.propertyList(from: xml, format: nil)
+          as? [String: Any],
+        let entitlements = profile["Entitlements"] as? [String: Any]
+      else { return "production" }
+      return entitlements["aps-environment"] as? String == "development"
+        ? "development" : "production"
+    #endif
   }
 }
 
@@ -261,6 +339,12 @@ public final class SkycotWatchModule: Module {
       }
     }
 
+    /// Apple's push token for this app and which push service it is for:
+    /// `{ token, environment: "production" | "development" }`.
+    AsyncFunction("registerForPush") { (promise: Promise) in
+      SkycotPushHub.shared.register(promise: promise)
+    }
+
     /// "Ava needs a grown-up", now, on this phone (and on the Watch when iOS forwards it).
     AsyncFunction("notifyRequest") { (requestKey: String, title: String, promise: Promise) in
       let content = UNMutableNotificationContent()
@@ -287,7 +371,8 @@ public final class SkycotWatchModule: Module {
 }
 
 /// Starts WatchConnectivity and the notification answers at launch, before JavaScript runs, so
-/// a Watch message or an answer that launched the app in the background is not lost.
+/// a Watch message or an answer that launched the app in the background is not lost; and takes
+/// iOS's answer to `registerForRemoteNotifications` (the push token).
 public final class SkycotWatchAppDelegate: ExpoAppDelegateSubscriber {
   public func application(
     _ application: UIApplication,
@@ -295,5 +380,17 @@ public final class SkycotWatchAppDelegate: ExpoAppDelegateSubscriber {
   ) -> Bool {
     SkycotWatchHub.shared.start()
     return true
+  }
+
+  public func application(
+    _ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    SkycotPushHub.shared.registered(deviceToken: deviceToken)
+  }
+
+  public func application(
+    _ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    SkycotPushHub.shared.failed(error: error)
   }
 }

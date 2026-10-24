@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 
-import type { HomeRecord } from "@t3tools/skycot-relay/client/home";
+import type { HomeRecord, RelayHome } from "@t3tools/skycot-relay/client/home";
 
 import type { MacTransport } from "../transport/MacTransport";
 import { closeRelayHome, relayHomeFor, waysToMac } from "../transport/ways";
@@ -44,6 +44,8 @@ function parseRelayRecord(raw: string | null): HomeRecord | null {
 
 export interface Mac extends LinkedMac {
   readonly transport: MacTransport;
+  /** The Mac's SKYCOT Relay tunnel, when its link carried one (notifications need it). */
+  readonly relay: RelayHome | null;
 }
 
 interface LinksState {
@@ -74,6 +76,7 @@ function withTransport(link: LinkedMac): Mac {
       : relayHomeFor(link.relayRecord, (record) => saveRelayRecord(link.macId, record));
   return {
     ...link,
+    relay,
     transport: waysToMac({ httpBaseUrl: link.httpBaseUrl, bearerToken: link.bearerToken, relay }),
   };
 }

@@ -41,8 +41,10 @@ struct RootView: View {
     .onChange(of: router.opened) { _, opened in
       guard let opened else { return }
       page = 0
-      path = [RequestRoute(key: opened.key, decline: opened.decline)]
+      // An empty key (a push that names no request) lands on the Requests list itself.
+      path = opened.key.isEmpty ? [] : [RequestRoute(key: opened.key, decline: opened.decline)]
       router.opened = nil
+      if opened.key.isEmpty { Task { await phone.refresh() } }
     }
   }
 

@@ -131,13 +131,21 @@ phone (Allow).
 - **Face ID to say yes** needs a passkey for one stable https address the app is entitled to (an
   associated domain). Until the relay has its address and the app its `webcredentials:` entitlement,
   a grown-up's phone uses the parent code (`src/family/passkey.ts`).
-- **Notifications and Live Activity pushes** need an Apple push key and the app's push entitlement;
-  `RelayHome.registerPush` is ready for it. Today both update only while the app is open.
+- **Notifications** (build 3 onwards): the app has the push entitlement (`aps-environment`,
+  production for TestFlight and the App Store, development for SKYCOT Dev), asks iOS for its push
+  token (`modules/skycot-watch`, `registerForPush`) and hands it to each Mac linked through the
+  relay (`src/push/PushRegistration.tsx` → `RelayHome.registerPush`). "SKYCOT needs a grown-up"
+  carries the same Allow once / Decline as the app's own notification but names no request:
+  Allow once opens Requests (a yes still needs the card and Face ID or the parent code), Decline
+  declines the one waiting request or posts one notification each when several wait. They need
+  the relay's APNs secrets; Macs linked without the relay get none. **Live Activity pushes** are
+  not on yet: the Live Activity updates only while the app is open.
 - **Away from home** works through the relay once Mark deploys it; until then, the home Wi-Fi or
   Tailscale. A relay-only QR code doesn't carry the Mac's home address, so such a device uses the
   relay at home too.
-- **Apple Watch**: built (Phase 4). Notifications reach it only while SKYCOT runs on the phone
-  until the relay pushes; the Smart Stack view itself was not opened in the Simulator.
+- **Apple Watch**: built (Phase 4). iOS forwards the relay's pushes to it when the phone is
+  locked (a forwarded "needs a grown-up" opens the Watch's Requests list); the Smart Stack view
+  itself was not opened in the Simulator.
   **Android** later (the code is ready for it; no Android build here).
 - Pictures in messages, drawing starter cards and reading replies aloud are not on the phone yet.
 

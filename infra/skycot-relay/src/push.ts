@@ -26,6 +26,15 @@ export const ALERT_TEXT: Readonly<Record<PushKind, string | null>> = {
   "activity-end": null,
 };
 
+/**
+ * The iOS app's notification category for a kind: "needs-grown-up" gets the same Allow once and
+ * Decline buttons as the app's own notification (SKYCOT_REQUEST in
+ * apps/skycot-mobile/modules/skycot-watch). A fixed word, as content-free as the text.
+ */
+export const ALERT_CATEGORY: Readonly<Partial<Record<PushKind, string>>> = {
+  "needs-grown-up": "SKYCOT_REQUEST",
+};
+
 export interface PushTarget {
   readonly token: string;
   readonly type: PushTokenType;
@@ -133,6 +142,7 @@ export function apnsRequestFor(input: {
           sound: "default",
           "mutable-content": 1,
           "thread-id": kind,
+          ...(ALERT_CATEGORY[kind] === undefined ? {} : { category: ALERT_CATEGORY[kind] }),
         },
         ...(input.sealed === null ? {} : { s: input.sealed }),
       }),

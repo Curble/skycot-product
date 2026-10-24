@@ -34,11 +34,15 @@ const VARIANT_CONFIG = {
     appName: "SKYCOT Dev",
     scheme: "skycot-dev",
     iosBundleIdentifier: "com.skycot.app.ios.dev",
+    // Apple's sandbox push service: the dev app runs from Xcode with a development profile.
+    apsEnvironment: "development",
   },
   production: {
     appName: "SKYCOT",
     scheme: "skycot",
     iosBundleIdentifier: "com.skycot.app.ios",
+    // TestFlight and the App Store use Apple's production push service.
+    apsEnvironment: "production",
   },
 } as const;
 
@@ -49,7 +53,8 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
   {
     bundleIdentifier: `${variant.iosBundleIdentifier}.widgets`,
     groupIdentifier: `group.${variant.iosBundleIdentifier}`,
-    // Real pushes wait for SKYCOT Relay (Phase 2). The app updates both from local state.
+    // Widget (Live Activity) pushes are not used yet: the app updates both from local state.
+    // Ordinary notifications get their own entitlement below (ios.entitlements).
     enablePushNotifications: false,
     frequentUpdates: true,
     enableAndroid: false,
@@ -89,8 +94,12 @@ const config: ExpoConfig = {
     bundleIdentifier: variant.iosBundleIdentifier,
     appleTeamId: SKYCOT_APPLE_TEAM_ID,
     // Each upload to App Store Connect needs a new build number (TestFlight 0.1.0: 1 failed
-    // processing, 2 onwards).
-    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "2",
+    // processing, 2 the first TestFlight build, 3 the first with notifications).
+    buildNumber: process.env.SKYCOT_MOBILE_BUILD ?? "3",
+    // "SKYCOT needs a grown-up" and "Sam has finished" from SKYCOT Relay, also when the app is
+    // closed (iOS forwards them to a paired Apple Watch). The pushes are content-free and shown
+    // by iOS itself, so no background mode is needed (UIBackgroundModes stays unset).
+    entitlements: { "aps-environment": variant.apsEnvironment },
     infoPlist: {
       CFBundleDisplayName: variant.appName,
       // SKYCOT never asks for the photo library; Expo's file-system module (part of expo itself)
