@@ -59,7 +59,13 @@ import { useEnsureInteractionMode } from "../compose/turnMode";
 import { firstBlank } from "../starters/starters";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
-import { PublishButton, PublishSheet, PublishStatusPill, usePublishOverview } from "../publish";
+import {
+  PublishButton,
+  PublishSheet,
+  PublishStatusPill,
+  ShowGrownUpButton,
+  usePublishOverview,
+} from "../publish";
 import { latestReviewable } from "../review";
 import { useRetryMade } from "../review/useRetryMade";
 import { enforcedRuntimeMode } from "../../plain/autonomy";
@@ -295,7 +301,10 @@ export function ConversationView({
             />
           ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
-          {archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
+          {/* nondev-seam: skycot-show-grown-up-button */}
+          {childView && shell && !archived ? (
+            <ShowGrownUpButton threadId={threadId} title={shell.title} />
+          ) : archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
           {shell && canOperate ? (

@@ -21,6 +21,8 @@ import type { RecapReport } from "../recap/recap";
 import { markSessionRecapSeen, SessionRecapBody } from "../recap/SessionRecap";
 import { asleepCopy, type LimitState } from "./limits";
 import { giveMoreTime } from "./store";
+import { familyApi } from "../family/api";
+import { useChildView } from "../../app/useChildView";
 
 type Kind = "extra15" | "extra30" | "endBedtime";
 
@@ -43,6 +45,7 @@ export function AsleepScreen({
   // Focus lands on the screen itself: nothing is pressed for the child by accident.
   useModal(ref, { open: true, onClose: () => setAsking(null), initialFocus: "body" });
   const copy = asleepCopy(state, child.limits, child.name, now, timeZone);
+  const childView = useChildView();
 
   return createPortal(
     <div
@@ -65,11 +68,15 @@ export function AsleepScreen({
           {copy.body}
         </p>
         {asking === "time" ? (
-          <MoreTimePanel
-            child={child}
-            bedtime={state.reason === "bedtime"}
-            onCancel={() => setAsking(null)}
-          />
+          childView ? (
+            <AskMoreTimePanel onCancel={() => setAsking(null)} />
+          ) : (
+            <MoreTimePanel
+              child={child}
+              bedtime={state.reason === "bedtime"}
+              onCancel={() => setAsking(null)}
+            />
+          )
         ) : asking === "recap" ? (
           <TodayPanel child={child} onDone={() => setAsking(null)} />
         ) : (
@@ -88,6 +95,38 @@ export function AsleepScreen({
       </div>
     </div>,
     document.body,
+  );
+}
+
+function AskMoreTimePanel({ onCancel }: { readonly onCancel: () => void }) {
+  const [asked, setAsked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fm-asleep__grownup">
+      <p className="fm-asleep__grownup-lead">A grown-up can give you more time.</p>
+      {asked ? (
+        <p role="status">Asked Mum…</p>
+      ) : (
+        <div className="fm-asleep__actions">
+          <Button onClick={onCancel} disabled={busy}>
+            Go back
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void familyApi.createNote({ kind: "more-time" }).then((result) => {
+                setBusy(false);
+                if (result.ok) setAsked(true);
+              });
+            }}
+          >
+            {busy ? "Asking…" : "Ask for more time"}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

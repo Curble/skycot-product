@@ -19,7 +19,13 @@ import {
 } from "react";
 import { AppState } from "react-native";
 
-import { familyApi, type PendingRequest, type ServerFamilyStatus, type Today } from "../family/api";
+import {
+  familyApi,
+  type FamilyNote,
+  type PendingRequest,
+  type ServerFamilyStatus,
+  type Today,
+} from "../family/api";
 import { codeLengthOf, sharedCodeLength } from "../family/codeLength";
 import { readShell } from "../engine/engine";
 import type { ShellSnapshot } from "../engine/types";
@@ -29,6 +35,7 @@ export interface MacState {
   readonly status: ServerFamilyStatus | null;
   readonly shell: ShellSnapshot | null;
   readonly requests: ReadonlyArray<PendingRequest> | null;
+  readonly notes: ReadonlyArray<FamilyNote> | null;
   readonly today: Today | null;
   /** The engine's own sentence when the last read failed. */
   readonly problem: string | null;
@@ -41,6 +48,7 @@ const EMPTY: MacState = {
   status: null,
   shell: null,
   requests: null,
+  notes: null,
   today: null,
   problem: null,
   signedOut: false,
@@ -110,9 +118,13 @@ export function MacDataProvider(props: { readonly children: ReactNode }) {
 
   const readRequests = useCallback(
     async (mac: Mac) => {
-      const result = await familyApi.pendingRequests(mac.transport);
+      const [result, notes] = await Promise.all([
+        familyApi.pendingRequests(mac.transport),
+        familyApi.familyNotes(mac.transport),
+      ]);
       if (result.ok) patch(mac.macId, { requests: result.value, reachable: true });
-      else patch(mac.macId, { reachable: result.reason !== "unreachable" });
+      if (notes.ok) patch(mac.macId, { notes: notes.value, reachable: true });
+      if (!result.ok && !notes.ok) patch(mac.macId, { reachable: result.reason !== "unreachable" });
     },
     [patch],
   );

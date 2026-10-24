@@ -1,2 +1,7 @@
-export { PublishButton, PublishStatusPill, usePublishOverview } from "./PublishControls";
+export {
+  PublishButton,
+  PublishStatusPill,
+  ShowGrownUpButton,
+  usePublishOverview,
+} from "./PublishControls";
 export { PublishSheet } from "./PublishSheet";

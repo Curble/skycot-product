@@ -12,7 +12,11 @@ import {
   grownUpRequestSentence,
   requestHeading,
 } from "../../../../nondev/src/features/family/people";
-import { useGrownUp, type WaitingRequest } from "../../app/grownup/GrownUpContext";
+import {
+  useGrownUp,
+  type WaitingFamilyNote,
+  type WaitingRequest,
+} from "../../app/grownup/GrownUpContext";
 import { useCodeLength, useMacData } from "../../data/MacData";
 import { subscribeAllow, takeAllow } from "../../faceid/allowIntent";
 import { useFaceId } from "../../faceid/FaceIdProvider";
@@ -42,6 +46,94 @@ export function ageOf(createdAt: number, now: number = Date.now()): string {
 export function countSentence(count: number): string {
   if (count === 0) return "Nothing needs you right now.";
   return count === 1 ? "1 request needs a grown-up." : `${count} requests need a grown-up.`;
+}
+
+function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
+  const { refresh } = useMacData();
+  const codeLength = useCodeLength(item.mac.macId);
+  const [minutes, setMinutes] = useState<0 | 15 | 30 | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const name = item.child?.name ?? "A child";
+  const note = item.note;
+  const settle = async (
+    value: 0 | 15 | 30,
+    proof?: { readonly type: "code"; readonly code: string },
+  ) => {
+    setBusy(true);
+    const result =
+      note.kind === "shown" && value === 0
+        ? await familyApi.seenFamilyNote(item.mac.transport, note.id)
+        : await familyApi.answerFamilyNote(item.mac.transport, {
+            id: note.id,
+            minutes: value,
+            ...(proof ? { proof } : {}),
+          });
+    setBusy(false);
+    if (result.ok) {
+      setMinutes(null);
+      void refresh(item.mac.macId);
+    } else setProblem(result.message);
+  };
+  return (
+    <Card style={{ gap: 10 }}>
+      <Txt variant="headline">
+        {note.kind === "shown"
+          ? `${name} made something. Have a look`
+          : `${name} asked for more time`}
+      </Txt>
+      {note.kind === "shown" ? <Txt variant="subheadline">{note.title}</Txt> : null}
+      {problem ? <Banner tone="warning" text={problem} /> : null}
+      {note.kind === "shown" ? (
+        <Button title="Seen" kind="grey" busy={busy} onPress={() => void settle(0)} />
+      ) : (
+        <ButtonRow minWidthEach={95}>
+          <Button
+            title="15 min"
+            kind="grey"
+            busy={busy}
+            onPress={() => setMinutes(15)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="30 min"
+            kind="grey"
+            busy={busy}
+            onPress={() => setMinutes(30)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Not tonight"
+            kind="grey"
+            busy={busy}
+            onPress={() => void settle(0)}
+            style={{ flex: 1 }}
+          />
+        </ButtonRow>
+      )}
+      <ParentCodeSheet
+        visible={minutes !== null}
+        title="Give more time?"
+        description={`Enter the parent code to give ${name} ${minutes ?? ""} more minutes.`}
+        actionLabel="Give more time"
+        length={codeLength}
+        onClose={() => setMinutes(null)}
+        onCode={async (code) => {
+          const chosen = minutes;
+          if (chosen === null) return null;
+          const result = await familyApi.answerFamilyNote(item.mac.transport, {
+            id: note.id,
+            minutes: chosen,
+            proof: { type: "code", code },
+          });
+          if (!result.ok) return result.message;
+          setMinutes(null);
+          void refresh(item.mac.macId);
+          return null;
+        }}
+      />
+    </Card>
+  );
 }
 
 function RequestCard(props: {
@@ -252,7 +344,7 @@ export function RequestsScreen() {
       </View>
       {!grownUp.loaded ? (
         <Spinner />
-      ) : grownUp.waiting.length === 0 ? (
+      ) : grownUp.waiting.length === 0 && grownUp.notes.length === 0 ? (
         <EmptyState
           symbol="checkmark.shield"
           title="All quiet"
@@ -260,6 +352,9 @@ export function RequestsScreen() {
         />
       ) : (
         <View style={{ gap: 14, marginHorizontal: 16, marginTop: 20 }}>
+          {grownUp.notes.map((item) => (
+            <FamilyNoteCard key={`${item.mac.macId}:${item.note.id}`} item={item} />
+          ))}
           {grownUp.waiting.map((waiting) => (
             <RequestCard
               key={`${waiting.mac.macId}:${waiting.request.requestId}`}
