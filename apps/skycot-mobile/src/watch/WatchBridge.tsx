@@ -8,7 +8,9 @@
  *   Mac's approver routes, once), and "Lock SKYCOT now" (the phone's Lock everything);
  * - posts "Ava needs a grown-up" when a new request appears while SKYCOT runs on the phone,
  *   with Allow once and Decline (Allow once opens the card first: the notification itself is
- *   content-free). Pushes when SKYCOT is closed wait for SKYCOT Relay and Apple's push key.
+ *   content-free). When SKYCOT is closed, SKYCOT Relay's push ("SKYCOT needs a grown-up", same
+ *   buttons, no request named) does the same: Allow once opens Requests; Decline declines the
+ *   one waiting request, or, with several, posts one notification for each to choose from.
  *
  * Setting the Watch up ("Say yes from my Apple Watch", This device) asks the parent code once on
  * the phone; the Watch makes its key and signs the Mac's one-use challenge to prove it holds it.
@@ -38,6 +40,7 @@ import {
   type WatchReply,
 } from "./protocol";
 import { buildWatchSnapshot, snapshotKey } from "./snapshot";
+import { pushedDeclineTarget, type WaitingRequest } from "../push/plan";
 
 const NO_WATCH: WatchLinkState = {
   supported: false,
@@ -77,7 +80,7 @@ const NOT_ANSWERED = "Your iPhone couldn't reach the Mac. Try again in a moment.
  * <parent code>` sets the Watch up as the Apple Watch row's Set up does, once the Watch app is
  * reachable; `-skycotTestQuiet YES` skips asking to show notifications.
  */
-function testSetting(key: string): string | null {
+export function testSetting(key: string): string | null {
   if (!__DEV__ || Platform.OS !== "ios") return null;
   // A launch argument arrives as a string, a number or a boolean ("YES"), as macOS reads it.
   const value: unknown = Settings.get(key);
@@ -86,12 +89,14 @@ function testSetting(key: string): string | null {
 }
 
 export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
-  const { macs, mode } = useLinks();
+  const { macs, mode, ready } = useLinks();
   const { byMac, refresh } = useMacData();
   const [link, setLink] = useState<WatchLinkState>(() => SkycotWatch?.state() ?? NO_WATCH);
   const [lockedAt, setLockedAt] = useState<number | null>(null);
   const macsRef = useRef(macs);
   macsRef.current = macs;
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
 
   const snapshot = useMemo(
     () => buildWatchSnapshot({ mode, macs, byMac, lockedAt, now: Date.now() }),
@@ -167,6 +172,39 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
     [mode, lockEverything, refresh],
   );
 
+  // Decline on SKYCOT Relay's push, which names no request: ask each Mac what is waiting.
+  const declinePushed = useCallback(async (): Promise<void> => {
+    const waiting: Array<WaitingRequest> = [];
+    for (const mac of macsRef.current) {
+      const result = await familyApi.pendingRequests(mac.transport);
+      if (!result.ok || result.value === null) continue;
+      for (const request of result.value) waiting.push({ macId: mac.macId, ...request });
+    }
+    const only = pushedDeclineTarget(waiting);
+    const mac = only === null ? null : macFor(only.macId);
+    if (only !== null && mac !== null) {
+      // A no needs no proof, exactly as the local notification's Decline.
+      await familyApi.answerRequest(mac.transport, {
+        threadId: only.threadId,
+        requestId: only.requestId,
+        decision: "decline",
+        fingerprint: only.fingerprint,
+        proof: null,
+      });
+      void refresh(mac.macId);
+      return;
+    }
+    // Several waiting: one notification each (with the child's name when it is known), so the
+    // grown-up chooses which to decline.
+    for (const request of waiting.filter((entry) => !entry.lapsed)) {
+      const key = `${request.macId}:${request.requestId}`;
+      const known = snapshotRef.current.requests.find((entry) => entry.id === key);
+      await SkycotWatch?.notifyRequest(key, known?.title ?? "Someone needs a grown-up").catch(
+        () => undefined,
+      );
+    }
+  }, [refresh]);
+
   // The Watch's messages, and the notification's answers.
   useEffect(() => {
     if (SkycotWatch === null) return;
@@ -186,6 +224,15 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
       ({ id, action, requestKey }) => {
         void (async () => {
           try {
+            // An answer can launch SKYCOT in the background, before the linked Macs are read
+            // from the keychain: wait for them (a few seconds at most).
+            for (let tries = 0; !readyRef.current && tries < 50; tries += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            if (requestKey === "" && action === "decline") {
+              await declinePushed();
+              return;
+            }
             const [macId, ...rest] = requestKey.split(":");
             const requestId = rest.join(":");
             const mac = macFor(macId ?? "");
@@ -228,7 +275,7 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
       messages.remove();
       answers.remove();
     };
-  }, [handle, refresh]);
+  }, [handle, refresh, declinePushed]);
 
   // "Ava needs a grown-up": once for each new request, while SKYCOT runs on the phone.
   const told = useRef<Set<string> | null>(null);

@@ -51,9 +51,14 @@ final class AppDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
-    let info = response.notification.request.content.userInfo
-    guard let key = info["requestKey"] as? String else { return }
-    let decline = response.actionIdentifier == "DECLINE"
+    let content = response.notification.request.content
+    // SKYCOT Relay's push, forwarded by the iPhone, names no request ("SKYCOT needs a
+    // grown-up"): it opens the Requests list, where each request has its own card.
+    let pushed = content.threadIdentifier == "needs-grown-up"
+    guard let key = content.userInfo["requestKey"] as? String ?? (pushed ? "" : nil) else {
+      return
+    }
+    let decline = response.actionIdentifier == "DECLINE" && !key.isEmpty
     await MainActor.run { Router.shared.opened = Opened(key: key, decline: decline) }
   }
 }

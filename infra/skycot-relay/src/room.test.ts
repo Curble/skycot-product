@@ -16,7 +16,7 @@ import {
 } from "@t3tools/skycot-relay/protocol";
 
 import { LIMITS } from "./limits.ts";
-import { openPushRef, sealPushRef } from "./push.ts";
+import { apnsRequestFor, openPushRef, sealPushRef } from "./push.ts";
 import { Room, type RoomSocket } from "./room.ts";
 
 class FakeSocket implements RoomSocket {
@@ -334,6 +334,7 @@ describe("notifications", () => {
         sound: "default",
         "mutable-content": 1,
         "thread-id": "needs-grown-up",
+        category: "SKYCOT_REQUEST",
       },
       s: "opaque",
     });
@@ -372,6 +373,18 @@ describe("notifications", () => {
       reason: "bad-ref",
     });
     expect(calls).toHaveLength(1);
+  });
+
+  it("give only a request its Allow once and Decline buttons", () => {
+    const target = { token: "d".repeat(64), type: "alert", environment: "production" } as const;
+    const body = (kind: "needs-grown-up" | "finished") =>
+      JSON.parse(
+        apnsRequestFor({ kind, target, bundleId: "com.skycot.app", sealed: null, nowSeconds: 1 })!
+          .body,
+      ) as { aps: Record<string, unknown> };
+    expect(body("needs-grown-up").aps["category"]).toBe("SKYCOT_REQUEST");
+    expect(body("finished").aps["category"]).toBeUndefined();
+    expect(body("finished").aps["alert"]).toEqual({ title: "SKYCOT", body: "Sam has finished" });
   });
 
   it("stay off without Apple's key", async () => {
