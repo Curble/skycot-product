@@ -1,17 +1,25 @@
 import type {
   OrchestrationV2Command,
+  OrchestrationV2ConversationMessage,
   OrchestrationV2ThreadProjection,
   ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
 import { CommandId, MessageId } from "@t3tools/contracts";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
-import type * as Orchestrator from "../../orchestration-v2/Orchestrator.ts";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+
+import * as Orchestrator from "../../orchestration-v2/Orchestrator.ts";
+import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import {
   CLAUDE_ACCOUNT_OUT,
   FABLE_RESET,
@@ -25,10 +33,14 @@ import {
   usageLimitError,
   window,
 } from "./fixtures.test-helpers.ts";
+import { LIMITS_FILE_NAME, makeLearnedLimitStore } from "./learnedLimits.ts";
+import * as SkycotQueuedTurn from "./queuedTurn.ts";
 import {
   SWITCH_MESSAGE_PREFIX,
   judgeBeforeTurn,
   judgedBeforeTurn,
+  judgedQueuedTurn,
+  layerOrchestrator,
   makeFallback,
   planContinuation,
 } from "./SkycotModelFallback.ts";
@@ -67,7 +79,35 @@ describe("before a turn", () => {
     assert.isFalse(
       judgedBeforeTurn(message({ messageId: MessageId.make(`${SWITCH_MESSAGE_PREFIX}run-1`) })),
     );
-    assert.isFalse(judgedBeforeTurn(message({ usageLimitContinuationOfRunId: "run-1" as never })));
+    assert.isFalse(judgedBeforeTurn(message({ restartContinuationOfRunId: "run-1" as never })));
+    // Upstream's resume after a reset: the model may still be resting (its own week).
+    assert.isTrue(judgedBeforeTurn(message({ usageLimitContinuationOfRunId: "run-1" as never })));
+  });
+
+  it("judges a queued message the same way, as the engine stored it", () => {
+    const stored = (overrides: Partial<OrchestrationV2ConversationMessage> = {}) =>
+      ({
+        id: MessageId.make("message-2"),
+        text: "Make it jump higher",
+        attachments: [],
+        ...overrides,
+      }) as unknown as OrchestrationV2ConversationMessage;
+    const queuedRun = {};
+    assert.isTrue(judgedQueuedTurn({ message: stored(), run: queuedRun }));
+    assert.isFalse(judgedQueuedTurn({ message: undefined, run: queuedRun }));
+    assert.isFalse(judgedQueuedTurn({ message: stored({ text: "/compact" }), run: queuedRun }));
+    assert.isFalse(
+      judgedQueuedTurn({ message: stored({ notification: {} as never }), run: queuedRun }),
+    );
+    assert.isFalse(
+      judgedQueuedTurn({ message: stored({ delegatedCompletion: {} as never }), run: queuedRun }),
+    );
+    assert.isFalse(
+      judgedQueuedTurn({
+        message: stored(),
+        run: { restartContinuationOfRunId: "run-1" as never },
+      }),
+    );
   });
 
   it("moves a resting model's turn and remembers the person's choice", () => {
@@ -375,5 +415,260 @@ describe("the fallback in front of the engine", () => {
       yield* fallback.carryOn("thread-1" as ThreadId, "run-1");
       assert.equal((yield* Ref.get(dispatched)).length, 0);
     }),
+  );
+});
+
+/** Claude's probe as it reports today: the account windows only, no "Weekly · Fable". */
+const FABLE_UNREPORTED = [
+  window("five_hour", "Session", 20, NOW + 3 * HOUR),
+  window("seven_day", "Weekly", 85, NOW + 70 * HOUR),
+];
+
+describe("what a limit taught, across a restart", () => {
+  it.effect("keeps a model aside after a restart until its reset, then lets it back", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fallback-limits-" });
+      const filePath = path.join(dir, LIMITS_FILE_NAME);
+      const providers = Effect.succeed([claude(FABLE_UNREPORTED), codex()]);
+      const turnRuleFor = () => Effect.succeed(() => true);
+      yield* TestClock.setTime(NOW);
+
+      // Before the restart: a Fable turn stops on Fable's own week, which the probe never shows.
+      const failed = run({ id: "run-1", ordinal: 1, modelSelection: FABLE });
+      const before = yield* Ref.make(
+        projection({ runs: [failed], turnItems: [usageLimitError(failed, FABLE_RESET)] }),
+      );
+      const firstDispatches = yield* Ref.make<ReadonlyArray<OrchestrationV2Command>>([]);
+      const first = yield* makeFallback(
+        fakeEngine({ projection: before, dispatched: firstDispatches }),
+        {
+          getProviders: providers,
+          store: yield* makeMemorySwitchStore,
+          learned: yield* makeLearnedLimitStore(filePath),
+          turnRuleFor,
+        },
+      );
+      yield* first.carryOn("thread-1" as ThreadId, "run-1");
+      assert.deepStrictEqual(
+        ((yield* Ref.get(firstDispatches))[0] as Dispatch).modelSelection,
+        OPUS,
+      );
+      const info = yield* fs.stat(filePath);
+      assert.equal(Number(info.mode) & 0o777, 0o600);
+
+      // The engine restarts (nothing in memory survives) and the person asks Fable again.
+      const restart = Effect.gen(function* () {
+        const done = run({ id: "run-0", ordinal: 0, modelSelection: FABLE, status: "completed" });
+        const state = yield* Ref.make(projection({ runs: [done], turnItems: [] }));
+        const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationV2Command>>([]);
+        const fallback = yield* makeFallback(fakeEngine({ projection: state, dispatched }), {
+          getProviders: providers,
+          store: yield* makeMemorySwitchStore,
+          learned: yield* makeLearnedLimitStore(filePath),
+          turnRuleFor,
+        });
+        yield* fallback.service.dispatch(message());
+        return ((yield* Ref.get(dispatched))[0] as Dispatch).modelSelection;
+      });
+      yield* TestClock.setTime(NOW + HOUR);
+      assert.deepStrictEqual(yield* restart, OPUS);
+
+      // After Fable's reset the lesson no longer applies, restart or not.
+      yield* TestClock.setTime(FABLE_RESET + 1);
+      assert.deepStrictEqual(yield* restart, FABLE);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+});
+
+describe("a message that waited in the queue", () => {
+  const waiting = run({
+    id: "run-3",
+    ordinal: 3,
+    modelSelection: FABLE,
+    status: "queued",
+    userMessageId: "message-3",
+  });
+  const stored = {
+    id: MessageId.make("message-3"),
+    text: "And make it purr",
+    attachments: [],
+  } as unknown as OrchestrationV2ConversationMessage;
+  // The turn in front was carried on on Opus and has finished.
+  const failed = run({ id: "run-1", ordinal: 1, modelSelection: FABLE });
+  const carried = run({
+    id: "run-2",
+    ordinal: 2,
+    modelSelection: OPUS,
+    status: "completed",
+    userMessageId: `${SWITCH_MESSAGE_PREFIX}run-1`,
+  });
+  const behindFinished = projection({
+    runs: [failed, carried, waiting],
+    turnItems: [usageLimitError(failed, FABLE_RESET)],
+    modelSelection: OPUS,
+  });
+
+  const setUp = (input: {
+    readonly providers?: ReadonlyArray<ServerProvider>;
+    readonly mayRunOn?: (provider: ServerProvider) => boolean;
+  }) =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(NOW);
+      const state = yield* Ref.make(behindFinished);
+      const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationV2Command>>([]);
+      const store = yield* makeMemorySwitchStore;
+      yield* store.remember("thread-1", { preferred: FABLE, fallback: OPUS });
+      const fallback = yield* makeFallback(fakeEngine({ projection: state, dispatched }), {
+        getProviders: Effect.succeed(input.providers ?? [claude(), codex()]),
+        store,
+        turnRuleFor: () => Effect.succeed(input.mayRunOn ?? (() => true)),
+      });
+      return { fallback, store };
+    });
+
+  it.effect("starts on the fallback while its stored model rests, and says it only once", () =>
+    Effect.gen(function* () {
+      const { fallback, store } = yield* setUp({});
+      const chosen = yield* fallback.queuedTurn({
+        projection: behindFinished,
+        run: waiting,
+        message: stored,
+        modelSelection: FABLE,
+      });
+      assert.deepStrictEqual(chosen, OPUS);
+      assert.lengthOf(yield* store.switchesFor("thread-1"), 0);
+    }),
+  );
+
+  it.effect("waits behind a turn a limit just stopped: that one is carried on first", () =>
+    Effect.gen(function* () {
+      const { fallback } = yield* setUp({});
+      const chosen = yield* fallback.queuedTurn({
+        projection: projection({
+          runs: [failed, waiting],
+          turnItems: [usageLimitError(failed, FABLE_RESET)],
+        }),
+        run: waiting,
+        message: stored,
+        modelSelection: FABLE,
+      });
+      assert.deepStrictEqual(chosen, FABLE);
+    }),
+  );
+
+  it.effect("keeps a usable model the person picked, and leaves notices alone", () =>
+    Effect.gen(function* () {
+      const { fallback } = yield* setUp({});
+      const picked = { ...waiting, modelSelection: SONNET };
+      assert.deepStrictEqual(
+        yield* fallback.queuedTurn({
+          projection: behindFinished,
+          run: picked,
+          message: stored,
+          modelSelection: SONNET,
+        }),
+        SONNET,
+      );
+      assert.deepStrictEqual(
+        yield* fallback.queuedTurn({
+          projection: behindFinished,
+          run: waiting,
+          message: { ...stored, notification: {} } as never,
+          modelSelection: FABLE,
+        }),
+        FABLE,
+      );
+    }),
+  );
+
+  it.effect("goes back to the person's model once it has reset", () =>
+    Effect.gen(function* () {
+      const { fallback, store } = yield* setUp({ providers: [claude([]), codex()] });
+      const onFallback = { ...waiting, modelSelection: OPUS };
+      assert.deepStrictEqual(
+        yield* fallback.queuedTurn({
+          projection: behindFinished,
+          run: onFallback,
+          message: stored,
+          modelSelection: OPUS,
+        }),
+        FABLE,
+      );
+      assert.isNull(yield* store.memoryFor("thread-1"));
+    }),
+  );
+
+  it.effect("never moves where the Family rules say the child cannot start a turn now", () =>
+    Effect.gen(function* () {
+      const { fallback } = yield* setUp({ mayRunOn: () => false });
+      assert.deepStrictEqual(
+        yield* fallback.queuedTurn({
+          projection: behindFinished,
+          run: waiting,
+          message: stored,
+          modelSelection: FABLE,
+        }),
+        FABLE,
+      );
+    }),
+  );
+});
+
+describe("the seam", () => {
+  const engineSeeing = (
+    seen: Ref.Ref<Option.Option<SkycotQueuedTurn.SkycotQueuedTurnModel["Service"]>>,
+  ) =>
+    Layer.effect(
+      Orchestrator.OrchestratorV2,
+      Effect.gen(function* () {
+        yield* Ref.set(seen, yield* Effect.serviceOption(SkycotQueuedTurn.SkycotQueuedTurnModel));
+        const state = yield* Ref.make(
+          projection({
+            runs: [run({ id: "run-0", ordinal: 0, modelSelection: FABLE, status: "completed" })],
+            turnItems: [],
+          }),
+        );
+        const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationV2Command>>([]);
+        return fakeEngine({ projection: state, dispatched });
+      }),
+    );
+  const registry = Layer.succeed(ProviderRegistry.ProviderRegistry, {
+    getProviders: Effect.succeed([claude(), codex()]),
+  } as unknown as ProviderRegistry.ProviderRegistry["Service"]);
+
+  it.effect("the engine asks the fallback that wraps it which model a queued turn starts on", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(NOW);
+      const seen = yield* Ref.make(
+        Option.none<SkycotQueuedTurn.SkycotQueuedTurnModel["Service"]>(),
+      );
+      yield* Layer.build(
+        layerOrchestrator(engineSeeing(seen), { enabled: true }).pipe(Layer.provide(registry)),
+      );
+      const service = yield* Ref.get(seen);
+      assert.isTrue(Option.isSome(service));
+      if (Option.isNone(service)) return;
+      const waiting = run({ id: "run-1", ordinal: 1, modelSelection: FABLE, status: "queued" });
+      const chosen = yield* service.value.choose({
+        projection: projection({ runs: [waiting], turnItems: [] }),
+        run: waiting,
+        message: {
+          id: MessageId.make("message-run-1"),
+          text: "Make it fly",
+          attachments: [],
+        } as unknown as OrchestrationV2ConversationMessage,
+        modelSelection: FABLE,
+      });
+      assert.deepStrictEqual(chosen, OPUS);
+
+      // Policy off: the engine is upstream's, with nothing to ask.
+      const off = yield* Ref.make(Option.none<SkycotQueuedTurn.SkycotQueuedTurnModel["Service"]>());
+      yield* Layer.build(
+        layerOrchestrator(engineSeeing(off), { enabled: false }).pipe(Layer.provide(registry)),
+      );
+      assert.isTrue(Option.isNone(yield* Ref.get(off)));
+    }).pipe(Effect.scoped),
   );
 });

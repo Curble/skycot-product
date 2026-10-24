@@ -11,10 +11,13 @@
 // runtimeLayer.ts (seam skycot-model-fallback), so every way a turn starts (the plain client,
 // Advanced mode, a scheduled task, upstream's own limit recovery) meets the same judge
 // (choose.ts). Two moments:
-//   - Before a turn: a person's message to a conversation with nothing running. If the model it
-//     asks for is resting, the message is dispatched with the fallback model instead. The
-//     engine's own provider switch (with its context hand-off) does the rest when the fallback
-//     belongs to another company.
+//   - Before a turn: a person's message to a conversation with nothing running, upstream's
+//     scheduled resume after a reset, and a message that waited in the queue when the engine
+//     starts it (queuedTurn.ts, seam skycot-model-fallback-queue in Orchestrator.ts). If the
+//     model it asks for is resting, the turn starts on the fallback model instead. The engine's
+//     own provider switch (with its context hand-off) does the rest when the fallback belongs to
+//     another company. A queue behind a turn a limit just stopped waits for that turn to be
+//     carried on first, as upstream holds it; then each queued message is judged as it starts.
 //   - When a limit stops a turn half-way (or the "before" check could not know): the failed run
 //     is carried on once on the fallback, with the same "Continue where you left off."
 //     continuation the stock client's Resume sends (`manualContinuationOfRunId`). Each model is
@@ -29,6 +32,8 @@
 // used up, a stopped turn is not carried on: it waits exactly as upstream leaves it. A
 // carried-on turn is the same turn, so it is not counted again. A move to another company is
 // noted for the grown-ups' Today and recap (switchLog.ts); no notification.
+// What failures taught (a model, or an account, resting until a time) is kept across restarts
+// (learnedLimits.ts), since the usage probe does not report every allowance.
 //
 // Inert unless T3CODE_SKYCOT_POLICY=1, and without provider snapshots (tests, stripped servers).
 
@@ -39,6 +44,7 @@ import {
   ProviderInstanceId,
   type ThreadId,
   type ModelSelection,
+  type OrchestrationV2ConversationMessage,
   type OrchestrationV2Command,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2Run,
@@ -49,6 +55,7 @@ import { modelSelectionsEqual } from "@t3tools/shared/model";
 import {
   latestExecutedRun,
   latestRootProviderFailure,
+  usageLimitBlockedRun,
 } from "@t3tools/shared/orchestrationV2ThreadError";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
@@ -57,7 +64,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
@@ -74,11 +80,19 @@ import {
   availabilityOf,
   failureScope,
   modelKey,
+  sameModel,
   sameReset,
   type LearnedLimit,
   type ModelRef,
 } from "./availability.ts";
 import { chooseModel, type Choice } from "./choose.ts";
+import {
+  LIMITS_FILE_NAME,
+  makeLearnedLimitStore,
+  makeMemoryLearnedLimitStore,
+  type LearnedLimitStore,
+} from "./learnedLimits.ts";
+import * as SkycotQueuedTurn from "./queuedTurn.ts";
 import {
   SWITCH_FILE_NAME,
   makeMemorySwitchStore,
@@ -121,7 +135,11 @@ function endOf(ref: ModelRef, providers: ReadonlyArray<ServerProvider>): SwitchE
   };
 }
 
-/** Messages the "before a turn" check leaves alone: everything but a person's own new message. */
+/**
+ * Messages the "before a turn" check leaves alone: everything but a person's own new message and
+ * upstream's scheduled resume after a reset (`usageLimitContinuationOfRunId`, which may find the
+ * model still resting: a model's own week can outlast the reset the failure reported).
+ */
 export function judgedBeforeTurn(command: DispatchCommand): boolean {
   return (
     command.dispatchMode.type !== "steer_active" &&
@@ -131,9 +149,24 @@ export function judgedBeforeTurn(command: DispatchCommand): boolean {
     command.notification === undefined &&
     command.delegatedCompletion === undefined &&
     command.restartContinuationOfRunId === undefined &&
-    command.usageLimitContinuationOfRunId === undefined &&
     !String(command.messageId).startsWith(SWITCH_MESSAGE_PREFIX) &&
     !isNativeMaintenanceCommand(command)
+  );
+}
+
+/** The same rule for a message that waited in the queue, as the engine stored it. */
+export function judgedQueuedTurn(input: {
+  readonly message: OrchestrationV2ConversationMessage | undefined;
+  readonly run: Pick<OrchestrationV2Run, "restartContinuationOfRunId">;
+}): boolean {
+  const { message } = input;
+  return (
+    message !== undefined &&
+    message.notification === undefined &&
+    message.delegatedCompletion === undefined &&
+    input.run.restartContinuationOfRunId === undefined &&
+    !String(message.id).startsWith(SWITCH_MESSAGE_PREFIX) &&
+    !isNativeMaintenanceCommand(message)
   );
 }
 
@@ -341,6 +374,8 @@ export function failedRunOf(event: OrchestrationV2DomainEvent): string | null {
 export interface FallbackDeps {
   readonly getProviders: Effect.Effect<ReadonlyArray<ServerProvider>>;
   readonly store: SwitchStore;
+  /** What usage-limit failures taught; kept in memory only when left out. */
+  readonly learned?: LearnedLimitStore;
   /** The Family rule: the providers this conversation's turn may run on now (`ChoiceInput.mayRunOn`). */
   readonly turnRuleFor: (
     threadId: string,
@@ -353,14 +388,11 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
   inner: Orchestrator.OrchestratorV2["Service"],
   deps: FallbackDeps,
 ) {
-  const learnedRef = yield* Ref.make<ReadonlyArray<LearnedLimit>>([]);
+  const learnedStore = deps.learned ?? (yield* makeMemoryLearnedLimitStore);
   const lock = yield* Semaphore.make(1);
   const handled = new Set<string>();
 
-  const learnedNow = (now: number) =>
-    Ref.updateAndGet(learnedRef, (entries) => entries.filter((entry) => entry.until > now));
-  const learn = (entries: ReadonlyArray<LearnedLimit>) =>
-    Ref.update(learnedRef, (current) => [...current, ...entries]);
+  const learnedNow = (now: number) => learnedStore.current(now);
 
   const record = Effect.fn("SkycotModelFallback.record")(function* (input: {
     readonly threadId: string;
@@ -393,17 +425,18 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
     });
   });
 
-  const beforeTurn = Effect.fn("SkycotModelFallback.beforeTurn")(function* (
-    command: DispatchCommand,
-  ) {
-    if (!judgedBeforeTurn(command)) return command;
-    const shell = yield* inner
-      .getThreadShell(command.threadId)
-      .pipe(Effect.orElseSucceed(() => null));
-    // A run is going: the message queues or joins it; leave the model to that run.
-    if (shell === null || shell.activeRunId !== null) return command;
-    const threadId = String(command.threadId);
-    const requested = command.modelSelection ?? shell.modelSelection;
+  /** The before-turn judge and its notes; the model to start on, or null for "as asked". */
+  const judgeTurn = Effect.fn("SkycotModelFallback.judgeTurn")(function* (input: {
+    readonly threadId: string;
+    readonly messageId: string;
+    readonly requested: ModelSelection;
+    /**
+     * A queued message stored with the model before the move: when the conversation already
+     * moved from that model to this fallback, it was said once and is not said again.
+     */
+    readonly quietWhenKnown?: boolean;
+  }) {
+    const { threadId, requested } = input;
     const memory = yield* deps.store.memoryFor(threadId);
     const providers = yield* deps.getProviders;
     const now = yield* Clock.currentTimeMillis;
@@ -413,31 +446,109 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
     switch (judgement.type) {
       case "unchanged":
         if (judgement.forget) yield* deps.store.forget(threadId);
-        return command;
+        return null;
       case "back":
         yield* deps.store.forget(threadId);
         yield* Effect.logInfo("skycot-model-fallback.back", {
           threadId,
           model: `${judgement.selection.instanceId}:${judgement.selection.model}`,
         });
-        return { ...command, modelSelection: judgement.selection };
+        return judgement.selection;
       case "switch":
+        if (
+          input.quietWhenKnown === true &&
+          memory !== null &&
+          modelSelectionsEqual(memory.preferred, judgement.preferred) &&
+          modelSelectionsEqual(memory.fallback, judgement.selection)
+        ) {
+          return judgement.selection;
+        }
         yield* deps.store.remember(threadId, {
           preferred: judgement.preferred,
           fallback: judgement.selection,
         });
         yield* record({
           threadId,
-          messageId: String(command.messageId),
+          messageId: input.messageId,
           choice: judgement.choice,
           from: refOf(judgement.preferred),
           until: judgement.choice.until,
           providers,
           now,
         });
-        return { ...command, modelSelection: judgement.selection };
+        return judgement.selection;
     }
   });
+
+  const beforeTurn = Effect.fn("SkycotModelFallback.beforeTurn")(function* (
+    command: DispatchCommand,
+  ) {
+    if (!judgedBeforeTurn(command)) return command;
+    const shell = yield* inner
+      .getThreadShell(command.threadId)
+      .pipe(Effect.orElseSucceed(() => null));
+    // A run is going: the message queues or joins it; it is judged when it starts (queuedTurn).
+    if (shell === null || shell.activeRunId !== null) return command;
+    const selection = yield* judgeTurn({
+      threadId: String(command.threadId),
+      messageId: String(command.messageId),
+      requested: command.modelSelection ?? shell.modelSelection,
+    });
+    return selection === null ? command : { ...command, modelSelection: selection };
+  });
+
+  /**
+   * The engine's question when it starts a queued message (queuedTurn.ts). Runs under the
+   * engine's thread lock, so it never calls back into the engine. A queue behind a run a usage
+   * limit just stopped is left alone: that turn is carried on first (`carryOn`), upstream holds
+   * the queue meanwhile, and the messages are judged when it lets them start.
+   */
+  const queuedTurn: SkycotQueuedTurn.QueuedTurnJudge = Effect.fn("SkycotModelFallback.queuedTurn")(
+    function* (input: SkycotQueuedTurn.QueuedTurnInput) {
+      if (!judgedQueuedTurn(input)) return input.modelSelection;
+      if (usageLimitBlockedRun(input.projection.runs, input.projection.turnItems, null) !== null) {
+        return input.modelSelection;
+      }
+      const selection = yield* judgeTurn({
+        threadId: String(input.projection.thread.id),
+        messageId: String(input.run.userMessageId),
+        requested: input.modelSelection,
+        quietWhenKnown: true,
+      });
+      return selection ?? input.modelSelection;
+    },
+    (effect, input) =>
+      effect.pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("skycot-model-fallback.queued-judge-failed", { cause }).pipe(
+            Effect.as(input.modelSelection),
+          ),
+        ),
+      ),
+  );
+
+  /** A turn completed on a model: it is back, whatever an earlier failure taught. */
+  const completed = Effect.fn("SkycotModelFallback.completed")(
+    function* (run: OrchestrationV2Run) {
+      if (run.startedAt === null) return;
+      const ref = refOf(run.modelSelection);
+      const now = yield* Clock.currentTimeMillis;
+      const learned = yield* learnedNow(now);
+      if (!learned.some((entry) => entry.instanceId === ref.instanceId)) return;
+      const providers = yield* deps.getProviders;
+      const provider = providers.find(
+        (candidate) => String(candidate.instanceId) === ref.instanceId,
+      );
+      yield* learnedStore.forgetFor(
+        ref,
+        DateTime.toEpochMillis(run.startedAt),
+        provider === undefined ? undefined : (left, right) => sameModel(provider, left, right),
+      );
+    },
+    Effect.catchCause((cause) =>
+      Effect.logWarning("skycot-model-fallback.completed-failed", { cause }),
+    ),
+  );
 
   const dispatch: Orchestrator.OrchestratorV2["Service"]["dispatch"] = (command) =>
     command.type !== "message.dispatch"
@@ -465,7 +576,7 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
       if (plan.type === "pending") return;
       handled.add(runId);
       if (plan.type === "ignore") return;
-      yield* learn(plan.learned);
+      yield* learnedStore.learn(plan.learned, now);
       if (plan.type === "wait") {
         yield* Effect.logInfo("skycot-model-fallback.nothing-usable", { threadId, runId });
         return;
@@ -512,6 +623,9 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
 
   const start = forkParked(
     Stream.runForEach(inner.streamDomainEvents, (event) => {
+      if (event.type === "run.updated" && event.payload.status === "completed") {
+        return completed(event.payload);
+      }
       const runId = failedRunOf(event);
       return runId === null ? Effect.void : carryOn(event.threadId, runId);
     }).pipe(
@@ -525,6 +639,7 @@ export const makeFallback = Effect.fn("SkycotModelFallback.make")(function* (
     service: { ...inner, dispatch } satisfies Orchestrator.OrchestratorV2["Service"],
     start,
     carryOn,
+    queuedTurn,
   };
 });
 
@@ -583,6 +698,13 @@ const layerWrap = Layer.effect(
             Effect.provideService(FileSystem.FileSystem, files.fs),
             Effect.provideService(Path.Path, files.path),
           );
+    const learned =
+      files === null
+        ? yield* makeMemoryLearnedLimitStore
+        : yield* makeLearnedLimitStore(files.path.join(files.stateDir, LIMITS_FILE_NAME)).pipe(
+            Effect.provideService(FileSystem.FileSystem, files.fs),
+            Effect.provideService(Path.Path, files.path),
+          );
     // A read-only reader of the Family activity file the gate keeps (it never counts or writes
     // here), so a carried-on turn meets the child's limits exactly as a new one would.
     const limits =
@@ -600,17 +722,25 @@ const layerWrap = Layer.effect(
     const fallback = yield* makeFallback(inner, {
       getProviders: registry.value.getProviders,
       store,
+      learned,
       turnRuleFor: makeTurnRule({ family, limits }),
     });
+    const queued = yield* Effect.serviceOption(SkycotQueuedTurn.SkycotQueuedTurnModel);
+    if (Option.isSome(queued)) yield* queued.value.register(fallback.queuedTurn);
     yield* fallback.start;
     return fallback.service;
   }),
 );
 
-/** The seam: `base` unchanged unless the SKYCOT policy is on. */
+/**
+ * The seam: `base` unchanged unless the SKYCOT policy is on. When it is, the engine and the
+ * fallback share one queued-turn service (the engine asks it, the fallback answers).
+ */
 export function layerOrchestrator<E, R>(
   base: Layer.Layer<Orchestrator.OrchestratorV2, E, R>,
   options: { readonly enabled: boolean },
 ): Layer.Layer<Orchestrator.OrchestratorV2, E, R> {
-  return options.enabled ? layerWrap.pipe(Layer.provide(base)) : base;
+  return options.enabled
+    ? layerWrap.pipe(Layer.provide(base.pipe(Layer.provideMerge(SkycotQueuedTurn.layer))))
+    : base;
 }
