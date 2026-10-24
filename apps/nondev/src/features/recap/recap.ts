@@ -7,6 +7,7 @@ import { describePersonalCategories, type PersonalCategory } from "@t3tools/skyc
 import { describeChanges, fromCheckpointFiles } from "../../plain/changes";
 import { grownUpSwitchLines } from "../../plain/switches";
 import { clockPhrase } from "../family-limits/limits";
+import { grownUpPlainNames } from "../family/copy";
 
 export type RecapRange = "session" | "week";
 
@@ -207,7 +208,7 @@ export function grownUpLines(
         `${describePersonalCategories([category as PersonalCategory])}${count > 1 ? ` (${count} times)` : ""}`,
     );
     lines.push(
-      `The shield spotted ${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`} before it was sent.`,
+      `${grownUpPlainNames.recapShield} ${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`} before it was sent.`,
     );
   }
   if (shieldAllowed > 0) {

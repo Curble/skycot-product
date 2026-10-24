@@ -4,15 +4,26 @@
 // device). The provider lives once, above the shell, so a sheet opened from inside another
 // sheet still stacks correctly (ui/useModal).
 import { KeyRound } from "lucide-react";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import { Button } from "../../ui/Button";
+import { HOME_HREF, navigate } from "../../router";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
 import { actionReason, familySteps } from "./copy";
 import {
   asksEachStep,
+  familyGrantOpen,
   familyOn,
+  grownUpMinutesLeft,
   isFamilyLocked,
   purposeFor,
   type FamilyAction,
@@ -21,6 +32,7 @@ import {
 import { ParentCodeEntry, useParentCodeEntry, type ParentCodeAttempt } from "./ParentCodeEntry";
 import {
   disableFamily,
+  lockFamilyGrants,
   moveLegacyProfile,
   readFamilyView,
   refreshFamily,
@@ -83,7 +95,8 @@ function makeApi(
     enabled: familyOn(view),
     isLocked: (action) => isFamilyLocked(view, action),
     requireParentCode: (action, options = {}) => {
-      if (!isFamilyLocked(view, action)) return Promise.resolve(true);
+      if (!isFamilyLocked(view, action) || familyGrantOpen(view, action, Date.now()))
+        return Promise.resolve(true);
       return open === null ? Promise.resolve(false) : open({ action, options });
     },
   };
@@ -103,6 +116,15 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
+
+  useEffect(() => {
+    if (!view.enabled || view.me.kind !== "shared") return;
+    const expiresAt = Math.max(view.openUntil.settings ?? 0, view.openUntil.advanced ?? 0);
+    const delay = expiresAt - Date.now();
+    if (delay <= 0) return;
+    const timer = window.setTimeout(() => void refreshFamily(), delay + 50);
+    return () => window.clearTimeout(timer);
+  }, [view.enabled, view.me.kind, view.openUntil.settings, view.openUntil.advanced]);
 
   const api = useMemo(
     () =>
@@ -125,6 +147,7 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
   return (
     <FamilyContext.Provider value={api}>
       {children}
+      <GrownUpModeBar view={view} />
       {pending ? (
         <ParentCodeSheet
           key={`${pending.action}:${pending.options.requestId ?? ""}`}
@@ -132,6 +155,32 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
         />
       ) : null}
     </FamilyContext.Provider>
+  );
+}
+
+const readBarClock = () => Math.floor(Date.now() / 60_000) * 60_000;
+const subscribeBarClock = (onChange: () => void) => {
+  const timer = window.setInterval(onChange, 60_000);
+  return () => window.clearInterval(timer);
+};
+
+function GrownUpModeBar({ view }: { readonly view: FamilyView }) {
+  const now = useSyncExternalStore(subscribeBarClock, readBarClock, readBarClock);
+  const minutes = grownUpMinutesLeft(view, now);
+  if (!view.enabled || view.me.kind !== "shared" || minutes === 0) return null;
+  return (
+    <div className="fm-grown-up-bar" role="status">
+      <span>Grown-up mode · {minutes} min</span>
+      <Button
+        size="sm"
+        onClick={() => {
+          void lockFamilyGrants();
+          navigate(HOME_HREF);
+        }}
+      >
+        Done
+      </Button>
+    </div>
   );
 }
 

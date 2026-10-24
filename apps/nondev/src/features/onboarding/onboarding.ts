@@ -46,7 +46,15 @@ export function onboardingSteps(
   familyEnabled = false,
 ): ReadonlyArray<OnboardingStep> {
   const family: OnboardingStep[] = audience === "child" && !familyEnabled ? ["family"] : [];
-  return ["who", ...family, "assistant", "work", "autonomy", "look", "done"];
+  return [
+    "who",
+    ...family,
+    "assistant",
+    "work",
+    ...(audience === "child" ? [] : ["autonomy" as const]),
+    "look",
+    "done",
+  ];
 }
 
 /** Whether "Continue" is live on a step; the others never block. */

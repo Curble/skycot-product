@@ -20,6 +20,7 @@ import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { homeTip } from "./tip";
 import { summarySentence } from "./summary";
+import { greeting as greetingForHour } from "./greeting";
 
 /**
  * Home: a greeting, the starter cards, every live or attention-needing job in one sentence
@@ -72,7 +73,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
               <h2 className="fm-home__greeting">
                 <span className="fm-marker-underline">
-                  {greeting()}
+                  {greetingForHour(new Date().getHours())}
                   {family.enabled && family.profile.childName
                     ? `, ${family.profile.childName}`
                     : ""}
@@ -186,14 +187,6 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
       href={threadHref(row.shell.environmentId, row.shell.id)}
     />
   );
-}
-
-function greeting(now = new Date()): string {
-  const hour = now.getHours();
-  if (hour < 5) return "Good evening";
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
 }
 
 function lowerFirst(text: string): string {

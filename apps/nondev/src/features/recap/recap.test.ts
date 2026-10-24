@@ -67,7 +67,7 @@ describe("the recap in plain words", () => {
     ).toEqual([
       "2 steps waited for a grown-up (the internet, an install, deleting, or outside the project); 1 was allowed with the parent code.",
       "A grown-up gave 15 more minutes at 5:00 pm when the day's time ran out.",
-      "The shield spotted a full name (2 times) and a school's name before it was sent.",
+      "The private-details check spotted a full name (2 times) and a school's name before it was sent.",
       "1 message went as typed after a grown-up said yes.",
     ]);
     expect(

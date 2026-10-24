@@ -27,7 +27,7 @@ export const familyCopy = {
   ],
   honesty:
     "These are guardrails for a child who isn't trying to get round them, kept by SKYCOT's engine on this Mac — not a security product.",
-  storage: `${PRODUCT_NAME}'s engine keeps a scrambled version of the code on this Mac. Nobody can read it back, including ${PRODUCT_NAME}. If it's forgotten, see "Forgotten the code?" in the guide.`,
+  storage: `${PRODUCT_NAME}'s engine keeps a scrambled version of the code on this Mac. Nobody can read it back, including ${PRODUCT_NAME}. If you forget it, use the reset steps below.`,
   /** While the engine answers a safe step itself, in place of its card. */
   checkingStep: "Checking this step…",
   askGrownUp: "Ask a grown-up",
@@ -38,6 +38,19 @@ export const familyCopy = {
   legacyBody:
     "This profile was set up in this browser only, so it could be cleared from the browser. Enter the parent code once and SKYCOT's engine will keep it and enforce it everywhere.",
 } as const;
+
+export const grownUpPlainNames = {
+  advanced: "Open the full workshop",
+  trustedAddOns: "Let SKYCOT fetch well-known add-ons (like 3D and drawing tools)",
+  publishLive: "Put it online",
+  publishReview: "Ask someone to check",
+  recapShield: "The private-details check spotted",
+} as const;
+
+export const codeChangeWarning =
+  "Changing the code signs out Mum's and Dad's phones and Watch. You'll link them again.";
+export const codeChangedNotice =
+  "The parent code has changed. Mum's and Dad's phones and Watch are signed out. Go to Phones and iPads to link them again.";
 
 /**
  * How a child's steps run, in the words the composer, the conversation strip and Settings use.

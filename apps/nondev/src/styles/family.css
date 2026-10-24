@@ -3,6 +3,23 @@
    flavours.css leaves them plain in every theme. */
 
 /* ---- Set-up form ------------------------------------------------------- */
+.fm-grown-up-bar {
+  position: fixed;
+  z-index: 50;
+  top: 10px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--fm-sep);
+  border-radius: 999px;
+  background: var(--fm-bg-card);
+  box-shadow: var(--fm-shadow-popover);
+  color: var(--fm-label);
+  font-size: calc(12px * var(--fm-text-scale));
+  transform: translateX(-50%);
+}
 .fm-family-setup {
   display: flex;
   flex-direction: column;

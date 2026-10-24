@@ -2,7 +2,14 @@ import { describe, expect, it } from "vite-plus/test";
 
 import brand from "../../../../../nondev/brand.json";
 import { CLI_NAME, PRODUCT_NAME } from "../../brand";
-import { actionReason, familyCopy, familySteps } from "./copy";
+import {
+  actionReason,
+  codeChangeWarning,
+  codeChangedNotice,
+  familyCopy,
+  familySteps,
+  grownUpPlainNames,
+} from "./copy";
 
 describe("actionReason", () => {
   // QA FK-13: every card's code sheet said "uses the internet, installs something, deletes…".
@@ -24,6 +31,23 @@ describe("brand", () => {
   it("names the command and product brand.json names", () => {
     expect(CLI_NAME).toBe(brand.cliName);
     expect(PRODUCT_NAME).toBe(brand.productName);
+  });
+});
+
+describe("grown-up plain names", () => {
+  it("uses the child-friendly words in grown-up flows", () => {
+    expect(grownUpPlainNames.advanced).toBe("Open the full workshop");
+    expect(grownUpPlainNames.trustedAddOns).toBe(
+      "Let SKYCOT fetch well-known add-ons (like 3D and drawing tools)",
+    );
+    expect(grownUpPlainNames.publishLive).toBe("Put it online");
+    expect(grownUpPlainNames.publishReview).toBe("Ask someone to check");
+    expect(grownUpPlainNames.recapShield).toBe("The private-details check spotted");
+  });
+
+  it("warns before changing the code and explains what was signed out", () => {
+    expect(codeChangeWarning).toMatch(/signs out Mum's and Dad's phones and Watch/);
+    expect(codeChangedNotice).toMatch(/link them again/);
   });
 });
 

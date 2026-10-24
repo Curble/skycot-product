@@ -15,6 +15,8 @@ import {
   digitsOnly,
   hashCode,
   grownUpSettingsOpen,
+  familyGrantOpen,
+  grownUpMinutesLeft,
   isFamilyLocked,
   LOCKED_ACTIONS,
   isValidCode,
@@ -562,5 +564,22 @@ describe("grownUpSettingsOpen", () => {
     expect(grownUpSettingsOpen({ openUntil: { advanced: 2_000 } }, 1_000)).toBe(true);
     expect(grownUpSettingsOpen({ openUntil: { settings: 500 } }, 1_000)).toBe(false);
     expect(grownUpSettingsOpen({ openUntil: { publish: 2_000 } }, 1_000)).toBe(false);
+  });
+});
+
+describe("grown-up grants", () => {
+  it("lets a settings grant cover later settings actions until it ends", () => {
+    const view = { openUntil: { settings: 10_000 } };
+    expect(familyGrantOpen(view, "aiSettings", 9_999)).toBe(true);
+    expect(familyGrantOpen(view, "manageChildren", 10_000)).toBe(false);
+    expect(familyGrantOpen({ openUntil: { advanced: 10_000 } }, "publish", 9_999)).toBe(true);
+    expect(familyGrantOpen({ openUntil: { recap: 10_000 } }, "seeRecap", 10_000)).toBe(false);
+    expect(familyGrantOpen({ openUntil: { settings: 10_000 } }, "seeRecap", 9_999)).toBe(true);
+    expect(familyGrantOpen(view, "approve", 1)).toBe(false);
+  });
+
+  it("shows whole minutes remaining in grown-up mode", () => {
+    expect(grownUpMinutesLeft({ openUntil: { settings: 7 * 60_000 + 1 } }, 0)).toBe(8);
+    expect(grownUpMinutesLeft({ openUntil: { settings: 5 } }, 5)).toBe(0);
   });
 });

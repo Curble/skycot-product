@@ -15,14 +15,15 @@ import { SettingsGroup } from "../settings/SettingsGroup";
 import { useFamily } from "./FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "./ParentCodeEntry";
 import { setTrustedAddOns } from "./store";
+import { grownUpPlainNames } from "./copy";
 
-export const TRUSTED_ADD_ONS_TITLE = "Trusted add-ons download by themselves";
+export const TRUSTED_ADD_ONS_TITLE = grownUpPlainNames.trustedAddOns;
 
 /** The row's line under the title. */
 export function trustedAddOnsLine(on: boolean): string {
   return on
-    ? "On. SKYCOT fetches these itself, with their install scripts off, and the recap lists each one. Any other add-on still asks a grown-up."
-    : "Off. Every add-on asks a grown-up first.";
+    ? "On. SKYCOT gets familiar add-ons for 3D and drawing tools. Anything else still asks a grown-up."
+    : "Off. A grown-up says yes before SKYCOT gets an add-on.";
 }
 
 export function TrustedAddOnsGroup() {
@@ -36,7 +37,7 @@ export function TrustedAddOnsGroup() {
     <>
       <SettingsGroup
         title="Add-ons"
-        footer={`The trusted add-ons: ${describeAddOns(TRUSTED_ADD_ONS.map((addOn) => addOn.name))}. They come only from npm or its two big download sites (jsDelivr and unpkg).`}
+        footer={`${describeAddOns(TRUSTED_ADD_ONS.map((addOn) => addOn.name))} are the well-known add-ons SKYCOT can fetch.`}
       >
         <ListRow
           leading={<StepBadge state={profile.trustedAddOns ? "ok" : "todo"} icon={Package} />}

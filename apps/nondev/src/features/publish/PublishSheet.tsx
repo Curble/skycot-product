@@ -68,6 +68,8 @@ import {
 } from "./state";
 import { useEnsureInteractionMode } from "../compose/turnMode";
 import { familyCopy } from "../family/copy";
+import { grownUpPlainNames } from "../family/copy";
+import { useChildView } from "../../app/useChildView";
 import { attemptFor, useFamily } from "../family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { rememberKeptVersion } from "../review/keptVersions";
@@ -152,6 +154,7 @@ function PublishSheetBody({
     wantDetail: true,
     wantChanges: true,
   });
+  const childView = useChildView();
   const projectName = project?.title ?? null;
   const crew = useCrew();
   const family = useFamily();
@@ -487,7 +490,11 @@ function PublishSheetBody({
           <div className="fm-pub-choices" role="group" aria-label="Ways to publish">
             <ChoiceCard
               icon={review.kind === "keep" ? Check : UserRound}
-              title={review.label}
+              title={
+                childView && review.kind === "review"
+                  ? grownUpPlainNames.publishReview
+                  : review.label
+              }
               recommended={review.kind === "review" && review.opensReview}
               explainer={
                 review.kind === "blocked" ? (
@@ -518,7 +525,7 @@ function PublishSheetBody({
             />
             <ChoiceCard
               icon={Globe}
-              title={live.label}
+              title={childView ? grownUpPlainNames.publishLive : live.label}
               explainer={live.kind === "blocked" ? live.reason : live.explainer}
               advanced={live.advanced}
               disabled={live.kind === "blocked" || (live.kind === "merge" && !data.canWrite)}
@@ -567,14 +574,18 @@ function PublishSheetBody({
             phase === "choose" || phase === "code"
               ? "Confirm"
               : choice === "live"
-                ? live.kind === "script"
-                  ? `Ask ${CREW_NAME} to put it live?`
-                  : `Put it live${projectName ? ` on ${projectName}` : ""}?`
+                ? childView
+                  ? grownUpPlainNames.publishLive + "?"
+                  : live.kind === "script"
+                    ? `Ask ${CREW_NAME} to put it live?`
+                    : `Put it live${projectName ? ` on ${projectName}` : ""}?`
                 : review.kind === "keep"
                   ? "Keep this version?"
                   : review.kind === "review" && !review.opensReview
                     ? "Upload a draft line?"
-                    : "Send for review?"
+                    : childView && review.kind === "review"
+                      ? `${grownUpPlainNames.publishReview}?`
+                      : "Send for review?"
           }
           state={
             phase === "choose" || phase === "code" ? "todo" : phase === "confirm" ? "now" : "done"

@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { ChevronLeft, Laptop } from "lucide-react";
+import { ChevronLeft, Laptop, Lock } from "lucide-react";
 
 import { useColumns, type Columns } from "../../app/useColumns";
 import {
@@ -115,6 +115,24 @@ export function SettingsScreen({
           ) : (
             <Pane section={meta.id} environmentId={environmentId} />
           )}
+        </div>
+      </section>
+    ) : active !== null && childView ? (
+      // A grown-up page reached while the code is locked: say so, and offer the way in.
+      <section className="fm-settings__detail" aria-labelledby="fm-settings-title">
+        <header className="fm-settings__header">
+          <h2 id="fm-settings-title" className="fm-settings__title">
+            For grown-ups
+          </h2>
+          <span className="fm-settings__header-spacer" />
+          {done}
+        </header>
+        <div className="fm-settings__panes">
+          <EmptyState icon={Lock} title="This part is for grown-ups">
+            <Button onClick={() => void family.requireParentCode("aiSettings")}>
+              Grown-up settings…
+            </Button>
+          </EmptyState>
         </div>
       </section>
     ) : null;
