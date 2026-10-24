@@ -5,7 +5,9 @@
  * - sends the Watch a small snapshot whenever what it shows changes (src/watch/snapshot.ts);
  * - answers the Watch: a challenge from the Mac for a yes (the Watch signs it with its own key),
  *   the answer itself (submitted exactly as the phone's own Allow once / Decline, through the
- *   Mac's approver routes, once), and "Lock SKYCOT now" (the phone's Lock everything);
+ *   Mac's approver routes, once), "Not tonight" to a family note asking for more time (no proof,
+ *   like a no; 15 or 30 minutes are never given from the Watch, the Mac wants the parent code),
+ *   and "Lock SKYCOT now" (the phone's Lock everything);
  * - posts "Ava needs a grown-up" when a new request appears while SKYCOT runs on the phone,
  *   with Allow once and Decline (Allow once opens the card first and starts Face ID there: the
  *   notification itself is content-free). When SKYCOT is closed, SKYCOT Relay's push ("SKYCOT needs a grown-up", same
@@ -139,6 +141,16 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
       if (message.type === "lock") return lockEverything();
       const mac = macFor(message.macId);
       if (mac === null) return { ok: false, sentence: "That Mac isn't linked to this iPhone now." };
+      if (message.type === "noteNotTonight") {
+        // A no needs no proof, exactly as a no to a request. Never minutes: see the protocol.
+        const said = await familyApi.answerFamilyNote(mac.transport, {
+          id: message.noteId,
+          minutes: 0,
+        });
+        if (!said.ok) return { ok: false, sentence: said.message };
+        setTimeout(() => void refresh(mac.macId), 600);
+        return { ok: true, sentence: "Said not tonight." };
+      }
       if (message.type === "challenge") {
         const issued = await familyApi.watchChallenge(mac.transport, message);
         if (!issued.ok) return { ok: false, sentence: issued.message };
