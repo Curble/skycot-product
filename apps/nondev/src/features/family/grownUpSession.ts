@@ -9,6 +9,11 @@ import { grownUpSettingsOpen, type FamilyView } from "./family";
 const KEY = "skycot:family:grown-up";
 const listeners = new Set<() => void>();
 
+/** The grown-up marked on this window (read outside React; still check the grant). */
+export function readGrownUpSessionId(): string | null {
+  return read();
+}
+
 function read(): string | null {
   try {
     return window.sessionStorage.getItem(KEY);

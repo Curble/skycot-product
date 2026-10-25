@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from "react";
 
 import { familyApi, request } from "../family/api";
+import { grownUpSessionFor, readGrownUpSessionId } from "../family/grownUpSession";
 
 import { applySession, readFamilyView } from "../family/store";
 import type { FamilyResult } from "../family/family";
@@ -142,7 +143,9 @@ function active(now: number): boolean {
 
 export async function heartbeat(): Promise<void> {
   if (!readFamilyView().enabled) return;
-  const result = await familyApi.heartbeat({ active: active(Date.now()) });
+  // A grown-up using the shared Mac: their minutes are not the child's.
+  const grownUp = grownUpSessionFor(readGrownUpSessionId(), readFamilyView(), Date.now()) !== null;
+  const result = await familyApi.heartbeat({ active: !grownUp && active(Date.now()) });
   if (result.ok) applySessionLimits(result.value);
 }
 

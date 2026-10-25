@@ -57,9 +57,12 @@ vi.mock("../features/family/FamilyProvider", () => ({
     },
   }),
 }));
-vi.mock("../features/family/family", () => ({
+vi.mock("../features/family/family", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../features/family/family")>()),
   currentChild: () => (fixture.childView ? child : null),
 }));
+// The child check reads the grown-up session; in these tests the fixture decides.
+vi.mock("./useChildView", () => ({ useChildView: () => fixture.childView }));
 vi.mock("../features/family-limits/FamilyLimitsHost", () => ({ openChildPicker: vi.fn() }));
 
 import { AppSidebar } from "./Sidebar";

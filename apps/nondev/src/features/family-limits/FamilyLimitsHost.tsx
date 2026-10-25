@@ -90,8 +90,16 @@ export function FamilyLimitsHost() {
   // A grown-up's time on the shared Mac ended (their code's grant lapsed): back to the picker.
   const grownUpId = useGrownUpSessionId();
   const grownUpActive = grownUpSessionFor(grownUpId, view, now) !== null;
+  // Only a change from open to closed ends it: right after the code, the session is marked a
+  // moment before the refreshed view shows the grant open, and that is not an ending.
+  const wasActive = useRef(false);
   useEffect(() => {
-    if (grownUpId === null || grownUpActive) return;
+    if (grownUpActive) {
+      wasActive.current = true;
+      return;
+    }
+    if (grownUpId === null || !wasActive.current) return;
+    wasActive.current = false;
     endGrownUpSession();
     openChildPicker();
   }, [grownUpId, grownUpActive]);

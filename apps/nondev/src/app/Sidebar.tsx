@@ -20,6 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ADVANCED_MODE_LABEL } from "../brand";
+import { useChildView } from "./useChildView";
 import {
   AUTOMATIONS_HREF,
   FRIDGE_HREF,
@@ -76,7 +77,7 @@ export function AppSidebar({
   const sheets = useSidebarSheets();
   const crew = useCrew();
   const family = useFamily();
-  const childView = family.enabled && family.profile.me.kind !== "grown-up";
+  const childView = useChildView();
   const archivedChildRows = useAtomValue(
     childView ? oldConversationRowsAtom : NO_CHILD_ARCHIVE_ROWS,
   );

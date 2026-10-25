@@ -8,6 +8,7 @@ import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
 import { useFamily } from "../family/FamilyProvider";
+import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
 import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
@@ -36,6 +37,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
+  // A grown-up who picked themselves on the shared Mac is greeted by name.
+  const grownUpId = grownUpSessionFor(useGrownUpSessionId(), family.profile, Date.now());
+  const grownUpName =
+    grownUpId === null
+      ? null
+      : (family.profile.grownUps.find((person) => person.id === grownUpId)?.name ?? null);
   const { kids } = useStarters();
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
 
@@ -74,9 +81,11 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               <h2 className="fm-home__greeting">
                 <span className="fm-marker-underline">
                   {greetingForHour(new Date().getHours())}
-                  {family.enabled && family.profile.childName
-                    ? `, ${family.profile.childName}`
-                    : ""}
+                  {family.enabled && grownUpName
+                    ? `, ${grownUpName}`
+                    : family.enabled && family.profile.childName
+                      ? `, ${family.profile.childName}`
+                      : ""}
                   .
                 </span>
               </h2>

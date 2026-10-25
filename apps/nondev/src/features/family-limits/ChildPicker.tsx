@@ -78,7 +78,10 @@ export function ChildPicker({
       tabIndex={-1}
     >
       <div className="fm-picker__inner">
-        <Mascot pose="hello" size={104} decorative />
+        <div className="fm-picker__hello">
+          <Mascot pose="hello" size={104} decorative />
+          <span className="fm-picker__bubble">Hi! Who's making today?</span>
+        </div>
         <h1 id="fm-picker-title" className="fm-picker__title">
           <span className="fm-marker-underline">Who's using SKYCOT?</span>
         </h1>
@@ -111,40 +114,68 @@ export function ChildPicker({
           </div>
         ) : (
           <>
-            <p className="fm-picker__lead">Hi! Who's making today? Tap your picture.</p>
-            <ul className="fm-picker__grid">
-              {view.children.map((child, index) => (
-                <li key={child.id}>
-                  <button
-                    type="button"
-                    className={`fm-picker__tile${child.id === view.currentChildId ? " fm-picker__tile--last" : ""}`}
-                    disabled={busy !== null}
-                    aria-current={child.id === view.currentChildId ? "true" : undefined}
-                    onClick={() => void choose(child.id)}
-                  >
-                    <ChildAvatar child={child} size={112} />
-                    <span className="fm-picker__name">{childLabel(child, index)}</span>
-                    {busy === child.id ? <span className="fm-picker__hint">Opening…</span> : null}
-                  </button>
-                </li>
-              ))}
-              {view.grownUps.map((person, index) => (
-                <li key={person.id}>
-                  <button
-                    type="button"
-                    className="fm-picker__tile fm-picker__tile--grown-up"
-                    disabled={busy !== null}
-                    onClick={() => setGrownUp({ id: person.id, name: grownUpLabel(person, index) })}
-                  >
-                    <ChildAvatar child={person} size={112} />
-                    <span className="fm-picker__name">{grownUpLabel(person, index)}</span>
-                    <span className="fm-picker__stamp" aria-label="Grown-up, needs the parent code">
-                      Grown-up
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <p className="fm-picker__lead fm-sr-only">Tap your name tag.</p>
+            <div className="fm-picker__groups">
+              <section className="fm-picker__group fm-picker__group--makers" aria-label="Makers">
+                <h2 className="fm-picker__group-title">Makers</h2>
+                <ul className="fm-picker__tags">
+                  {view.children.map((child, index) => (
+                    <li key={child.id}>
+                      <button
+                        type="button"
+                        className={`fm-picker__tag${child.id === view.currentChildId ? " fm-picker__tag--last" : ""}`}
+                        disabled={busy !== null}
+                        aria-current={child.id === view.currentChildId ? "true" : undefined}
+                        onClick={() => void choose(child.id)}
+                      >
+                        <span className="fm-picker__tag-hello" aria-hidden>
+                          HELLO <small>my name is</small>
+                        </span>
+                        <ChildAvatar child={child} size={104} />
+                        <span className="fm-picker__name">{childLabel(child, index)}</span>
+                        {busy === child.id ? (
+                          <span className="fm-picker__hint">Opening…</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              {view.grownUps.length > 0 ? (
+                <section
+                  className="fm-picker__group fm-picker__group--grown-ups"
+                  aria-label="Grown-ups"
+                >
+                  <h2 className="fm-picker__group-title">Grown-ups</h2>
+                  <ul className="fm-picker__tags fm-picker__tags--small">
+                    {view.grownUps.map((person, index) => (
+                      <li key={person.id}>
+                        <button
+                          type="button"
+                          className="fm-picker__tag fm-picker__tag--grown-up"
+                          disabled={busy !== null}
+                          onClick={() =>
+                            setGrownUp({ id: person.id, name: grownUpLabel(person, index) })
+                          }
+                        >
+                          <span className="fm-picker__tag-hello" aria-hidden>
+                            HELLO <small>my name is</small>
+                          </span>
+                          <ChildAvatar child={person} size={64} />
+                          <span className="fm-picker__name">{grownUpLabel(person, index)}</span>
+                          <span
+                            className="fm-picker__stamp"
+                            aria-label="Grown-up, needs the parent code"
+                          >
+                            🔒 Grown-up
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
             {problem ? (
               <p className="fm-picker__problem" role="alert">
                 {problem}

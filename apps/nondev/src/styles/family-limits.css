@@ -414,3 +414,194 @@ html[data-flavour-borders="sketch"] .fm-headsup {
 .fm-child-avatar--character svg {
   display: block;
 }
+
+/* "Who's using SKYCOT?" as name tags (option B2, Mark 25 Oct): the children's tags are the hero on
+   their own "Makers" board; the grown-ups' smaller tags sit in their own pocket beside it. */
+.fm-picker__hello {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.fm-picker__bubble {
+  padding: 8px 16px;
+  border: 1.5px solid var(--fm-sep);
+  border-radius: 16px;
+  background: var(--fm-bg-card);
+  color: var(--fm-label);
+  font-size: calc(18px * var(--fm-text-scale));
+  font-weight: 650;
+}
+.fm-picker__groups {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(220px, 1fr);
+  gap: 20px;
+  align-items: start;
+  width: min(1080px, 100%);
+  margin-top: 18px;
+}
+.fm-picker__group {
+  padding: 16px 18px 20px;
+  border: 1.5px solid var(--fm-sep);
+  border-radius: 18px;
+  background: var(--fm-bg-card);
+}
+.fm-picker__group-title {
+  margin: 0 0 12px;
+  color: var(--fm-label-2);
+  font-size: calc(13px * var(--fm-text-scale));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fm-picker__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fm-picker__tags--small {
+  flex-direction: column;
+  gap: 12px;
+}
+.fm-picker__tag {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 190px;
+  padding: 0 14px 16px;
+  overflow: hidden;
+  border: 1.5px solid var(--fm-sep);
+  border-radius: 14px;
+  background: var(--fm-bg-window);
+  color: var(--fm-label);
+  cursor: pointer;
+}
+.fm-picker__tags--small .fm-picker__tag {
+  grid-template-columns: auto 1fr;
+  justify-items: start;
+  align-items: center;
+  width: 100%;
+  padding: 0 12px 12px;
+}
+.fm-picker__tag-hello {
+  display: block;
+  width: calc(100% + 28px);
+  margin: 0 -14px;
+  padding: 6px 0 4px;
+  background: var(--fm-red, #d93a3a);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.fm-picker__tags--small .fm-picker__tag-hello {
+  grid-column: 1 / -1;
+  width: calc(100% + 24px);
+  margin: 0 -12px;
+}
+.fm-picker__tag-hello small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.fm-picker__tag .fm-picker__name {
+  font-size: calc(26px * var(--fm-text-scale));
+  font-weight: 700;
+}
+.fm-picker__tags--small .fm-picker__name {
+  font-size: calc(20px * var(--fm-text-scale));
+}
+.fm-picker__stamp {
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 2px 8px;
+  border: 2px solid #c62828;
+  border-radius: 6px;
+  color: #c62828;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+}
+.fm-picker__tag:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .fm-picker__groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fm-picker__tag {
+    width: min(100%, 190px);
+  }
+}
+
+/* Workshop: chunky sticky-note name tags with hard ink shadows; the Makers board is cream paper
+   and the Grown-ups pocket is kraft paper, so each group has its own section. */
+html[data-flavour-cards="sticky"] .fm-picker__bubble {
+  border: 2px solid var(--fm-ink);
+  background: #fffcf1;
+  color: #3a2d22;
+  font-family: var(--fm-font-label);
+  box-shadow: 3px 4px 0 rgba(8, 5, 2, 0.55);
+}
+html[data-flavour-cards="sticky"] .fm-picker__group {
+  border: 2px solid #3a2d22;
+  border-radius: 15px 22px 13px 20px / 20px 13px 22px 15px;
+  box-shadow: 4px 5px 0 rgba(8, 5, 2, 0.5);
+}
+html[data-flavour-cards="sticky"] .fm-picker__group--makers {
+  background: #f6ecd6;
+}
+html[data-flavour-cards="sticky"] .fm-picker__group--grown-ups {
+  background: #d4ae78;
+  transform: rotate(0.6deg);
+}
+html[data-flavour-cards="sticky"] .fm-picker__group-title {
+  color: #3a2d22;
+  font-family: var(--fm-font-label);
+  font-size: calc(20px * var(--fm-text-scale));
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+html[data-flavour-cards="sticky"] .fm-picker__tag {
+  border: 2px solid #3a2d22;
+  border-radius: 6px;
+  background: var(--fm-picker-tag-paper, #ffe27a);
+  color: #3a2d22;
+  box-shadow: 3px 4px 0 rgba(8, 5, 2, 0.55);
+  transform: rotate(var(--fm-picker-tilt, -1.2deg));
+}
+html[data-flavour-cards="sticky"] .fm-picker__tags li:nth-child(2n) .fm-picker__tag {
+  --fm-picker-tilt: 1deg;
+  --fm-picker-tag-paper: #bfe3f7;
+}
+html[data-flavour-cards="sticky"] .fm-picker__tags li:nth-child(3n) .fm-picker__tag {
+  --fm-picker-tilt: -0.6deg;
+  --fm-picker-tag-paper: #c9edc2;
+}
+html[data-flavour-cards="sticky"] .fm-picker__tags--small .fm-picker__tag {
+  --fm-picker-tag-paper: #fffcf1;
+}
+html[data-flavour-cards="sticky"] .fm-picker__tag:not(:disabled):hover {
+  transform: rotate(0deg) translate(-1px, -2px);
+  box-shadow: 5px 6px 0 rgba(8, 5, 2, 0.55);
+}
+html[data-flavour-labels="handwritten"] .fm-picker__tag .fm-picker__name {
+  font-family: var(--fm-font-label);
+  font-weight: 400;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-flavour-cards="sticky"] .fm-picker__tag,
+  html[data-flavour-cards="sticky"] .fm-picker__group--grown-ups {
+    transform: none;
+  }
+}
