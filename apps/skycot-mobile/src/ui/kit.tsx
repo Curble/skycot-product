@@ -27,6 +27,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { avatarLetter } from "../../../nondev/src/features/family/children";
 import { codeComplete } from "../family/codeLength";
+import { CHARACTER_PICTURES } from "./characters";
 import type { ChildAvatar } from "../../../nondev/src/features/family/children";
 import { AVATAR_COLORS, mascotSource, skyPhaseNow, type MascotPose } from "./brand";
 import { RootHeaderContext } from "./rootHeader";
@@ -493,6 +494,27 @@ export function Avatar(props: {
         }}
       >
         <Mascot pose={props.person.avatar.pose} size={size} />
+      </View>
+    );
+  }
+  if (props.person.avatar.kind === "character") {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: theme.dark ? theme.color.fill : "#FFFFFF",
+          overflow: "hidden",
+        }}
+      >
+        <Image
+          source={CHARACTER_PICTURES[props.person.avatar.id]}
+          style={{ width: size, height: size }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+          accessible={false}
+        />
       </View>
     );
   }

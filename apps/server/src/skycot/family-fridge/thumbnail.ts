@@ -11,8 +11,16 @@
 //
 // Only files inside the project are read (`..` and links out of it are refused by the reader),
 // with size caps, so a big page cannot make the fridge slow.
+//
+// The same copy is what a child's phone or iPad shows for "Open it" (apps/skycot-mobile
+// PagePreview), so it carries no code at all: no scripts, no code in tags (`onload="…"`), no
+// `javascript:` links, no automatic redirects, and offline rules of its own that forbid code
+// and the internet even if something slipped through (the Family decision of 25 Oct 2026: a
+// page reaches the internet only after a grown-up's yes, which the copy never has).
 
 import * as Effect from "effect/Effect";
+
+import { withHeadStart } from "@t3tools/skycot-rules/page-internet";
 
 /** Reads one project file by its project-relative path; null when it is missing or refused. */
 export type ReadProjectFile = (relativePath: string) => Effect.Effect<Uint8Array | null>;
@@ -38,6 +46,56 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
 };
 
 const decoder = new TextDecoder();
+
+/** The copy's own rules: its inlined styles, pictures, fonts and sounds; no code, no internet. */
+export const PAGE_COPY_POLICY = [
+  "default-src 'none'",
+  "script-src 'none'",
+  "style-src 'unsafe-inline'",
+  "img-src data:",
+  "font-src data:",
+  "media-src data:",
+  "form-action 'none'",
+  "base-uri 'none'",
+].join("; ");
+
+/** A tag, quotes respected: `<a title="1 > 0">` is one tag. */
+const TAG = /<[a-z][\w:-]*(?:[^>"']|"[^"]*"|'[^']*')*>/giu;
+/** One attribute and its value, as written (a browser also takes "/" between attributes). */
+const ATTRIBUTE = /[\s/]([^\s"'>/=]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+))?/gu;
+
+/** An attribute value as a browser reads it for its scheme: entities decoded, spaces gone. */
+function schemeOf(value: string): string {
+  const code = (point: number) => (point <= 0x10ffff ? String.fromCodePoint(point) : "\ufffd");
+  return value
+    .replace(/^["']|["']$/gu, "")
+    .replace(/&#x([\da-f]+);?/giu, (_, hex: string) => code(parseInt(hex, 16)))
+    .replace(/&#(\d+);?/gu, (_, decimal: string) => code(Number(decimal)))
+    .replace(/&colon;/giu, ":")
+    .replace(/&tab;|&newline;/giu, "")
+    .replace(/[\u0000-\u0020]/gu, "")
+    .toLowerCase();
+}
+
+/** The tag without code: every `on…` handler, and any address that is code (`javascript:`). */
+function tagWithoutCode(tag: string): string {
+  return tag.replace(ATTRIBUTE, (whole, name: string, value: string | undefined) => {
+    if (/^on/iu.test(name)) return "";
+    if (value !== undefined && /^(?:javascript|vbscript):/u.test(schemeOf(value))) return "";
+    return whole;
+  });
+}
+
+/** The page with no code left in it and its own offline rules first in the head. */
+export function withoutCode(html: string): string {
+  const cleaned = html
+    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh[^>]*>/giu, "")
+    .replace(TAG, tagWithoutCode);
+  return withHeadStart(
+    cleaned,
+    `<meta http-equiv="Content-Security-Policy" content="${PAGE_COPY_POLICY}">`,
+  );
+}
 
 function dirOf(path: string): string {
   const at = path.lastIndexOf("/");
@@ -206,5 +264,5 @@ export const selfContainedPage = Effect.fn("SkycotFridge.selfContainedPage")(fun
       html.slice(last, match.index) + withAttribute(match[0], "style", escapeAttribute(inlined));
     last = match.index + match[0].length;
   }
-  return out + html.slice(last);
+  return withoutCode(out + html.slice(last));
 });

@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { projectPathOf, selfContainedPage } from "./thumbnail.ts";
+import { PAGE_COPY_POLICY, projectPathOf, selfContainedPage, withoutCode } from "./thumbnail.ts";
 
 const encoder = new TextEncoder();
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -85,5 +85,41 @@ describe("projectPathOf", () => {
     assert.isNull(projectPathOf("pets", "//example.com/a.css"));
     assert.isNull(projectPathOf("pets", "data:image/png;base64,AAAA"));
     assert.isNull(projectPathOf("pets", "#top"));
+  });
+});
+
+describe("the copy a phone or iPad shows", () => {
+  it.effect("keeps no code at all and carries offline rules of its own", () =>
+    Effect.gen(function* () {
+      const { read } = project({
+        "index.html": `<!doctype html><html><head><title>Dogs</title><meta http-equiv="refresh" content="0;url=https://example.com"></head><body onload="fetch('https://dog.ceo/api')">
+<h1 title="1 > 0" onclick="go()">Dogs</h1><script>fetch("https://dog.ceo/a")</script>
+<img src="missing.png" onerror="fetch('https://dog.ceo/b')"><img/onerror=fetch(1) alt="x">
+<a href="javascript:fetch('https://dog.ceo/c')">one</a><a href=" &#106;avascript:alert(1)">two</a>
+<a href="&#x6A;ava&#x09;script&colon;x">three</a><a href="pets.html">pets</a><svg onLoad="x()"></svg>
+<form action="javascript:void(0)"><button formaction="javascript:x()">Go</button></form></body></html>`,
+      });
+      const html = (yield* selfContainedPage("index.html", read))!;
+      assert.notMatch(html, /\son[a-z]+\s*=/iu);
+      assert.notMatch(html, /\/on[a-z]+\s*=/iu);
+      assert.notMatch(html, /javascript|&#106;|&#x6a;/iu);
+      assert.notMatch(html, /<script|http-equiv="refresh"/iu);
+      assert.include(
+        html,
+        `<meta http-equiv="Content-Security-Policy" content="${PAGE_COPY_POLICY}">`,
+      );
+      assert.isBelow(html.indexOf("Content-Security-Policy"), html.indexOf("<title>"));
+      // Ordinary content and attributes stay as they were.
+      assert.include(html, '<h1 title="1 > 0">Dogs</h1>');
+      assert.include(html, '<a href="pets.html">pets</a>');
+      assert.include(html, 'alt="x"');
+    }),
+  );
+
+  it("forbids code and the internet in its own rules", () => {
+    assert.include(PAGE_COPY_POLICY, "default-src 'none'");
+    assert.include(PAGE_COPY_POLICY, "script-src 'none'");
+    assert.notMatch(PAGE_COPY_POLICY, /https?:|\*/u);
+    assert.include(withoutCode("<p>x"), "Content-Security-Policy");
   });
 });
