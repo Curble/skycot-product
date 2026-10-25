@@ -14,6 +14,7 @@ import type {
 import * as DateTime from "effect/DateTime";
 import { CircleAlert, Hammer, HandMetal } from "lucide-react";
 
+import { useCrew } from "../../themes/useCrew";
 import { useChildView } from "../../app/useChildView";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { describeDecision } from "../../plain/approvals";
@@ -38,8 +39,6 @@ import { StepBadge } from "../../ui/StepBadge";
 import { Disclosure, TechnicalList } from "./cards/Disclosure";
 import type { WorkGroup } from "./cards/grouping";
 import { shortTime, toIso } from "./cards/time";
-import { elapsedCopy, estimateCopy } from "../../plain/estimate";
-import { estimateForRun } from "./runEstimate";
 
 const ACTIVE_RUN = new Set<OrchestrationV2Run["status"]>([
   "preparing",
@@ -108,6 +107,7 @@ export function WorkingCard({
   readonly projectName: string | null;
 }) {
   const childView = useChildView();
+  const builderName = useCrew().builder.name;
   // environmentId / threadId stay in the signature for the stream's call site;
   // the card itself no longer dispatches anything (Stop moved to the header).
   void environmentId;
@@ -218,24 +218,18 @@ export function WorkingCard({
   const elapsed = useElapsedLabel(
     startMillis === null ? null : new Date(Date.parse(startMillis) + waited).toISOString(),
     toIso(run?.completedAt ?? null),
-    active,
+    active && !childView,
   );
   const hint = progressHint(toolItems, run?.status ?? "running", ctx);
   // "Working on it" is already the title; saying it three times tells nothing.
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 
   const doneSoFar = checklist.done.length;
-  const { phase, range } = estimateForRun(run);
-  const estimate = childView && run ? estimateCopy(phase, range) : null;
-  const childElapsed =
-    childView && run && startMillis
-      ? elapsedCopy(
-          Math.max(0, Date.now() - Date.parse(startMillis) - waited),
-          phase,
-          range,
-          hint.replace(/[.…]+$/, "") || "Building it",
-        )
-      : null;
+  const planDone =
+    childView &&
+    run?.status === "completed" &&
+    !run.sourcePlanRef &&
+    projection.turnItems.some((item) => item.runId === run.id && item.type === "proposed_plan");
   const subtitleParts =
     pendingAsk && childView
       ? []
@@ -248,7 +242,6 @@ export function WorkingCard({
                 : genericHint
                   ? "Just started"
                   : hint.replace(/[.…]+$/, ""),
-            childElapsed ?? estimate,
             childView ? null : elapsed,
           ]
         : [
@@ -257,7 +250,7 @@ export function WorkingCard({
               : stepCount === 0
                 ? "No files touched"
                 : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`,
-            elapsed,
+            childView ? null : elapsed,
           ];
   const subtitle = subtitleParts.filter((part): part is string => !!part).join(" · ");
 
@@ -319,7 +312,9 @@ export function WorkingCard({
           ? "Waiting for a grown-up"
           : carriedOn
             ? "Paused here, carried on below"
-            : finishedTitle(run?.status, refused);
+            : planDone
+              ? `${builderName} made a plan`
+              : finishedTitle(run?.status, refused);
   const icon = carriedOn
     ? Hammer
     : awaitingGrownUp
@@ -380,6 +375,8 @@ export function WorkingCard({
                 </p>
               )}
             </>
+          ) : planDone ? (
+            <p className="fm-work__hint">The plan is ready. Press Build it when you’re ready.</p>
           ) : refused ? (
             <p className="fm-work__hint">
               You said no to {deniedAsks === 1 ? "a step" : `${deniedAsks} steps`}, so nothing in

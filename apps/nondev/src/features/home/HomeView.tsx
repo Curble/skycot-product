@@ -168,6 +168,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
 }
 
 function JobRow({ row }: { readonly row: ConversationRow }) {
+  const crew = useCrew();
+  const family = useFamily();
+  const childView = family.enabled && family.profile.me.kind !== "grown-up";
+  const headline = childView
+    ? row.status.headline.replaceAll("Sam", crew.builder.name)
+    : lowerFirst(row.status.headline);
   const lead =
     row.status.kind === "waiting" ? (
       <StepBadge state="warn" label="Waiting for you" />
@@ -182,7 +188,7 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
     <ListRow
       leading={lead}
       title={row.title}
-      subtitle={`${row.project?.title ?? "Project"} · ${lowerFirst(row.status.headline)}`}
+      subtitle={`${row.project?.title ?? "Project"} · ${headline}`}
       chevron
       href={threadHref(row.shell.environmentId, row.shell.id)}
     />

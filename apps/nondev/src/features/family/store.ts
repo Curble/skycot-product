@@ -221,8 +221,13 @@ export function stopAllowingAssistant(driver: string): Promise<FamilyResult<Serv
 }
 
 /** Ends this device's grants (a parent leaving Advanced mode). */
-export function lockFamilyGrants(): Promise<FamilyResult<ServerFamilyStatus>> {
-  return settle(familyApi.lock(), applyStatus);
+export async function lockFamilyGrants(): Promise<FamilyResult<ServerFamilyStatus>> {
+  const result = await settle(familyApi.lock(), applyStatus);
+  if (result.ok) {
+    setView({ ...view, openUntil: {} });
+    await refreshFamily();
+  }
+  return result;
 }
 
 /**

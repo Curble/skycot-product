@@ -580,7 +580,8 @@ describe("grown-up grants", () => {
   });
 
   it("shows whole minutes remaining in grown-up mode", () => {
-    expect(grownUpMinutesLeft({ openUntil: { settings: 7 * 60_000 + 1 } }, 0)).toBe(8);
+    expect(grownUpMinutesLeft({ openUntil: { settings: 7 * 60_000 + 1 } }, 0)).toBe(7);
     expect(grownUpMinutesLeft({ openUntil: { settings: 5 } }, 5)).toBe(0);
+    expect(grownUpMinutesLeft({ openUntil: { settings: 10 * 60_000 + 25_000 } }, 0)).toBe(10);
   });
 });

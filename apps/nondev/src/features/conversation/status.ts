@@ -6,6 +6,7 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 
 import { CREW_NAME } from "../../brand";
+import { promptTitle } from "../../plain/titles";
 import { progress } from "../../plain/copy";
 import type { PillTone } from "../../ui/Pill";
 
@@ -291,9 +292,9 @@ export function conversationPreview(
 
 export function conversationTitle(shell: EnvironmentThreadShell): string {
   const title = shell.title.trim();
-  if (title.length > 0) return title;
+  if (title.length > 0) return promptTitle(title);
   const latest = shell.source.latestVisibleMessage;
-  if (latest && latest.role === "user") return firstLine(latest.text, 80);
+  if (latest && latest.role === "user") return promptTitle(firstLine(latest.text, 80));
   return "New conversation";
 }
 

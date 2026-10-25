@@ -444,6 +444,31 @@ function capitalize(text: string): string {
  */
 const HEREDOC_PATTERN = /<<-?\s*(['"]?)\w+\1([^\n]*)[\s\S]*$/;
 
+const INSTALL_VALUE_FLAGS = new Set([
+  "--cache",
+  "--registry",
+  "--prefix",
+  "--userconfig",
+  "--globalconfig",
+  "--workspace",
+  "-w",
+  "--tag",
+  "--store-dir",
+  "--filter",
+  "--cwd",
+  "--modules-folder",
+]);
+
+function installPositionals(args: ReadonlyArray<string>): Array<string> {
+  const words: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (INSTALL_VALUE_FLAGS.has(arg)) index++;
+    else if (!arg.startsWith("-")) words.push(arg);
+  }
+  return words;
+}
+
 function stripFlags(args: ReadonlyArray<string>): Array<string> {
   return args.filter((arg) => !arg.startsWith("-"));
 }
@@ -803,7 +828,7 @@ function classifySegmentProgram(segment: string): CommandClassification | null {
   }
 
   if (PACKAGE_MANAGERS.has(base)) {
-    const positional = stripFlags(args);
+    const positional = installPositionals(args);
     const sub = positional[0] ?? "";
     if (base === "npx" || base === "pnpx" || base === "bunx") {
       const tool = positional[0] ?? "a tool";

@@ -373,29 +373,47 @@ export function RequestCard({
                 : `${crew.builder.name} has a question`}
           </p>
         ) : null}
-        <Card label={childView && grownUp !== null ? "A grown-up is needed" : card.title}>
+        <Card
+          label={
+            childView && decided
+              ? decided
+              : childView && grownUp !== null
+                ? "A grown-up is needed"
+                : card.title
+          }
+        >
           <CardHeader
             icon={Icon}
             tone={decided ? "grey" : tone}
-            title={childView && grownUp !== null ? "A grown-up is needed" : card.title}
+            title={
+              childView && decided
+                ? decided
+                : childView && grownUp !== null
+                  ? "A grown-up is needed"
+                  : card.title
+            }
             subtitle={
-              decided ??
-              (childView && grownUp !== null
-                ? "Waiting for a grown-up"
-                : grownUp !== null
-                  ? `${familyCopy.needsGrownUp} · waiting for a parent`
-                  : card.ruleTitle
-                    ? `${card.ruleTitle} · waiting for you`
-                    : "Waiting for you · nothing is pre-selected")
+              childView && decided
+                ? undefined
+                : (decided ??
+                  (childView && grownUp !== null
+                    ? "Waiting for a grown-up"
+                    : grownUp !== null
+                      ? `${familyCopy.needsGrownUp} · waiting for a parent`
+                      : card.ruleTitle
+                        ? `${card.ruleTitle} · waiting for you`
+                        : "Waiting for you · nothing is pre-selected"))
             }
           />
           <CardBody>
-            <p className="fm-approval__what">
-              {childView && grownUp !== null
-                ? childApprovalSentence(card, crew.named ? crew.builder.name : "Sam")
-                : card.whatItWants}
-            </p>
-            {childView && grownUp !== null && remoteGrownUps ? (
+            {childView && decided ? null : (
+              <p className="fm-approval__what">
+                {childView && grownUp !== null
+                  ? childApprovalSentence(card, crew.named ? crew.builder.name : "Sam")
+                  : card.whatItWants}
+              </p>
+            )}
+            {childView && !decided && grownUp !== null && remoteGrownUps ? (
               <p className="fm-help">
                 {grownUpNames.length > 0
                   ? `We've let ${grownUpNames[0]} know on their phone. Or a grown-up can type the code here.`

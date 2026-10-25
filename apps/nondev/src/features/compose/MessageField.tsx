@@ -1,6 +1,16 @@
 import { ArrowUp, Plus, X } from "lucide-react";
-import { useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 
+import { firstBlank } from "../starters/starters";
 import { useVoiceSettings } from "../voice/browser";
 import { MicButton, useVoiceTypingControl, VoiceTypingStatus } from "../voice/VoiceTyping";
 import { PICTURE_ACCEPT, type PictureDraft } from "./pictures";
@@ -26,6 +36,7 @@ export function MessageField({
   foot,
   label = "Message",
   inputRef,
+  starterBlanks = false,
 }: {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -42,13 +53,49 @@ export function MessageField({
   readonly foot?: { readonly left?: ReactNode; readonly right?: ReactNode };
   readonly label?: string;
   readonly inputRef?: Ref<HTMLTextAreaElement>;
+  readonly starterBlanks?: boolean;
 }) {
   const id = useId();
+  const field = useRef<HTMLTextAreaElement>(null);
+  useImperativeHandle(inputRef, () => field.current!, []);
+  const [blankHint, setBlankHint] = useState<string | null>(null);
+  const [hintValue, setHintValue] = useState(value);
+  if (hintValue !== value) {
+    setHintValue(value);
+    setBlankHint(null);
+  }
+  const previous = useRef(value);
+  const advancing = useRef(false);
+  useEffect(() => {
+    const count = (text: string) => (text.match(/\[[^\]\n]+\]/g) ?? []).length;
+    if (starterBlanks && count(value) < count(previous.current)) advancing.current = true;
+    previous.current = value;
+    const blank = starterBlanks ? firstBlank(value) : null;
+    if (blank === null) advancing.current = false;
+    if (!advancing.current || blank === null) return;
+    // Wait for the replacement word to be typed, rather than jumping after its first letter.
+    const cursor = field.current?.selectionStart;
+    const timer = window.setTimeout(() => {
+      const input = field.current;
+      if (input !== null && document.activeElement === input && input.selectionStart === cursor) {
+        input.setSelectionRange(blank.start, blank.end);
+      }
+      advancing.current = false;
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [value, starterBlanks]);
   const fileRef = useRef<HTMLInputElement>(null);
   const voiceSettings = useVoiceSettings();
   const voice = useVoiceTypingControl({ value, onChange, disabled });
   const send = () => {
     voice.cancel();
+    const blank = starterBlanks ? firstBlank(value) : null;
+    if (blank !== null) {
+      setBlankHint(`Fill in the ${value.slice(blank.start, blank.end)} bit, or delete it.`);
+      field.current?.focus();
+      field.current?.setSelectionRange(blank.start, blank.end);
+      return;
+    }
     onSend();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -114,10 +161,11 @@ export function MessageField({
             {label}
           </label>
           <textarea
-            ref={inputRef}
+            ref={field}
             id={id}
             className="fm-composer__textarea"
             rows={1}
+            aria-describedby={blankHint === null ? undefined : `${id}-blank`}
             value={value}
             placeholder={placeholder}
             disabled={disabled}
@@ -141,6 +189,11 @@ export function MessageField({
         </div>
         {voiceSettings.typing ? <MicButton control={voice} disabled={disabled} /> : null}
       </div>
+      {blankHint !== null ? (
+        <p id={`${id}-blank`} className="fm-help" role="status">
+          {blankHint}
+        </p>
+      ) : null}
       {foot ? (
         <div className="fm-composer__foot">
           <span>{foot.left}</span>

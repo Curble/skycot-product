@@ -3,13 +3,15 @@
 // offline and reviewed (docs/nondev/design-explorations/2026-10-25/build-journey/BRIEF.md has the
 // approved "Test it" text). Little makers get one short sentence; Makers get the why and one real
 // word; Big makers get how it works. Sam's name is filled in for the family's own crew.
+import { starterIdFromText } from "../badges/facts";
 import type { ReadingLevel } from "../family/children";
 import type { JourneyStep } from "./steps";
 
 export interface ThinkChoice {
   readonly label: string;
   readonly reply: string;
-  /** The reply offers "Tell Sam", which sends the choice as the child's note. */
+  readonly say: string;
+  /** The reply offers "Tell Sam", which puts the choice in the child's message box. */
   readonly tellSam?: boolean;
 }
 
@@ -29,8 +31,18 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Makers think first, so they make the right thing.",
       question: "How should it feel?",
       answers: [
-        { label: "😄 Silly", reply: "Silly is great! Sam loves silly.", tellSam: true },
-        { label: "😌 Calm", reply: "Calm and cosy. Lovely!", tellSam: true },
+        {
+          label: "😄 Silly",
+          say: "Can you make it silly?",
+          reply: "Silly is great! Sam loves silly.",
+          tellSam: true,
+        },
+        {
+          label: "😌 Calm",
+          say: "Can you make it calm and cosy?",
+          reply: "Calm and cosy. Lovely!",
+          tellSam: true,
+        },
       ],
     },
     makers: {
@@ -38,9 +50,15 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Designers start by asking “what is this for, and who will use it?” before making anything.",
       question: "Who is this for?",
       answers: [
-        { label: "Just me", reply: "Then it can be exactly how you like it!", tellSam: true },
+        {
+          label: "Just me",
+          say: "This one is just for me.",
+          reply: "Then it can be exactly how you like it!",
+          tellSam: true,
+        },
         {
           label: "My friends",
+          say: "I'm making this for my friends.",
           reply: "Good thinking: Sam can make it easy for anyone to try.",
           tellSam: true,
         },
@@ -53,11 +71,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "Looks amazing",
+          say: "Can you make it look amazing?",
           reply: "Then Sam will spend extra care on colours and layout.",
           tellSam: true,
         },
         {
           label: "Works perfectly",
+          say: "Can you check that everything works?",
           reply: "Then Sam will test it extra carefully.",
           tellSam: true,
         },
@@ -70,8 +90,18 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "A plan is like a recipe for making things.",
       question: "What do you do first in a recipe?",
       answers: [
-        { label: "📋 Read it", reply: "Yes! Reading the steps first helps.", tellSam: false },
-        { label: "🍳 Start cooking", reply: "Ha! Reading first stops mistakes.", tellSam: false },
+        {
+          label: "📋 Read it",
+          say: "I would read the recipe first.",
+          reply: "Yes! Reading the steps first helps.",
+          tellSam: false,
+        },
+        {
+          label: "🍳 Start cooking",
+          say: "I would start cooking first.",
+          reply: "Ha! Reading first stops mistakes.",
+          tellSam: false,
+        },
       ],
     },
     makers: {
@@ -81,11 +111,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "Add sounds",
+          say: "Can you add sounds?",
           reply: "Nice idea! Tell Sam and it can add it to the plan.",
           tellSam: true,
         },
         {
           label: "It's perfect",
+          say: "I like it just as it is.",
           reply: "Great! Press Build it when you're ready.",
           tellSam: false,
         },
@@ -98,11 +130,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "It's too big",
+          say: "Can you start with a smaller version?",
           reply: "Smart: you can ask Sam to start with a smaller first version.",
           tellSam: true,
         },
         {
           label: "Something's missing",
+          say: "Can we check the plan for anything missing?",
           reply: "Tell Sam what's missing and it will update the plan.",
           tellSam: true,
         },
@@ -115,8 +149,18 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Makers build one little piece at a time.",
       question: "What should be your favourite colour in it?",
       answers: [
-        { label: "💙 Blue", reply: "Blue! Tell Sam and it can use it.", tellSam: true },
-        { label: "💗 Pink", reply: "Pink! Tell Sam and it can use it.", tellSam: true },
+        {
+          label: "💙 Blue",
+          say: "Can you use blue as my favourite colour?",
+          reply: "Blue! Tell Sam and it can use it.",
+          tellSam: true,
+        },
+        {
+          label: "💗 Pink",
+          say: "Can you use pink as my favourite colour?",
+          reply: "Pink! Tell Sam and it can use it.",
+          tellSam: true,
+        },
       ],
     },
     makers: {
@@ -124,9 +168,15 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Code is like a recipe the computer follows exactly, step by step, so every word matters.",
       question: "What should happen when you win?",
       answers: [
-        { label: "Confetti!", reply: "Confetti is a classic. Tell Sam to add it.", tellSam: true },
+        {
+          label: "Confetti!",
+          say: "Can you add confetti when I win?",
+          reply: "Confetti is a classic. Tell Sam to add it.",
+          tellSam: true,
+        },
         {
           label: "A big sound",
+          say: "Can you add a big sound when I win?",
           reply: "A winning sound makes it feel real. Tell Sam!",
           tellSam: true,
         },
@@ -139,11 +189,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "The JavaScript",
+          say: "Can you change the JavaScript to make the game harder?",
           reply: "Right: the behaviour, like speed or rules, lives in the JavaScript.",
           tellSam: true,
         },
         {
           label: "The CSS",
+          say: "I think the CSS changes how it looks.",
           reply: "CSS changes the look, but the rules live in the JavaScript.",
           tellSam: false,
         },
@@ -158,10 +210,16 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "🐧 It moves",
+          say: "Can you check that it moves?",
           reply: "Great idea! If it can't move, nobody can play.",
           tellSam: true,
         },
-        { label: "⭐ It's fun", reply: "Yes! Fun matters too.", tellSam: true },
+        {
+          label: "⭐ It's fun",
+          say: "Can you check that the game is fun?",
+          reply: "Yes! Fun matters too.",
+          tellSam: true,
+        },
       ],
     },
     makers: {
@@ -171,11 +229,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "Fix it",
+          say: "Can you fix the bug?",
           reply: "Good call. Fixing bugs early is what good makers do.",
           tellSam: true,
         },
         {
           label: "Keep it, it's a secret!",
+          say: "Can you keep that bug as a secret?",
           reply: "Ha! Some famous game secrets started as bugs. Tell Sam if you want to keep it.",
           tellSam: true,
         },
@@ -188,11 +248,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "Winning gives points",
+          say: "Can you check that winning gives me points?",
           reply: "Yes: test the rules, like the score going up when you win.",
           tellSam: true,
         },
         {
           label: "The colours",
+          say: "Can you check the colours?",
           reply: "Colours are easy to see yourself; tests are best at checking rules.",
           tellSam: false,
         },
@@ -205,8 +267,18 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Makers share what they made. Show a grown-up!",
       question: "What do you want to do now?",
       answers: [
-        { label: "▶️ Play it", reply: "Press Play it to try it!", tellSam: false },
-        { label: "✏️ Change it", reply: "Tell Sam what to change.", tellSam: true },
+        {
+          label: "▶️ Play it",
+          say: "I want to try my game.",
+          reply: "Press Play it to try it!",
+          tellSam: false,
+        },
+        {
+          label: "✏️ Change it",
+          say: "Can we change one thing?",
+          reply: "Tell Sam what to change.",
+          tellSam: true,
+        },
       ],
     },
     makers: {
@@ -214,8 +286,18 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       why: "Makers keep improving: try it, notice what you'd change, and ask for one change at a time.",
       question: "What would make it even better?",
       answers: [
-        { label: "A new level", reply: "Great idea! Ask Sam for a second level.", tellSam: true },
-        { label: "It's perfect", reply: "Then show a grown-up what you made!", tellSam: false },
+        {
+          label: "A new level",
+          say: "Can you add a new level?",
+          reply: "Great idea! Ask Sam for a second level.",
+          tellSam: true,
+        },
+        {
+          label: "It's perfect",
+          say: "I like it just as it is.",
+          reply: "Then show a grown-up what you made!",
+          tellSam: false,
+        },
       ],
     },
     "big-makers": {
@@ -225,11 +307,13 @@ const LIBRARY: Record<JourneyStep, Copy> = {
       answers: [
         {
           label: "Make it harder",
+          say: "Can you make the game a little harder?",
           reply: "Try asking for one change, like a faster speed, then test it.",
           tellSam: true,
         },
         {
           label: "Share it",
+          say: "I want to show a grown-up what I made.",
           reply: "Press Show a grown-up to share what you made.",
           tellSam: false,
         },
@@ -238,12 +322,157 @@ const LIBRARY: Record<JourneyStep, Copy> = {
   },
 };
 
+const PAGE_LIBRARY: Partial<Record<JourneyStep, Copy>> = {
+  "Build it": {
+    "little-makers": LIBRARY["Build it"]["little-makers"],
+    makers: {
+      now: "Sam is writing the code: the instructions that tell the computer what to show and what to do when you click.",
+      why: LIBRARY["Build it"].makers.why,
+      question: "What would make your page feel special?",
+      answers: [
+        {
+          label: "Confetti!",
+          say: "Can you add confetti when I click?",
+          reply: "A little celebration! Tell Sam where you'd like it.",
+          tellSam: true,
+        },
+        {
+          label: "A big picture",
+          say: "Can you add a big picture?",
+          reply: "A big picture can make it feel like yours.",
+          tellSam: true,
+        },
+      ],
+    },
+    "big-makers": {
+      now: LIBRARY["Build it"]["big-makers"].now,
+      why: LIBRARY["Build it"]["big-makers"].why,
+      question: "Which part would you change to make the text bigger?",
+      answers: [
+        {
+          label: "The CSS",
+          say: "Can you make the text bigger with CSS?",
+          reply: "Right! CSS decides how the text looks.",
+          tellSam: true,
+        },
+        {
+          label: "The JavaScript",
+          say: "I think JavaScript changes what happens.",
+          reply: "JavaScript changes behaviour; CSS sets the text size.",
+          tellSam: false,
+        },
+      ],
+    },
+  },
+  "Test it": {
+    "little-makers": {
+      now: "Sam is checking your page to see it works!",
+      why: LIBRARY["Test it"]["little-makers"].why,
+      question: "What should Sam check first?",
+      answers: [
+        {
+          label: "🔘 The buttons",
+          say: "Can you check the buttons work?",
+          reply: "Yes! Each button should do what you expect.",
+          tellSam: true,
+        },
+        {
+          label: "🎨 The pictures",
+          say: "Can you check the pictures look right?",
+          reply: "Good idea! The pictures should look right.",
+          tellSam: true,
+        },
+      ],
+    },
+    makers: {
+      now: "Sam is testing your work: checking each part does what you asked, like the buttons, pictures and words.",
+      why: "Testing is how makers find bugs (mistakes in the code) before anyone uses their work.",
+      question: LIBRARY["Test it"].makers.question,
+      answers: [
+        LIBRARY["Test it"].makers.answers[0]!,
+        {
+          label: "Check it again",
+          say: "Can you check it again to be sure?",
+          reply: "Good thinking. Trying again can help find what went wrong.",
+          tellSam: true,
+        },
+      ],
+    },
+    "big-makers": {
+      now: LIBRARY["Test it"]["big-makers"].now,
+      why: LIBRARY["Test it"]["big-makers"].why,
+      question: "What would a good test check on a page?",
+      answers: [
+        {
+          label: "The button works",
+          say: "Can you test that the button does the right thing?",
+          reply: "Yes! A test can click a button and check what happens.",
+          tellSam: true,
+        },
+        {
+          label: "The colours",
+          say: "Can you check the colours?",
+          reply: "Colours are easy to see yourself; tests can check what happens when you click.",
+          tellSam: false,
+        },
+      ],
+    },
+  },
+  Finish: {
+    "little-makers": {
+      ...LIBRARY.Finish["little-makers"],
+      answers: [
+        {
+          label: "👀 Open it",
+          say: "I want to see my page.",
+          reply: "Press Preview to see your page!",
+          tellSam: false,
+        },
+        LIBRARY.Finish["little-makers"].answers[1]!,
+      ],
+    },
+    makers: {
+      ...LIBRARY.Finish.makers,
+      answers: [
+        {
+          label: "More colour",
+          say: "Can you add more colour?",
+          reply: "Pick a colour you'd like Sam to add.",
+          tellSam: true,
+        },
+        LIBRARY.Finish.makers.answers[1]!,
+      ],
+    },
+    "big-makers": {
+      ...LIBRARY.Finish["big-makers"],
+      answers: [
+        {
+          label: "Make it clearer",
+          say: "Can you make the page easier to read?",
+          reply: "Try one change, like bigger words, then check it.",
+          tellSam: true,
+        },
+        LIBRARY.Finish["big-makers"].answers[1]!,
+      ],
+    },
+  },
+};
+
+/** A starter's kind wins over incidental words such as the quiz card's “score”. */
+export function journeyIsGame(request: string): boolean {
+  const starter = starterIdFromText(request);
+  if (starter !== null) return starter === "game";
+  if (/\bquiz\b/i.test(request) && !/\bgame\b/i.test(request)) return false;
+  return /\b(games?|play|playing|scores?|levels?|maze|platformer|pong)\b/i.test(request);
+}
+
 export function explanationFor(
   step: JourneyStep,
   level: ReadingLevel,
   name = "Sam",
+  game = true,
 ): StepExplanation {
-  const copy = LIBRARY[step][level];
+  const copy = (!game && PAGE_LIBRARY[step]?.[level]) || LIBRARY[step][level];
   const named = (text: string) => text.replaceAll("Sam", name);
   return {
     now: named(copy.now),

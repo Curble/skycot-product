@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -21,6 +20,8 @@ vi.mock("../family/FamilyProvider", () => ({
 vi.mock("../../themes/useCrew", () => ({ useCrew: () => ({ builder: { name: "Sam" } }) }));
 vi.mock("../voice/ReadAloud", () => ({ ReadAloudButton: () => <button>Read it to me</button> }));
 vi.mock("./words", () => ({
+  readBuildWord: () => null,
+  rememberBuildWord: () => {},
   readKnownWords: () => state.known,
   rememberWord: (_childId: string, word: string) => (state.known = [...state.known, word]),
 }));
@@ -48,6 +49,9 @@ async function mount(node: ReactNode) {
   await act(async () => root.render(node));
   return {
     host,
+    async rerender(node: ReactNode) {
+      await act(async () => root.render(node));
+    },
     async click(selector: string) {
       const button = host.querySelector<HTMLButtonElement>(selector);
       if (!button) throw new Error(`No button found for ${selector}`);
@@ -99,9 +103,63 @@ describe("Build Journey notebook", () => {
     await page.click(".fm-journey__answers button");
     expect(page.host.textContent).toContain("Good call. Fixing bugs early is what good makers do.");
     await page.click(".fm-journey__tell");
-    expect(onTellSam).toHaveBeenCalledWith(
-      "About “Sam found something that could be a bug. What should it do?”: Fix it",
+    expect(onTellSam).toHaveBeenCalledWith("Can you fix the bug?");
+    await page.unmount();
+  });
+  it("keeps an unanswered question through Finish, then offers the next question", async () => {
+    const early = { ...projection, turnItems: projection.turnItems.slice(0, 1) };
+    const page = await mount(<BuildJourney projection={early} elapsedMs={0} />);
+    const question = page.host.querySelector(".fm-journey__think p")?.textContent;
+    await page.rerender(<BuildJourney projection={projection} elapsedMs={30_000} finished />);
+    expect(page.host.textContent).toContain("Sam has finished!");
+    expect(page.host.querySelector(".fm-journey__think p")?.textContent).toBe(question);
+    await page.click(".fm-journey__answers button");
+    await page.click(".fm-journey__again");
+    expect(page.host.querySelector(".fm-journey__think p")?.textContent).toBe(
+      "What would make it even better?",
     );
+    await page.unmount();
+  });
+
+  it("chooses one word per run, waits for evidence, and chooses at Finish if necessary", async () => {
+    const empty = { ...projection, turnItems: [] };
+    const page = await mount(
+      <BuildJourney key="new" runId="new" projection={projection} elapsedMs={0} />,
+    );
+    // A new run can start before its first item reaches the client: old runs cannot choose its word.
+    expect(page.host.querySelector(".fm-journey__word")).toBeNull();
+    await page.rerender(
+      <BuildJourney
+        key="build"
+        projection={{
+          ...projection,
+          turnItems: projection.turnItems
+            .slice(0, 1)
+            .map((item) => ({ ...item, fileName: "page.html", newStr: "<h1>Hello</h1>" })),
+        }}
+        elapsedMs={0}
+      />,
+    );
+    const word = page.host.querySelector(".fm-journey__word h3")?.textContent;
+    expect(word).toBe("page");
+    await page.rerender(
+      <BuildJourney key="build" projection={projection} elapsedMs={30_000} finished />,
+    );
+    expect(page.host.querySelector(".fm-journey__word h3")?.textContent).toBe(word);
+    await page.rerender(<BuildJourney key="next" projection={empty} elapsedMs={0} finished />);
+    expect(page.host.querySelector(".fm-journey__word h3")?.textContent).toBe("plan");
+    await page.unmount();
+  });
+
+  it("offers a page change in the child's voice after a birthday card build", async () => {
+    const onTellSam = vi.fn();
+    const page = await mount(
+      <BuildJourney projection={projection} elapsedMs={0} finished onTellSam={onTellSam} />,
+    );
+    await page.click(".fm-journey__answers button");
+    await page.click(".fm-journey__tell");
+    expect(onTellSam).toHaveBeenCalledWith("Can you add more colour?");
+    expect(page.host.textContent).not.toContain("A new level");
     await page.unmount();
   });
 });

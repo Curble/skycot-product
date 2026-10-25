@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { friendlyTitle } from "./titles";
+import { friendlyTitle, promptTitle } from "./titles";
 
 describe("friendlyTitle", () => {
   // Real titles the assistant wrote in the beta walkthrough (Ava and Leo).
@@ -29,5 +29,18 @@ describe("friendlyTitle", () => {
   it("keeps the original when stripping would leave nothing", () => {
     expect(friendlyTitle("Create Page")).toBe("Create Page");
     expect(friendlyTitle("")).toBe("");
+  });
+});
+
+describe("raw request titles", () => {
+  it("summarises the thing and drops the instructions", () => {
+    const prompt =
+      "make a page with a big friendly robot that waves when i click it and counts the clicks";
+    expect(promptTitle(prompt)).toBe("Big Friendly Robot");
+    expect(friendlyTitle(prompt)).toBe("Big Friendly Robot");
+    expect(friendlyTitle(prompt, { renamed: true })).toBe(prompt);
+    expect(promptTitle("Please make a birthday card for Mum with stars")).toBe(
+      "Birthday Card For Mum",
+    );
   });
 });

@@ -158,7 +158,7 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
   );
 }
 
-const readBarClock = () => Math.floor(Date.now() / 60_000) * 60_000;
+const readBarClock = () => Math.round(Date.now() / 60_000) * 60_000;
 const subscribeBarClock = (onChange: () => void) => {
   const timer = window.setInterval(onChange, 60_000);
   return () => window.clearInterval(timer);
@@ -251,7 +251,7 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
         </>
       }
     >
-      <ParentCodeEntry entry={entry} />
+      <ParentCodeEntry entry={entry} autoFocus />
     </Sheet>
   );
 }

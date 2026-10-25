@@ -3,6 +3,10 @@ import { defineConfig } from "vite-plus";
 import * as NodeURL from "node:url";
 
 const DOM_TEST_ENVIRONMENT_ALLOWLIST: Array<string> = [];
+// nondev-seam: beta6-dom-tests
+const NONDEV_DOM_TESTS = [
+  "apps/nondev/src/features/{compose/MessageField,conversation/WorkingCard,journey/BuildJourney}.test.tsx",
+];
 
 const RESTRICTED_IMPORT_PATHS = [
   {
@@ -55,6 +59,14 @@ export default defineConfig({
     },
   },
   test: {
+    // nondev-seam: beta6-dom-tests
+    projects: [
+      { extends: true, test: { name: "unit", exclude: NONDEV_DOM_TESTS } },
+      {
+        extends: true,
+        test: { name: "nondev-dom", include: NONDEV_DOM_TESTS, environment: "jsdom" },
+      },
+    ],
     environment: "node",
     exclude: [
       "**/.repos/**",

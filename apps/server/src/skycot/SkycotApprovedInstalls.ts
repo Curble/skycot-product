@@ -1,3 +1,4 @@
+// nondev-seam: beta6-install-exact
 // An add-on install someone said yes to, done by SKYCOT itself.
 //
 // First principles: a yes to "install 1 add-on: the three add-on" has to end with that add-on
@@ -84,6 +85,7 @@ export function installArguments(install: ApprovedInstall): ReadonlyArray<string
         "--no-audit",
         "--no-fund",
         ...(install.dev ? ["--save-dev"] : []),
+        ...(install.exact ? ["--save-exact"] : []),
         ...install.packages,
       ];
     case "pnpm":
@@ -91,10 +93,17 @@ export function installArguments(install: ApprovedInstall): ReadonlyArray<string
         "add",
         "--ignore-scripts",
         ...(install.dev ? ["--save-dev"] : []),
+        ...(install.exact ? ["--save-exact"] : []),
         ...install.packages,
       ];
     case "bun":
-      return ["add", "--ignore-scripts", ...(install.dev ? ["--dev"] : []), ...install.packages];
+      return [
+        "add",
+        "--ignore-scripts",
+        ...(install.dev ? ["--dev"] : []),
+        ...(install.exact ? ["--exact"] : []),
+        ...install.packages,
+      ];
   }
 }
 

@@ -49,7 +49,7 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "./autonomy";
-import { firstBlank, starterMessageText } from "../starters/starters";
+import { firstBlank, starterMessageText, stillFromStarter } from "../starters/starters";
 import type { ComposerSeed } from "../starters/StarterCards";
 import { useShield, type ShieldOutcome } from "../shield";
 import { firstMessageLabels } from "./firstMessage";
@@ -659,8 +659,9 @@ function ComposerField({
         disabled={!ready || sending}
         placeholder={placeholder}
         label="New conversation"
+        starterBlanks={childView && seed !== null && stillFromStarter(seed.text, text)}
         foot={{
-          left: phone ? (
+          left: childView ? null : phone ? (
             <>
               {project === null
                 ? JUST_ASK_COPY.footPhone

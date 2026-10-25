@@ -113,8 +113,6 @@ import { BuildJourney } from "../journey/BuildJourney";
 import { withoutAssistantPlumbing } from "../../plain/plumbing";
 import { recordBuildTime } from "./buildTimes";
 import { starterIdFromText } from "../badges/facts";
-import { elapsedCopy } from "../../plain/estimate";
-import { estimateForRun } from "./runEstimate";
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -239,19 +237,6 @@ export function ConversationView({
     shell?.latestRun?.completedAt ?? null,
     active && !(childView && waitingOnYou),
   );
-  // The run's own record carries `sourcePlanRef`; the shell summary does not.
-  const { phase: runPhase, range: runEstimate } = estimateForRun(
-    projection?.runs.find((run) => run.id === latestRunId),
-  );
-  const timeLine =
-    childView && active && !waitingOnYou && runStart
-      ? elapsedCopy(
-          Math.max(0, Date.now() - Date.parse(runStart) - waited),
-          runPhase,
-          runEstimate,
-          status?.headline ?? "Building it",
-        )
-      : elapsed;
 
   const projectName = project?.title ?? null;
 
@@ -404,20 +389,24 @@ export function ConversationView({
               Ready to look at
             </Pill>
           ) : null}
-          {timeLine ? (
+          {elapsed && !childView ? (
             <span className="fm-strip__time">
               <Clock size={13} strokeWidth={1.8} aria-hidden />
-              {waitingForGrownUp && childView ? "Paused — waiting for a grown-up" : timeLine}
+              {elapsed}
             </span>
           ) : null}
-          <span className="fm-strip__dot">·</span>
-          <span>
-            {familySteps?.label ??
-              autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}
-          </span>
+          {!childView ? (
+            <>
+              <span className="fm-strip__dot">·</span>
+              <span>
+                {familySteps?.label ??
+                  autonomyLabel(autonomyForRuntimeMode(runtimeMode ?? shell.runtimeMode))}
+              </span>
+            </>
+          ) : null}
           <span className="fm-strip__dot">·</span>
           <ExplainToggle threadId={threadId} />
-          {publish.status && !question ? (
+          {publish.status && !question && !childView ? (
             <>
               <span className="fm-strip__dot">·</span>
               <PublishStatusPill status={publish.status} />
@@ -497,7 +486,7 @@ export function ConversationView({
           projectName={projectName}
           trailing={
             childView &&
-            ((active && !waitingOnYou) ||
+            (active ||
               // After a build: its Finish page stays until the child sends something new.
               (!active &&
                 !waitingForGrownUp &&
@@ -506,12 +495,18 @@ export function ConversationView({
                 projection.turnItems.some(
                   (item) => item.type === "file_change" && item.runId === latestRunId,
                 ))) ? (
-              <BuildJourney
-                projection={projection}
-                elapsedMs={startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0}
-                finished={!active}
-                onTellSam={setJourneyNote}
-              />
+              <div hidden={active && waitingOnYou}>
+                <BuildJourney
+                  key={latestRunId}
+                  runId={latestRunId}
+                  projection={projection}
+                  elapsedMs={
+                    startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0
+                  }
+                  finished={!active}
+                  onTellSam={setJourneyNote}
+                />
+              </div>
             ) : active &&
               !waitingOnYou &&
               !projection.turnItems.some(
@@ -968,16 +963,20 @@ function ReplyComposer({
     await deliver(message, active);
   };
 
+  const [appliedJourneyNote, setAppliedJourneyNote] = useState<string | null>(null);
+  if (journeyNote !== appliedJourneyNote) {
+    setAppliedJourneyNote(journeyNote);
+    if (journeyNote !== null) {
+      setText(journeyNote);
+      setTypedWhileActive(active);
+      setConfirmNewTurn(false);
+    }
+  }
   useEffect(() => {
     if (journeyNote === null) return;
-    const answer = journeyNote;
     onJourneyNoteHandled();
-    void (async () => {
-      const cleared = await shield.clear(answer, 0);
-      if (cleared.kind !== "send") return;
-      await deliver({ text: cleared.text, messageId: cleared.messageId }, true);
-    })();
-  }, [journeyNote, onJourneyNoteHandled, shield]);
+    inputRef.current?.focus();
+  }, [journeyNote, onJourneyNoteHandled]);
 
   const confirmGoBack = async (restoreFiles: boolean) => {
     if (goBackOpen === null) return;
@@ -1108,6 +1107,12 @@ function ReplyComposer({
               : "This connection can read but not reply"
           }
           label={editing !== null ? "Your changed message" : "Reply"}
+          starterBlanks={
+            childView &&
+            appliedSeed !== null &&
+            !seedSent &&
+            stillFromStarter(appliedSeed.text, text)
+          }
           foot={{
             left: childView
               ? ""

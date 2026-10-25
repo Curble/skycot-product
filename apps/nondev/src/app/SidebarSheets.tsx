@@ -83,9 +83,11 @@ function ChildSettingsSheet({
 }) {
   const family = useFamily();
   const grownUpSettings = async () => {
-    const allowed = await family.requireParentCode("aiSettings");
-    if (!allowed) return;
     onClose();
+    const allowed = await family.requireParentCode("aiSettings", {
+      reason: "A grown-up's code opens the grown-up settings.",
+    });
+    if (!allowed) return;
     navigate(settingsHref("family"));
   };
   return (

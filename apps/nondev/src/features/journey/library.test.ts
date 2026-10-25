@@ -1,6 +1,7 @@
+import { withStarterMarker } from "@t3tools/skycot-rules/starter";
 import { describe, expect, it } from "vite-plus/test";
 
-import { BUILD_WORDS, chooseBuildWord, explanationFor, wordFor } from "./library";
+import { BUILD_WORDS, chooseBuildWord, explanationFor, journeyIsGame, wordFor } from "./library";
 
 const STEPS = ["Think it through", "Make a plan", "Build it", "Test it", "Finish"] as const;
 const LEVELS = ["little-makers", "makers", "big-makers"] as const;
@@ -14,6 +15,7 @@ describe("Build Journey library", () => {
         const copy = explanationFor(step, level);
         expect(copy.question.length).toBeGreaterThan(0);
         expect(copy.answers.length).toBeGreaterThanOrEqual(2);
+        for (const answer of copy.answers) expect(answer.say.length).toBeGreaterThan(0);
       }
       // The levels really differ, not one sentence with words bolted on.
       const nows = new Set(LEVELS.map((level) => explanationFor(step, level).now));
@@ -60,5 +62,32 @@ describe("Build Journey library", () => {
       "3D",
     );
     expect(chooseBuildWord({})).toBe("plan");
+  });
+});
+
+describe("game and page questions", () => {
+  it("uses the request and gives starter kinds priority over incidental game words", () => {
+    for (const request of ["make a game", "I want to play", "add a score", "make a new level"])
+      expect(journeyIsGame(request)).toBe(true);
+    for (const id of ["birthday", "pet", "quiz"])
+      expect(journeyIsGame(withStarterMarker("keep score when I play", id))).toBe(false);
+    expect(journeyIsGame("make a quiz and keep score")).toBe(false);
+    expect(journeyIsGame("make a page about my pet")).toBe(false);
+    expect(journeyIsGame(withStarterMarker("make something", "game"))).toBe(true);
+  });
+
+  it("has page copy with no winning, playing or levels at any reading level", () => {
+    for (const step of ["Build it", "Test it", "Finish"] as const) {
+      for (const level of LEVELS) {
+        const page = explanationFor(step, level, "Pip", false);
+        expect(JSON.stringify(page)).not.toMatch(
+          /\b(win|winning|play|playing|players?|levels?|game)\b/i,
+        );
+        for (const answer of page.answers) expect(answer.say.length).toBeGreaterThan(0);
+      }
+    }
+    expect(explanationFor("Build it", "makers", "Sam", true).answers[0]?.say).toBe(
+      "Can you add confetti when I win?",
+    );
   });
 });

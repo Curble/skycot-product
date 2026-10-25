@@ -1,3 +1,4 @@
+// nondev-seam: beta6-starter-blank-test
 import { describe, expect, it } from "vite-plus/test";
 
 import { EXPLAIN_OFF_MARKER, readExplainMarker, withExplainMarker } from "./explain.ts";
@@ -54,6 +55,9 @@ describe("starterRulesFor", () => {
       expect(rules).toMatch(/HTML, CSS and JavaScript all inside that one file/);
       expect(rules).toMatch(/work offline/);
       expect(rules).toMatch(/no installs/);
+      expect(rules).toContain(
+        "If a [blank] is left in the request, ask one short question before making anything.",
+      );
     }
   });
 

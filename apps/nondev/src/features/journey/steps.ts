@@ -44,8 +44,8 @@ export function journeyFromItems(
   items: ReadonlyArray<OrchestrationV2TurnItem>,
   childName = "Sam",
   finished = false,
+  runId: string | null = latestRunId(items),
 ): JourneyState {
-  const runId = latestRunId(items);
   const current = runId === null ? items : items.filter((item) => item.runId === runId);
   const plannedBefore = items.some((item) => item.type === "proposed_plan" && item.runId !== runId);
   const plannedNow = current.some((item) => item.type === "proposed_plan");

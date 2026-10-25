@@ -560,7 +560,7 @@ export function familyGrantOpen(
 /** Whole minutes left in the shared Mac's grown-up mode bar. */
 export function grownUpMinutesLeft(view: Pick<FamilyView, "openUntil">, now: number): number {
   const until = Math.max(view.openUntil.settings ?? 0, view.openUntil.advanced ?? 0);
-  return until <= now ? 0 : Math.ceil((until - now) / 60_000);
+  return until <= now ? 0 : Math.max(1, Math.round((until - now) / 60_000));
 }
 
 const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [

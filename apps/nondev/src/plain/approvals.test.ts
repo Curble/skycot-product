@@ -149,6 +149,21 @@ describe("describeRuntimeRequest — commands", () => {
 });
 
 describe("childApprovalSentence", () => {
+  it.each(["--cache .npm-cache", "--cache=.npm-cache", "--registry https://registry.npmjs.org"])(
+    "does not call an option value an add-on: %s",
+    (option) => {
+      const card = describeRuntimeRequest(
+        items.approval("command", {
+          prompt: `npm install lodash ${option} --ignore-scripts`,
+        }),
+      );
+      expect(card.whatItWants).toBe(
+        "The assistant wants to install 1 add-on: a grab-bag of helpers.",
+      );
+      expect(card.sizeOrCost).toContain("1 add-on");
+      expect(childApprovalSentence(card, "Sam")).not.toContain(".npm-cache");
+    },
+  );
   it("turns a held add-on ask into one short child-facing sentence", () => {
     const card = describeRuntimeRequest(items.approval("command", { prompt: "npm install three" }));
     expect(childApprovalSentence(card, "Sam")).toBe(

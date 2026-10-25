@@ -1,3 +1,4 @@
+// nondev-seam: beta6-install-test
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -34,6 +35,18 @@ describe("SkycotApprovedInstalls", () => {
     });
   });
 
+  it("installs the walkthrough command without forwarding its cache or options", () => {
+    const install = parseApprovedInstall("npm install lodash --cache .npm-cache --ignore-scripts");
+    assert.deepStrictEqual(install, { manager: "npm", packages: ["lodash"], dev: false });
+    assert.deepStrictEqual(installArguments(install!), [
+      "install",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "lodash",
+    ]);
+  });
+
   it("leaves everything else to the assistant's own command", () => {
     for (const command of [
       undefined,
@@ -55,6 +68,12 @@ describe("SkycotApprovedInstalls", () => {
     ]) {
       assert.isNull(parseApprovedInstall(command), String(command));
     }
+  });
+
+  it("keeps a request to save the exact add-on version", () => {
+    const install = parseApprovedInstall("npm install lodash -E")!;
+    assert.isTrue(install.exact);
+    assert.include(installArguments(install), "--save-exact");
   });
 
   it("installs the same add-ons with their install scripts off", () => {

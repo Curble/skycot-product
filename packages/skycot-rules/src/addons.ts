@@ -17,6 +17,7 @@ export interface ApprovedInstall {
   readonly manager: InstallManager;
   readonly packages: ReadonlyArray<string>;
   readonly dev: boolean;
+  readonly exact?: true;
 }
 
 const MAX_PACKAGES = 10;
@@ -33,7 +34,29 @@ const INSTALL_VERBS: Record<string, ReadonlySet<string>> = {
 };
 const DEV_FLAGS = new Set(["-D", "--save-dev", "--dev", "-d"]);
 // Flags that only repeat what the install does anyway.
-const HARMLESS_FLAGS = new Set(["-S", "--save", "--save-prod", "-P"]);
+const HARMLESS_FLAGS = new Set([
+  "-S",
+  "--save",
+  "--save-prod",
+  "-P",
+  "--ignore-scripts",
+  "--no-audit",
+  "--no-fund",
+  "--save-exact",
+  "-E",
+]);
+
+// The cache hint is dropped: SKYCOT uses its normal cache, never a command-supplied path.
+function projectCachePath(value: string | undefined): boolean {
+  return (
+    value !== undefined &&
+    value.length > 0 &&
+    !value.startsWith("/") &&
+    value
+      .split("/")
+      .every((part) => part !== ".." && /^[A-Za-z0-9._-]+$/u.test(part) && !part.startsWith("-"))
+  );
+}
 
 /** `/bin/zsh -lc 'npm install three'` as Codex reports it, or the bare command. */
 export function unwrapShell(command: string): string {
@@ -57,15 +80,23 @@ export function parseApprovedInstall(command: string | undefined): ApprovedInsta
   const verbs = INSTALL_VERBS[program];
   if (verbs === undefined || !verbs.has(verb)) return null;
   let dev = false;
+  let exact = false;
   const packages: Array<string> = [];
-  for (const word of rest) {
-    if (DEV_FLAGS.has(word)) dev = true;
+  for (let index = 0; index < rest.length; index++) {
+    const word = rest[index]!;
+    if (word === "--cache" || word.startsWith("--cache=")) {
+      const cache = word === "--cache" ? rest[++index] : word.slice("--cache=".length);
+      if (!projectCachePath(cache)) return null;
+      continue;
+    }
+    if (word === "--save-exact" || word === "-E") exact = true;
+    else if (DEV_FLAGS.has(word)) dev = true;
     else if (HARMLESS_FLAGS.has(word)) continue;
     else if (PACKAGE_SPEC.test(word)) packages.push(word);
     else return null;
   }
   if (packages.length === 0 || packages.length > MAX_PACKAGES) return null;
-  return { manager: program as InstallManager, packages, dev };
+  return { manager: program as InstallManager, packages, dev, ...(exact ? { exact: true } : {}) };
 }
 
 export interface ApprovedDownload {

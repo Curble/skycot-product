@@ -1,14 +1,14 @@
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { estimateCopy } from "../../plain/estimate";
 import { estimateForRun } from "../conversation/runEstimate";
 import { ReadAloudButton } from "../voice/ReadAloud";
 import { useFamily } from "../family/FamilyProvider";
 import { useCrew } from "../../themes/useCrew";
-import { chooseBuildWord, codePeekFor, explanationFor, wordFor } from "./library";
+import { chooseBuildWord, codePeekFor, explanationFor, journeyIsGame, wordFor } from "./library";
 import { journeyFromItems, type JourneyStep } from "./steps";
-import { readKnownWords, rememberWord } from "./words";
+import { readBuildWord, readKnownWords, rememberBuildWord, rememberWord } from "./words";
 import "./journey.css";
 
 const STEP_PICTURES: Record<JourneyStep, string> = {
@@ -34,12 +34,6 @@ function lookBackFor(step: JourneyStep, facts: ReadonlyArray<string>): string {
   return "Sam worked through this step.";
 }
 
-/** "About “What should happen when you win?”: Confetti!" (emoji dropped from the answer). */
-export function tellSamText(question: string, label: string): string {
-  const answer = label.replace(/^[^\p{L}\p{N}]+/u, "").trim();
-  return `About “${question}”: ${answer}`;
-}
-
 function elapsedLabel(milliseconds: number): string {
   const seconds = Math.floor(milliseconds / 1000);
   if (seconds < 60) return `${seconds} s`;
@@ -52,40 +46,59 @@ export function BuildJourney({
   projection,
   elapsedMs,
   finished = false,
+  runId,
   onTellSam,
 }: {
   readonly projection: OrchestrationV2ThreadProjection;
   readonly elapsedMs: number;
   readonly finished?: boolean;
+  readonly runId?: string | null;
   readonly onTellSam?: (text: string) => void;
 }) {
   const family = useFamily();
   const child = family.profile.children.find((entry) => entry.id === family.profile.currentChildId);
   const level = child?.readingLevel ?? "makers";
   const childName = useCrew().builder.name;
-  const journey = journeyFromItems(projection.turnItems, childName, finished);
+  const latestRunId =
+    runId ?? projection.turnItems.findLast((item) => item.runId !== null)?.runId ?? null;
+  const journey = journeyFromItems(projection.turnItems, childName, finished, latestRunId);
   const [reviewStep, setReviewStep] = useState<JourneyStep | null>(null);
   const step = reviewStep ?? journey.now;
-  const explanation = explanationFor(step, level, childName);
-  const changedCode = projection.turnItems
+  const request = projection.turnItems.find((item) => item.type === "user_message");
+  const game = journeyIsGame(request?.type === "user_message" ? request.text : "");
+  const explanation = explanationFor(step, level, childName, game);
+  const currentItems = projection.turnItems.filter((item) => item.runId === latestRunId);
+  const changedCode = currentItems
     .flatMap((item) => (item.type === "file_change" ? [item.newStr ?? item.diffStr ?? ""] : []))
     .join("\n");
-  const chosen = chooseBuildWord({
-    fileNames: projection.turnItems.flatMap((item) =>
-      item.type === "file_change" ? [item.fileName] : [],
-    ),
-    commands: projection.turnItems.flatMap((item) =>
+  const candidate = chooseBuildWord({
+    fileNames: currentItems.flatMap((item) => (item.type === "file_change" ? [item.fileName] : [])),
+    commands: currentItems.flatMap((item) =>
       item.type === "command_execution" ? [item.input] : [],
     ),
     changedCode,
   });
-  const word = wordFor(chosen, level);
+  const [chosen, setChosen] = useState<typeof candidate | null>(() => readBuildWord(latestRunId));
+  if (chosen === null && (candidate !== "plan" || finished)) setChosen(candidate);
+  useEffect(() => {
+    if (latestRunId !== null && chosen !== null) rememberBuildWord(latestRunId, chosen);
+  }, [latestRunId, chosen]);
+  const word = chosen === null ? null : wordFor(chosen, level);
   const [known, setKnown] = useState(() => (child ? readKnownWords(child.id) : []));
+  // The question belongs to the child until they answer, even if the build finishes first.
+  const [questionStep, setQuestionStep] = useState(journey.now);
   const [answer, setAnswer] = useState<(typeof explanation.answers)[number] | null>(null);
-  // The same estimate as the strip and the working card, for the run going on now.
-  const latestRunId = projection.turnItems.findLast((item) => item.runId !== null)?.runId;
+  const [lastStep, setLastStep] = useState(journey.now);
+  if (lastStep !== journey.now) {
+    setLastStep(journey.now);
+    if (answer !== null) {
+      setAnswer(null);
+      setQuestionStep(journey.now);
+    }
+  }
+  const thinking = explanationFor(questionStep, level, childName, game);
   const { phase, range } = estimateForRun(projection.runs?.find((run) => run.id === latestRunId));
-  const peek = level === "big-makers" ? codePeekFor(changedCode, chosen) : null;
+  const peek = level === "big-makers" && chosen !== null ? codePeekFor(changedCode, chosen) : null;
   const textToRead = `${explanation.now} ${explanation.why}`;
   const steps = journey.steps.map((entry) => (
     <li key={entry.label} data-state={entry.state}>
@@ -95,7 +108,6 @@ export function BuildJourney({
         aria-label={`${entry.label}, ${entry.state}. Review this step`}
         onClick={() => {
           setReviewStep(entry.state === "now" ? null : entry.label);
-          setAnswer(null);
         }}
       >
         <span className="fm-journey__step-mark" aria-hidden>
@@ -145,7 +157,7 @@ export function BuildJourney({
                 </span>
               ))}
             </code>
-            <small>Real lines from your project. Can you spot the {word.word}?</small>
+            <small>Real lines from your project. Can you spot the {word?.word}?</small>
           </div>
         ) : null}
         <ReadAloudButton id={`journey-${step}`} text={textToRead} />
@@ -166,21 +178,27 @@ export function BuildJourney({
               <button
                 className="fm-journey__tell"
                 type="button"
-                // The question travels with the answer, so the builder knows what it is about.
-                onClick={() => onTellSam(tellSamText(explanation.question, answer.label))}
+                onClick={() => onTellSam(answer.say)}
               >
                 Tell {childName}
               </button>
             ) : null}
-            <button type="button" className="fm-journey__again" onClick={() => setAnswer(null)}>
-              Choose another answer
+            <button
+              type="button"
+              className="fm-journey__again"
+              onClick={() => {
+                setAnswer(null);
+                setQuestionStep(journey.now);
+              }}
+            >
+              {questionStep === journey.now ? "Choose another answer" : "Next question"}
             </button>
           </>
         ) : (
           <>
-            <p>{explanation.question}</p>
+            <p>{thinking.question}</p>
             <div className="fm-journey__answers">
-              {explanation.answers.map((choice) => (
+              {thinking.answers.map((choice) => (
                 <button type="button" key={choice.label} onClick={() => setAnswer(choice)}>
                   {choice.label}
                 </button>
@@ -189,39 +207,41 @@ export function BuildJourney({
           </>
         )}
       </section>
-      <section className="fm-journey__word">
-        <div>
-          <span className="fm-journey__eyebrow">WORD OF THE BUILD</span>
-          <h3>{word.word}</h3>
-          <p>{word.meaning}</p>
-          {child && !known.includes(chosen) ? (
-            <button
-              type="button"
-              className="fm-journey__know"
-              onClick={() => setKnown(rememberWord(child.id, chosen))}
-            >
-              I know this word
-            </button>
-          ) : null}
-        </div>
-        <aside className="fm-journey__pocket" aria-label="Words I know">
-          <b>Words I know</b>
-          <span>{known.length} words collected</span>
-          <div
-            className="fm-journey__dots"
-            aria-label={`${Math.min(known.length, 10)} of 10 words`}
-          >
-            {Array.from({ length: 10 }, (_, index) => (
-              <i key={index} data-filled={index < known.length || undefined} />
-            ))}
+      {word !== null && chosen !== null ? (
+        <section className="fm-journey__word">
+          <div>
+            <span className="fm-journey__eyebrow">WORD OF THE BUILD</span>
+            <h3>{word.word}</h3>
+            <p>{word.meaning}</p>
+            {child && !known.includes(chosen) ? (
+              <button
+                type="button"
+                className="fm-journey__know"
+                onClick={() => setKnown(rememberWord(child.id, chosen))}
+              >
+                I know this word
+              </button>
+            ) : null}
           </div>
-          <small>
-            {known.length >= 10
-              ? "Word Wizard sticker earned!"
-              : `${10 - known.length} more for the Word Wizard sticker`}
-          </small>
-        </aside>
-      </section>
+          <aside className="fm-journey__pocket" aria-label="Words I know">
+            <b>Words I know</b>
+            <span>{known.length} words collected</span>
+            <div
+              className="fm-journey__dots"
+              aria-label={`${Math.min(known.length, 10)} of 10 words`}
+            >
+              {Array.from({ length: 10 }, (_, index) => (
+                <i key={index} data-filled={index < known.length || undefined} />
+              ))}
+            </div>
+            <small>
+              {known.length >= 10
+                ? "Word Wizard sticker earned!"
+                : `${10 - known.length} more for the Word Wizard sticker`}
+            </small>
+          </aside>
+        </section>
+      ) : null}
     </section>
   );
 }

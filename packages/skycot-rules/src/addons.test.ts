@@ -1,7 +1,9 @@
+// nondev-seam: beta6-install-options-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   addOnAskOf,
+  parseApprovedInstall,
   cdnPackageOf,
   describeAddOns,
   isTrustedAddOnAsk,
@@ -230,5 +232,39 @@ describe("deletes inside the project", () => {
     expect(needsGrownUp("rm -rf dist", { ...SMOOTH, keepsVersions: false })).toBe(true);
     expect(needsGrownUp("rm old.html", ROOTS)).toBe(true);
     expect(isUndoableProjectDelete(cmd("rm -rf dist"), {})).toBe(false);
+  });
+});
+
+describe("approved install options", () => {
+  it.each([
+    "npm install lodash --cache .npm-cache --ignore-scripts",
+    "npm install --cache=./.npm-cache lodash --no-audit --no-fund --save-exact",
+    "npm install -E lodash --cache cache/npm",
+    "pnpm add lodash --ignore-scripts --save-exact",
+    "bun add lodash --ignore-scripts",
+  ])("reads only the add-ons in %s", (command) => {
+    expect(parseApprovedInstall(command)?.packages).toEqual(["lodash"]);
+    expect(addOnAskOf(command)?.names).toEqual(["lodash"]);
+  });
+
+  it.each([
+    "--cache",
+    "--cache=",
+    "--cache /tmp/cache",
+    "--cache ../cache",
+    "--cache .cache/../../outside",
+    "--cache ~/cache",
+    "--cache https://example.com/cache",
+    "--cache C:/cache",
+    "--cache --ignore-scripts",
+    "--registry=https://example.com",
+    "-g",
+    "--force",
+    "--unsafe-perm",
+    "&& echo done",
+    "./folder",
+    "https://example.com/x.tgz",
+  ])("rejects %s", (extra) => {
+    expect(parseApprovedInstall(`npm install lodash ${extra}`)).toBeNull();
   });
 });

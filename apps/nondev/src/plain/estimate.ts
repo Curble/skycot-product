@@ -43,7 +43,11 @@ export function estimateCopy(
   const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
   if (phase === "plan")
     return `Usually about ${Math.max(1, Math.round(range.high / 1000))} seconds.`;
-  return `Usually about ${minutes(range.low)}–${minutes(range.high)} minutes.`;
+  const low = minutes(range.low);
+  const high = minutes(range.high);
+  return low === high
+    ? `Usually about ${low} ${low === 1 ? "minute" : "minutes"}.`
+    : `Usually about ${low}–${high} minutes.`;
 }
 
 export function elapsedCopy(

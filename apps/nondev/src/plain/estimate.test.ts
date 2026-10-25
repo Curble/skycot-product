@@ -2,6 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 import { elapsedCopy, estimateBuildTime, estimateCopy, type BuildSample } from "./estimate";
 
 describe("build time estimates", () => {
+  it("uses a single minute value when both ends round to it", () => {
+    expect(estimateCopy("build", { low: 20_000, high: 70_000 })).toBe("Usually about 1 minute.");
+    expect(estimateCopy("build", { low: 100_000, high: 140_000 })).toBe("Usually about 2 minutes.");
+    expect(estimateCopy("build", { low: 60_000, high: 180_000 })).toBe(
+      "Usually about 1–3 minutes.",
+    );
+  });
   it("uses the narrowest bucket with at least three samples", () => {
     const samples: BuildSample[] = [20, 30, 40].map((seconds) => ({
       kind: "game",

@@ -9,6 +9,7 @@
 // when the length is unknown. The engine still counts every try the same way.
 import { useEffect, useRef, useState } from "react";
 
+import { useChildView } from "../../app/useChildView";
 import { Banner } from "../../ui/Banner";
 import { TextField } from "../../ui/TextField";
 import type { FamilyResult } from "./api";
@@ -114,6 +115,7 @@ export function ParentCodeEntry({
   readonly label?: string;
   readonly autoFocus?: boolean;
 }) {
+  const childView = useChildView();
   // A wrong try empties the field: put the cursor back so the next try is just typing.
   const field = useRef<HTMLInputElement>(null);
   const wasBusy = useRef(false);
@@ -148,8 +150,8 @@ export function ParentCodeEntry({
         <Banner tone={entry.locked ? "danger" : "warning"}>{entry.feedback}</Banner>
       ) : (
         <p className="fm-help">
-          {entry.codeLength === null ? "4 to 6 digits" : `${entry.codeLength} digits`}. Five wrong
-          tries mean a five-minute wait.
+          {entry.codeLength === null ? "4 to 6 digits" : `${entry.codeLength} digits`}.
+          {childView ? null : " Five wrong tries mean a five-minute wait."}
         </p>
       )}
     </div>

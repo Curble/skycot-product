@@ -79,6 +79,7 @@ export function familySteps(askEachStep: boolean): {
  * internet and installs something."), so the sheet says what this step does (QA FK-13).
  */
 export function actionReason(action: FamilyAction, cardReason?: string | null): string {
+  if (action === "aiSettings" && cardReason) return cardReason;
   if (action === "approve" && cardReason) {
     return `${cardReason} A grown-up allows this one step with the parent code.`;
   }

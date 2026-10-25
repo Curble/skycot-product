@@ -73,6 +73,23 @@ function sentenceCase(text: string): string {
     .join(" ");
 }
 
+/** A short fallback for an instruction still being used as the title. */
+export function promptTitle(title: string): string {
+  const clean = title.replace(/\s+/g, " ").trim();
+  const request = clean.replace(/^(?:please\s+|can you\s+|could you\s+)/i, "");
+  if (!LEADING_VERB.test(request) || (!/^[a-z]/.test(request) && words(request).length < 9))
+    return clean;
+  let subject = request.replace(LEADING_VERB, "").replace(LEADING_ARTICLE, "");
+  subject = subject.replace(/^(?:page|website|card)\s+(?:with|about|of)\s+(?:an?\s+)?/i, "");
+  subject = subject.split(/\b(?:that|which|when|where|and|with)\b|[.!?…]/i)[0]!.trim();
+  const summary = words(subject).slice(0, 6);
+  while (summary.length > 1 && /^(?:a|an|the|for|to|of|about)$/i.test(summary.at(-1)!))
+    summary.pop();
+  return summary.length === 0
+    ? clean
+    : summary.map((word) => word[0]!.toUpperCase() + word.slice(1)).join(" ");
+}
+
 /**
  * The title to show on a magnet, the recap or a certificate. A title the person gave it
  * (`renamed`) or wrote themselves (not Title Case) is shown as it is; an assistant-written
@@ -81,7 +98,10 @@ function sentenceCase(text: string): string {
  */
 export function friendlyTitle(title: string, options: { readonly renamed?: boolean } = {}): string {
   const clean = title.replace(/\s+/g, " ").trim();
-  if (clean.length === 0 || options.renamed === true || !looksGenerated(clean)) return clean;
+  if (clean.length === 0 || options.renamed === true) return clean;
+  const fallback = promptTitle(clean);
+  if (fallback !== clean) return fallback;
+  if (!looksGenerated(clean)) return clean;
   let text = clean.replace(LEADING_VERB, "");
   text = text.replace(LEADING_ARTICLE, "");
   text = text.replace(BUILD_WORDS, "").replace(/\s+/g, " ").trim();

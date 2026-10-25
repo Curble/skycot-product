@@ -19,10 +19,6 @@ import { InlineReply } from "./InlineReply";
 import { Markdown, parseMarkdown } from "./Markdown";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
-import { useChildView } from "../../../app/useChildView";
-import { estimateCopy } from "../../../plain/estimate";
-import { estimateBuildTime } from "../../../plain/estimate";
-import { readBuildTimes } from "../buildTimes";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -41,7 +37,6 @@ export function PlanCard({
   readonly item: PlanItem;
   readonly context: TimelineRenderContext;
 }) {
-  const childView = useChildView();
   const { projection, environmentId, threadId, shell, projectName } = context;
   const plan = projection.plans.find((p) => p.id === item.planId);
   const acceptedRun = projection.runs.find((run) => run.sourcePlanRef?.planId === item.planId);
@@ -83,21 +78,7 @@ export function PlanCard({
             ? "Replaced by a newer plan"
             : state === "completed"
               ? "Carried out"
-              : `${
-                  childView && state === "actionable"
-                    ? `Building this usually takes about ${estimateCopy(
-                        "build",
-                        estimateBuildTime(readBuildTimes(), {
-                          kind: "other",
-                          model: shell?.modelSelection.model ?? "unknown",
-                          phase: "build",
-                        }),
-                      )
-                        .replace(/^Most builds take /, "")
-                        .replace(/^Usually about /, "")
-                        .replace(/\.$/, "")} · `
-                    : ""
-                }${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
+              : `${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
 
   const approve = card.options.find((o) => o.id === "approve");
 
