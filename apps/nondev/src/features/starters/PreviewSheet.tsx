@@ -10,7 +10,8 @@ import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { Play, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { filesApi, pageWithAssets, type FilesPlace } from "../files/api";
+// nondev-seam: skycot-playable-copy
+import { filesApi, pageWithAssets, playablePage, type FilesPlace } from "../files/api";
 import { fetchPreviewStatus } from "../preview/api";
 import { desktopPreviewBridge } from "../preview/DesktopPreviewFrame";
 import { previewAddressWorksHere } from "../preview/model";
@@ -18,11 +19,13 @@ import { openPreviewAt } from "../preview/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
-import { offlinePreviewDocument, openItChoice, PREVIEW_SANDBOX, usesModules } from "./preview";
+import { offlinePreviewDocument, openItChoice, usesModules } from "./preview";
 import { Mascot } from "../brand/Mascot";
 import { useChildView } from "../../app/useChildView";
 import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import { useSealedInternet } from "../page-internet/useSealedInternet";
+import { FullscreenPage } from "../preview/FullscreenPage";
+import { SealedPreviewFrame } from "../preview/SealedPreviewFrame";
 
 /** One page to open: the conversation that made it, its project, and its project path. */
 export interface OpenItTarget {
@@ -88,6 +91,8 @@ type Load =
       readonly state: "ready";
       readonly html: string;
       readonly truncated: boolean;
+      // nondev-seam: skycot-playable-copy
+      readonly engineCopy: boolean;
       /** The page's path on the Mac: what a grown-up's internet yes is kept for. */
       readonly absolutePath: string;
     }
@@ -125,12 +130,16 @@ export function PreviewSheet({
         setLoad({ state: "problem", message: "This page is too big to open here." });
         return;
       }
-      const html = await pageWithAssets(at, answer.value);
+      // nondev-seam: skycot-playable-copy
+      const engineHtml = await playablePage(at.threadId, answer.value.absolutePath);
+      const html = engineHtml ?? (await pageWithAssets(at, answer.value));
       if (!cancelled) {
         setLoad({
           state: "ready",
           html,
           truncated: answer.value.truncated,
+          // nondev-seam: skycot-playable-copy
+          engineCopy: engineHtml !== null,
           absolutePath: answer.value.absolutePath,
         });
       }
@@ -178,38 +187,39 @@ export function PreviewSheet({
           {load.truncated ? (
             <Banner tone="info">This page is very big, so only the first part is shown.</Banner>
           ) : null}
-          {usesModules(load.html) ? (
+          {usesModules(load.html) && !load.engineCopy ? (
             <Banner tone="info">
               Some parts of this page may not show here: it's made of files that only work together
               in a browser, like the Preview in SKYCOT on the Mac.
             </Banner>
           ) : null}
-          {load.state === "ready" && internet.asks.length > 0 ? (
-            <PageInternetAsk
-              key={internet.asks.join(",")}
-              page={load.absolutePath}
-              sites={internet.asks}
-              onAllowed={() => setRun((count) => count + 1)}
-            />
-          ) : null}
-          <div className="fm-preview-frame-wrap">
-            {!frameLoaded ? (
-              <div className="fm-preview-frame-loading">
-                <Mascot pose="thinking" size={56} decorative />
-                <p>Getting it ready…</p>
-              </div>
+          <FullscreenPage game={/game/i.test(name)} className="fm-sealed-fullscreen">
+            {load.state === "ready" && threadId !== null && internet.asks.length > 0 ? (
+              <PageInternetAsk
+                key={internet.asks.join(",")}
+                threadId={threadId}
+                page={load.absolutePath}
+                sites={internet.asks}
+                onAllowed={() => setRun((count) => count + 1)}
+              />
             ) : null}
-            <iframe
-              key={run}
-              ref={frame}
-              className="fm-preview-frame"
-              title={`Preview of ${name}`}
-              sandbox={PREVIEW_SANDBOX}
-              referrerPolicy="no-referrer"
-              srcDoc={offlinePreviewDocument(load.html, internet.allowed)}
-              onLoad={() => setFrameLoaded(true)}
-            />
-          </div>
+            <div className="fm-preview-frame-wrap">
+              {!frameLoaded ? (
+                <div className="fm-preview-frame-loading">
+                  <Mascot pose="thinking" size={56} decorative />
+                  <p>Getting it ready…</p>
+                </div>
+              ) : null}
+              <SealedPreviewFrame
+                key={run}
+                frameRef={frame}
+                className="fm-preview-frame"
+                title={`Preview of ${name}`}
+                srcDoc={offlinePreviewDocument(load.html, internet.allowed)}
+                onLoad={() => setFrameLoaded(true)}
+              />
+            </div>
+          </FullscreenPage>
         </>
       )}
     </Sheet>

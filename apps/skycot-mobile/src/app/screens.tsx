@@ -84,9 +84,10 @@ export function PageRoute() {
   return <PagePreview mac={mac} threadId={route.params.threadId} page={route.params.page} />;
 }
 
+// nondev-seam: skycot-mobile-page-screen
 export const pageOptions = (params: StackRoutes["Page"]) => ({
   title: params.title,
-  presentation: "modal" as const,
+  presentation: "fullScreenModal" as const,
   headerLargeTitle: false,
 });
 

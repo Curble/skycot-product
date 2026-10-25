@@ -1538,6 +1538,16 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       });
     };
     const beforeInput = (event: Electron.Event, input: Electron.Input): void => {
+      // nondev-seam: skycot-page-fullscreen-guest
+      if (input.type === "keyDown" && input.key === "Escape") {
+        const host = wc.hostWebContents;
+        const owner = host ? Electron.BrowserWindow.fromWebContents(host) : null;
+        if (owner?.isFullScreen()) {
+          event.preventDefault();
+          owner.setFullScreen(false);
+          return;
+        }
+      }
       syncMenuShortcuts(wc, input);
       const host = wc.hostWebContents;
       const forwarded =

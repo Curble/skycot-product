@@ -117,3 +117,18 @@ export function relaySummary(status: RelayStatus | null): RelaySummary {
       };
   }
 }
+
+/** A phone needs either an address on the home network or an enabled relay in its link. */
+export function linkNeedsRelayStep(
+  status: RelayStatus | null,
+  addresses: ReadonlyArray<{ readonly reachable: boolean }>,
+): boolean {
+  return status !== null && !status.enabled && !addresses.some((address) => address.reachable);
+}
+
+// nondev-seam: skycot-family-reachable-link
+export function reachableLink<T extends { readonly reachable: boolean }>(
+  links: ReadonlyArray<T>,
+): T | null {
+  return links.find((link) => link.reachable) ?? null;
+}

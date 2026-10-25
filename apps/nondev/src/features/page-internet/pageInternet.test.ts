@@ -1,16 +1,18 @@
+// nondev-seam: skycot-page-play-policy-test
 import { describe, expect, it } from "vite-plus/test";
 
 import { offlinePreviewDocument, OFFLINE_POLICY, sealedPolicy } from "../starters/preview";
 import { pageName, sitesSentence } from "./PageInternetAsk";
-import { reportedSite } from "./useSealedInternet";
+import { reportedSite } from "@t3tools/skycot-rules/page-internet";
 
 describe("the sealed frame and the internet", () => {
   it("stays offline with no allowed sites, and opens only pictures, sounds, fonts and data", () => {
     expect(sealedPolicy()).toBe(OFFLINE_POLICY);
     const open = sealedPolicy(["images.dog.ceo"]);
     expect(open).toContain("img-src data: blob: https://dog.ceo https://*.dog.ceo");
-    expect(open).toContain("connect-src https://dog.ceo https://*.dog.ceo");
-    expect(open).toContain("script-src 'unsafe-inline';");
+    expect(open).toContain("connect-src blob: data: https://dog.ceo https://*.dog.ceo");
+    expect(open).toContain("script-src 'unsafe-inline'");
+    expect(open.match(/script-src [^;]*/u)?.[0]).not.toMatch(/\b(?:data|blob):/u);
     expect(open).toContain("frame-src 'none'");
     expect(sealedPolicy(["*", "dog.ceo; script-src *"])).not.toContain("script-src *");
   });
@@ -23,11 +25,19 @@ describe("the sealed frame and the internet", () => {
   });
 
   it("only counts the reporter's https addresses", () => {
-    expect(reportedSite({ skycot: "page-internet", url: "https://images.dog.ceo" })).toBe(
-      "dog.ceo",
-    );
-    expect(reportedSite({ skycot: "page-internet", url: "http://dog.ceo" })).toBeNull();
-    expect(reportedSite({ skycot: "other", url: "https://dog.ceo" })).toBeNull();
+    expect(
+      reportedSite({
+        skycot: "page-internet",
+        url: "https://images.dog.ceo",
+        directive: "img-src",
+      }),
+    ).toBe("dog.ceo");
+    expect(
+      reportedSite({ skycot: "page-internet", url: "http://dog.ceo", directive: "img-src" }),
+    ).toBeNull();
+    expect(
+      reportedSite({ skycot: "other", url: "https://dog.ceo", directive: "img-src" }),
+    ).toBeNull();
     expect(reportedSite("https://dog.ceo")).toBeNull();
     expect(reportedSite({ skycot: "page-internet", url: "https://127.0.0.1:3000" })).toBeNull();
   });

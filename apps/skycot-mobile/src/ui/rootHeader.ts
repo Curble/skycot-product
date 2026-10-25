@@ -5,10 +5,12 @@
  */
 import { createContext, type ReactNode } from "react";
 
+// nondev-seam: skycot-ipad-root-header
 export interface RootHeader {
   readonly route: string;
   readonly title: string;
   readonly right?: (() => ReactNode) | undefined;
+  readonly leading?: ReactNode;
 }
 
 export const RootHeaderContext = createContext<RootHeader | null>(null);

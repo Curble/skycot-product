@@ -50,6 +50,49 @@ import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
 import { filterShellSnapshot, folderOwner, referencedBy } from "./visibility.ts";
 
+// nondev-seam: skycot-page-internet-approver-test
+
+describe("page ask fingerprints", () => {
+  it("binds the child, conversation, page and sorted exact sites", () => {
+    const what = SkycotFamilyDevices.pageAskMaterial("ava", "/games/game.html", [
+      "dog.ceo",
+      "cats.example",
+    ]);
+    const fingerprint = SkycotFamilyDevices.fingerprintFor({
+      threadId: "thread-ava",
+      requestId: "page-internet:ask-1",
+      what,
+      why: "This page wants the internet.",
+    });
+    const anotherChild = SkycotFamilyDevices.fingerprintFor({
+      threadId: "thread-ava",
+      requestId: "page-internet:ask-1",
+      what: SkycotFamilyDevices.pageAskMaterial("leo", "/games/game.html", [
+        "cats.example",
+        "dog.ceo",
+      ]),
+      why: "This page wants the internet.",
+    });
+    const anotherConversation = SkycotFamilyDevices.fingerprintFor({
+      threadId: "thread-leo",
+      requestId: "page-internet:ask-1",
+      what,
+      why: "This page wants the internet.",
+    });
+    assert.equal(
+      what,
+      JSON.stringify({
+        target: "page-internet",
+        page: "/games/game.html",
+        sites: ["cats.example", "dog.ceo"],
+        childId: "ava",
+      }),
+    );
+    assert.notEqual(fingerprint, anotherChild);
+    assert.notEqual(fingerprint, anotherConversation);
+  });
+});
+
 const CODE = "482913";
 /** A fixed moment for request times and link expiries; tests set the engine's clock to it. */
 const EPOCH = Date.UTC(2026, 9, 23, 9, 0, 0);
@@ -599,7 +642,7 @@ interface Recorded {
   readonly dispatched: Array<Record<string, unknown>>;
 }
 
-const withDevices = <A, E>(
+const withDevices = <A, E, R>(
   use: (
     input: World & {
       readonly devices: SkycotFamilyDevices.SkycotFamilyDevices["Service"];
@@ -610,7 +653,7 @@ const withDevices = <A, E>(
         needsGrownUp: boolean;
       };
     },
-  ) => Effect.Effect<A, E>,
+  ) => Effect.Effect<A, E, R>,
 ) =>
   Effect.gen(function* () {
     const recorded: Recorded = { links: [], revokedSessions: [], revokedLinks: [], dispatched: [] };
@@ -822,6 +865,86 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
           assert.equal(logged?.by?.deviceName, "Mum's phone");
         }),
       ),
+  );
+
+  it.effect("a page ask uses the same grown-up proof and grants only its stored sites", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-page-ask-" });
+        const requestedPage = path.join(dir, "dogs.html");
+        yield* fs.writeFileString(requestedPage, "<h1>Dogs</h1>");
+        const page = yield* fs.realPath(requestedPage);
+        const ask = yield* world.family.askPageInternet({
+          threadId: "thread-ava",
+          childId: world.avaId,
+          page,
+          sites: ["dog.ceo", "pictures.example.com"],
+        });
+        const listed = (yield* world.devices.approvals).find((entry) => entry.requestId === ask.id);
+        assert.equal(listed?.target, "page-internet");
+        assert.equal(listed?.requestId, ask.id);
+        assert.deepEqual(listed?.sites, ["dog.ceo", "example.com"]);
+        assert.isTrue(Boolean(listed?.fingerprint));
+        const answer = (overrides: Partial<Parameters<typeof world.devices.answer>[0]> = {}) =>
+          world.devices.answer({
+            who: mum(world),
+            sessionId: "mum-phone",
+            origin: "http://localhost:3790",
+            threadId: "thread-ava",
+            requestId: ask.id,
+            decision: "accept",
+            fingerprint: listed!.fingerprint,
+            proof: { type: "code", code: CODE },
+            ...overrides,
+          });
+        assert.isTrue(yield* refused(answer({ fingerprint: "edited" })));
+        assert.deepEqual(yield* world.family.pageInternetSites(page), []);
+        yield* answer();
+        assert.deepEqual(yield* world.family.pageInternetSites(page), ["dog.ceo", "example.com"]);
+        assert.isTrue(yield* refused(answer()));
+        const events = (yield* world.limits.snapshot)!.activity.events;
+        assert.equal(events.find((event) => event.requestId === ask.id)?.kind, "approved");
+      }),
+    ),
+  );
+
+  it.effect("declining a page ask needs no proof, records the answer, and grants nothing", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-page-decline-" });
+        const requestedPage = path.join(dir, "dogs.html");
+        yield* fs.writeFileString(requestedPage, "<h1>Dogs</h1>");
+        const page = yield* fs.realPath(requestedPage);
+        const ask = yield* world.family.askPageInternet({
+          threadId: "thread-ava",
+          childId: world.avaId,
+          page,
+          sites: ["dog.ceo"],
+        });
+        const listed = (yield* world.devices.approvals).find(
+          (entry) => entry.requestId === ask.id,
+        )!;
+        yield* world.devices.answer({
+          who: mum(world),
+          sessionId: "mum-phone",
+          origin: "http://localhost:3790",
+          threadId: ask.threadId,
+          requestId: ask.id,
+          decision: "decline",
+          fingerprint: listed.fingerprint,
+          proof: null,
+        });
+        assert.deepEqual(yield* world.family.pageInternetSites(page), []);
+        const event = (yield* world.limits.snapshot)!.activity.events.find(
+          (entry) => entry.requestId === ask.id,
+        );
+        assert.equal(event?.kind, "declined");
+      }),
+    ),
   );
 
   it.effect("a grown-up's device never lists a step the child may allow at the Mac", () =>

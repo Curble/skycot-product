@@ -13,6 +13,7 @@
 
 // Hashing and random challenges have no Effect counterpart; these are pure calls.
 // @effect-diagnostics nodeBuiltinImport:off
+// nondev-seam: skycot-page-internet-approver
 import * as NodeCrypto from "node:crypto";
 import * as NodeOS from "node:os";
 
@@ -152,6 +153,8 @@ export interface LinkResult {
 }
 
 export interface PendingApproval {
+  /** Older clients may omit this; absent means the existing runtime request. */
+  readonly target?: "runtime-request" | "page-internet";
   readonly threadId: string;
   readonly requestId: string;
   readonly childId: string | null;
@@ -167,6 +170,8 @@ export interface PendingApproval {
   readonly kind: string;
   /** What the phone shows, hashed: a yes names it, so a changed card can't be approved unseen. */
   readonly fingerprint: string;
+  readonly page?: string;
+  readonly sites?: ReadonlyArray<string>;
 }
 
 /** How a grown-up's device proves it is the grown-up for a yes. */
@@ -234,6 +239,9 @@ export function fingerprintFor(input: {
 
 const approveAction = (threadId: string, requestId: string, fingerprint: string) =>
   `approve:${threadId}:${requestId}:${fingerprint}`;
+export const pageAskMaterial = (childId: string, page: string, sites: ReadonlyArray<string>) =>
+  JSON.stringify({ target: "page-internet", page, sites: sites.toSorted(), childId });
+const PAGE_ASK_WHY = "This page wants the internet.";
 const moreTimeAction = (childId: string, kind: string) => `more-time:${childId}:${kind}`;
 
 const MORE_TIME: Readonly<Record<string, SkycotFamilyLimits.MoreTime>> = {
@@ -890,6 +898,9 @@ const make = Effect.gen(function* () {
     );
     const owners = (yield* limits.today).threads;
     const at = yield* now;
+    const threadsById = new Map(
+      [...shell.threads, ...shell.archivedThreads].map((thread) => [thread.id, thread] as const),
+    );
     const found: Array<PendingApproval> = [];
     for (const thread of shell.threads) {
       const pending = thread.pendingRuntimeRequest;
@@ -922,6 +933,33 @@ const make = Effect.gen(function* () {
           what: described.what,
           why: described.why,
         }),
+      });
+    }
+    for (const ask of yield* family.pendingPageInternetAsks) {
+      const thread = threadsById.get(ask.threadId as ThreadId);
+      if (thread === undefined || owners[ask.threadId] !== ask.childId) continue;
+      const material = pageAskMaterial(ask.childId, ask.page, ask.sites);
+      found.push({
+        target: "page-internet",
+        threadId: ask.threadId,
+        requestId: ask.id,
+        childId: ask.childId,
+        threadTitle: thread.title,
+        projectTitle: projectTitles.get(String(thread.projectId)) ?? null,
+        createdAt: ask.createdAt,
+        lapsed: ask.expiresAt <= at || at - ask.createdAt > APPROVAL_LAPSE_MS,
+        needsGrownUp: true,
+        why: PAGE_ASK_WHY,
+        what: `${ask.page.split("/").at(-1) ?? ask.page} wants internet from ${ask.sites.join(", ")}`,
+        kind: "page-internet",
+        fingerprint: fingerprintFor({
+          threadId: ask.threadId,
+          requestId: ask.id,
+          what: material,
+          why: PAGE_ASK_WHY,
+        }),
+        page: ask.page,
+        sites: ask.sites,
       });
     }
     return found.toSorted((a, b) => b.createdAt - a.createdAt);
@@ -1033,6 +1071,96 @@ const make = Effect.gen(function* () {
 
   const answer: SkycotFamilyDevices["Service"]["answer"] = Effect.fn("SkycotFamilyDevices.answer")(
     function* (input) {
+      if (input.requestId.startsWith("page-internet:")) {
+        const ask = (yield* family.pendingPageInternetAsks).find(
+          (entry) => entry.id === input.requestId && entry.threadId === input.threadId,
+        );
+        if (ask === undefined)
+          return yield* fail("gone", "That request was already answered, or it stopped.");
+        if (ask.expiresAt <= (yield* now)) {
+          return yield* fail("lapsed", "This one is waiting on the Mac now. Ask again there.");
+        }
+        const owners = (yield* limits.today).threads;
+        if (owners[ask.threadId] !== ask.childId) {
+          return yield* fail("gone", "That page or conversation can't be read any more.");
+        }
+        const shell = yield* projections
+          .getShellSnapshot({ location: "active" })
+          .pipe(Effect.orElseSucceed(() => null));
+        if (
+          !shell?.threads.some((entry) => entry.id === ask.threadId) &&
+          !shell?.archivedThreads.some((entry) => entry.id === ask.threadId)
+        ) {
+          return yield* fail("gone", "That page or conversation can't be read any more.");
+        }
+        const material = pageAskMaterial(ask.childId, ask.page, ask.sites);
+        const fingerprint = fingerprintFor({
+          threadId: ask.threadId,
+          requestId: ask.id,
+          what: material,
+          why: PAGE_ASK_WHY,
+        });
+        if (fingerprint !== input.fingerprint) {
+          return yield* fail(
+            "changed",
+            "That request changed. Have another look before you answer.",
+          );
+        }
+        const proven =
+          input.decision === "accept"
+            ? yield* prove(
+                input.who,
+                input.origin,
+                approveAction(ask.threadId, ask.id, fingerprint),
+                input.proof,
+              )
+            : null;
+        const via: AnswerVia | null =
+          proven !== null
+            ? proven.via
+            : input.via === "watch"
+              ? yield* family
+                  .device(input.who.deviceId)
+                  .pipe(
+                    Effect.map((record) =>
+                      record?.watch === undefined
+                        ? null
+                        : ({ kind: "watch", name: record.watch.name } satisfies AnswerVia),
+                    ),
+                  )
+              : null;
+        yield* family.settlePageInternetAsk({
+          id: ask.id,
+          decision: input.decision === "accept" ? "allow" : "decline",
+        });
+        yield* limits.recordEvent({
+          sessionId: input.sessionId,
+          kind: input.decision === "accept" ? "approved" : "declined",
+          threadId: ask.threadId,
+          requestId: ask.id,
+          childId: ask.childId,
+          by: {
+            personId: input.who.personId,
+            deviceId: input.who.deviceId,
+            deviceName: input.who.deviceName,
+            ...(via === null ? {} : { via }),
+            ...(proven?.how === "face-id"
+              ? {
+                  how: "face-id" as const,
+                  ...(proven.biometry ? { biometry: proven.biometry } : {}),
+                }
+              : {}),
+          },
+        });
+        yield* Effect.logInfo("skycot-family.approver-answered", {
+          deviceId: input.who.deviceId,
+          decision: input.decision,
+          how: proven?.how ?? null,
+          via: via?.kind ?? null,
+          target: "page-internet",
+        });
+        return;
+      }
       const threadId = input.threadId as ThreadId;
       const requestId = input.requestId as RuntimeRequestId;
       const request = yield* projections

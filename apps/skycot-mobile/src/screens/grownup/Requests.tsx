@@ -331,7 +331,7 @@ function RequestCard(props: {
       <ParentCodeSheet
         visible={asking}
         title="Allow this once?"
-        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}. Enter the parent code to allow it, this once.`}
+        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${request.kind === "page-internet" ? `${name}'s ${request.page?.split("/").at(-1) ?? "page"} wants internet from ${request.sites?.join(", ") ?? "the listed sites"}.` : `${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}.`} Enter the parent code to allow it, this once.`}
         actionLabel="Allow once"
         length={codeLength}
         onClose={() => {

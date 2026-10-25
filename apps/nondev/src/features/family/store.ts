@@ -230,6 +230,15 @@ export function allowPageInternet(
   return settle(familyApi.allowPageInternet({ page, sites, code }), applyStatus);
 }
 
+/** Sends a child's page through the ordinary grown-up approval list. */
+export function askPageInternet(input: {
+  readonly threadId: string;
+  readonly page: string;
+  readonly sites: ReadonlyArray<string>;
+}) {
+  return familyApi.askPageInternet(input);
+}
+
 export function stopPageInternet(page: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.stopPageInternet({ page }), applyStatus);
 }

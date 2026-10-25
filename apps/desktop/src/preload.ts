@@ -253,6 +253,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   },
   getWindowFullscreenState: () =>
     ipcRenderer.sendSync(IpcChannels.GET_WINDOW_FULLSCREEN_STATE_CHANNEL) === true,
+  // nondev-seam: skycot-page-fullscreen-preload
+  setWindowFullscreen: (fullscreen) =>
+    ipcRenderer.invoke(IpcChannels.SET_WINDOW_FULLSCREEN_CHANNEL, fullscreen),
   getWindowZoomFactor: () => webFrame.getZoomFactor(),
   onWindowFullscreenStateChange: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, fullscreen: unknown) => {

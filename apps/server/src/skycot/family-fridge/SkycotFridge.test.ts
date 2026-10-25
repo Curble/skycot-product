@@ -1,3 +1,4 @@
+// nondev-seam: skycot-playable-copy-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
@@ -93,6 +94,7 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
         '<html><head><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="leak.css"></head><body>Space</body></html>',
       );
       yield* fs.writeFileString(path.join(root, "style.css"), "body { color: hotpink }");
+      yield* fs.writeFileString(path.join(root, "unmade.html"), "<p>not checkpointed</p>");
       yield* fs.writeFileString(path.join(dir, "secret.css"), "body { content: 'secret' }");
       // A link that leaves the project is refused even though its name looks like the project's.
       yield* fs.symlink(path.join(dir, "secret.css"), path.join(root, "leak.css"));
@@ -103,11 +105,16 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
       const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
         get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
       });
-      const [made, other] = yield* Effect.gen(function* () {
+      const [made, other, unmade] = yield* Effect.gen(function* () {
         const fridge = yield* SkycotFridge.SkycotFridge;
         return [
           yield* fridge.page({ threadId: "live", page: "index.html" }),
           yield* fridge.page({ threadId: "live", page: "style.css" }),
+          yield* fridge.playable({
+            threadId: "live",
+            page: "unmade.html",
+            sitesForPage: () => Effect.succeed([]),
+          }),
         ] as const;
       }).pipe(
         Effect.provide(
@@ -120,8 +127,9 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
       assert.notInclude(made ?? "", "secret");
       assert.notInclude(made ?? "", "<link");
       assert.isNull(other);
-      }).pipe(Effect.scoped),
-    );
+      assert.isNull(unmade.html);
+    }).pipe(Effect.scoped),
+  );
 
   // The allowance ran out while the card was being written; "Please try again" finished it.
   // The failed turn saved no checkpoint and the retry's own list is empty, but the page is

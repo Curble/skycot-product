@@ -16,6 +16,7 @@ import {
   parsePendingRequests,
   type PendingRequest,
 } from "../../../nondev/src/features/family/people";
+import { parseGrownUpAnswers, type GrownUpAnswer } from "../../../nondev/src/plain/grownUpAnswers";
 import { parseFridge, type FridgeItem } from "../../../nondev/src/features/fridge/fridge";
 import {
   parseLimitState,
@@ -34,6 +35,25 @@ import type { MacRequest, MacTransport } from "../transport/MacTransport";
 export const FAMILY_API_PATH = "/api/skycot/family";
 
 export type MoreTimeKind = "extra15" | "extra30" | "endBedtime";
+export interface FridgePlay {
+  readonly html: string | null;
+  readonly reason: "too-big" | null;
+  readonly page: string | null;
+}
+export interface PageInternetAskResult {
+  readonly id: string;
+  readonly expiresAt: number;
+}
+
+export function parsePageInternetAsk(body: unknown): PageInternetAskResult | null {
+  const id = record(record(body).ask).id;
+  const ask = record(record(body).ask);
+  return typeof id === "string" &&
+    id.startsWith("page-internet:") &&
+    typeof ask.expiresAt === "number"
+    ? { id, expiresAt: ask.expiresAt }
+    : null;
+}
 export type ApproverProof =
   | { readonly type: "code"; readonly code: string }
   | {
@@ -100,6 +120,21 @@ async function call<A>(
 }
 
 const ok = () => true as const;
+
+export function parseFridgePlay(body: unknown): FridgePlay | null {
+  const input = record(body);
+  if (
+    (input.html !== null && typeof input.html !== "string") ||
+    (input.reason !== null && input.reason !== "too-big") ||
+    (input.page !== null && typeof input.page !== "string")
+  )
+    return null;
+  return {
+    html: typeof input.html === "string" ? input.html : null,
+    reason: input.reason === "too-big" ? "too-big" : null,
+    page: typeof input.page === "string" ? input.page : null,
+  };
+}
 
 export interface TodayEntry {
   readonly childId: string;
@@ -210,6 +245,43 @@ export const familyApi = {
       { method: "GET", path: `${FAMILY_API_PATH}/fridge/page`, query: { threadId, page } },
       (body) => (typeof record(body).html === "string" ? (record(body).html as string) : null),
     ),
+  // nondev-seam: skycot-mobile-family-api
+  fridgePlay: (transport: MacTransport, threadId: string, page: string) =>
+    call(
+      transport,
+      { method: "GET", path: `${FAMILY_API_PATH}/fridge/play`, query: { threadId, page } },
+      parseFridgePlay,
+    ),
+  // nondev-seam: skycot-mobile-family-api
+  allowPageInternet: (
+    transport: MacTransport,
+    input: { readonly page: string; readonly sites: ReadonlyArray<string>; readonly code: string },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/page-internet/allow`, body: input },
+      ok,
+    ),
+  // A child's page asks through the same grown-up request list as every other approval.
+  askPageInternet: (
+    transport: MacTransport,
+    input: {
+      readonly threadId: string;
+      readonly page: string;
+      readonly sites: ReadonlyArray<string>;
+    },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/page-internet/ask`, body: input },
+      parsePageInternetAsk,
+    ),
+  grownUpAnswers: (transport: MacTransport, threadId: string) =>
+    call(
+      transport,
+      { method: "GET", path: `${FAMILY_API_PATH}/grown-up-answers`, query: { threadId } },
+      parseGrownUpAnswers,
+    ) as Promise<FamilyResult<ReadonlyArray<GrownUpAnswer>>>,
   recap: (transport: MacTransport, childId: string, range: RecapRange) =>
     call(
       transport,

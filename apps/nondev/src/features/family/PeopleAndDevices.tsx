@@ -35,6 +35,7 @@ import {
   type FamilyGrownUp,
 } from "./people";
 import { addGrownUp, refreshFamily, removeGrownUp, updateGrownUp } from "./store";
+import { linkNeedsRelayStep, reachableLink, RELAY_FOOTER, type RelayStatus } from "./relay";
 
 import "./people.css";
 
@@ -381,7 +382,7 @@ type Person = {
 };
 
 function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
-  const { profile } = useFamily();
+  const { profile, requireParentCode } = useFamily();
   const people: ReadonlyArray<Person> = useMemo(
     () => [
       ...profile.children.map((child, index) => ({
@@ -405,9 +406,58 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [link, setLink] = useState<DeviceLink | null>(null);
   const [linked, setLinked] = useState(false);
+  const [relayStatus, setRelayStatus] = useState<RelayStatus | null>(null);
+  const [addresses, setAddresses] = useState<ReadonlyArray<{
+    label: string;
+    reachable: boolean;
+  }> | null>(null);
+  const [checkingRoutes, setCheckingRoutes] = useState(true);
+  const [routeProblem, setRouteProblem] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const suggested =
     chosen === null ? "" : `${chosen.label}'s ${chosen.kind === "child" ? "iPad" : "phone"}`;
+
+  const checkRoutes = useCallback(async () => {
+    setCheckingRoutes(true);
+    setRouteProblem(null);
+    const [relay, routes] = await Promise.all([familyApi.relay(), familyApi.linkAddresses()]);
+    if (relay.ok && routes.ok) {
+      setRelayStatus(relay.value);
+      setAddresses(routes.value);
+    } else {
+      setRouteProblem(
+        !relay.ok
+          ? relay.message
+          : !routes.ok
+            ? routes.message
+            : "Couldn't check the link addresses.",
+      );
+    }
+    setCheckingRoutes(false);
+  }, []);
+
+  useEffect(() => {
+    void checkRoutes();
+  }, [checkRoutes]);
+
+  const turnOnRelay = async () => {
+    if (!(await requireParentCode("manageChildren"))) return;
+    setBusy(true);
+    setProblem(null);
+    const result = await familyApi.setRelay({ enabled: true });
+    setBusy(false);
+    if (result.ok) {
+      setRelayStatus(result.value);
+      if (addresses !== null && linkNeedsRelayStep(result.value, addresses)) {
+        setProblem(
+          "SKYCOT Relay could not be turned on. Try again, or use the home network option in Advanced Mode under Connections.",
+        );
+      }
+    } else setProblem(result.message);
+  };
+
+  const needsRelayStep =
+    relayStatus !== null && addresses !== null && linkNeedsRelayStep(relayStatus, addresses);
 
   // While the code is up: tick the countdown and watch for the other device to open it.
   useEffect(() => {
@@ -443,7 +493,7 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
   };
 
   if (link !== null) {
-    const best = link.links.find((entry) => entry.reachable) ?? link.links[0] ?? null;
+    const best = reachableLink(link.links);
     const secondsLeft = Math.max(0, Math.round((link.expiresAt - now) / 1000));
     const expired = secondsLeft === 0 && !linked;
     return (
@@ -477,13 +527,6 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
               {String(secondsLeft % 60).padStart(2, "0")}.
             </p>
             {best ? <CopyLink url={best.url} /> : null}
-            {best && !best.reachable ? (
-              <Banner tone="info">
-                Other devices can't reach this Mac yet, so this link only opens in another browser
-                on this Mac. Phones and iPads will be able to link from anywhere with SKYCOT Relay,
-                which is coming next.
-              </Banner>
-            ) : null}
           </div>
         )}
       </Sheet>
@@ -502,7 +545,9 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={busy || chosen === null}
+            disabled={
+              busy || chosen === null || checkingRoutes || routeProblem !== null || needsRelayStep
+            }
             onClick={() => void create()}
           >
             {busy ? "Making a code…" : "Show the code"}
@@ -511,6 +556,40 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
       }
     >
       <div className="fm-people-form">
+        {checkingRoutes ? (
+          <p className="fm-help">Checking how a phone can reach this Mac…</p>
+        ) : null}
+        {routeProblem ? (
+          <Banner tone="warning">
+            {routeProblem}{" "}
+            <Button size="sm" onClick={() => void checkRoutes()}>
+              Try again
+            </Button>
+          </Banner>
+        ) : null}
+        {needsRelayStep ? (
+          <div>
+            {relayStatus?.available ? (
+              <>
+                <p>Phones need a way to reach this Mac. Turn on Reach this Mac from anywhere?</p>
+                <ul className="fm-relay-points">
+                  <li>{RELAY_FOOTER}</li>
+                </ul>
+                <Button variant="primary" disabled={busy} onClick={() => void turnOnRelay()}>
+                  {busy ? "Turning on…" : "Turn on and continue"}
+                </Button>
+              </>
+            ) : (
+              <ul className="fm-relay-points">
+                <li>
+                  SKYCOT Relay isn't available in this version. To link a phone, open Settings ›
+                  Advanced Mode › Connections and allow other devices on your home network to reach
+                  this Mac.
+                </li>
+              </ul>
+            )}
+          </div>
+        ) : null}
         <List label="Who it's for">
           {people.map((person) => (
             <ListRow

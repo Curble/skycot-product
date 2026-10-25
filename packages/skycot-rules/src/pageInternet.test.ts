@@ -1,3 +1,4 @@
+// nondev-seam: skycot-page-play-policy-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -5,6 +6,9 @@ import {
   cleanSites,
   MAX_PAGE_SITES,
   pageServerPolicy,
+  sealedPolicy,
+  BLOCKED_REPORTER,
+  reportedSite,
   siteOf,
   siteOfUrl,
   sitesForPage,
@@ -19,11 +23,36 @@ describe("siteOf", () => {
     expect(siteOf("dog.ceo")).toBe("dog.ceo");
     expect(siteOf("www.bbc.co.uk")).toBe("bbc.co.uk");
     expect(siteOf("api.abc.net.au")).toBe("abc.net.au");
-    expect(siteOf("Upload.Wikimedia.org.")).toBe("wikimedia.org");
+    expect(siteOf("Upload.Wikimedia.org.")).toBeNull();
+  });
+
+  it("uses the private, wildcard and exception rules in the Public Suffix List", () => {
+    expect(siteOf("alice.github.io")).toBe("alice.github.io");
+    expect(cleanSites(["alice.github.io", "bob.github.io"])).toEqual([
+      "alice.github.io",
+      "bob.github.io",
+    ]);
+    expect(siteOf("foo.s3.amazonaws.com")).toBe("foo.s3.amazonaws.com");
+    expect(siteOf("a.b.ck")).toBe("a.b.ck");
+    expect(siteOf("www.ck")).toBe("www.ck");
+    expect(siteOf("a.www.ck")).toBe("www.ck");
+    expect(pageServerPolicy(["alice.github.io"])).toContain("https://*.alice.github.io");
+    expect(pageServerPolicy(["alice.github.io"])).not.toContain("*.github.io");
   });
 
   it("is never a local or numeric address", () => {
-    for (const host of ["localhost", "127.0.0.1", "10.0.0.2", "printer.local", "x.localhost", ""]) {
+    for (const host of [
+      "localhost",
+      "127.0.0.1",
+      "10.0.0.2",
+      "::1",
+      "[::1]",
+      "printer.local",
+      "x.localhost",
+      "com",
+      "co.uk",
+      "",
+    ]) {
       expect(siteOf(host)).toBeNull();
     }
     expect(siteOfUrl("https://images.dog.ceo/breeds/a.jpg")).toBe("dog.ceo");
@@ -31,6 +60,19 @@ describe("siteOf", () => {
     expect(siteOfUrl("not a url")).toBeNull();
     expect(siteOfUrl("https://user@cdn.example.com:8443/x?y")).toBe("example.com");
     expect(siteOfUrl("ftp://dog.ceo/x")).toBeNull();
+  });
+
+  it("rejects malformed host spellings without canonicalizing them into approvals", () => {
+    for (const host of [
+      "Dog.ceo",
+      "dog.ceo.",
+      "xn--bcher-kva.example",
+      "éxample.com",
+      `${"a".repeat(64)}.com`,
+      `${"a.".repeat(130)}com`,
+    ]) {
+      expect(siteOf(host)).toBeNull();
+    }
   });
 
   it("keeps a short, clean list", () => {
@@ -41,6 +83,36 @@ describe("siteOf", () => {
     ]);
     const many = Array.from({ length: 20 }, (_, index) => `site${index}.com`);
     expect(cleanSites(many)).toHaveLength(MAX_PAGE_SITES);
+  });
+});
+
+describe("reportedSite", () => {
+  it("accepts only the reporter's public https sites", () => {
+    expect(
+      reportedSite(
+        JSON.stringify({
+          skycot: "page-internet",
+          url: "https://images.dog.ceo",
+          directive: "img-src",
+        }),
+      ),
+    ).toBe("dog.ceo");
+    expect(
+      reportedSite({ skycot: "page-internet", url: "http://dog.ceo", directive: "img-src" }),
+    ).toBeNull();
+    expect(
+      reportedSite({ skycot: "page-internet", url: "https://127.0.0.1", directive: "img-src" }),
+    ).toBeNull();
+    expect(reportedSite({ skycot: "page-internet", url: "https://dog.ceo" })).toBeNull();
+    expect(
+      reportedSite({
+        skycot: "page-internet",
+        url: "https://dog.ceo",
+        directive: "img-src",
+        extra: true,
+      }),
+    ).toBeNull();
+    expect(reportedSite("not json")).toBeNull();
   });
 });
 
@@ -73,6 +145,29 @@ describe("pageServerPolicy", () => {
     const policy = pageServerPolicy(["*", "https:", "dog.ceo; script-src *", "'unsafe-inline'"]);
     expect(policy).not.toContain("script-src *");
     expect(policy).not.toMatch(/img-src [^;]* \* /u);
+  });
+});
+
+describe("sealed playable policy", () => {
+  it("allows local code and only allowed data sources, never frames or forms", () => {
+    const policy = sealedPolicy(["dog.ceo"]);
+    for (const directive of ["img-src", "media-src", "font-src", "connect-src"]) {
+      expect(policy.match(new RegExp(`${directive} [^;]*`, "u"))?.[0]).toContain("dog.ceo");
+    }
+    for (const directive of ["script-src", "frame-src", "form-action", "default-src"]) {
+      expect(policy.match(new RegExp(`${directive} [^;]*`, "u"))?.[0]).not.toContain("dog.ceo");
+    }
+    expect(policy).toContain("script-src 'unsafe-inline'");
+    expect(policy.match(/script-src [^;]*/u)?.[0]).not.toMatch(/\b(?:data|blob):/u);
+    expect(sealedPolicy([])).not.toContain("https:");
+  });
+
+  it("reports the same message to the web parent or phone bridge", () => {
+    expect(BLOCKED_REPORTER).toContain("window.parent.postMessage(m,'*')");
+    expect(BLOCKED_REPORTER).toContain("window.ReactNativeWebView.postMessage(JSON.stringify(m))");
+    expect(BLOCKED_REPORTER).toContain(
+      "skycot:'page-internet',url:u.origin,directive:String(e.effectiveDirective||'')",
+    );
   });
 });
 

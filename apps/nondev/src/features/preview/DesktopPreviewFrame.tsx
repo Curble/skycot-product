@@ -173,6 +173,7 @@ export function DesktopPreviewFrame({
       partition={config.partition}
       webpreferences={config.webPreferences}
       {...(config.preloadUrl ? { preload: config.preloadUrl } : {})}
+      {...({ allowFullScreen: true } as unknown as { readonly allowFullScreen?: boolean })}
       {...({ allowpopups: "true" } as unknown as { readonly allowpopups?: boolean })}
     />
   );

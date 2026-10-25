@@ -36,6 +36,29 @@ export const filesApi = {
     engineRequest("GET", `${FILES_API_PATH}/read`, undefined, parseFileRead, query(place, path)),
 };
 
+// nondev-seam: skycot-playable-copy
+export async function playablePage(
+  threadId: ThreadId | null,
+  page: string,
+): Promise<string | null> {
+  if (threadId === null) return null;
+  const answer = await engineRequest(
+    "GET",
+    "/api/skycot/family/fridge/play",
+    undefined,
+    (body) => {
+      if (typeof body !== "object" || body === null) return null;
+      const value = body as { html?: unknown; reason?: unknown };
+      return (typeof value.html === "string" || value.html === null) &&
+        (value.reason === null || value.reason === "too-big")
+        ? { html: value.html, reason: value.reason as "too-big" | null }
+        : null;
+    },
+    { threadId, page },
+  );
+  return answer.ok && answer.value.html !== null ? answer.value.html : null;
+}
+
 /**
  * A page with its own files (styles, scripts, pictures) put inside it, read through the same
  * engine route: what the sealed, offline frame shows (Quick Look, and "Open it" when the Preview

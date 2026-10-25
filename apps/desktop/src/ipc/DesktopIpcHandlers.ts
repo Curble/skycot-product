@@ -50,6 +50,8 @@ import {
   pasteAsText,
   probeRemoteEditors,
   revealWindow,
+  // nondev-seam: skycot-page-fullscreen-registration
+  setWindowFullscreen,
   pickFolder,
   pickProjectFavicon,
   pickThemeFiles,
@@ -99,6 +101,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(getRelayTelemetryEnabled);
   yield* ipc.handleSync(getSystemLocale);
   yield* ipc.handleSync(getWindowFullscreenState);
+  // nondev-seam: skycot-page-fullscreen-registration
+  yield* ipc.handle(setWindowFullscreen);
   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
   yield* ipc.handleSync(getLocalEnvironmentEnabled);
   yield* ipc.handle(setLocalEnvironmentEnabled);

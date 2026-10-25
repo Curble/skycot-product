@@ -151,6 +151,41 @@ describe("what the Watch is sent", () => {
     expect(snapshot.children[0]!.messages).toBe("7 of 30 messages");
   });
 
+  it("shows the page and exact sites on the Watch before a grown-up says yes", () => {
+    const pageRequest = parsePendingRequests({
+      requests: [
+        {
+          threadId: "thread-ava",
+          requestId: "page-internet:ask-1",
+          target: "page-internet",
+          childId: "ava",
+          createdAt: NOW,
+          lapsed: false,
+          needsGrownUp: true,
+          what: "dogs.html wants internet from dog.ceo",
+          why: "This page wants the internet.",
+          kind: "page-internet",
+          page: "/games/dogs.html",
+          sites: ["dog.ceo"],
+          fingerprint: "page-fingerprint",
+        },
+      ],
+    });
+    const snapshot = buildWatchSnapshot({
+      mode: "grown-up",
+      macs: [mac],
+      byMac: { [mac.macId]: { ...state("Mum's Watch"), requests: pageRequest } },
+      lockedAt: null,
+      now: NOW,
+    });
+    expect(snapshot.requests[0]).toMatchObject({
+      requestId: "page-internet:ask-1",
+      heading: "This page wants the internet",
+      sentence: "Ava's dogs.html wants pictures and information from dog.ceo.",
+      fingerprint: "page-fingerprint",
+    });
+  });
+
   it("sends nothing private: no conversation titles, projects, sign-ins or addresses", () => {
     const json = JSON.stringify(
       buildWatchSnapshot({

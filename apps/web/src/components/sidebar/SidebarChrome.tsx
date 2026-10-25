@@ -117,7 +117,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
 
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    // nondev-seam: brand-advanced-mark
+    // nondev-seam: brand-advanced-sidebar
     <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight">
       <T3Wordmark aria-hidden className="h-5 w-auto shrink-0" />
       <span className="flex min-w-0 flex-col leading-none">

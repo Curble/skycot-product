@@ -191,6 +191,8 @@ export function parseDeviceLink(body: unknown): DeviceLink | null {
 
 /** A request waiting for a grown-up, as a grown-up's phone shows it. */
 export interface PendingRequest {
+  /** Missing on older Mac responses and means the usual runtime request. */
+  readonly target?: "runtime-request" | "page-internet";
   readonly threadId: string;
   readonly requestId: string;
   readonly childId: string | null;
@@ -203,6 +205,8 @@ export interface PendingRequest {
   readonly what: string;
   readonly kind: string;
   readonly fingerprint: string;
+  readonly page?: string;
+  readonly sites?: ReadonlyArray<string>;
 }
 
 /**
@@ -235,6 +239,11 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
         what: text(input["what"]) ?? "",
         kind: text(input["kind"]) ?? "command",
         fingerprint,
+        ...(input["target"] === "page-internet" ? { target: "page-internet" as const } : {}),
+        ...(typeof input["page"] === "string" ? { page: input["page"] } : {}),
+        ...(Array.isArray(input["sites"])
+          ? { sites: input["sites"].filter((site): site is string => typeof site === "string") }
+          : {}),
       },
     ];
   });
@@ -242,6 +251,7 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
 
 /** The card's heading, in a child's terms: what the assistant wants to do. */
 export function requestHeading(request: Pick<PendingRequest, "kind">): string {
+  if (request.kind === "page-internet") return "This page wants the internet";
   switch (request.kind) {
     case "command":
       return "Run a command";
@@ -256,9 +266,14 @@ export function requestHeading(request: Pick<PendingRequest, "kind">): string {
 
 /** A grown-up sees the plain reason first; the exact command stays available below it. */
 export function grownUpRequestSentence(
-  request: Pick<PendingRequest, "kind" | "what">,
+  request: Pick<PendingRequest, "kind" | "what" | "page" | "sites">,
   childName: string,
 ): string {
+  if (request.kind === "page-internet") {
+    const page = request.page?.split("/").at(-1) ?? "page";
+    const sites = request.sites?.join(", ") ?? "the listed internet sites";
+    return `${childName}'s ${page} wants pictures and information from ${sites}.`;
+  }
   const what = request.what.toLowerCase();
   if (request.kind === "command" && /three(?:\.js)?/.test(what)) {
     return `${childName}'s game wants to download a free 3D tool (three.js) from the internet.`;

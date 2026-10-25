@@ -54,6 +54,7 @@ import {
   cleanPagePath,
   cleanSites,
   MAX_PAGE_ENTRIES,
+  MAX_PAGE_SITES,
   sitesForPage,
   withAllowed,
   type PageInternetEntry,
@@ -66,6 +67,21 @@ export const CODE_PATTERN = /^\d{4,6}$/;
 export const CHILD_NAME_MAX = 40;
 export const MAX_CHILDREN = 8;
 export const DEFAULT_LOOK = "workshop";
+// nondev-seam: skycot-page-internet-ask-storage
+export const PAGE_INTERNET_ASK_TTL_MS = 30 * 60_000;
+export const MAX_PAGE_INTERNET_ASKS = 50;
+
+const PageInternetAsk = Schema.Struct({
+  id: Schema.String,
+  threadId: Schema.String,
+  childId: Schema.String,
+  page: Schema.String,
+  sites: Schema.Array(Schema.String),
+  createdAt: Schema.Number,
+  expiresAt: Schema.Number,
+  status: Schema.Literals(["pending", "allowed", "declined", "superseded"]),
+});
+export type PageInternetAsk = typeof PageInternetAsk.Type;
 
 /** The mascot's poses a child can pick as their picture (apps/nondev features/brand/Mascot). */
 export const AVATAR_POSES = [
@@ -347,6 +363,8 @@ const FamilyFile = Schema.Struct({
       Schema.Struct({ page: Schema.String, sites: Schema.Array(Schema.String), at: Schema.Number }),
     ),
   ),
+  /** Bounded requests to allow one page's exact internet sites. */
+  pageInternetAsks: Schema.optionalKey(Schema.Array(PageInternetAsk)),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -472,6 +490,10 @@ export interface FamilyStatus {
   /** Pages allowed to load things from internet sites (Settings › Family lists them). */
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
 }
+
+const pageInternetAsksOf = (
+  file: Pick<FamilyFile, "pageInternetAsks"> | null,
+): ReadonlyArray<PageInternetAsk> => file?.pageInternetAsks ?? [];
 
 /** What a parent sets for a child; anything left out keeps its value (or the default). */
 export interface ChildInput {
@@ -642,6 +664,20 @@ export class SkycotFamily extends Context.Service<
       readonly page: string;
       readonly sites: ReadonlyArray<string>;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Creates or reuses a child's pending request for one page and exact site set. */
+    readonly askPageInternet: (input: {
+      readonly threadId: string;
+      readonly childId: string;
+      readonly page: string;
+      readonly sites: ReadonlyArray<string>;
+    }) => Effect.Effect<PageInternetAsk, FamilyError>;
+    /** Pending page requests for the grown-up approval list. */
+    readonly pendingPageInternetAsks: Effect.Effect<ReadonlyArray<PageInternetAsk>>;
+    /** Settles a page request; approval and its page grant are one profile write. */
+    readonly settlePageInternetAsk: (input: {
+      readonly id: string;
+      readonly decision: "allow" | "decline";
+    }) => Effect.Effect<PageInternetAsk, FamilyError>;
     /** Takes a page's internet back. No code: it only makes the profile stricter. */
     readonly stopPageInternet: (input: {
       readonly page: string;
@@ -1433,6 +1469,106 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return toStatus(next, at);
   }, lock.withPermits(1));
 
+  const askPageInternet: SkycotFamily["Service"]["askPageInternet"] = Effect.fn(
+    "SkycotFamily.askPageInternet",
+  )(function* (input) {
+    const asked = cleanPagePath(input.page);
+    const sites = cleanSites(input.sites);
+    const real =
+      asked === null ? null : yield* fs.realPath(asked).pipe(Effect.orElseSucceed(() => null));
+    const info = real === null ? null : yield* fs.stat(real).pipe(Effect.orElseSucceed(() => null));
+    const page = real === null || info?.type !== "File" ? null : cleanPagePath(real);
+    if (
+      page === null ||
+      sites.length === 0 ||
+      input.threadId.length === 0 ||
+      input.childId.length === 0 ||
+      input.threadId.length > 200 ||
+      input.childId.length > 100 ||
+      input.sites.length > MAX_PAGE_SITES ||
+      input.sites.some((site) => typeof site !== "string" || cleanSites([site]).length === 0)
+    ) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const asks = pageInternetAsksOf(file).filter(
+      (ask) => ask.status === "pending" && ask.expiresAt > at,
+    );
+    const same = asks.find(
+      (ask) =>
+        ask.status === "pending" &&
+        ask.threadId === input.threadId &&
+        ask.childId === input.childId &&
+        ask.page === page &&
+        JSON.stringify(ask.sites) === JSON.stringify(sites),
+    );
+    if (same !== undefined) return same;
+    const nextAsk: PageInternetAsk = {
+      id: `page-internet:${NodeCrypto.randomUUID()}`,
+      threadId: input.threadId,
+      childId: input.childId,
+      page,
+      sites,
+      createdAt: at,
+      expiresAt: at + PAGE_INTERNET_ASK_TTL_MS,
+      status: "pending",
+    };
+    const next: FamilyFile = {
+      ...file,
+      pageInternetAsks: [
+        ...asks.map((ask) =>
+          ask.status === "pending" && ask.threadId === input.threadId && ask.page === page
+            ? { ...ask, status: "superseded" as const }
+            : ask,
+        ),
+        nextAsk,
+      ].slice(-MAX_PAGE_INTERNET_ASKS),
+    };
+    yield* save(next);
+    return nextAsk;
+  }, lock.withPermits(1));
+
+  const pendingPageInternetAsks: SkycotFamily["Service"]["pendingPageInternetAsks"] = Effect.gen(
+    function* () {
+      const file = yield* load;
+      return pageInternetAsksOf(file).filter((ask) => ask.status === "pending");
+    },
+  ).pipe(Effect.catchCause(() => Effect.succeed([] as ReadonlyArray<PageInternetAsk>)));
+
+  const settlePageInternetAsk: SkycotFamily["Service"]["settlePageInternetAsk"] = Effect.fn(
+    "SkycotFamily.settlePageInternetAsk",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const asks = pageInternetAsksOf(file);
+    const ask = asks.find((item) => item.id === input.id);
+    if (ask === undefined || ask.status !== "pending") {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    if (ask.expiresAt <= at) return yield* new FamilyError({ reason: "invalid-request" });
+    let pageInternet = pageInternetOf(file);
+    if (input.decision === "allow") {
+      const real = yield* fs.realPath(ask.page).pipe(Effect.orElseSucceed(() => null));
+      const info =
+        real === null ? null : yield* fs.stat(real).pipe(Effect.orElseSucceed(() => null));
+      const page = real === null || info?.type !== "File" ? null : cleanPagePath(real);
+      if (page === null || page !== ask.page)
+        return yield* new FamilyError({ reason: "invalid-request" });
+      pageInternet = withAllowed(pageInternet, page, ask.sites, at);
+    }
+    const settled: PageInternetAsk = {
+      ...ask,
+      status: input.decision === "allow" ? "allowed" : "declined",
+    };
+    yield* save({
+      ...file,
+      pageInternet,
+      pageInternetAsks: asks.map((item) => (item.id === ask.id ? settled : item)),
+    });
+    return settled;
+  }, lock.withPermits(1));
+
   const stopPageInternet: SkycotFamily["Service"]["stopPageInternet"] = Effect.fn(
     "SkycotFamily.stopPageInternet",
   )(function* (input) {
@@ -1798,6 +1934,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     setTrustedAddOns,
     trustedAddOnsOn,
     allowPageInternet,
+    askPageInternet,
+    pendingPageInternetAsks,
+    settlePageInternetAsk,
     stopPageInternet,
     pageInternetSites,
     lock: lockSession,

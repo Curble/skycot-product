@@ -1,3 +1,5 @@
+import { registrableDomain } from "./publicSuffix.ts";
+
 // "A grown-up says yes once per page before it can load things from the internet" (Mark,
 // 25 Oct 2026). While the Family profile is on, a child's page runs offline: SKYCOT's own page
 // server and the sealed frame both give it a Content-Security-Policy with no internet sites.
@@ -15,22 +17,19 @@ export const MAX_PAGE_SITES = 8;
 export const MAX_PAGE_ENTRIES = 200;
 
 const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/u;
-/** Second-level names used under a country ("bbc.co.uk", "abc.net.au"). */
-const COUNTRY_SECOND_LEVEL = new Set(["co", "com", "net", "org", "gov", "edu", "ac", "id"]);
 
 /**
- * The site a grown-up is asked about for an address the page tried ("images.dog.ceo" →
- * "dog.ceo", "www.bbc.co.uk" → "bbc.co.uk"); null for anything that is not a public name
- * (an IP address, localhost, a single word).
+ * The registrable domain a grown-up is asked about, including private hosting suffixes; null
+ * for anything that is not a public name (an IP address, localhost, a single word or public suffix).
  */
 export function siteOf(host: string): string | null {
-  const name = host.trim().toLowerCase().replace(/\.$/u, "");
+  // Page hosts arrive here as labels, not URL parser output. Reject non-canonical spellings
+  // rather than silently turning malformed input into an approval for a different site.
+  if (host !== host.trim() || host !== host.toLowerCase() || host.endsWith(".")) return null;
+  const name = host;
   if (!HOST.test(name) || name.endsWith(".localhost") || name.endsWith(".local")) return null;
-  const labels = name.split(".");
-  const last = labels.at(-1)!;
-  const second = labels.at(-2)!;
-  const keep = last.length === 2 && COUNTRY_SECOND_LEVEL.has(second) && labels.length > 2 ? 3 : 2;
-  return labels.slice(-keep).join(".");
+  if (name.split(".").some((label) => label.startsWith("xn--"))) return null;
+  return registrableDomain(name);
 }
 
 // Plain text, not URL: these rules also run on the phone, which has no URL parser to rely on.
@@ -40,6 +39,30 @@ const WEB_ADDRESS = /^(https?):\/\/(?:[^@/?#]*@)?([^:/?#]*)(?::\d+)?([^?#]*)/iu;
 export function siteOfUrl(url: string): string | null {
   const match = WEB_ADDRESS.exec(url.trim());
   return match === null ? null : siteOf(match[2]!);
+}
+
+// nondev-seam: skycot-page-play-policy
+/** A site named by the sealed page's reporter, when it is a public https address. */
+export function reportedSite(data: unknown): string | null {
+  let value = data;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value !== "object" || value === null) return null;
+  const message = value as Record<string, unknown>;
+  if (
+    message["skycot"] !== "page-internet" ||
+    typeof message["url"] !== "string" ||
+    typeof message["directive"] !== "string" ||
+    Object.keys(message).length !== 3 ||
+    !message["url"].startsWith("https://")
+  )
+    return null;
+  return siteOfUrl(message["url"]);
 }
 
 /** Sites as stored and sent: public names only, each once, sorted, at most MAX_PAGE_SITES. */
@@ -131,7 +154,37 @@ export function readBlockedReport(
  * it can offer "Get a grown-up".
  */
 export const BLOCKED_REPORTER =
-  "<script>(function(){document.addEventListener('securitypolicyviolation',function(e){try{var u=new URL(e.blockedURI);if(u.protocol!=='https:'&&u.protocol!=='http:')return;window.parent.postMessage({skycot:'page-internet',url:u.origin,directive:String(e.effectiveDirective||'')},'*')}catch(_){}})})()</script>";
+  "<script>(function(){document.addEventListener('securitypolicyviolation',function(e){try{var u=new URL(e.blockedURI);if(u.protocol!=='https:'&&u.protocol!=='http:')return;var m={skycot:'page-internet',url:u.origin,directive:String(e.effectiveDirective||'')};if(window.ReactNativeWebView&&typeof window.ReactNativeWebView.postMessage==='function')window.ReactNativeWebView.postMessage(JSON.stringify(m));else window.parent.postMessage(m,'*')}catch(_){}})})()</script>";
+
+// nondev-seam: skycot-page-play-policy
+/** Policy for a page's own runnable copy: local code only, and allowed sites for data only. */
+export const OFFLINE_POLICY = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "font-src data: blob:",
+  "media-src data: blob:",
+  "connect-src blob: data:",
+  "frame-src 'none'",
+  "form-action 'none'",
+].join("; ");
+
+// nondev-seam: skycot-page-play-policy
+export const STORAGE_SHIM =
+  "<script>(function(){try{window.localStorage.length}catch(e){var m=new Map();var s={getItem:function(k){return m.has(String(k))?m.get(String(k)):null},setItem:function(k,v){m.set(String(k),String(v))},removeItem:function(k){m.delete(String(k))},clear:function(){m.clear()},key:function(i){return Array.from(m.keys())[i]||null},get length(){return m.size}};try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});Object.defineProperty(window,'sessionStorage',{value:s,configurable:true})}catch(_){}}})()</script>";
+
+// nondev-seam: skycot-page-play-policy
+export function sealedPolicy(sites: ReadonlyArray<string> = []): string {
+  const allowed = cleanSites(sites)
+    .flatMap((site) => [`https://${site}`, `https://*.${site}`])
+    .join(" ");
+  if (allowed === "") return OFFLINE_POLICY;
+  return OFFLINE_POLICY.replace("img-src data: blob:", `img-src data: blob: ${allowed}`)
+    .replace("font-src data: blob:", `font-src data: blob: ${allowed}`)
+    .replace("media-src data: blob:", `media-src data: blob: ${allowed}`)
+    .replace("connect-src blob: data:", `connect-src blob: data: ${allowed}`);
+}
 
 /** The page with `head` put first inside its <head> (or after the doctype, or at the start). */
 export function withHeadStart(html: string, head: string): string {

@@ -858,6 +858,63 @@ const fridgePinRoute = madeRoute("POST", "/fridge/pin", ({ fridge, body, childVi
  * One magnet's page for its thumbnail, with the project's own stylesheets and pictures inside it
  * (the thumbnail frame may not load anything). Only a page that conversation made.
  */
+// nondev-seam: skycot-playable-copy
+const fridgePlayRoute = madeRoute("GET", "/fridge/play", ({ fridge, query, childView, family }) =>
+  Effect.gen(function* () {
+    const threadId = query.get("threadId") ?? "";
+    const page = query.get("page") ?? "";
+    if (!threadId || !page || !/\.html?$/iu.test(page))
+      return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+    if (
+      childView !== null &&
+      childView.owners.threads[threadId] !== childView.childId &&
+      !childView.pinned.has(threadId)
+    )
+      return deviceRefused;
+    // Sites are keyed by the canonical path on this Mac; an unapproved page stays offline.
+    return json(yield* fridge.playable({ threadId, page, sitesForPage: family.pageInternetSites }));
+  }),
+);
+
+// nondev-seam: skycot-page-internet-ask-route
+const pageInternetAskRoute = madeRoute(
+  "POST",
+  "/page-internet/ask",
+  ({ body, childView, family, fridge, limits, sessionId, who }) =>
+    Effect.gen(function* () {
+      const threadId = text(body["threadId"]);
+      const requestedPage = text(body["page"]);
+      const sites = Array.isArray(body["sites"]) ? body["sites"] : [];
+      if (
+        (who.kind !== "child" && who.kind !== "shared") ||
+        threadId.length === 0 ||
+        requestedPage.length === 0
+      ) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      const childId =
+        who.kind === "child" ? who.childId : (yield* limits.forSession({ sessionId })).childId;
+      if (childId === null)
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      const owner = childView?.owners.threads[threadId] ?? (yield* limits.today).threads[threadId];
+      if (owner !== childId || (childView !== null && childView.childId !== childId)) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      const page = yield* fridge.pagePath({ threadId, page: requestedPage });
+      if (page === null) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      return json({
+        ask: yield* family.askPageInternet({
+          threadId,
+          childId,
+          page,
+          sites: sites as string[],
+        }),
+      });
+    }),
+);
+
 const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query, childView }) =>
   Effect.gen(function* () {
     const threadId = query.get("threadId") ?? "";
@@ -944,6 +1001,14 @@ const managerRoute = (
 /** Every linked device with its person, kind and when it was last seen. */
 const devicesListRoute = managerRoute("GET", "/devices", ({ service }) =>
   service.list.pipe(Effect.map((devices) => json({ devices }))),
+);
+
+// nondev-seam: skycot-family-link-addresses
+const deviceLinkAddressesRoute = managerRoute(
+  "GET",
+  "/devices/link-addresses",
+  ({ service, request }) =>
+    service.linkAddresses(originOf(request)).pipe(Effect.map((addresses) => json({ addresses }))),
 );
 
 /**
@@ -1488,6 +1553,7 @@ export const layerDeviceRoutes = Layer.mergeAll(
   relayStatusRoute,
   relaySetRoute,
   devicesListRoute,
+  deviceLinkAddressesRoute,
   devicesLinkRoute,
   devicesRemoveRoute,
   peopleAddRoute,
@@ -1531,6 +1597,9 @@ function originOf(request: HttpServerRequest.HttpServerRequest): string | null {
 export const layerMadeRoutes = Layer.mergeAll(
   recapRoute,
   fridgeRoute,
+  // nondev-seam: skycot-playable-copy
+  fridgePlayRoute,
+  pageInternetAskRoute,
   fridgePinRoute,
   fridgePageRoute,
 );

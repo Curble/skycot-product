@@ -1,9 +1,11 @@
+// nondev-seam: skycot-ipad-grownup-recap
 /**
  * "Ava's week" (or today): what they made, what they asked for, what needed a grown-up and the
  * time used, built by the Mac from what it already keeps. Open on a grown-up's phone without
  * the code (Phase 1). The words are the plain client's (features/recap/recap.ts).
  */
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -17,13 +19,25 @@ import {
   weekBars,
   type RecapRange,
 } from "../../../../nondev/src/features/recap/recap";
+import { childLabel } from "../../../../nondev/src/features/family/children";
 import { friendlyTitle } from "../../../../nondev/src/plain/titles";
 import type { StackRoutes } from "../../app/routes";
+import { useGrownUp } from "../../app/grownup/GrownUpContext";
 import { useFamilyRead } from "../../data/hooks";
 import { useMacData } from "../../data/MacData";
 import { familyApi } from "../../family/api";
 import { useLinks } from "../../links/store";
-import { Banner, Card, Page, Segmented, Spinner, Txt } from "../../ui/kit";
+import {
+  Banner,
+  Card,
+  EmptyState,
+  Page,
+  Row,
+  Section,
+  Segmented,
+  Spinner,
+  Txt,
+} from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 
 export function RecapScreen() {
@@ -155,6 +169,52 @@ export function RecapScreen() {
           </Card>
         </View>
       ) : null}
+    </Page>
+  );
+}
+
+export function RecapHomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const grownUp = useGrownUp();
+  const several = grownUp.macs.length > 1;
+  return (
+    <Page>
+      {grownUp.macs.map((mac) => {
+        const children = grownUp.childrenOn(mac);
+        return (
+          <View key={mac.macId}>
+            {several ? (
+              <Txt variant="title3" style={{ marginHorizontal: 20, marginTop: 22 }}>
+                {mac.macName}
+              </Txt>
+            ) : null}
+            {children.length === 0 ? (
+              <EmptyState
+                pose="hello"
+                title="No children yet"
+                body="Add a child on the Mac, in Settings › Family."
+              />
+            ) : (
+              <Section>
+                {children.map((child, index) => {
+                  const name = childLabel(child, index);
+                  return (
+                    <Row
+                      key={child.id}
+                      title={`${name}'s week`}
+                      subtitle="What they made, asked for and needed help with."
+                      chevron
+                      onPress={() =>
+                        navigation.navigate("Recap", { macId: mac.macId, childId: child.id })
+                      }
+                    />
+                  );
+                })}
+              </Section>
+            )}
+          </View>
+        );
+      })}
     </Page>
   );
 }

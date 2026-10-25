@@ -51,10 +51,13 @@ import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
+import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
+import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
 import { SWITCH_FILE_NAME, makeSwitchStore } from "./model-fallback/switchLog.ts";
 
 const CODE = "482913";
 const BEARER = "Bearer parent-device";
+const CHILD_BEARER = "Bearer child-device";
 
 const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
   const config = yield* ServerConfig.ServerConfig;
@@ -62,6 +65,24 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
   const path = yield* Path.Path;
   const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-family-http-" });
   const staticDir = path.join(dir, "client");
+  const projectRoot = path.join(dir, "game-project");
+  const outsideRoot = path.join(dir, "outside");
+  yield* fs.makeDirectory(projectRoot, { recursive: true });
+  yield* fs.makeDirectory(outsideRoot, { recursive: true });
+  yield* fs.writeFileString(path.join(projectRoot, "game.html"), '<script src="game.js"></script>');
+  yield* fs.writeFileString(
+    path.join(projectRoot, "uncheckpointed.html"),
+    "not this conversation's page",
+  );
+  yield* fs.symlink(path.join(projectRoot, "game.html"), path.join(projectRoot, "page-alias.html"));
+  yield* fs.writeFileString(
+    path.join(projectRoot, "game.js"),
+    'fetch(".env.json"); new Audio("id_rsa.png");',
+  );
+  yield* fs.writeFileString(path.join(projectRoot, ".env.json"), "ENV_SECRET_SENTINEL");
+  yield* fs.writeFileString(path.join(projectRoot, "id_rsa.png"), "SSH_SECRET_SENTINEL");
+  yield* fs.writeFileString(path.join(outsideRoot, "outside.html"), "OUTSIDE_PAGE_SENTINEL");
+  yield* fs.symlink(path.join(outsideRoot, "outside.html"), path.join(projectRoot, "linked.html"));
   yield* fs.makeDirectory(path.join(staticDir, "simple"), { recursive: true });
   yield* fs.makeDirectory(path.join(staticDir, "assets"), { recursive: true });
   yield* fs.writeFileString(path.join(staticDir, "assets", "index-abc12345.js"), "// bundle");
@@ -75,10 +96,16 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
     ),
     Layer.mock(EnvironmentAuth.EnvironmentAuth)({
       authenticateHttpRequest: (request) =>
-        request.headers["authorization"] === BEARER
+        request.headers["authorization"] === BEARER ||
+        request.headers["authorization"] === CHILD_BEARER
           ? Effect.succeed({
-              sessionId: AuthSessionId.make("session-parent"),
-              subject: "parent",
+              sessionId: AuthSessionId.make(
+                request.headers["authorization"] === CHILD_BEARER
+                  ? "session-child"
+                  : "session-parent",
+              ),
+              subject:
+                request.headers["authorization"] === CHILD_BEARER ? "child-device" : "parent",
               method: "bearer" as never,
               scopes: AuthStandardClientScopes,
             })
@@ -90,8 +117,32 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
         return Effect.succeed({} as never);
       },
     }),
+    Layer.mock(SkycotFamilyIdentity.SkycotFamilyIdentity)({
+      identifySession: (session) =>
+        Effect.succeed(
+          session.subject === "child-device"
+            ? ({
+                kind: "child",
+                childId: "ava",
+                deviceId: "device-ava",
+                deviceName: "Tablet",
+              } as never)
+            : ({ kind: "shared" } as never),
+        ),
+      identify: () => Effect.succeed({ kind: "shared" } as never),
+    }),
+    Layer.mock(SkycotFamilyVisibility.SkycotFamilyVisibility)({
+      childViewFor: () =>
+        Effect.succeed({
+          childId: "ava",
+          owners: { threads: { "own-thread": "ava", "other-thread": "bea" }, projects: {} },
+          pinned: new Set(),
+        } as never),
+      allows: () => Effect.succeed(true),
+      filterShellStream: (_sessionId, stream) => stream,
+      filterArchivedStream: (_sessionId, stream) => stream,
+    }),
   );
-  const pins: Array<unknown> = [];
   // Stand-ins: the recap and fridge contents have their own tests; these check the doors.
   const layerMade = SkycotFamilyHttp.layerMadeRoutes.pipe(
     Layer.provide(
@@ -100,18 +151,65 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
           recap: ({ childId, range }) =>
             Effect.succeed(childId === "nobody" ? null : ({ childId, range } as never)),
         }),
-        Layer.mock(SkycotFridge.SkycotFridge)({
-          list: Effect.succeed([]),
-          pin: (input) => {
-            pins.push(input);
-            return Effect.succeed([]);
-          },
-        }),
+        SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+          Layer.provide(
+            Layer.merge(
+              Layer.mock(ProjectionStore.ProjectionStoreV2)({
+                getShellSnapshot: () =>
+                  Effect.succeed({ threads: [], archivedThreads: [] } as never),
+                getThreadRecords: ((threadId: string) =>
+                  Effect.succeed({
+                    thread: {
+                      id: threadId,
+                      projectId: "project:games",
+                      title: "Game",
+                      createdAt: DateTime.makeUnsafe("2026-10-25T00:00:00.000Z"),
+                      updatedAt: DateTime.makeUnsafe("2026-10-25T00:00:00.000Z"),
+                      archivedAt: null,
+                      deletedAt: null,
+                      worktreePath: projectRoot,
+                    },
+                    checkpointScopes: [{ id: "scope:root", kind: "root_run" }],
+                    checkpoints: [
+                      {
+                        id: `checkpoint:${threadId}`,
+                        runId: `run:${threadId}`,
+                        scopeId: "scope:root",
+                        capturedAt: DateTime.makeUnsafe("2026-10-25T00:00:00.000Z"),
+                        files: [{ path: "game.html", kind: "added", additions: 1, deletions: 0 }],
+                      },
+                      {
+                        id: `checkpoint:alias:${threadId}`,
+                        runId: `run:${threadId}`,
+                        scopeId: "scope:root",
+                        capturedAt: DateTime.makeUnsafe("2026-10-25T00:00:00.000Z"),
+                        files: [
+                          { path: "page-alias.html", kind: "added", additions: 1, deletions: 0 },
+                        ],
+                      },
+                    ],
+                    runs: [],
+                  } as never)) as never,
+              }),
+              Layer.mock(ProjectStore.ProjectStoreV2)({
+                get: () =>
+                  Effect.succeed(
+                    Option.some({
+                      projectId: "project:games",
+                      title: "Games",
+                      workspaceRoot: projectRoot,
+                    } as never),
+                  ),
+              }),
+            ),
+          ),
+        ),
       ),
     ),
   );
   const layerApp = Layer.mergeAll(
     SkycotFamilyHttp.layerCore,
+    SkycotFamilyHttp.layerDeviceRoutes,
     layerMade,
     ServerHttp.layerStaticAndDevRoute,
   ).pipe(Layer.provideMerge(NodeHttpPlatform.layer));
@@ -138,7 +236,7 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
             headers: { authorization: BEARER, ...options.headers },
           }).pipe(HttpClientRequest.bodyJsonUnsafe(options.body)),
     );
-  return { send, pinned, pins, dir };
+  return { send, pinned, dir };
 });
 
 it.layer(
@@ -207,6 +305,16 @@ it.layer(
       }),
   );
 
+  // nondev-seam: skycot-family-link-addresses-test
+  it.effect("routes link address checks through the device service", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const response = yield* send("GET", "/api/skycot/family/devices/link-addresses");
+      assert.equal(response.status, 503);
+      assert.include(yield* response.text, "Linking devices isn't available");
+    }),
+  );
+
   it.effect("the parent code opens the developer interface with an HttpOnly cookie", () =>
     Effect.gen(function* () {
       const { send } = yield* makeClient();
@@ -242,7 +350,7 @@ it.layer(
 
   it.effect("shows a child's recap only after the parent code; the fridge stays open", () =>
     Effect.gen(function* () {
-      const { send, pins } = yield* makeClient();
+      const { send } = yield* makeClient();
       const status = (yield* (yield* send("POST", "/api/skycot/family/enable", {
         body: { code: CODE, childName: "Ava" },
       })).json) as { children: ReadonlyArray<{ id: string }> };
@@ -261,6 +369,17 @@ it.layer(
       const report = yield* send("GET", resource);
       assert.equal(report.status, 200);
       assert.deepEqual(yield* report.json, { childId: ava, range: "week" });
+      // nondev-seam: skycot-playable-route-test
+      assert.equal(
+        (yield* send("GET", "/api/skycot/family/fridge/play?threadId=t&page=game.js")).status,
+        400,
+      );
+      const playable = yield* send(
+        "GET",
+        "/api/skycot/family/fridge/play?threadId=t&page=game.html",
+      );
+      assert.equal(playable.status, 200);
+      assert.include(((yield* playable.json) as { html: string }).html, 'fetch(".env.json")');
       assert.equal((yield* send("GET", `${resource.replace("week", "year")}`)).status, 400);
       assert.equal(
         (yield* send("GET", "/api/skycot/family/recap?childId=nobody&range=session")).status,
@@ -273,7 +392,108 @@ it.layer(
         body: { threadId: "thread:space", pinned: true },
       });
       assert.equal(pinned.status, 200);
-      assert.deepEqual(pins, [{ threadId: "thread:space", pinned: true }]);
+    }),
+  );
+
+  it.effect(
+    "refuses another child's playable page and keeps project paths and secrets closed",
+    () =>
+      Effect.gen(function* () {
+        const { send, dir } = yield* makeClient();
+        const path = yield* Path.Path;
+        const child = { headers: { authorization: CHILD_BEARER } };
+        const other = yield* send(
+          "GET",
+          "/api/skycot/family/fridge/play?threadId=other-thread&page=game.html",
+          child,
+        );
+        assert.equal(other.status, 403);
+        const sameGuard = yield* send(
+          "GET",
+          "/api/skycot/family/fridge/page?threadId=other-thread&page=game.html",
+          child,
+        );
+        assert.equal(sameGuard.status, 403);
+
+        const outside = path.join(dir, "outside", "outside.html");
+        for (const page of ["../x.html", outside, "linked.html"]) {
+          const response = yield* send(
+            "GET",
+            `/api/skycot/family/fridge/play?threadId=own-thread&page=${encodeURIComponent(page)}`,
+            child,
+          );
+          assert.equal(response.status, 200);
+          assert.isNull(((yield* response.json) as { html: string | null }).html);
+        }
+        const packed = yield* send(
+          "GET",
+          "/api/skycot/family/fridge/play?threadId=own-thread&page=game.html",
+          child,
+        );
+        assert.equal(packed.status, 200);
+        const body = (yield* packed.json) as { html: string | null };
+        assert.isNotNull(body.html);
+        assert.notInclude(body.html!, "ENV_SECRET_SENTINEL");
+        assert.notInclude(body.html!, "SSH_SECRET_SENTINEL");
+      }),
+  );
+
+  // nondev-seam: skycot-page-internet-ask-route-test
+  it.effect("a child can ask only for a real page in their own conversation", () =>
+    Effect.gen(function* () {
+      const { send, dir } = yield* makeClient();
+      const path = yield* Path.Path;
+      const child = { headers: { authorization: CHILD_BEARER } };
+      yield* send("POST", "/api/skycot/family/enable", {
+        body: { code: CODE, childName: "Ava" },
+      });
+      const page = yield* (yield* FileSystem.FileSystem).realPath(
+        path.join(dir, "game-project", "game.html"),
+      );
+      const asked = yield* send("POST", "/api/skycot/family/page-internet/ask", {
+        ...child,
+        body: { threadId: "own-thread", page, sites: ["dog.ceo", "dog.ceo"] },
+      });
+      assert.equal(asked.status, 200);
+      const body = (yield* asked.json) as {
+        ask: { id: string; threadId: string; page: string; sites: string[] };
+      };
+      assert.equal(body.ask.threadId, "own-thread");
+      assert.equal(body.ask.page, yield* (yield* FileSystem.FileSystem).realPath(page));
+      assert.deepEqual(body.ask.sites, ["dog.ceo"]);
+      const alias = yield* send("POST", "/api/skycot/family/page-internet/ask", {
+        ...child,
+        body: { threadId: "own-thread", page: "page-alias.html", sites: ["dog.ceo"] },
+      });
+      assert.equal(alias.status, 200);
+      assert.equal(
+        ((yield* alias.json) as { ask: { id: string; page: string } }).ask.id,
+        body.ask.id,
+      );
+      for (const threadId of ["other-thread", "own-thread"]) {
+        const refused = yield* send("POST", "/api/skycot/family/page-internet/ask", {
+          ...child,
+          body: {
+            threadId,
+            page: threadId === "other-thread" ? page : path.join(dir, "outside", "outside.html"),
+            sites: ["dog.ceo"],
+          },
+        });
+        assert.equal(refused.status, 400);
+      }
+      const empty = yield* send("POST", "/api/skycot/family/page-internet/ask", {
+        ...child,
+        body: { threadId: "own-thread", page, sites: [] },
+      });
+      assert.equal(empty.status, 400);
+      const otherPage = yield* (yield* FileSystem.FileSystem).realPath(
+        path.join(dir, "game-project", "uncheckpointed.html"),
+      );
+      const uncheckpointed = yield* send("POST", "/api/skycot/family/page-internet/ask", {
+        ...child,
+        body: { threadId: "own-thread", page: otherPage, sites: ["dog.ceo"] },
+      });
+      assert.equal(uncheckpointed.status, 400);
     }),
   );
 

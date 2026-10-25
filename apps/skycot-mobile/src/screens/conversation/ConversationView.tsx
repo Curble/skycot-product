@@ -1,3 +1,4 @@
+// nondev-seam: skycot-ipad-conversation-width
 /**
  * One conversation, as SKYCOT's plain cards: what you said, what Sam said, the plan (Build it /
  * Change the plan), Ask a grown-up, What changed (Open it / Undo all of it). On a grown-up's
@@ -179,7 +180,7 @@ export function ConversationView(props: {
         keyboardDismissMode="interactive"
         contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 24 }}
       >
-        <View style={{ width: "100%", maxWidth: 760, alignSelf: "center", gap: 14 }}>
+        <View style={{ width: "100%", maxWidth: 720, alignSelf: "center", gap: 14 }}>
           {timeline.length === 0 ? (
             <Txt tone="label2" center>
               Nothing has been said yet.

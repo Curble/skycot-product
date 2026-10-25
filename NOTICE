@@ -23,3 +23,7 @@ Third-party open-source components are listed, with their licence texts, in
 the application under Settings > About > "Open-source licences" (the
 third-party-licenses.json manifest generated at build time from
 third-party-licenses.config.json).
+
+The Public Suffix List snapshot in packages/skycot-rules/src/publicSuffixList.ts is
+provided under the Mozilla Public License 2.0 (MPL-2.0), from
+https://publicsuffix.org/list/public_suffix_list.dat.

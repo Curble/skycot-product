@@ -199,6 +199,17 @@ export const familyApi = {
     readonly sites: ReadonlyArray<string>;
     readonly code: string;
   }) => request("POST", "/page-internet/allow", input, parseServerStatus),
+  askPageInternet: (input: {
+    readonly threadId: string;
+    readonly page: string;
+    readonly sites: ReadonlyArray<string>;
+  }) =>
+    request("POST", "/page-internet/ask", input, (body) => {
+      const ask = (body as { ask?: { id?: unknown; expiresAt?: unknown } } | null)?.ask;
+      return typeof ask?.id === "string" && typeof ask.expiresAt === "number"
+        ? { id: ask.id, expiresAt: ask.expiresAt }
+        : null;
+    }),
   /** No code: taking a page's internet back only makes the profile stricter. */
   stopPageInternet: (input: { readonly page: string }) =>
     request("POST", "/page-internet/stop", input, parseServerStatus),
@@ -210,6 +221,18 @@ export const familyApi = {
     request("POST", "/assistants/stop", input, parseServerStatus),
   // Who is who: people and devices (the family's Mac, with the Family settings' yes).
   devices: () => request("GET", "/devices", undefined, parseDeviceRows),
+  linkAddresses: () =>
+    request("GET", "/devices/link-addresses", undefined, (body) => {
+      const addresses = (body as { addresses?: unknown } | null)?.addresses;
+      if (!Array.isArray(addresses)) return null;
+      return addresses.flatMap((entry: unknown) => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const input = entry as Record<string, unknown>;
+        return typeof input.label === "string" && typeof input.reachable === "boolean"
+          ? [{ label: input.label, reachable: input.reachable }]
+          : [];
+      });
+    }),
   linkDevice: (input: {
     readonly kind: DeviceKind;
     readonly personId: string;

@@ -7,6 +7,8 @@ import * as TestClock from "effect/testing/TestClock";
 
 import * as SkycotFamily from "./SkycotFamily.ts";
 
+// nondev-seam: skycot-page-internet-ask-storage-test
+
 const CODE = "482913";
 const SESSION = "session-parent";
 
@@ -119,6 +121,71 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           const stopped = yield* family.stopPageInternet({ page });
           assert.lengthOf(stopped.pageInternet, 0);
           assert.deepStrictEqual(yield* family.pageInternetSites(page), []);
+        }),
+      ),
+    );
+
+    it.effect("a page ask is exact, idempotent, bounded by expiry, and grants atomically", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const page = path.join(yield* fs.realPath(path.dirname(filePath)), "dog.html");
+          yield* fs.writeFileString(page, "<h1>Dogs</h1>");
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          const input = {
+            threadId: "thread-1",
+            childId: "child-1",
+            page,
+            sites: ["images.dog.ceo", "dog.ceo", "dog.ceo"],
+          };
+          const first = yield* family.askPageInternet(input);
+          const retry = yield* family.askPageInternet(input);
+          assert.equal(retry.id, first.id);
+          assert.deepEqual(first.sites, ["dog.ceo"]);
+          const changed = yield* family.askPageInternet({ ...input, sites: ["cats.example.com"] });
+          assert.notEqual(changed.id, first.id);
+          assert.deepEqual(
+            (yield* family.pendingPageInternetAsks).map((ask) => ask.id),
+            [changed.id],
+          );
+          const settled = yield* family.settlePageInternetAsk({
+            id: changed.id,
+            decision: "allow",
+          });
+          assert.equal(settled.status, "allowed");
+          assert.deepEqual(yield* family.pageInternetSites(page), ["example.com"]);
+          assert.equal(
+            (yield* failureOf(family.settlePageInternetAsk({ id: changed.id, decision: "allow" })))
+              .reason,
+            "invalid-request",
+          );
+        }),
+      ),
+    );
+
+    it.effect("page asks expire and cannot be answered", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const page = path.join(yield* fs.realPath(path.dirname(filePath)), "dog.html");
+          yield* fs.writeFileString(page, "<h1>Dogs</h1>");
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          const ask = yield* family.askPageInternet({
+            threadId: "thread-1",
+            childId: "child-1",
+            page,
+            sites: ["dog.ceo"],
+          });
+          yield* TestClock.adjust("30 minutes");
+          assert.equal((yield* family.pendingPageInternetAsks)[0]?.id, ask.id);
+          assert.equal(
+            (yield* failureOf(family.settlePageInternetAsk({ id: ask.id, decision: "allow" })))
+              .reason,
+            "invalid-request",
+          );
+          assert.deepEqual(yield* family.pageInternetSites(page), []);
         }),
       ),
     );

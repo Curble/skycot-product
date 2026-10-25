@@ -1,3 +1,4 @@
+// nondev-seam: skycot-ipad-grownup-app
 /**
  * Grown-up mode (iPhone first, iPad too): Requests, Children and This device, as Phase 1's
  * grown-up phone. It reads everything and answers through the Mac's approver routes; it can't
@@ -10,7 +11,7 @@ import {
   ChildrenScreen,
   childConversationsOptions,
 } from "../../screens/grownup/Children";
-import { RecapScreen, recapOptions } from "../../screens/grownup/Recap";
+import { RecapHomeScreen, RecapScreen, recapOptions } from "../../screens/grownup/Recap";
 import { RequestsScreen } from "../../screens/grownup/Requests";
 import { ThisDeviceScreen } from "../../screens/grownup/ThisDevice";
 import {
@@ -24,10 +25,12 @@ import {
   pageOptions,
 } from "../screens";
 import { Shell, type ShellScreen, type ShellSection } from "../Shell";
+import { grownupSidebarSections } from "../sidebarSections";
 
 const SCREENS: ReadonlyArray<ShellScreen> = [
   { name: "Requests", component: RequestsScreen },
   { name: "Children", component: ChildrenScreen },
+  { name: "RecapHome", component: RecapHomeScreen },
   { name: "ThisDevice", component: ThisDeviceScreen },
   {
     name: "ChildConversations",
@@ -66,6 +69,7 @@ export function GrownUpApp() {
   return (
     <Shell
       sections={sections}
+      sidebarSections={grownupSidebarSections(count)}
       screens={SCREENS}
       sidebarTitle="SKYCOT"
       sidebarSubtitle={grownUp.macs[0]?.me.deviceName ?? "A grown-up's device"}

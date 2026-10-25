@@ -40,6 +40,7 @@ import {
   type PreviewAnswer,
 } from "./api";
 import { BrowserPreviewFrame } from "./BrowserPreviewFrame";
+import { FullscreenPage } from "./FullscreenPage";
 import {
   DesktopPreviewFrame,
   desktopPreviewBridge,
@@ -360,97 +361,103 @@ function PreviewPanelBody({
   const canOpenOutside = frameUrl !== null && surface !== "elsewhere";
   // The picker runs inside T3's preview browser, which only the Mac app has.
   const canPoint = surface === "desktop" && controls?.pick !== undefined;
+  const isGame =
+    /game/i.test(frameUrl ?? "") ||
+    /game/i.test(status?.state === "running" ? status.command.script : "");
   return (
-    <aside className="fm-preview" aria-label="Preview" ref={ref} tabIndex={-1}>
-      <header className="fm-preview__bar">
-        <span className="fm-preview__title">
-          <AppWindow size={15} strokeWidth={1.8} aria-hidden />
-          Preview
-          {frameUrl && !childView ? (
-            <span className="fm-preview__address">{shortAddress(frameUrl)}</span>
-          ) : null}
-        </span>
-        <span className="fm-preview__tools">
-          <IconButton
-            icon={RotateCw}
-            label="Reload"
-            size="sm"
-            disabled={controls === null}
-            onClick={() => controls?.reload()}
-          />
-          <IconButton
-            icon={ExternalLink}
-            label="Open in browser"
-            size="sm"
-            disabled={!canOpenOutside}
-            onClick={() => frameUrl && openOutside(frameUrl)}
-          />
-          <IconButton icon={X} label="Close preview" size="sm" onClick={closePreview} />
-        </span>
-      </header>
-      {leaving ? (
-        <div className="fm-preview__notice">
-          <Banner
-            tone="info"
-            action={
-              <span className="fm-preview__notice-actions">
-                {leaving.requestId ? (
-                  <Button size="sm" variant="primary" onClick={() => void askToLeave()}>
-                    Ask a grown-up
-                  </Button>
-                ) : null}
-                <Button size="sm" onClick={() => setLeaving(null)}>
-                  Stay here
-                </Button>
-              </span>
-            }
-          >
-            <b>That link goes to the internet</b> ({shortAddress(leaving.url)}). With the Family
-            profile on, a grown-up says yes first.
-          </Banner>
-        </div>
-      ) : null}
-      {problem ? (
-        <div className="fm-preview__notice">
-          <Banner tone="info">{problem}</Banner>
-        </div>
-      ) : null}
-      {status?.state === "running" && status.internetAsks[0] !== undefined ? (
-        <PageInternetAsk
-          key={`${status.internetAsks[0].page}:${status.internetAsks[0].sites.join(",")}`}
-          page={status.internetAsks[0].page}
-          sites={status.internetAsks[0].sites}
-          onAllowed={() => {
-            controls?.reload();
-            refresh();
-          }}
-        />
-      ) : null}
-      <div className="fm-preview__body">{body}</div>
-      {status?.state === "running" && surface !== "elsewhere" ? (
-        <footer className="fm-preview__foot">
-          <Button
-            size="sm"
-            variant={pointing === "picking" ? "primary" : "secondary"}
-            icon={MousePointerClick}
-            aria-pressed={pointing === "picking"}
-            disabled={!canPoint}
-            onClick={() => void point()}
-          >
-            {pointing === "picking" ? "Stop pointing" : "Point at something"}
-          </Button>
-          <span className="fm-preview__hint" role="status">
-            {!canPoint
-              ? "Pointing works in the SKYCOT app for Mac. Here, say it in words: “the big pink title”."
-              : pointing === "picking"
-                ? childView
-                  ? "Click the part you mean, then press Attach."
-                  : "Click the part you mean, then press Attach. Esc stops."
-                : `Click a part of your page, then tell ${builder} what to change.`}
+    <FullscreenPage className="fm-preview-fullscreen" game={isGame}>
+      <aside className="fm-preview" aria-label="Preview" ref={ref} tabIndex={-1}>
+        <header className="fm-preview__bar">
+          <span className="fm-preview__title">
+            <AppWindow size={15} strokeWidth={1.8} aria-hidden />
+            Preview
+            {frameUrl && !childView ? (
+              <span className="fm-preview__address">{shortAddress(frameUrl)}</span>
+            ) : null}
           </span>
-        </footer>
-      ) : null}
-    </aside>
+          <span className="fm-preview__tools">
+            <IconButton
+              icon={RotateCw}
+              label="Reload"
+              size="sm"
+              disabled={controls === null}
+              onClick={() => controls?.reload()}
+            />
+            <IconButton
+              icon={ExternalLink}
+              label="Open in browser"
+              size="sm"
+              disabled={!canOpenOutside}
+              onClick={() => frameUrl && openOutside(frameUrl)}
+            />
+            <IconButton icon={X} label="Close preview" size="sm" onClick={closePreview} />
+          </span>
+        </header>
+        {leaving ? (
+          <div className="fm-preview__notice">
+            <Banner
+              tone="info"
+              action={
+                <span className="fm-preview__notice-actions">
+                  {leaving.requestId ? (
+                    <Button size="sm" variant="primary" onClick={() => void askToLeave()}>
+                      Ask a grown-up
+                    </Button>
+                  ) : null}
+                  <Button size="sm" onClick={() => setLeaving(null)}>
+                    Stay here
+                  </Button>
+                </span>
+              }
+            >
+              <b>That link goes to the internet</b> ({shortAddress(leaving.url)}). With the Family
+              profile on, a grown-up says yes first.
+            </Banner>
+          </div>
+        ) : null}
+        {problem ? (
+          <div className="fm-preview__notice">
+            <Banner tone="info">{problem}</Banner>
+          </div>
+        ) : null}
+        {status?.state === "running" && status.internetAsks[0] !== undefined ? (
+          <PageInternetAsk
+            key={`${status.internetAsks[0].page}:${status.internetAsks[0].sites.join(",")}`}
+            threadId={threadId}
+            page={status.internetAsks[0].page}
+            sites={status.internetAsks[0].sites}
+            onAllowed={() => {
+              controls?.reload();
+              refresh();
+            }}
+          />
+        ) : null}
+        <div className="fm-preview__body">{body}</div>
+        {status?.state === "running" && surface !== "elsewhere" ? (
+          <footer className="fm-preview__foot">
+            <Button
+              size="sm"
+              variant={pointing === "picking" ? "primary" : "secondary"}
+              icon={MousePointerClick}
+              aria-pressed={pointing === "picking"}
+              disabled={!canPoint}
+              onClick={() => void point()}
+            >
+              {pointing === "picking" ? "Stop pointing" : "Point at something"}
+            </Button>
+            <span className="fm-preview__hint" role="status">
+              {!canPoint
+                ? "Pointing works in the SKYCOT app for Mac. Here, say it in words: “the big pink title”."
+                : pointing === "picking"
+                  ? childView
+                    ? "Click the part you mean, then press Attach."
+                    : "Click the part you mean, then press Attach. Esc stops."
+                  : `Click a part of your page, then tell ${builder} what to change.`}
+            </span>
+          </footer>
+        ) : null}
+      </aside>
+    </FullscreenPage>
   );
 }
 

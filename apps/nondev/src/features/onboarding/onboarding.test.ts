@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { canContinue, onboardingSteps, shouldShowOnboarding, welcomeEntry } from "./onboarding";
+import {
+  canContinue,
+  onboardingProgress,
+  onboardingSteps,
+  shouldShowOnboarding,
+  welcomeEntry,
+} from "./onboarding";
 
 describe("onboardingSteps", () => {
   it("puts the parent code and child's name before the child setup", () => {
@@ -21,6 +27,23 @@ describe("onboardingSteps", () => {
     expect(onboardingSteps("child", true)).not.toContain("family");
     expect(onboardingSteps("child", true)).not.toContain("picture");
     expect(onboardingSteps("child", true)).toEqual(["who", "assistant", "work", "look", "done"]);
+  });
+});
+
+describe("onboardingProgress", () => {
+  it("shows one dot per setup step and follows the current step on each path", () => {
+    const me = onboardingProgress(onboardingSteps("me"), "work");
+    expect(me.steps).toHaveLength(5);
+    expect(me.index).toBe(2);
+
+    const child = onboardingProgress(onboardingSteps("child"), "work");
+    expect(child.steps).toHaveLength(6);
+    expect(child.index).toBe(4);
+  });
+
+  it("keeps the final setup dot selected on done", () => {
+    const progress = onboardingProgress(onboardingSteps("child"), "done");
+    expect(progress.index).toBe(progress.steps.length - 1);
   });
 });
 

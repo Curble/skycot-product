@@ -58,7 +58,13 @@ import { startGrownUpSession } from "../family/grownUpSession";
 import { readFamilyView, tryParentCode } from "../family/store";
 import { markPickedThisWindow } from "../family-limits/FamilyLimitsHost";
 import { PictureStep } from "./PictureStep";
-import { canContinue, onboardingSteps, type Audience, type OnboardingStep } from "./onboarding";
+import {
+  canContinue,
+  onboardingProgress,
+  onboardingSteps,
+  type Audience,
+  type OnboardingStep,
+} from "./onboarding";
 import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
 import {
   PROVIDER_CATALOG,
@@ -142,6 +148,7 @@ export function OnboardingSheet({
   const enableFamily = useEnableFamilyWithDefaults(environmentId);
   const steps = onboardingSteps(audience, family.enabled);
   const index = Math.max(0, steps.indexOf(step));
+  const progress = onboardingProgress(steps, step);
   const meta = STEP_META[step];
   const childPath = audience === "child";
   const finish = (state: "done" | "skipped") => {
@@ -218,11 +225,15 @@ export function OnboardingSheet({
       sober={step === "family"}
       actions={
         <>
-          <span className="fm-steps" role="img" aria-label={`Step ${index + 1} of ${steps.length}`}>
-            {steps.map((entry, position) => (
+          <span
+            className="fm-steps"
+            role="img"
+            aria-label={`Step ${progress.index + 1} of ${progress.steps.length}`}
+          >
+            {progress.steps.map((entry, position) => (
               <span
                 key={entry}
-                className={`fm-steps__dot${position <= index ? " fm-steps__dot--on" : ""}`}
+                className={`fm-steps__dot${position === progress.index ? " fm-steps__dot--on" : ""}`}
               />
             ))}
           </span>

@@ -1,8 +1,12 @@
+import type { RelayLink } from "@t3tools/skycot-relay/link";
 import { describe, expect, it } from "vite-plus/test";
+
+// nondev-seam: skycot-mobile-link-failure-copy-test
 
 import {
   acceptsLink,
   LinkError,
+  linkFailureCopy,
   modeOf,
   normaliseAddress,
   readLinkInput,
@@ -18,6 +22,50 @@ const child = (macId: string): MacLink => ({
 });
 
 describe("reading the Mac's link", () => {
+  it("explains when a link has no address a phone can reach", () => {
+    expect(
+      linkFailureCopy({ httpBaseUrl: null, code: "7KQ3M9XD2HPA", relay: null }, "first-connection"),
+    ).toMatch(/isn't set up for phones yet/);
+    expect(
+      linkFailureCopy(
+        { httpBaseUrl: "http://localhost:3773", code: "7KQ3M9XD2HPA", relay: null },
+        "first-connection",
+      ),
+    ).toMatch(/isn't set up for phones yet/);
+  });
+
+  it("keeps the asleep message and adds Local Network permission for a home-only link", () => {
+    const target = {
+      httpBaseUrl: "http://192.168.1.20:3773",
+      code: "7KQ3M9XD2HPA",
+      relay: null,
+    };
+    expect(linkFailureCopy(target, "first-connection")).toMatch(/same Wi-Fi.*Mac is awake/);
+    expect(linkFailureCopy(target, "first-connection")).toMatch(/Local Network permission/);
+    expect(linkFailureCopy(target, "later-connection")).not.toMatch(/Local Network permission/);
+  });
+
+  it("keeps the asleep message when a relay was offered", () => {
+    expect(
+      linkFailureCopy(
+        {
+          httpBaseUrl: null,
+          code: "7KQ3M9XD2HPA",
+          relay: {
+            relayUrl: "https://relay.skycot.com",
+            hostSigningKey: "key",
+            hostNoiseKey: "key",
+            deviceRelayId: "device",
+            pass: "pass",
+            homeId: "home",
+            token: "7KQ3M9XD2HPA",
+          } satisfies RelayLink,
+        },
+        "first-connection",
+      ),
+    ).toMatch(/same Wi-Fi.*Mac is awake/);
+  });
+
   it("takes the address and the code from the QR code's link", () => {
     expect(
       readLinkInput({

@@ -13,7 +13,14 @@
 // The sealed frame is sandboxed with no same-origin access (it cannot read SKYCOT's storage or
 // cookies), and a Content-Security-Policy keeps it offline: the promise every starter prompt
 // makes ("no internet") is then also what it enforces.
-import { BLOCKED_REPORTER, cleanSites, withHeadStart } from "@t3tools/skycot-rules/page-internet";
+// nondev-seam: skycot-page-play-policy
+import {
+  BLOCKED_REPORTER,
+  OFFLINE_POLICY,
+  sealedPolicy,
+  STORAGE_SHIM,
+  withHeadStart,
+} from "@t3tools/skycot-rules/page-internet";
 
 import type { PreviewStatusView } from "../preview/model";
 
@@ -103,43 +110,14 @@ export function usesModules(html: string): boolean {
 
 export const PREVIEW_SANDBOX = "allow-scripts allow-modals allow-forms";
 
-export const OFFLINE_POLICY = [
-  "default-src 'none'",
-  "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline'",
-  "img-src data: blob:",
-  "font-src data:",
-  "media-src data: blob:",
-  "connect-src 'none'",
-  "frame-src 'none'",
-  "form-action 'none'",
-].join("; ");
-
-// An opaque-origin frame has no localStorage: a game that saves its high score would throw.
-// This gives it an in-memory one that lasts while the preview is open.
-const STORAGE_SHIM =
-  "<script>(function(){try{window.localStorage.length}catch(e){var m=new Map();var s={getItem:function(k){return m.has(String(k))?m.get(String(k)):null},setItem:function(k,v){m.set(String(k),String(v))},removeItem:function(k){m.delete(String(k))},clear:function(){m.clear()},key:function(i){return Array.from(m.keys())[i]||null},get length(){return m.size}};try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});Object.defineProperty(window,'sessionStorage',{value:s,configurable:true})}catch(_){}}})()</script>";
-
-/**
- * The sealed frame's policy: offline, except pictures, sounds, fonts and data from the sites a
- * grown-up allowed for this page (Family profile; https only, never scripts).
- */
-export function sealedPolicy(sites: ReadonlyArray<string> = []): string {
-  const allowed = cleanSites(sites)
-    .flatMap((site) => [`https://${site}`, `https://*.${site}`])
-    .join(" ");
-  if (allowed === "") return OFFLINE_POLICY;
-  return OFFLINE_POLICY.replace("img-src data: blob:", `img-src data: blob: ${allowed}`)
-    .replace("font-src data:", `font-src data: ${allowed}`)
-    .replace("media-src data: blob:", `media-src data: blob: ${allowed}`)
-    .replace("connect-src 'none'", `connect-src ${allowed}`);
-}
+export { OFFLINE_POLICY, sealedPolicy };
 
 /**
  * The page with the policy, storage shim and blocked-address reporter as the first things in
  * its head. The reporter only tells SKYCOT's window which address the policy stopped.
  */
 export function offlinePreviewDocument(html: string, sites: ReadonlyArray<string> = []): string {
+  // nondev-seam: skycot-page-play-policy
   const head = `<meta http-equiv="Content-Security-Policy" content="${sealedPolicy(sites)}">${STORAGE_SHIM}${BLOCKED_REPORTER}`;
   return withHeadStart(html, head);
 }

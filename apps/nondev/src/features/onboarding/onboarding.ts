@@ -67,6 +67,19 @@ export function onboardingSteps(
   ];
 }
 
+/** Progress dots track setup steps, ending on the last dot when the sheet is done. */
+export function onboardingProgress(
+  steps: ReadonlyArray<OnboardingStep>,
+  step: OnboardingStep,
+): { readonly steps: ReadonlyArray<OnboardingStep>; readonly index: number } {
+  const progressSteps = steps.filter((entry) => entry !== "done");
+  const stepIndex = steps.indexOf(step);
+  return {
+    steps: progressSteps,
+    index: Math.min(Math.max(0, stepIndex), progressSteps.length - 1),
+  };
+}
+
 /** Whether "Continue" is live on a step; the others never block. */
 export function canContinue(
   step: OnboardingStep,

@@ -88,6 +88,7 @@ export function haptic(kind: "tap" | "success" | "warning" = "tap") {
   else void Haptics.selectionAsync();
 }
 
+// nondev-seam: skycot-ipad-page-header
 /** A scrolling page on the grouped background, under a large title. */
 export function Page(
   props: ScrollViewProps & { readonly children: ReactNode; readonly maxWidth?: number },
@@ -119,6 +120,7 @@ export function Page(
               paddingBottom: 6,
             }}
           >
+            {large.leading}
             <Txt variant="largeTitle" accessibilityRole="header" style={{ flex: 1 }}>
               {large.title}
             </Txt>

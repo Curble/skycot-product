@@ -23,8 +23,11 @@ import { Sheet } from "../../ui/Sheet";
 import { Markdown } from "../conversation/cards/Markdown";
 import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import { useSealedInternet } from "../page-internet/useSealedInternet";
-import { offlinePreviewDocument, PREVIEW_SANDBOX } from "../starters/preview";
-import { filesApi, pageWithAssets, type FilesPlace } from "./api";
+import { FullscreenPage } from "../preview/FullscreenPage";
+import { SealedPreviewFrame } from "../preview/SealedPreviewFrame";
+import { offlinePreviewDocument } from "../starters/preview";
+// nondev-seam: skycot-playable-copy
+import { filesApi, pageWithAssets, playablePage, type FilesPlace } from "./api";
 import { KIND_ICON } from "./icons";
 import {
   codeNote,
@@ -40,7 +43,12 @@ const shellCommands = createShellEnvironmentAtoms(connectionAtomRuntime);
 
 type Load =
   | { readonly state: "loading" }
-  | { readonly state: "ready"; readonly file: FileRead; readonly page: string | null }
+  | {
+      readonly state: "ready";
+      readonly file: FileRead;
+      readonly page: string | null;
+      readonly engineCopy: boolean;
+    }
   | { readonly state: "refused"; readonly message: string };
 
 function bytesOf(base64: string): Uint8Array<ArrayBuffer> {
@@ -98,11 +106,17 @@ export function QuickLook({
         setLoad({ state: "refused", message: answer.message });
         return;
       }
+      // nondev-seam: skycot-playable-copy
+      const enginePage =
+        answer.value.mode === "page"
+          ? await playablePage(at.threadId, answer.value.absolutePath)
+          : null;
       const page =
         answer.value.mode === "page" && answer.value.contents !== null
-          ? await pageWithAssets(at, answer.value)
+          ? (enginePage ?? (await pageWithAssets(at, answer.value)))
           : null;
-      if (!cancelled) setLoad({ state: "ready", file: answer.value, page });
+      if (!cancelled)
+        setLoad({ state: "ready", file: answer.value, page, engineCopy: enginePage !== null });
     });
     return () => {
       cancelled = true;
@@ -174,7 +188,10 @@ export function QuickLook({
       ) : (
         <Body
           file={load.file}
+          threadId={threadId}
           page={load.page}
+          // nondev-seam: skycot-playable-copy
+          engineCopy={load.engineCopy}
           objectUrl={objectUrl}
           run={run}
           canReveal={showInFinder !== null}
@@ -189,7 +206,9 @@ export function QuickLook({
 
 function Body({
   file,
+  threadId,
   page,
+  engineCopy,
   objectUrl,
   run,
   canReveal,
@@ -198,7 +217,10 @@ function Body({
   onFrameLoad,
 }: {
   readonly file: FileRead;
+  readonly threadId: string | null;
   readonly page: string | null;
+  // nondev-seam: skycot-playable-copy
+  readonly engineCopy: boolean;
   readonly objectUrl: string | null;
   readonly run: number;
   readonly canReveal: boolean;
@@ -237,33 +259,38 @@ function Body({
               this Mac.
             </p>
           ) : null}
-          {internet.asks.length > 0 ? (
-            <PageInternetAsk
-              key={internet.asks.join(",")}
-              page={file.absolutePath}
-              sites={internet.asks}
-              // The allowed sites change the frame's policy, which loads the page again.
-              onAllowed={() => undefined}
-            />
-          ) : null}
-          <div className="fm-preview-frame-wrap">
-            {childView && !frameLoaded ? (
-              <div className="fm-preview-frame-loading">
-                <Mascot pose="thinking" size={56} decorative />
-                <p>Getting it ready…</p>
-              </div>
+          <FullscreenPage game={/game/i.test(file.name)} className="fm-sealed-fullscreen">
+            {threadId !== null && internet.asks.length > 0 ? (
+              <PageInternetAsk
+                key={internet.asks.join(",")}
+                threadId={threadId}
+                page={file.absolutePath}
+                sites={internet.asks}
+                // The allowed sites change the frame's policy, which loads the page again.
+                onAllowed={() => undefined}
+              />
             ) : null}
-            <iframe
-              key={run}
-              ref={frame}
-              className="fm-preview-frame fm-ql__frame"
-              title={`Preview of ${file.name}`}
-              sandbox={PREVIEW_SANDBOX}
-              referrerPolicy="no-referrer"
-              srcDoc={offlinePreviewDocument(page ?? file.contents ?? "", internet.allowed)}
-              onLoad={onFrameLoad}
-            />
-          </div>
+            <div className="fm-preview-frame-wrap">
+              {childView && !frameLoaded ? (
+                <div className="fm-preview-frame-loading">
+                  <Mascot pose="thinking" size={56} decorative />
+                  <p>Getting it ready…</p>
+                </div>
+              ) : null}
+              <SealedPreviewFrame
+                key={run}
+                frameRef={frame}
+                className="fm-preview-frame fm-ql__frame"
+                title={`Preview of ${file.name}`}
+                srcDoc={
+                  engineCopy
+                    ? (page ?? "")
+                    : offlinePreviewDocument(page ?? file.contents ?? "", internet.allowed)
+                }
+                onLoad={onFrameLoad}
+              />
+            </div>
+          </FullscreenPage>
         </>
       );
     case "pdf":

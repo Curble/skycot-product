@@ -3,6 +3,21 @@ import { assert, describe, it } from "@effect/vitest";
 import { approvalNotifications } from "./approvalNotifications.ts";
 
 describe("approvalNotifications", () => {
+  it("treats a page ask as one fresh ordinary approval notification", () => {
+    const ask = { requestId: "page-internet:ask-1", lapsed: false };
+    assert.deepEqual(
+      approvalNotifications([ask], { requests: new Set(), lapsed: new Set() }).fresh,
+      [ask],
+    );
+    assert.deepEqual(
+      approvalNotifications([ask], {
+        requests: new Set([ask.requestId]),
+        lapsed: new Set(),
+      }).fresh,
+      [],
+    );
+  });
+
   // nondev-seam: skycot-approval-lapse-notifications-test
   it("sends a second nudge when a held approval first lapses", () => {
     const before = { requests: new Set(["req-1"]), lapsed: new Set<string>() };

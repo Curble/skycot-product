@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseRelayStatus, relaySummary } from "./relay";
+import { linkNeedsRelayStep, parseRelayStatus, reachableLink, relaySummary } from "./relay";
 
 const status = (state: string, extra: Record<string, unknown> = {}) =>
   parseRelayStatus({
@@ -13,7 +13,28 @@ const status = (state: string, extra: Record<string, unknown> = {}) =>
     ...extra,
   });
 
+// nondev-seam: skycot-family-reachable-link-test
 describe("SKYCOT Relay in the Family settings", () => {
+  it("never picks an unreachable address for a phone's QR code", () => {
+    const unreachable = { reachable: false, url: "http://localhost/simple/#token=secret" };
+    expect(reachableLink([unreachable])).toBeNull();
+    expect(
+      reachableLink([unreachable, { reachable: true, url: "https://relay/simple/#token=secret" }]),
+    ).toEqual({ reachable: true, url: "https://relay/simple/#token=secret" });
+  });
+
+  it("asks for the relay only when it is off and no link address is reachable", () => {
+    expect(linkNeedsRelayStep(status("off", { enabled: false }), [])).toBe(true);
+    expect(
+      linkNeedsRelayStep(status("not-available", { available: false, enabled: false }), []),
+    ).toBe(true);
+    expect(linkNeedsRelayStep(status("off", { enabled: false }), [{ reachable: true }])).toBe(
+      false,
+    );
+    expect(linkNeedsRelayStep(status("connected"), [])).toBe(false);
+    expect(linkNeedsRelayStep(null, [])).toBe(false);
+  });
+
   it("cannot be switched on in a build without a relay", () => {
     const summary = relaySummary(
       parseRelayStatus({ available: false, enabled: false, state: "not-available" }),

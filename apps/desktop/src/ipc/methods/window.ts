@@ -99,6 +99,24 @@ export const getWindowFullscreenState = DesktopIpc.makeSyncIpcMethod({
   }),
 });
 
+// nondev-seam: skycot-page-fullscreen-ipc
+export const setWindowFullscreen = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.SET_WINDOW_FULLSCREEN_CHANNEL,
+  payload: Schema.Boolean,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.window.setWindowFullscreen")(function* (fullscreen, event) {
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const window = yield* electronWindow.main;
+    if (
+      event !== undefined &&
+      Option.isSome(window) &&
+      !window.value.isDestroyed() &&
+      window.value.webContents.id === event.sender.id
+    )
+      window.value.setFullScreen(fullscreen);
+  }),
+});
+
 export const getLocalEnvironmentBootstraps = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL,
   result: Schema.Array(DesktopEnvironmentBootstrapSchema),

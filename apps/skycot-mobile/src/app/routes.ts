@@ -1,10 +1,13 @@
 /** The screens a stack can push, in either mode. */
+// nondev-seam: skycot-ipad-routes
 export type StackRoutes = {
   ChildHome: undefined;
+  MyMakes: undefined;
   Fridge: undefined;
   Stickers: undefined;
   Requests: undefined;
   Children: undefined;
+  RecapHome: undefined;
   ThisDevice: undefined;
   Conversation: {
     readonly macId: string;

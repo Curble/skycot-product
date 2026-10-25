@@ -64,7 +64,11 @@ function navigationTheme(theme: Theme): NavigationTheme {
   };
 }
 
-function screenOptions(theme: Theme): NativeStackNavigationOptions {
+// nondev-seam: skycot-ipad-shell
+function screenOptions(
+  theme: Theme,
+  sidebarControl?: () => ReactNode,
+): NativeStackNavigationOptions {
   return {
     headerLargeTitle: false,
     headerShadowVisible: false,
@@ -74,6 +78,7 @@ function screenOptions(theme: Theme): NativeStackNavigationOptions {
     headerLargeTitleStyle: { color: theme.color.label, fontFamily: theme.font.family },
     headerTintColor: theme.color.accent,
     contentStyle: { backgroundColor: theme.color.background },
+    ...(sidebarControl ? { headerRight: sidebarControl } : {}),
   };
 }
 
@@ -84,6 +89,7 @@ function SectionStack(props: {
   readonly section: ShellSection;
   readonly screens: ReadonlyArray<ShellScreen>;
   readonly headerRight?: () => ReactNode;
+  readonly onToggleSidebar?: () => void;
   readonly initial?: {
     readonly name: StackRouteName;
     readonly params?: object;
@@ -95,7 +101,22 @@ function SectionStack(props: {
   const rootName = props.initial?.name ?? props.section.route;
   return (
     <RootHeaderContext
-      value={{ route: props.section.route, title: props.section.title, right: props.headerRight }}
+      value={{
+        route: props.section.route,
+        title: props.section.title,
+        right: props.headerRight,
+        ...(props.onToggleSidebar
+          ? {
+              leading: (
+                <HeaderButton
+                  symbol="sidebar.left"
+                  label="Show or hide sidebar"
+                  onPress={props.onToggleSidebar}
+                />
+              ),
+            }
+          : {}),
+      }}
     >
       <NavigationIndependentTree>
         <NavigationContainer
@@ -103,7 +124,21 @@ function SectionStack(props: {
           {...(props.navRef ? { ref: props.navRef } : {})}
           onStateChange={(state) => props.onDepth?.(state?.index ?? 0)}
         >
-          <Stack.Navigator initialRouteName={rootName} screenOptions={screenOptions(theme)}>
+          <Stack.Navigator
+            initialRouteName={rootName}
+            screenOptions={screenOptions(
+              theme,
+              props.onToggleSidebar
+                ? () => (
+                    <HeaderButton
+                      symbol="sidebar.left"
+                      label="Show or hide sidebar"
+                      onPress={props.onToggleSidebar!}
+                    />
+                  )
+                : undefined,
+            )}
+          >
             {props.screens.map((screen) => {
               const isRoot = screen.name === rootName;
               return (
@@ -154,6 +189,7 @@ export interface SidebarItem {
 
 export function Shell(props: {
   readonly sections: ReadonlyArray<ShellSection>;
+  readonly sidebarSections?: ReadonlyArray<ShellSection>;
   readonly screens: ReadonlyArray<ShellScreen>;
   readonly sidebarTitle: string;
   readonly sidebarSubtitle?: string;
@@ -164,7 +200,10 @@ export function Shell(props: {
 }) {
   const layout = useLayout();
   const theme = useTheme();
+  const sidebarSections = props.sidebarSections ?? props.sections;
+  const visibleSections = layout.usesSplitView ? sidebarSections : props.sections;
   const [selected, setSelected] = useState(props.sections[0]!.id);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [opened, setOpened] = useState<SidebarItem | null>(null);
   const [provenance, setProvenance] = useState(0);
   // Like iOS's hidesBottomBarWhenPushed: a conversation pushed in a tab gets the whole screen.
@@ -172,7 +211,10 @@ export function Shell(props: {
   const refs = useMemo(
     () =>
       new Map(
-        props.sections.map((section) => [section.id, createNavigationContainerRef<StackRoutes>()]),
+        [...props.sections, ...sidebarSections].map((section) => [
+          section.id,
+          createNavigationContainerRef<StackRoutes>(),
+        ]),
       ),
     // One stack per section for the life of the shell.
     [],
@@ -181,6 +223,10 @@ export function Shell(props: {
   const conversationLink = useDeepLink("conversation");
   const demoLink = useDeepLink("demo");
   const openLink = useDeepLink("open");
+  useEffect(() => {
+    if (!visibleSections.some((section) => section.id === selected))
+      setSelected(visibleSections[0]!.id);
+  }, [selected, visibleSections]);
   useEffect(() => {
     const link = openLink.link;
     if (link === null) return;
@@ -227,10 +273,10 @@ export function Shell(props: {
     const link = sectionLink.link;
     if (link === null) return;
     sectionLink.consume();
-    if (!props.sections.some((section) => section.id === link.id)) return;
+    if (!visibleSections.some((section) => section.id === link.id)) return;
     setOpened(null);
     setSelected(link.id);
-  }, [sectionLink, props.sections]);
+  }, [sectionLink, visibleSections]);
   useEffect(() => {
     const link = conversationLink.link;
     if (link === null) return;
@@ -310,72 +356,80 @@ export function Shell(props: {
   }
 
   const section =
-    props.sections.find((candidate) => candidate.id === selected) ?? props.sections[0]!;
+    visibleSections.find((candidate) => candidate.id === selected) ?? visibleSections[0]!;
   const contentKey = opened ? `item:${opened.key}` : `section:${section.id}`;
+  const toggleSidebar = () => setSidebarVisible((visible) => !visible);
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.color.background }}>
-      <SafeAreaView
-        edges={["top", "bottom", "left"]}
-        style={{
-          width: layout.sidebarWidth,
-          backgroundColor:
-            theme.look === "workshop" ? theme.color.cardRaised : theme.dark ? "#1C1C1E" : "#F2F2F7",
-          borderRightWidth: StyleSheet.hairlineWidth,
-          borderRightColor: theme.color.separator,
-        }}
-      >
-        <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
-          <View style={{ paddingHorizontal: 20, paddingBottom: 14, paddingTop: 8 }}>
-            <Txt variant="title1">{props.sidebarTitle}</Txt>
-            {props.sidebarSubtitle ? (
-              <Txt variant="subheadline" tone="label2">
-                {props.sidebarSubtitle}
-              </Txt>
-            ) : null}
-          </View>
-          {props.sections.map((candidate) => (
-            <SidebarRow
-              key={candidate.id}
-              title={candidate.title}
-              symbol={candidate.symbol}
-              selected={opened === null && candidate.id === section.id}
-              badge={candidate.badge}
-              onPress={() => {
-                setOpened(null);
-                setSelected(candidate.id);
-              }}
-            />
-          ))}
-          {props.sidebarItems && props.sidebarItems.length > 0 ? (
-            <View style={{ marginTop: 18 }}>
-              <Txt
-                variant="footnote"
-                tone="label2"
-                style={{ marginHorizontal: 20, marginBottom: 6, textTransform: "uppercase" }}
-              >
-                {props.sidebarItemsTitle ?? "Conversations"}
-              </Txt>
-              {props.sidebarItems.map((item) => (
-                <SidebarRow
-                  key={item.key}
-                  title={item.title}
-                  subtitle={item.subtitle}
-                  symbol={item.symbol}
-                  selected={opened?.key === item.key}
-                  onPress={() => setOpened(item)}
-                />
-              ))}
+      {sidebarVisible ? (
+        <SafeAreaView
+          edges={["top", "bottom", "left"]}
+          style={{
+            width: layout.sidebarWidth,
+            backgroundColor:
+              theme.look === "workshop"
+                ? theme.color.cardRaised
+                : theme.dark
+                  ? "#1C1C1E"
+                  : "#F2F2F7",
+            borderRightWidth: StyleSheet.hairlineWidth,
+            borderRightColor: theme.color.separator,
+          }}
+        >
+          <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 14, paddingTop: 8 }}>
+              <Txt variant="title1">{props.sidebarTitle}</Txt>
+              {props.sidebarSubtitle ? (
+                <Txt variant="subheadline" tone="label2">
+                  {props.sidebarSubtitle}
+                </Txt>
+              ) : null}
             </View>
-          ) : null}
-          {props.sidebarFooter}
-        </ScrollView>
-      </SafeAreaView>
+            {sidebarSections.map((candidate) => (
+              <SidebarRow
+                key={candidate.id}
+                title={candidate.title}
+                symbol={candidate.symbol}
+                selected={opened === null && candidate.id === section.id}
+                badge={candidate.badge}
+                onPress={() => {
+                  setOpened(null);
+                  setSelected(candidate.id);
+                }}
+              />
+            ))}
+            {props.sidebarItems && props.sidebarItems.length > 0 ? (
+              <View style={{ marginTop: 18 }}>
+                <Txt
+                  variant="footnote"
+                  tone="label2"
+                  style={{ marginHorizontal: 20, marginBottom: 6, textTransform: "uppercase" }}
+                >
+                  {props.sidebarItemsTitle ?? "Conversations"}
+                </Txt>
+                {props.sidebarItems.map((item) => (
+                  <SidebarRow
+                    key={item.key}
+                    title={item.title}
+                    subtitle={item.subtitle}
+                    symbol={item.symbol}
+                    selected={opened?.key === item.key}
+                    onPress={() => setOpened(item)}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {props.sidebarFooter}
+          </ScrollView>
+        </SafeAreaView>
+      ) : null}
       <View style={{ flex: 1 }}>
         <SectionStack
           key={contentKey}
           section={section}
           screens={props.screens}
           {...(props.headerRight ? { headerRight: props.headerRight } : {})}
+          onToggleSidebar={toggleSidebar}
           {...(opened ? { initial: opened.open } : {})}
         />
       </View>

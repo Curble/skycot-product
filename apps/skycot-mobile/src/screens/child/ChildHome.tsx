@@ -1,3 +1,4 @@
+// nondev-seam: skycot-ipad-child-makes
 /**
  * A child's Home: the greeting, "What shall we make?" starter cards, Just ask, their own
  * conversations (from every linked Mac, each labelled by its Mac when there are several), and
@@ -227,6 +228,41 @@ export function ChildHome() {
       </Section>
 
       <FridgeTile onSeeAll={() => navigation.navigate("Fridge")} />
+    </Page>
+  );
+}
+
+export function MyMakesScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const child = useChild();
+  const { byMac } = useMacData();
+  const rows = conversationRows(child.macs, byMac, child.questionsRoots);
+  return (
+    <Page>
+      <Section
+        title="My makes"
+        footer={rows.length === 0 ? "When you start a conversation, it shows here." : undefined}
+      >
+        {rows.map((row) => (
+          <Row
+            key={row.key}
+            title={row.thread.title}
+            subtitle={[
+              rowLabel(row, child.macs.length > 1),
+              stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt),
+            ].join(" · ")}
+            leading={<Symbol name="bubble.left.fill" size={22} />}
+            chevron
+            onPress={() =>
+              navigation.navigate("Conversation", {
+                macId: row.mac.macId,
+                threadId: row.thread.id,
+                title: row.thread.title,
+              })
+            }
+          />
+        ))}
+      </Section>
     </Page>
   );
 }

@@ -2,18 +2,10 @@
 // may use (the engine's list for that page, Family profile only) and which ones it tried that
 // still need a yes. The frame's reporter (BLOCKED_REPORTER) names a stopped address; only a
 // message from this frame counts, and only an https site can ever be allowed.
-import { siteOfUrl, MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
+import { reportedSite, MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 import { useEffect, useState, type RefObject } from "react";
 
 import { useFamily } from "../family/FamilyProvider";
-
-/** The site a frame's message names, when it is the reporter's and an https address. */
-export function reportedSite(data: unknown): string | null {
-  if (typeof data !== "object" || data === null) return null;
-  const message = data as Record<string, unknown>;
-  if (message["skycot"] !== "page-internet" || typeof message["url"] !== "string") return null;
-  return message["url"].startsWith("https://") ? siteOfUrl(message["url"]) : null;
-}
 
 export function useSealedInternet(
   page: string | null,

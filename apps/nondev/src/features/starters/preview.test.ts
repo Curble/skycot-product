@@ -210,7 +210,7 @@ describe("offline preview document", () => {
 
   it("blocks the network and allows only inline code and data pictures", () => {
     expect(OFFLINE_POLICY).toContain("default-src 'none'");
-    expect(OFFLINE_POLICY).toContain("connect-src 'none'");
+    expect(OFFLINE_POLICY).toContain("connect-src blob: data:");
     expect(OFFLINE_POLICY).not.toMatch(/https?:|\*/);
   });
 });

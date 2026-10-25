@@ -16,6 +16,8 @@ import { parseRelayLink, type RelayLink } from "@t3tools/skycot-relay/link";
 import { parseMe, type FamilyMe } from "../../../nondev/src/features/family/people";
 import { directTransport, type MacTransport } from "../transport/MacTransport";
 
+// nondev-seam: skycot-mobile-link-failure-copy
+
 /** T3's pairing alphabet: no 0, 1, I or O, so a typed code can't be misread. */
 const CODE_PATTERN = /^[2-9A-HJ-NP-Z]{12}$/u;
 
@@ -70,6 +72,22 @@ export const LINK_COPY: Readonly<Record<LinkProblem, string>> = {
   "wrong-kind":
     "This device is already linked as someone else's kind of device. A child's iPad can't also be a grown-up's phone.",
 };
+
+export type LinkFailureKind = "first-connection" | "later-connection";
+
+/** Copy depends on what the QR offered and whether the first contact reached the Mac. */
+export function linkFailureCopy(target: LinkTarget, failure: LinkFailureKind): string {
+  const homeAddress = target.httpBaseUrl;
+  const loopback =
+    homeAddress !== null && /^(localhost|127\..*|\[?::1\]?)$/u.test(new URL(homeAddress).hostname);
+  if ((homeAddress === null || loopback) && target.relay === null) {
+    return "This Mac isn't set up for phones yet. On the Mac: Settings › Family › Away from home › turn on Reach this Mac from anywhere, then make a new QR code.";
+  }
+  if (failure === "first-connection" && homeAddress !== null && target.relay === null) {
+    return `${LINK_COPY.unreachable} Check that SKYCOT has Local Network permission in iPhone Settings.`;
+  }
+  return LINK_COPY.unreachable;
+}
 
 /** "192.168.1.20:3773" or a full address → "http://192.168.1.20:3773". */
 export function normaliseAddress(address: string): string | null {
@@ -166,16 +184,28 @@ export async function linkToMac(
         options.fetch ? { fetch: options.fetch } : {},
       );
     });
-  const open = ways(null);
-  const call = async (run: (transport: MacTransport) => ReturnType<MacTransport["request"]>) => {
+  const firstFailure = () =>
+    new LinkError("unreachable", linkFailureCopy(target, "first-connection"));
+  let open: MacTransport;
+  try {
+    open = ways(null);
+  } catch {
+    throw firstFailure();
+  }
+  const call = async (
+    run: (transport: MacTransport) => ReturnType<MacTransport["request"]>,
+    first = false,
+  ) => {
     try {
       return await run(open);
     } catch {
-      throw new LinkError("unreachable", LINK_COPY.unreachable);
+      throw first ? firstFailure() : new LinkError("unreachable", LINK_COPY.unreachable);
     }
   };
-  const descriptor = await call((transport) =>
-    transport.request({ method: "GET", path: "/.well-known/t3/environment", signedIn: false }),
+  const descriptor = await call(
+    (transport) =>
+      transport.request({ method: "GET", path: "/.well-known/t3/environment", signedIn: false }),
+    true,
   );
   const described = record(descriptor.json);
   const macId = typeof described.environmentId === "string" ? described.environmentId : null;

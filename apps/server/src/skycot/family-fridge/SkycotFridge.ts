@@ -28,6 +28,8 @@ import { loadThread } from "../family-recap/threads.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import { fridgeItems, type FridgeItem } from "./fridge.ts";
 import { MAX_ASSET_BYTES, selfContainedPage } from "./thumbnail.ts";
+// nondev-seam: skycot-playable-copy
+import { MAX_PLAYABLE_FILE_BYTES, playablePage } from "./playable.ts";
 
 export const FRIDGE_FILE_NAME = "skycot-fridge.json";
 const PINS_KEEP = 500;
@@ -56,6 +58,21 @@ export class SkycotFridge extends Context.Service<
      * the thumbnail frame (./thumbnail.ts). Null when the conversation never made that page.
      */
     readonly page: (input: {
+      readonly threadId: string;
+      readonly page: string;
+    }) => Effect.Effect<string | null>;
+    // nondev-seam: skycot-playable-copy
+    readonly playable: (input: {
+      readonly threadId: string;
+      readonly page: string;
+      readonly sitesForPage: (realPath: string) => Effect.Effect<ReadonlyArray<string> | null>;
+    }) => Effect.Effect<{
+      readonly html: string | null;
+      readonly reason: "too-big" | null;
+      readonly page: string | null;
+    }>;
+    /** Canonical existing page path, only when it resolves inside this thread's project. */
+    readonly pagePath: (input: {
       readonly threadId: string;
       readonly page: string;
     }) => Effect.Effect<string | null>;
@@ -164,7 +181,129 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     );
   });
 
-  return SkycotFridge.of({ list, pin, page });
+  // nondev-seam: skycot-playable-copy
+  const playable: SkycotFridge["Service"]["playable"] = Effect.fn("SkycotFridge.playable")(
+    function* (input) {
+      const thread = yield* loadThread(projections, projects, input.threadId as ThreadId, {
+        messages: false,
+      });
+      if (
+        thread === null ||
+        thread.deleted ||
+        thread.cwd === null ||
+        !/\.html?$/iu.test(input.page)
+      )
+        return { html: null, reason: null, page: null } as const;
+      if (
+        !new Set(thread.checkpoints.map((checkpoint) => pageOf(checkpoint.files))).has(input.page)
+      )
+        return { html: null, reason: null, page: null } as const;
+      const root = yield* fs.realPath(thread.cwd).pipe(Effect.orElseSucceed(() => null));
+      if (root === null) return { html: null, reason: null, page: null } as const;
+      const relativePage = path.isAbsolute(input.page)
+        ? path.relative(root, input.page).split(path.sep).join("/")
+        : input.page;
+      if (
+        !relativePage ||
+        relativePage.split(/[\\/]/u).some((part) => !part || part === ".." || part.startsWith("."))
+      )
+        return { html: null, reason: null, page: null } as const;
+      const realPage = yield* fs
+        .realPath(path.join(root, relativePage))
+        .pipe(Effect.orElseSucceed(() => null));
+      if (realPage === null || (realPage !== root && !realPage.startsWith(`${root}${path.sep}`)))
+        return { html: null, reason: null, page: null } as const;
+      const sites = (yield* input.sitesForPage(realPage)) ?? [];
+      const result = yield* playablePage(
+        relativePage,
+        (relativePath) =>
+          Effect.gen(function* () {
+            if (
+              relativePath
+                .split(/[\\/]/u)
+                .some((part) => !part || part === ".." || part.startsWith("."))
+            )
+              return null;
+            const target = yield* fs.realPath(path.join(root, relativePath));
+            if (target !== root && !target.startsWith(`${root}${path.sep}`)) return null;
+            const resolvedParts = path.relative(root, target).split(path.sep);
+            if (
+              resolvedParts.some(
+                (part) =>
+                  !part ||
+                  part.startsWith(".") ||
+                  /secret|password|credential|\.env|id_rsa|id_ed25519|id_ecdsa|private[_-]?key|\.(?:pem|key)$/iu.test(
+                    part,
+                  ),
+              )
+            )
+              return null;
+            const info = yield* fs.stat(target);
+            if (info.type !== "File" || Number(info.size) > MAX_PLAYABLE_FILE_BYTES) return null;
+            return yield* fs.readFile(target);
+          }).pipe(Effect.orElseSucceed(() => null)),
+        sites,
+      );
+      return { ...result, page: realPage };
+    },
+  );
+
+  const pagePath: SkycotFridge["Service"]["pagePath"] = Effect.fn("SkycotFridge.pagePath")(
+    function* (input) {
+      const thread = yield* loadThread(projections, projects, input.threadId as ThreadId, {
+        messages: false,
+      });
+      if (
+        thread === null ||
+        thread.deleted ||
+        thread.cwd === null ||
+        !/\.html?$/iu.test(input.page)
+      )
+        return null;
+      const pages = new Set(
+        thread.checkpoints
+          .map((checkpoint) => pageOf(checkpoint.files))
+          .filter((page) => page !== null),
+      );
+      const root = yield* fs.realPath(thread.cwd).pipe(Effect.orElseSucceed(() => null));
+      if (root === null) return null;
+      const relative = path.isAbsolute(input.page)
+        ? path.relative(root, input.page).split(path.sep).join("/")
+        : input.page;
+      if (
+        !relative ||
+        relative.split(/[\\/]/u).some((part) => !part || part === ".." || part.startsWith("."))
+      )
+        return null;
+      const real = yield* fs
+        .realPath(path.join(root, relative))
+        .pipe(Effect.orElseSucceed(() => null));
+      if (real === null || (real !== root && !real.startsWith(`${root}${path.sep}`))) return null;
+      let belongsToThread = pages.has(relative);
+      if (!belongsToThread && path.isAbsolute(input.page)) {
+        for (const checkpointPage of pages) {
+          if (
+            checkpointPage
+              .split(/[\\/]/u)
+              .some((part) => !part || part === ".." || part.startsWith("."))
+          )
+            continue;
+          const checkpointReal = yield* fs
+            .realPath(path.join(root, checkpointPage))
+            .pipe(Effect.orElseSucceed(() => null));
+          if (checkpointReal === real) {
+            belongsToThread = true;
+            break;
+          }
+        }
+      }
+      if (!belongsToThread) return null;
+      const info = yield* fs.stat(real).pipe(Effect.orElseSucceed(() => null));
+      return info?.type === "File" ? real : null;
+    },
+  );
+
+  return SkycotFridge.of({ list, pin, page, playable, pagePath });
 });
 
 /** For tests and tools: a fridge file at an explicit path. */

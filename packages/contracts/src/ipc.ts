@@ -1128,6 +1128,8 @@ export interface DesktopBridge {
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
   onQuitShortcut?: (listener: (event: QuitShortcutHintEvent) => void) => () => void;
   getWindowFullscreenState: () => boolean;
+  // nondev-seam: skycot-page-fullscreen-contract
+  setWindowFullscreen?: (fullscreen: boolean) => Promise<void>;
   onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
   /** App window zoom; older desktop shells omit this method. */
   getWindowZoomFactor?: () => number;

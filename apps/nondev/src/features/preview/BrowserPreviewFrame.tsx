@@ -35,6 +35,7 @@ export function BrowserPreviewFrame({
       className="fm-preview__frame"
       title="Your site"
       src={shown.url}
+      allow="fullscreen"
       // oxlint-disable-next-line react/iframe-missing-sandbox -- cross-origin by construction
       sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-pointer-lock"
       referrerPolicy="no-referrer"
