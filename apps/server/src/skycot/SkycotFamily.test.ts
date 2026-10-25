@@ -190,6 +190,56 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
       ),
     );
 
+    it.effect("a parent code settles covered page asks in the same save", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const directory = yield* fs.realPath(path.dirname(filePath));
+          const page = path.join(directory, "dog.html");
+          const otherPage = path.join(directory, "cat.html");
+          yield* fs.writeFileString(page, "<h1>Dogs</h1>");
+          yield* fs.writeFileString(otherPage, "<h1>Cats</h1>");
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          const covered = yield* family.askPageInternet({
+            threadId: "thread-1",
+            childId: "child-1",
+            page,
+            sites: ["dog.ceo"],
+          });
+          const partial = yield* family.askPageInternet({
+            threadId: "thread-2",
+            childId: "child-1",
+            page,
+            sites: ["dog.ceo", "cats.example.com"],
+          });
+          const otherPageAsk = yield* family.askPageInternet({
+            threadId: "thread-3",
+            childId: "child-1",
+            page: otherPage,
+            sites: ["dog.ceo"],
+          });
+
+          assert.equal(
+            (yield* failureOf(
+              family.allowPageInternet({ code: "000000", page, sites: ["dog.ceo"] }),
+            )).reason,
+            "wrong-code",
+          );
+          assert.deepEqual(
+            (yield* family.pendingPageInternetAsks).map((ask) => ask.id),
+            [covered.id, partial.id, otherPageAsk.id],
+          );
+
+          yield* family.allowPageInternet({ code: CODE, page, sites: ["dog.ceo"] });
+          assert.deepEqual(
+            (yield* family.pendingPageInternetAsks).map((ask) => ask.id),
+            [partial.id, otherPageAsk.id],
+          );
+        }),
+      ),
+    );
+
     it.effect("refuses a code that is not 4 to 6 digits, and a second enable", () =>
       withFamily((family) =>
         Effect.gen(function* () {

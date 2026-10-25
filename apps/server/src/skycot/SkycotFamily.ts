@@ -1460,9 +1460,20 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const file = yield* requireEnabled(yield* load);
     const at = yield* now;
     const cleared = yield* attempt(file, input.code, at);
+    const pageInternet = withAllowed(pageInternetOf(cleared), page, sites, at);
+    const allowedSites = sitesForPage(pageInternet, page);
+    const pageInternetAsks = pageInternetAsksOf(cleared).map((ask) =>
+      ask.status === "pending" &&
+      ask.expiresAt > at &&
+      ask.page === page &&
+      ask.sites.every((site) => allowedSites.includes(site))
+        ? { ...ask, status: "allowed" as const }
+        : ask,
+    );
     const next: FamilyFile = {
       ...cleared,
-      pageInternet: withAllowed(pageInternetOf(cleared), page, sites, at),
+      pageInternet,
+      pageInternetAsks,
     };
     yield* save(next);
     yield* Effect.logInfo("skycot-family.page-internet-allowed", { sites });
