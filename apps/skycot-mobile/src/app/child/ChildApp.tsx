@@ -26,7 +26,7 @@ import {
 } from "../screens";
 import { Shell, type ShellScreen, type ShellSection } from "../Shell";
 import { useActivityMirror } from "../../activity/useActivityMirror";
-import { CHILD_SIDEBAR_SECTIONS } from "../sidebarSections";
+import { CHILD_SIDEBAR_SECTIONS, sidebarPersonSubtitle } from "../sidebarSections";
 
 const SECTIONS: ReadonlyArray<ShellSection> = [
   { id: "make", title: "Make", symbol: "sparkles", route: "ChildHome" },
@@ -76,7 +76,7 @@ export function ChildApp() {
         sidebarSections={CHILD_SIDEBAR_SECTIONS}
         screens={SCREENS}
         sidebarTitle="SKYCOT"
-        {...(child.macs[0] ? { sidebarSubtitle: child.macs[0].me.deviceName } : {})}
+        sidebarSubtitle={sidebarPersonSubtitle("child", child.name)}
         headerRight={headerRight}
       />
       {asleep ? <AsleepCover mac={asleep} /> : null}

@@ -36,3 +36,15 @@ export function resolveServerBackedAppDisplayName(input: {
     ? input.fallbackDisplayName
     : formatAppDisplayName({ baseName: input.baseName, stageLabel });
 }
+
+// nondev-seam: brand-advanced-web-title-logic
+export function resolveAdvancedAppDisplayName(input: {
+  readonly baseName: string;
+  readonly fallbackStageLabel: string;
+  readonly primaryServerVersion: string | null | undefined;
+}): string {
+  const stageLabel = resolveServerBackedAppStageLabel(input);
+  const baseName = `${input.baseName} Advanced`;
+  if (["beta", "latest"].includes(stageLabel.trim().toLowerCase())) return baseName;
+  return `${baseName} (${stageLabel})`;
+}

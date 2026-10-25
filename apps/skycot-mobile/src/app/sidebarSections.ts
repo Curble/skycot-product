@@ -20,6 +20,15 @@ export const CHILD_SIDEBAR_SECTIONS: ReadonlyArray<ShellSection> = [
   },
 ];
 
+export function sidebarPersonSubtitle(
+  mode: "child" | "grown-up",
+  name: string | null | undefined,
+): string {
+  const trimmedName = name?.trim();
+  if (mode === "child") return trimmedName?.split(/\s+/u)[0] ?? "Child";
+  return trimmedName || "Grown-up";
+}
+
 export function grownupSidebarSections(requestCount: number): ReadonlyArray<ShellSection> {
   return [
     {

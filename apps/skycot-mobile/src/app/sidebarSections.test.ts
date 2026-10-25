@@ -1,10 +1,21 @@
 // nondev-seam: skycot-ipad-sections-test
 import { describe, expect, it } from "vitest";
 
-import { CHILD_SIDEBAR_SECTIONS, grownupSidebarSections } from "./sidebarSections";
+import {
+  CHILD_SIDEBAR_SECTIONS,
+  grownupSidebarSections,
+  sidebarPersonSubtitle,
+} from "./sidebarSections";
 import { deriveLayout } from "../ui/layoutLogic";
 
 describe("iPad sidebar destinations", () => {
+  it("shows only the signed-in person's name in the sidebar", () => {
+    expect(sidebarPersonSubtitle("child", "Ava Rivera")).toBe("Ava");
+    expect(sidebarPersonSubtitle("child", null)).toBe("Child");
+    expect(sidebarPersonSubtitle("grown-up", "Mum Rivera")).toBe("Mum Rivera");
+    expect(sidebarPersonSubtitle("grown-up", null)).toBe("Grown-up");
+  });
+
   it("uses the compact and regular layout at the width breakpoints", () => {
     expect(deriveLayout({ width: 390, height: 844 }).variant).toBe("compact");
     expect(deriveLayout({ width: 820, height: 1180 }).variant).toBe("split");

@@ -15,7 +15,7 @@ import { Check, Copy } from "lucide";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL, APP_VERSION } from "../branding";
-import { resolveServerBackedAppDisplayName } from "../branding.logic";
+import { resolveAdvancedAppDisplayName } from "../branding.logic";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
@@ -358,9 +358,9 @@ function BrowserChromeThemeSync() {
 function DocumentTitleSync() {
   const primaryServerVersion =
     useAtomValue(primaryServerConfigAtom)?.environment.serverVersion ?? null;
-  const title = resolveServerBackedAppDisplayName({
+  // nondev-seam: brand-advanced-web-title-sync
+  const title = resolveAdvancedAppDisplayName({
     baseName: APP_BASE_NAME,
-    fallbackDisplayName: APP_DISPLAY_NAME,
     fallbackStageLabel: APP_STAGE_LABEL,
     primaryServerVersion,
   });

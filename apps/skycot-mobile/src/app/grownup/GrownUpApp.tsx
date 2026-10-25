@@ -25,7 +25,7 @@ import {
   pageOptions,
 } from "../screens";
 import { Shell, type ShellScreen, type ShellSection } from "../Shell";
-import { grownupSidebarSections } from "../sidebarSections";
+import { grownupSidebarSections, sidebarPersonSubtitle } from "../sidebarSections";
 
 const SCREENS: ReadonlyArray<ShellScreen> = [
   { name: "Requests", component: RequestsScreen },
@@ -72,7 +72,7 @@ export function GrownUpApp() {
       sidebarSections={grownupSidebarSections(count)}
       screens={SCREENS}
       sidebarTitle="SKYCOT"
-      sidebarSubtitle={grownUp.macs[0]?.me.deviceName ?? "A grown-up's device"}
+      sidebarSubtitle={sidebarPersonSubtitle("grown-up", grownUp.name)}
       sidebarItemsTitle="Waiting"
       sidebarItems={grownUp.waiting.slice(0, 12).map((waiting) => ({
         key: `${waiting.mac.macId}:${waiting.request.requestId}`,

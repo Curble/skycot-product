@@ -53,6 +53,17 @@ function syncMacosWindowButtons(window: Electron.BrowserWindow): void {
   });
 }
 
+// nondev-seam: brand-advanced-desktop-window-title
+function resolveAdvancedWindowTitle(branding: {
+  readonly baseName: string;
+  readonly stageLabel: string;
+}) {
+  const baseName = `${branding.baseName} Advanced`;
+  return ["beta", "latest"].includes(branding.stageLabel.trim().toLowerCase())
+    ? baseName
+    : `${baseName} (${branding.stageLabel})`;
+}
+
 const TITLEBAR_COLOR = "#01000000"; // #00000000 does not work correctly on Linux
 const TITLEBAR_LIGHT_SYMBOL_COLOR = "#1f2937";
 const TITLEBAR_DARK_SYMBOL_COLOR = "#f8fafc";
@@ -289,6 +300,7 @@ function bindFirstRevealTrigger(
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
+  const advancedWindowTitle = resolveAdvancedWindowTitle(environment.branding);
   const desktopState = yield* DesktopState.DesktopState;
   const assets = yield* DesktopAssets.DesktopAssets;
   const electronMenu = yield* ElectronMenu.ElectronMenu;
@@ -392,7 +404,7 @@ export const make = Effect.gen(function* () {
       ...(environment.platform === "darwin" ? { disableAutoHideCursor: true } : {}),
       backgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
       ...iconOption,
-      title: environment.displayName,
+      title: advancedWindowTitle,
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),
       webPreferences: {
         preload: environment.preloadPath,
@@ -682,7 +694,7 @@ export const make = Effect.gen(function* () {
 
     window.on("page-title-updated", (event) => {
       event.preventDefault();
-      window.setTitle(environment.displayName);
+      window.setTitle(advancedWindowTitle);
     });
     window.on("resize", scheduleBoundsPersist);
     window.on("move", scheduleBoundsPersist);
@@ -757,7 +769,7 @@ export const make = Effect.gen(function* () {
       }
       clearDevelopmentLoadRetry();
       developmentLoadRetryIndex = 0;
-      window.setTitle(environment.displayName);
+      window.setTitle(advancedWindowTitle);
       if (environment.platform === "darwin") syncMacosWindowButtons(window);
     });
     window.webContents.on(
