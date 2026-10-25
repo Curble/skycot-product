@@ -129,12 +129,9 @@ export function pageServerPolicy(
   ].join("; ");
 }
 
-/** Size-cap fallback for a page too large to inspect; preserves the prior policy except eval. */
+/** Size-cap fallback: own script files still run, but uninspected inline code stays blocked. */
 export function pageServerFallbackPolicy(sites: ReadonlyArray<string>): string {
-  return pageServerPolicy(sites).replace(
-    "script-src 'self'",
-    "script-src 'self' 'unsafe-inline' blob:",
-  );
+  return pageServerPolicy(sites).replace("script-src 'self' ", "script-src 'self'");
 }
 
 /**

@@ -141,8 +141,9 @@ describe("pageServerPolicy", () => {
     }
     expect(open).toContain("form-action 'none'");
     const capped = pageServerFallbackPolicy([]).match(/script-src [^;]*/u)?.[0] ?? "";
-    expect(capped).toContain("'unsafe-inline'");
-    expect(capped).toContain("blob:");
+    expect(capped).toBe("script-src 'self'");
+    expect(capped).not.toContain("'unsafe-inline'");
+    expect(capped).not.toContain("blob:");
     expect(capped).not.toContain("'unsafe-eval'");
   });
 

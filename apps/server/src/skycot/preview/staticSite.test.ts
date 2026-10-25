@@ -5,8 +5,9 @@ import * as NodeCrypto from "node:crypto";
 import * as NodeHttp from "node:http";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
+import * as NodeProcess from "node:process";
 
-import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "@effect/vitest";
 
 import {
   isInside,
@@ -142,6 +143,10 @@ describe("serveStaticSite", () => {
     await write(
       "levels/index.html",
       '<script>window.levelsReady=true</script><button onclick="window.levelsReady=true">Go</button><h1>Levels</h1>',
+    );
+    await write(
+      "large.html",
+      `<script src="/app.mjs"></script><script>window.inlineWasAllowed=true</script>${" ".repeat(2 * 1024 * 1024)}`,
     );
     await write("empty/readme.txt", "no page here");
     await write(".env", "SECRET=1");
@@ -303,5 +308,27 @@ describe("serveStaticSite", () => {
     const other = await serveStaticSite(NodePath.join(dir, "site"));
     await other.close();
     await expect(rawGet(other.port, "/")).rejects.toThrow();
+  });
+
+  it("blocks inline scripts on pages too big to inspect and logs why", async () => {
+    const family = await serveStaticSite(NodePath.join(dir, "site"), {
+      pageSites: async () => [],
+    });
+    const write = vi.spyOn(NodeProcess.stderr, "write").mockImplementation(() => true);
+    try {
+      const response = await rawGet(family.port, "/large.html");
+      const policy = String(response.headers["content-security-policy"]);
+      const scriptPolicy = policy.match(/script-src [^;]*/u)?.[0] ?? "";
+      expect(scriptPolicy).toBe("script-src 'self'");
+      expect(scriptPolicy).not.toContain("'unsafe-inline'");
+      expect(scriptPolicy).not.toContain("'unsafe-eval'");
+      expect(scriptPolicy).not.toContain("blob:");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("it is too big to inspect, so inline scripts are blocked"),
+      );
+    } finally {
+      write.mockRestore();
+      await family.close();
+    }
   });
 });

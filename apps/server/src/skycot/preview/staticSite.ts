@@ -146,7 +146,7 @@ export interface StaticSite {
 const MAX_BLOCKED_PAGES = 20;
 const MAX_BLOCKED_SITES = 8;
 const MAX_REPORT_BYTES = 16 * 1024;
-const MAX_POLICY_PAGE_BYTES = 1_000_000;
+const MAX_POLICY_PAGE_BYTES = 2 * 1024 * 1024;
 
 const inlineHashes = (html: string) => ({
   scripts: [
@@ -322,7 +322,7 @@ export async function serveStaticSite(
       } else {
         if (/\.html?$/iu.test(found.path))
           NodeProcess.stderr.write(
-            `[skycot-preview] HTML page exceeds ${MAX_POLICY_PAGE_BYTES} bytes; using size-cap policy: ${found.path}\n`,
+            `[skycot-preview] HTML page exceeds ${MAX_POLICY_PAGE_BYTES} bytes; it is too big to inspect, so inline scripts are blocked: ${found.path}\n`,
           );
         policy = { "content-security-policy": pageServerFallbackPolicy(sites) };
       }

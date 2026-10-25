@@ -263,7 +263,8 @@ it.layer(NodeServices.layer)("Family profile enforcement", (it) => {
           assert.match(rules, /Never suggest it could be unlocked/);
           assert.match(rules, /at most 3 short sentences/);
           assert.match(rules, /Plans: at most 5 numbered steps/);
-          assert.match(rules, /do not use eval, vm or Function/);
+          assert.match(rules, /do not use eval, vm or new Function/);
+          assert.match(rules, /setTimeout\(fn, ms\), not setTimeout\("code", ms\)/);
           assert.notMatch(rules, /gently say that it needs a grown-up/);
           // Short enough to sit in front of every message.
           assert.isBelow(rules.length, 1800);

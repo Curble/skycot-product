@@ -21,5 +21,9 @@
       var s = document.createElement("script");
       s.textContent = text;
       document.head.append(s);
+      var blob = URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+      var b = document.createElement("script");
+      b.src = blob;
+      document.head.append(b);
     });
 </script>
