@@ -231,7 +231,15 @@ const serveDesktopAsset = Effect.fn("desktop.protocol.serveAsset")(function* (
   }
   const stat = yield* fileSystem.stat(assetPath).pipe(Effect.orElseSucceed(() => null));
   let filePath = assetPath;
-  if (stat?.type !== "File") {
+  // nondev-seam: protocol-folder-index
+  // A folder opens its own page (`/simple/` -> `/simple/index.html`), as a web server would;
+  // otherwise "Back to SKYCOT" fell through to the root page, which is Advanced mode.
+  if (stat?.type === "Directory") {
+    const folderIndex = path.join(assetPath, "index.html");
+    const indexStat = yield* fileSystem.stat(folderIndex).pipe(Effect.orElseSucceed(() => null));
+    if (indexStat?.type === "File") filePath = folderIndex;
+  }
+  if (filePath === assetPath && stat?.type !== "File") {
     const wantsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
     if (path.extname(assetPath) !== "" && !wantsHtml) {
       return new Response(null, { status: 404 });

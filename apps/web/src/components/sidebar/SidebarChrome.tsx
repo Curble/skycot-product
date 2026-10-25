@@ -6,7 +6,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { usePullRequestsSupported } from "../../state/environments";
-import { T3Wordmark } from "../T3Wordmark";
+import { SkycotBackMark, T3Wordmark } from "../T3Wordmark";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -117,15 +117,19 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
 
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-      <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
-      <span
-        className={cn(
-          "truncate [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1",
-          onBackdrop ? "text-white/70" : "text-muted-foreground",
-        )}
-      >
-        Code
+    // nondev-seam: brand-advanced-mark
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight">
+      <T3Wordmark aria-hidden className="h-5 w-auto shrink-0" />
+      <span className="flex min-w-0 flex-col leading-none">
+        <span className="truncate">SKYCOT</span>
+        <span
+          className={cn(
+            "truncate text-[10px] font-medium uppercase tracking-wide",
+            onBackdrop ? "text-white/70" : "text-muted-foreground",
+          )}
+        >
+          Advanced
+        </span>
       </span>
     </span>
   );
@@ -224,9 +228,18 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           {/* nondev-seam: web-back-to-skycot — the simple client at /simple/ writes this key, so the link appears only where it exists */}
           {window.localStorage.getItem("skycot:uiMode") !== null ? (
             <SidebarUtilityItem
-              icon={<ArrowLeftIcon />}
+              icon={<SkycotBackMark className="size-5" />}
               label="Back to SKYCOT"
-              onClick={() => window.location.assign("/simple/")}
+              onClick={() => {
+                // Remember the choice (going in recorded "advanced"), then open the plain view's
+                // own page, which every host serves (the Mac app's protocol and the server).
+                try {
+                  window.localStorage.setItem("skycot:uiMode", "simple");
+                } catch {
+                  // Storage blocked: nothing to remember.
+                }
+                window.location.assign("/simple/index.html");
+              }}
             />
           ) : null}
         </>
