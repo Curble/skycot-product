@@ -83,7 +83,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   {greetingForHour(new Date().getHours())}
                   {family.enabled && grownUpName
                     ? `, ${grownUpName}`
-                    : family.enabled && family.profile.childName
+                    : family.enabled && grownUpId === null && family.profile.childName
                       ? `, ${family.profile.childName}`
                       : ""}
                   .

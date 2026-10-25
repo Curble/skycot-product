@@ -72,4 +72,18 @@ describe("Sidebar identity in the child view", () => {
     );
     expect(html).toContain("Grown-up");
   });
+
+  it("shows the grown-up's own name while they are using the family's Mac", () => {
+    const html = renderToStaticMarkup(
+      <SidebarIdentity
+        familyOn
+        childView={false}
+        child={null}
+        grownUp={{ name: "Mum", avatar: { kind: "character", id: "cat" } }}
+        onSwitch={vi.fn()}
+      />,
+    );
+    expect(html).toContain("Mum");
+    expect(html).not.toContain("Grown-up");
+  });
 });

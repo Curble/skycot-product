@@ -182,11 +182,15 @@ export function onParentYes(listener: (purpose: FamilyPurpose) => void): () => v
   };
 }
 
-/** One code try for a grown-up's "yes"; the engine records the grant for this device. */
+/**
+ * One code try for a grown-up's "yes"; the engine records the grant for this device. `quiet`
+ * skips the "a grown-up is back" listeners (first-run setup: the grown-up never left).
+ */
 export function tryParentCode(
   code: string,
   purpose: FamilyPurpose,
   requestId?: string,
+  options?: { readonly quiet?: boolean },
 ): Promise<FamilyResult<UnlockToken>> {
   return settle(
     familyApi.verify({ code, purpose, ...(requestId === undefined ? {} : { requestId }) }),
@@ -194,6 +198,7 @@ export function tryParentCode(
       setView({ ...view, attemptsLeft: 5, lockedUntil: null });
       // The engine says how long the new "yes" lasts.
       void refreshFamily();
+      if (options?.quiet) return;
       for (const listener of parentYesListeners) listener(purpose);
     },
   );

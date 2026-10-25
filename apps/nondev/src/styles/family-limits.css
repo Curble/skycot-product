@@ -680,3 +680,7 @@ html[data-flavour-labels="handwritten"] .fm-picture-step__name,
 html[data-flavour-labels="handwritten"] .fm-picture-step__title {
   font-family: var(--fm-font-label);
 }
+.fm-picture-step__name-field {
+  max-width: 280px;
+  margin-bottom: 12px;
+}

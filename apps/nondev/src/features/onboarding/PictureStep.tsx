@@ -9,29 +9,50 @@ import type { ChildAvatar as Avatar } from "../family/children";
 import type { FamilyResult } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { updateChild, updateGrownUp } from "../family/store";
+import { TextField } from "../../ui/TextField";
 
 function PictureRow({
   title,
   name,
   avatar,
   onPick,
+  onName,
 }: {
   readonly title: string;
   readonly name: string;
   readonly avatar: Avatar;
   readonly onPick: (avatar: Avatar) => void;
+  /** The grown-up's own row: a box for what the family calls them ("Mum", "Dad", "Nan"). */
+  readonly onName?: (name: string) => void;
 }) {
+  const [draftName, setDraftName] = useState(onName ? "" : name);
+  const shownName = onName ? draftName.trim() || name : name;
   return (
     <section className="fm-picture-step__row" aria-label={title}>
       <div className="fm-picture-step__tag" aria-hidden>
         <span className="fm-picker__tag-hello">
           HELLO <small>my name is</small>
         </span>
-        <ChildAvatar child={{ avatar, name }} size={88} />
-        <span className="fm-picture-step__name">{name}</span>
+        <ChildAvatar child={{ avatar, name: shownName }} size={88} />
+        <span className="fm-picture-step__name">{shownName}</span>
       </div>
       <div>
         <h3 className="fm-picture-step__title">{title}</h3>
+        {onName ? (
+          <div className="fm-picture-step__name-field">
+            <TextField
+              label="What does the family call you?"
+              placeholder="Mum, Dad, Nan…"
+              autoComplete="off"
+              maxLength={40}
+              value={draftName}
+              onChange={(event) => setDraftName(event.currentTarget.value)}
+              onBlur={() => {
+                if (draftName.trim() !== "") onName(draftName.trim());
+              }}
+            />
+          </div>
+        ) : null}
         <div className="fm-picture-step__grid" role="radiogroup" aria-label={title}>
           {AVATAR_CHARACTERS.map((id) => {
             const chosen = avatar.kind === "character" && avatar.id === id;
@@ -66,10 +87,7 @@ export function PictureStep() {
   };
   return (
     <div className="fm-picture-step">
-      <p className="fm-help">
-        This is the picture each person taps when SKYCOT asks "Who's using SKYCOT?". Change it any
-        time in Settings › Family.
-      </p>
+      <p className="fm-help">Change these any time in Settings › Family.</p>
       {child ? (
         <PictureRow
           title={`${child.name ?? "Your child"}'s picture`}
@@ -84,6 +102,7 @@ export function PictureStep() {
           name={grownUp.name ?? "Grown-up"}
           avatar={grownUp.avatar}
           onPick={(avatar) => void save(updateGrownUp(grownUp.id, { avatar }))}
+          onName={(name) => void save(updateGrownUp(grownUp.id, { name }))}
         />
       ) : null}
       {problem ? (

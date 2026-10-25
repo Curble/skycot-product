@@ -40,6 +40,15 @@ function rememberPicked() {
   }
 }
 
+/**
+ * The grown-up who just turned the Family profile on in first-run setup is the one using this
+ * window: "Who's using SKYCOT?" waits until they finish (Done in the grown-up bar brings it).
+ */
+export function markPickedThisWindow() {
+  rememberPicked();
+  window.dispatchEvent(new Event("skycot:family-picked"));
+}
+
 const pickerListeners = new Set<() => void>();
 let pickerRequested = false;
 
@@ -85,6 +94,11 @@ export function FamilyLimitsHost() {
   const view = family.profile;
   const requested = usePickerRequested();
   const [picked, setPicked] = useState(pickedThisWindow);
+  useEffect(() => {
+    const onPicked = () => setPicked(true);
+    window.addEventListener("skycot:family-picked", onPicked);
+    return () => window.removeEventListener("skycot:family-picked", onPicked);
+  }, []);
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const engineKnown = view.source === "engine" && view.enabled;
   // A grown-up's time on the shared Mac ended (their code's grant lapsed): back to the picker.
@@ -155,7 +169,13 @@ export function FamilyLimitsHost() {
   if (!engineKnown) return null;
   return (
     <>
-      <LimitsCover now={now} requested={requested} picked={picked} setPicked={setPicked} />
+      <LimitsCover
+        now={now}
+        requested={requested}
+        picked={picked}
+        setPicked={setPicked}
+        grownUpActive={grownUpActive}
+      />
       <SessionRecapHost />
     </>
   );
@@ -166,7 +186,9 @@ function LimitsCover({
   requested,
   picked,
   setPicked,
+  grownUpActive,
 }: {
+  readonly grownUpActive: boolean;
   readonly now: number;
   readonly requested: boolean;
   readonly picked: boolean;
@@ -180,7 +202,8 @@ function LimitsCover({
   // Only the family's Mac asks "Who's using SKYCOT?": a child's own device is always that
   // child, and a grown-up's device is nobody's child (the engine says which, never this tab).
   const shared = view.me.kind === "shared";
-  if (shared && (requested || view.needsChoice || (several && !picked))) {
+  // A grown-up using the Mac (after their code) is not asked again until Switch or Done.
+  if (shared && (requested || (!grownUpActive && (view.needsChoice || (several && !picked))))) {
     return (
       <ChildPicker
         dismissible={requested && !view.needsChoice}

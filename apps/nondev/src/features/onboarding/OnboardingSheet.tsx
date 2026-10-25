@@ -54,7 +54,9 @@ import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/
 import { useFamily } from "../family/FamilyProvider";
 import { familyAgeTermsNote } from "../family/assistantAllowance";
 import { FamilySetupForm } from "../family/FamilySetupForm";
-import { tryParentCode } from "../family/store";
+import { startGrownUpSession } from "../family/grownUpSession";
+import { readFamilyView, tryParentCode } from "../family/store";
+import { markPickedThisWindow } from "../family-limits/FamilyLimitsHost";
 import { PictureStep } from "./PictureStep";
 import { canContinue, onboardingSteps, type Audience, type OnboardingStep } from "./onboarding";
 import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
@@ -159,6 +161,8 @@ export function OnboardingSheet({
     if (step === "family" && childPath && !family.enabled) {
       setFinishing(true);
       setProblem(null);
+      // The grown-up setting this up is the one using SKYCOT, so "Who's using SKYCOT?" waits.
+      markPickedThisWindow();
       const failure = await enableFamily({ childName: draft.childName, code: draft.code });
       setFinishing(false);
       if (failure !== null) {
@@ -167,8 +171,10 @@ export function OnboardingSheet({
       }
       setSkipWarning(false);
       // The code just set opens the grown-up settings here, so the pictures save without asking
-      // for it a second time.
-      await tryParentCode(draft.code, "settings");
+      // for it a second time, and this window is theirs until Done in the grown-up bar.
+      const opened = await tryParentCode(draft.code, "settings", undefined, { quiet: true });
+      const grownUp = readFamilyView().grownUps[0];
+      if (opened.ok && grownUp !== undefined) startGrownUpSession(grownUp.id);
       setStep("picture");
       return;
     }

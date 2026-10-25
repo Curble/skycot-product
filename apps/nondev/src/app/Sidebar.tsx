@@ -50,6 +50,7 @@ import { currentChild } from "../features/family/family";
 import { ChildAvatar } from "../features/family/ChildAvatar";
 import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
 import type { FamilyChild } from "../features/family/children";
+import { grownUpSessionFor, useGrownUpSessionId } from "../features/family/grownUpSession";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
@@ -107,6 +108,12 @@ export function AppSidebar({
   const primaryEnvironmentId: EnvironmentId | undefined = environmentIds[0];
   // The Mac's own name ("MamaBear") is not a person, and a child should never see it.
   const child = currentChild(family.profile);
+  // The grown-up using the family's Mac (after their code): their own picture and name below.
+  const grownUpId = grownUpSessionFor(useGrownUpSessionId(), family.profile, Date.now());
+  const grownUp =
+    grownUpId === null
+      ? null
+      : (family.profile.grownUps.find((person) => person.id === grownUpId) ?? null);
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
 
@@ -444,6 +451,7 @@ export function AppSidebar({
             familyOn={family.enabled}
             childView={childView}
             child={child}
+            grownUp={grownUp}
             onSwitch={openChildPicker}
           />
           {childView ? (
@@ -544,11 +552,13 @@ export function SidebarIdentity({
   familyOn,
   childView,
   child,
+  grownUp = null,
   onSwitch,
 }: {
   readonly familyOn: boolean;
   readonly childView: boolean;
   readonly child: FamilyChild | null;
+  readonly grownUp?: Pick<FamilyChild, "avatar" | "name"> | null;
   readonly onSwitch: () => void;
 }) {
   const label = sidebarPersonLabel(familyOn);
@@ -557,10 +567,12 @@ export function SidebarIdentity({
       <span className="fm-sidebar__me">
         {childView && child ? (
           <ChildAvatar child={child} size={24} />
+        ) : grownUp ? (
+          <ChildAvatar child={grownUp} size={24} />
         ) : (
           <Avatar kind="person" value={label} size="sm" label={label} />
         )}
-        <b>{childView ? (child?.name ?? "You") : label}</b>
+        <b>{childView ? (child?.name ?? "You") : (grownUp?.name ?? label)}</b>
       </span>
       {childView ? (
         <Button size="sm" variant="quiet" onClick={onSwitch}>
