@@ -14,6 +14,11 @@ import { readFamilyView, saveOwnLook } from "../family/store";
 import { SessionRecapHost } from "../recap/SessionRecap";
 import { AsleepScreen } from "./AsleepScreen";
 import { ChildPicker } from "./ChildPicker";
+import {
+  endGrownUpSession,
+  grownUpSessionFor,
+  useGrownUpSessionId,
+} from "../family/grownUpSession";
 import { pickerAfterIdle, PICKER_IDLE_MS } from "./idlePicker";
 import { startLimitsClock, useLimits } from "./store";
 
@@ -82,6 +87,14 @@ export function FamilyLimitsHost() {
   const [picked, setPicked] = useState(pickedThisWindow);
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const engineKnown = view.source === "engine" && view.enabled;
+  // A grown-up's time on the shared Mac ended (their code's grant lapsed): back to the picker.
+  const grownUpId = useGrownUpSessionId();
+  const grownUpActive = grownUpSessionFor(grownUpId, view, now) !== null;
+  useEffect(() => {
+    if (grownUpId === null || grownUpActive) return;
+    endGrownUpSession();
+    openChildPicker();
+  }, [grownUpId, grownUpActive]);
 
   useEffect(() => {
     if (!engineKnown || view.me.kind !== "shared" || view.children.length < 2) return;
@@ -154,7 +167,8 @@ function LimitsCover({
   const view = useFamily().profile;
   const { session } = useLimits();
   const child = currentChild(view);
-  const several = view.children.length > 1;
+  // Everyone in the family picks their own picture: children, and grown-ups (with the code).
+  const several = view.children.length + view.grownUps.length > 1;
   // Only the family's Mac asks "Who's using SKYCOT?": a child's own device is always that
   // child, and a grown-up's device is nobody's child (the engine says which, never this tab).
   const shared = view.me.kind === "shared";

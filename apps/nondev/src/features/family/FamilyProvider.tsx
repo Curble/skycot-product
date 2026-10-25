@@ -16,6 +16,8 @@ import {
 
 import { Button } from "../../ui/Button";
 import { HOME_HREF, navigate } from "../../router";
+import { openChildPicker } from "../family-limits/FamilyLimitsHost";
+import { endGrownUpSession } from "./grownUpSession";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
 import { actionReason, familySteps } from "./copy";
@@ -175,6 +177,9 @@ function GrownUpModeBar({ view }: { readonly view: FamilyView }) {
         size="sm"
         onClick={() => {
           void lockFamilyGrants();
+          // A grown-up who picked themselves on the shared Mac hands it back to the picker.
+          endGrownUpSession();
+          openChildPicker();
           navigate(HOME_HREF);
         }}
       >

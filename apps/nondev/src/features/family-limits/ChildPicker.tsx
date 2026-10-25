@@ -10,6 +10,8 @@ import { Mascot } from "../brand/Mascot";
 import { useModal } from "../../ui/useModal";
 import { ChildAvatar } from "../family/ChildAvatar";
 import { childLabel } from "../family/children";
+import { startGrownUpSession } from "../family/grownUpSession";
+import { grownUpLabel } from "../family/people";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { tryParentCode, useFamilyView } from "../family/store";
 import { chooseChild } from "./store";
@@ -29,6 +31,10 @@ export function ChildPicker({
     null,
   );
   const [problem, setProblem] = useState<string | null>(null);
+  /** A grown-up's tile was tapped: their code first, then the grown-up view. */
+  const [grownUp, setGrownUp] = useState<{ readonly id: string; readonly name: string } | null>(
+    null,
+  );
   useModal(ref, {
     open: true,
     onClose: dismissible ? onDone : () => undefined,
@@ -51,6 +57,12 @@ export function ChildPicker({
   const entry = useParentCodeEntry(
     (code) => tryParentCode(code, "settings"),
     () => {
+      if (grownUp) {
+        startGrownUpSession(grownUp.id);
+        setGrownUp(null);
+        onDone();
+        return;
+      }
       if (needsGrownUp) void choose(needsGrownUp.childId);
       setNeedsGrownUp(null);
     },
@@ -70,12 +82,22 @@ export function ChildPicker({
         <h1 id="fm-picker-title" className="fm-picker__title">
           <span className="fm-marker-underline">Who's using SKYCOT?</span>
         </h1>
-        {needsGrownUp ? (
+        {needsGrownUp || grownUp ? (
           <div className="fm-picker__grownup" data-sober="">
-            <p className="fm-picker__lead">{needsGrownUp.sentence}</p>
+            <p className="fm-picker__lead">
+              {grownUp
+                ? `Hi ${grownUp.name}! Enter the parent code to check it's you.`
+                : needsGrownUp?.sentence}
+            </p>
             <ParentCodeEntry entry={entry} autoFocus />
             <div className="fm-picker__actions">
-              <Button onClick={() => setNeedsGrownUp(null)} disabled={entry.busy}>
+              <Button
+                onClick={() => {
+                  setNeedsGrownUp(null);
+                  setGrownUp(null);
+                }}
+                disabled={entry.busy}
+              >
                 Back
               </Button>
               <Button
@@ -83,13 +105,13 @@ export function ChildPicker({
                 disabled={!entry.canSubmit}
                 onClick={() => void entry.submit()}
               >
-                {entry.busy ? "Checking…" : "Switch"}
+                {entry.busy ? "Checking…" : grownUp ? "Open" : "Switch"}
               </Button>
             </div>
           </div>
         ) : (
           <>
-            <p className="fm-picker__lead">Tap your picture.</p>
+            <p className="fm-picker__lead">Hi! Who's making today? Tap your picture.</p>
             <ul className="fm-picker__grid">
               {view.children.map((child, index) => (
                 <li key={child.id}>
@@ -103,6 +125,22 @@ export function ChildPicker({
                     <ChildAvatar child={child} size={112} />
                     <span className="fm-picker__name">{childLabel(child, index)}</span>
                     {busy === child.id ? <span className="fm-picker__hint">Opening…</span> : null}
+                  </button>
+                </li>
+              ))}
+              {view.grownUps.map((person, index) => (
+                <li key={person.id}>
+                  <button
+                    type="button"
+                    className="fm-picker__tile fm-picker__tile--grown-up"
+                    disabled={busy !== null}
+                    onClick={() => setGrownUp({ id: person.id, name: grownUpLabel(person, index) })}
+                  >
+                    <ChildAvatar child={person} size={112} />
+                    <span className="fm-picker__name">{grownUpLabel(person, index)}</span>
+                    <span className="fm-picker__stamp" aria-label="Grown-up, needs the parent code">
+                      Grown-up
+                    </span>
                   </button>
                 </li>
               ))}
