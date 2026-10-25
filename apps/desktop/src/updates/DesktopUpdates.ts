@@ -51,7 +51,8 @@ import {
 } from "./updateMachine.ts";
 
 const AUTO_UPDATE_STARTUP_DELAY = "15 seconds";
-const AUTO_UPDATE_POLL_INTERVAL = "4 minutes";
+const AUTO_UPDATE_POLL_INTERVAL = "4 hours"; // nondev-seam: skycot-update-poll-interval
+const AUTO_UPDATE_FAILURE_RETRY_INTERVAL = "15 minutes";
 const PREPARED_INSTALL_CHECK_WAIT = Duration.seconds(90);
 
 type UpdateAction = "check" | "download" | "install" | "install-recovery" | "channel";
@@ -821,7 +822,7 @@ export const make = Effect.gen(function* () {
   });
 
   const startUpdatePollers: Effect.Effect<void, never, Scope.Scope> = Effect.gen(function* () {
-    yield* Effect.sleep(AUTO_UPDATE_STARTUP_DELAY).pipe(
+    const startupCheck = Effect.sleep(AUTO_UPDATE_STARTUP_DELAY).pipe(
       Effect.andThen(checkForUpdates("startup")),
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
@@ -834,11 +835,22 @@ export const make = Effect.gen(function* () {
           poller: error.poller,
         });
       }),
-      Effect.forkScoped,
     );
-    yield* Effect.sleep(AUTO_UPDATE_POLL_INTERVAL).pipe(
-      Effect.andThen(checkForUpdates("poll")),
-      Effect.forever,
+
+    yield* Effect.gen(function* () {
+      yield* startupCheck;
+      return yield* Effect.forever(
+        Effect.gen(function* () {
+          const state = yield* Ref.get(updateStateRef);
+          yield* Effect.sleep(
+            state.status === "error"
+              ? AUTO_UPDATE_FAILURE_RETRY_INTERVAL
+              : AUTO_UPDATE_POLL_INTERVAL,
+          );
+          yield* checkForUpdates("poll");
+        }),
+      );
+    }).pipe(
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
           return Effect.void;

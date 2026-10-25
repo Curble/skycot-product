@@ -1,7 +1,9 @@
+// nondev-seam: skycot-update-poll-interval-test
 import { assert, describe, it } from "@effect/vitest";
 import { DESKTOP_UPDATE_RESTART_MARKER_FILE } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -21,6 +23,44 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
 import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
 
 describe("DesktopUpdates", () => {
+  it.effect("keeps the startup check and backs off failed checks before the four-hour poll", () => {
+    const updaterError = new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({
+      channel: null,
+      cause: new Error("request failed"),
+    });
+    const harness = makeHarness({
+      checkForUpdates: (attempt) => (attempt === 1 ? Effect.fail(updaterError) : Effect.void),
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        yield* TestClock.adjust(Duration.seconds(15));
+        yield* flushCallbacks;
+        assert.equal(harness.checkCount(), 1);
+        assert.equal((yield* updates.getState).status, "error");
+
+        yield* TestClock.adjust(Duration.millis(15 * 60_000 - 1));
+        yield* flushCallbacks;
+        assert.equal(harness.checkCount(), 1);
+
+        yield* TestClock.adjust(Duration.millis(1));
+        yield* flushCallbacks;
+        assert.equal(harness.checkCount(), 2);
+
+        yield* TestClock.adjust(Duration.millis(4 * 60 * 60_000 - 1));
+        yield* flushCallbacks;
+        assert.equal(harness.checkCount(), 2);
+
+        yield* TestClock.adjust(Duration.millis(1));
+        yield* flushCallbacks;
+        assert.equal(harness.checkCount(), 3);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
   it.effect("updates Linux .deb installs and leaves other non-AppImage installs off", () =>
     Effect.gen(function* () {
       const linuxState = (packageType: string | undefined) =>

@@ -4,6 +4,9 @@ How SKYCOT gets new versions of itself, why it can never pick up T3 Code's, and 
 the Mac feed on once there is a signed public download. (Updating an AI service's program is a
 separate item, BACKLOG #13.)
 
+The desktop app checks 15 seconds after startup, then every four hours. A failed check retries
+after 15 minutes. Manual checks remain available from Settings → About.
+
 ## What people see
 
 - **Settings → About → Updates** says where things stand, in plain words:

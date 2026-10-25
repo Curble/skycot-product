@@ -1,3 +1,4 @@
+// nondev-seam: skycot-update-poll-interval-harness
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { DesktopUpdateState } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
@@ -18,10 +19,11 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
 export const flushCallbacks = Effect.yieldNow;
 
 export interface UpdatesHarnessOptions {
-  readonly checkForUpdates?: Effect.Effect<
-    void,
-    ElectronUpdater.ElectronUpdaterCheckForUpdatesError
-  >;
+  readonly checkForUpdates?:
+    | Effect.Effect<void, ElectronUpdater.ElectronUpdaterCheckForUpdatesError>
+    | ((
+        attempt: number,
+      ) => Effect.Effect<void, ElectronUpdater.ElectronUpdaterCheckForUpdatesError>);
   readonly beforeSetUpdateChannel?: Effect.Effect<void>;
   readonly setUpdateChannelError?: DesktopAppSettings.DesktopSettingsWriteError;
   readonly setDisableDifferentialDownload?: Effect.Effect<void>;
@@ -86,7 +88,15 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     setDisableDifferentialDownload: () => options.setDisableDifferentialDownload ?? Effect.void,
     checkForUpdates: Effect.sync(() => {
       checkCount += 1;
-    }).pipe(Effect.andThen(options.checkForUpdates ?? Effect.void)),
+    }).pipe(
+      Effect.andThen(
+        Effect.suspend(() =>
+          typeof options.checkForUpdates === "function"
+            ? options.checkForUpdates(checkCount)
+            : (options.checkForUpdates ?? Effect.void),
+        ),
+      ),
+    ),
     downloadUpdate: Effect.sync(() => {
       downloadCount += 1;
     }).pipe(Effect.andThen(options.downloadUpdate ?? Effect.void)),

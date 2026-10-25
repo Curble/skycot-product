@@ -1,3 +1,4 @@
+// nondev-seam: skycot-update-poll-race-comment
 import type { DesktopUpdateRemoteOutcome, DesktopUpdateState } from "@t3tools/contracts";
 
 export type RemoteDesktopUpdateStep =
@@ -14,7 +15,7 @@ export type RemoteDesktopUpdateStep =
 /**
  * The caps are what stop a check -> up-to-date -> check loop and endless
  * download retries; they are counts rather than booleans because a state event
- * raced by the local 4-minute poller can re-show an already-handled status
+ * raced by the local periodic poller can re-show an already-handled status
  * once.
  */
 export interface RemoteDesktopUpdateAttempts {
