@@ -2,6 +2,7 @@
 // Object (room.ts) and answers a health check. There are no accounts, no database and no stored
 // messages; the only thing a home's object keeps on disk is which removed devices to refuse,
 // until their passes would have run out anyway. See docs/nondev/RELAY.md.
+// nondev-seam: skycot-relay-daily-counts
 
 import { HOME_ID_PATTERN } from "@t3tools/skycot-relay/pass";
 import { RELAY_PROTOCOL_VERSION } from "@t3tools/skycot-relay/protocol";
@@ -16,6 +17,49 @@ export interface Env extends PushEnv {
   /** "1" only on a local test relay: logs every forwarded frame to prove it is unreadable. */
   readonly RELAY_DEBUG_FRAMES?: string;
   readonly ASSETS?: Fetcher;
+  readonly DAILY_SALT_SECRET?: string;
+  readonly SKYCOT_COUNTS?: AnalyticsEngineDataset;
+}
+
+const countedThisHour = new Set<string>();
+let activeCountHour = "";
+
+async function dailyId(secret: string, date: string, identity: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`${secret}${date}`),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(identity)),
+  );
+  return Array.from(digest.slice(0, 8), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function recordCount(
+  env: Env,
+  event: "relay-home" | "relay-device",
+  identity: string,
+): Promise<void> {
+  try {
+    if (!env.DAILY_SALT_SECRET || !env.SKYCOT_COUNTS) return;
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const hour = now.toISOString().slice(0, 13);
+    if (activeCountHour !== hour) {
+      countedThisHour.clear();
+      activeCountHour = hour;
+    }
+    const id = await dailyId(env.DAILY_SALT_SECRET, date, identity);
+    const dedupeKey = `${event}:${id}:${hour}`;
+    if (countedThisHour.has(dedupeKey)) return;
+    countedThisHour.add(dedupeKey);
+    env.SKYCOT_COUNTS.writeDataPoint({ indexes: [id], blobs: [event], doubles: [1] });
+  } catch {
+    // Totals are optional; never make a family connection depend on analytics.
+  }
 }
 
 const ROUTE = /^\/v1\/homes\/([a-z2-7]{32})\/(host|device)$/;
@@ -64,6 +108,9 @@ export class HomeRoom implements DurableObject {
         storage: ctx.storage,
         now: () => Date.now(),
         log: (event, fields) => console.log(JSON.stringify({ event, ...fields })),
+        count: (event, identity) => {
+          ctx.waitUntil(recordCount(env, event, identity));
+        },
         debugFrames: env.RELAY_DEBUG_FRAMES === "1",
       },
       env,

@@ -6,6 +6,7 @@
 // What the room does with a frame from a device: checks the device was admitted with a valid
 // pass, checks the rate limits, and hands the sealed bytes to the Mac with the device's
 // connection id in front. It never opens them, and keeps nothing once they are passed on.
+// nondev-seam: skycot-relay-daily-counts-room
 
 import {
   parseJsonObject,
@@ -63,6 +64,8 @@ export interface RoomHost {
   readonly storage: RoomStorage;
   now(): number;
   log(event: string, fields: Record<string, unknown>): void;
+  /** Fire-and-forget daily totals; the caller must fail open and never log identities. */
+  count(event: "relay-home" | "relay-device", identity: string): void;
   /** Local debugging only: every forwarded frame, to show it was never readable. */
   readonly debugFrames: boolean;
 }
@@ -100,6 +103,14 @@ const safeSend = (socket: RoomSocket, data: string | Uint8Array) => {
     socket.send(data);
   } catch {
     // The socket went away; its close event tidies up.
+  }
+};
+
+const safeCount = (host: RoomHost, event: "relay-home" | "relay-device", identity: string) => {
+  try {
+    host.count(event, identity);
+  } catch {
+    // Optional totals never decide whether a family can connect.
   }
 };
 
@@ -261,7 +272,7 @@ export class Room {
         signature: hello["signature"],
       });
     if (!ok) {
-      this.host.log("host-refused", { home: tag(attachment.homeId) });
+      this.host.log("host-refused", {});
       safeClose(socket, CloseCode.unauthorized, "This is not the home's Mac.");
       return;
     }
@@ -281,6 +292,7 @@ export class Room {
       homeId: attachment.homeId,
       at: this.host.now(),
     } satisfies Attachment);
+    safeCount(this.host, "relay-home", attachment.homeId);
     safeSend(socket, JSON.stringify({ t: "ready" }));
     const devices = this.devices();
     for (const device of devices) {
@@ -288,7 +300,7 @@ export class Room {
     }
     for (const device of devices)
       safeSend(device.socket, JSON.stringify({ t: "status", mac: true }));
-    this.host.log("host-ready", { home: tag(attachment.homeId), devices: devices.length });
+    this.host.log("host-ready", { devices: devices.length });
   }
 
   private async deviceHello(
@@ -310,13 +322,13 @@ export class Room {
           })
         : null;
     if (pass === null) {
-      this.host.log("device-refused", { home: tag(attachment.homeId), why: "pass" });
+      this.host.log("device-refused", { why: "pass" });
       safeClose(socket, CloseCode.unauthorized, "This device's relay pass is not valid.");
       return;
     }
     const revokedUntil = (await this.revocations())[pass.deviceRelayId];
     if (revokedUntil !== undefined && revokedUntil > this.host.now() / 1000) {
-      this.host.log("device-refused", { home: tag(attachment.homeId), why: "revoked" });
+      this.host.log("device-refused", { why: "revoked" });
       safeClose(socket, CloseCode.revoked, "This device was removed on the Mac.");
       return;
     }
@@ -337,10 +349,11 @@ export class Room {
       connectionId,
       deviceRelayId: pass.deviceRelayId,
     } satisfies Attachment);
+    safeCount(this.host, "relay-device", pass.deviceRelayId);
     const host = this.hostSocket();
     if (host !== null) safeSend(host, openFrame(connectionId, pass.deviceRelayId));
     safeSend(socket, JSON.stringify({ t: "status", mac: host !== null }));
-    this.host.log("device-admitted", { home: tag(attachment.homeId), mac: host !== null });
+    this.host.log("device-admitted", { mac: host !== null });
   }
 
   private fromDevice(
@@ -354,7 +367,7 @@ export class Room {
       !this.deviceBytes.take(attachment.deviceRelayId, now, bytes.length) ||
       !this.homeFrames.take(now)
     ) {
-      this.host.log("rate-limited", { home: tag(attachment.homeId), what: "frames" });
+      this.host.log("rate-limited", { what: "frames" });
       retire(socket, CloseCode.rateLimited, "Too many messages; slow down.");
       this.notifyHostClosed(attachment.connectionId);
       return;
@@ -432,7 +445,7 @@ export class Room {
           this.notifyHostClosed(device.attachment.connectionId);
         }
       }
-      this.host.log("device-revoked", { home: tag(attachment.homeId) });
+      this.host.log("device-revoked", {});
       return;
     }
     if (message["t"] === "push") {
@@ -467,7 +480,7 @@ export class Room {
         sealed: typeof sealed === "string" ? sealed : null,
         nowSeconds: Math.floor(now / 1000),
       });
-      this.host.log("push", { home: tag(attachment.homeId), kind, ok: outcome.ok });
+      this.host.log("push", { kind, ok: outcome.ok });
       return outcome.ok ? reply(true) : reply(false, outcome.reason);
     }
   }
@@ -516,7 +529,7 @@ export class Room {
     if (attachment.role === "host") {
       if (this.hostSocket() !== null && this.hostSocket() !== socket) return;
       this.endDeviceConnections();
-      this.host.log("host-gone", { home: tag(attachment.homeId) });
+      this.host.log("host-gone", {});
     } else if (attachment.role === "device") {
       this.notifyHostClosed(attachment.connectionId);
     }
@@ -540,4 +553,3 @@ const openFrame = (connectionId: string, deviceRelayId: string) =>
 const REVOKED_KEY = "revoked";
 
 /** Logs name a home by its first characters only. */
-const tag = (homeId: string) => homeId.slice(0, 6);

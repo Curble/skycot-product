@@ -1,0 +1,16 @@
+# nondev-seam: skycot-update-count-wrangler
+name = "skycot-counter"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+routes = [{ pattern = "downloads.skycot.com/mac/latest-mac.yml", zone_name = "skycot.com" }]
+
+[[r2_buckets]]
+binding = "DOWNLOADS"
+bucket_name = "skycot-downloads"
+
+[[analytics_engine_datasets]]
+binding = "SKYCOT_COUNTS"
+dataset = "skycot_counts"
+
+# Set with: wrangler secret put DAILY_SALT_SECRET

@@ -8,6 +8,10 @@ workers_dev = false
 # Live on its own domain since 24 October 2026 (docs/nondev/RELAY.md).
 routes = [{ pattern = "relay.skycot.com", custom_domain = true }]
 
+[[analytics_engine_datasets]]
+binding = "SKYCOT_COUNTS"
+dataset = "skycot_counts"
+
 [[durable_objects.bindings]]
 name = "HOMES"
 class_name = "HomeRoom"
@@ -31,8 +35,8 @@ simple = { limit = 30, period = 60 }
 APNS_BUNDLE_ID = "com.skycot.app.ios"
 
 # Secrets, set with `wrangler secret put` (never in this file or the repository):
-#   APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY (the .p8 file's text), PUSH_REF_KEY
+#   APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY (the .p8 file's text), PUSH_REF_KEY,
+#   DAILY_SALT_SECRET
 
 [observability]
 enabled = true
-

@@ -1,3 +1,4 @@
+// nondev-seam: skycot-relay-count-fail-open-test
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { parseJsonObject, toBase64Url, utf8 } from "@t3tools/skycot-relay/encoding";
@@ -61,6 +62,7 @@ function setup(env: Record<string, string> = {}) {
   const store = new Map<string, unknown>();
   let now = 1_000_000_000_000;
   const logs: Array<{ event: string; fields: Record<string, unknown> }> = [];
+  const count = vi.fn();
   const room = new Room(
     {
       sockets: () => [...sockets],
@@ -71,6 +73,7 @@ function setup(env: Record<string, string> = {}) {
       },
       now: () => now,
       log: (event, fields) => logs.push({ event, fields }),
+      count,
       debugFrames: false,
     },
     { PUSH_REF_KEY, ...env },
@@ -115,6 +118,7 @@ function setup(env: Record<string, string> = {}) {
     sockets,
     store,
     logs,
+    count,
     key,
     homeId,
     connectHost,
@@ -126,6 +130,16 @@ function setup(env: Record<string, string> = {}) {
 }
 
 describe("a home on the relay", () => {
+  it("keeps an admitted home connected when daily counting throws", async () => {
+    const { connectHost, count } = setup();
+    count.mockImplementation(() => {
+      throw new Error("Analytics Engine unavailable");
+    });
+    const host = await connectHost();
+    expect(host.closed).toBeNull();
+    expect(host.texts().at(-1)).toEqual({ t: "ready" });
+  });
+
   it("lets only the home's own Mac be its host", async () => {
     const { connectHost } = setup();
     const host = await connectHost();
@@ -136,11 +150,13 @@ describe("a home on the relay", () => {
   });
 
   it("forwards sealed bytes both ways without changing them, naming the connection", async () => {
-    const { room, connectHost, connectDevice } = setup();
+    const { room, connectHost, connectDevice, logs, homeId } = setup();
     const host = await connectHost();
     const deviceRelayId = newDeviceRelayId();
     const device = await connectDevice(deviceRelayId);
     expect(device.texts().at(-1)).toEqual({ t: "status", mac: true });
+    expect(JSON.stringify(logs)).not.toContain(homeId);
+    expect(JSON.stringify(logs)).not.toContain(deviceRelayId);
     const open = host.frames().find((frame) => frame?.kind === HostFrameKind.open)!;
     expect(parseJsonObject(new TextDecoder().decode(open.payload))).toEqual({ d: deviceRelayId });
 

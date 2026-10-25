@@ -1,0 +1,23 @@
+{
+  // nondev-seam: skycot-update-count-tsconfig
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "WebWorker"],
+    "types": ["@cloudflare/workers-types", "node"],
+    "typeRoots": ["../skycot-relay/node_modules", "../../node_modules/@types"],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalTimers": "off",
+          "globalFetch": "off",
+          "globalRandom": "off",
+          "globalConsole": "off"
+        }
+      }
+    ]
+  },
+  "include": ["src/**/*.ts"]
+}
