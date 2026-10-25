@@ -5,7 +5,7 @@
 // SKYCOT. It is read only once the magnet scrolls into view, so a full fridge stays light.
 import { useEffect, useRef, useState } from "react";
 
-import { offlinePreviewDocument } from "../starters/preview";
+import { useOfflinePreviewDocument } from "../starters/preview";
 import { readMagnetPage, type MagnetPage } from "./pages";
 
 export function MagnetThumb({
@@ -49,6 +49,7 @@ export function MagnetThumb({
     };
   }, [seen, key, threadId, page, version]);
   const current = loaded?.key === key ? loaded.page : null;
+  const sealedDocument = useOfflinePreviewDocument(current?.kind === "page" ? current.html : "");
   return (
     <div ref={ref} className="fm-magnet__thumb" aria-hidden>
       {current?.kind === "page" ? (
@@ -59,7 +60,7 @@ export function MagnetThumb({
           tabIndex={-1}
           loading="lazy"
           referrerPolicy="no-referrer"
-          srcDoc={offlinePreviewDocument(current.html)}
+          srcDoc={sealedDocument}
         />
       ) : (
         <span className="fm-magnet__placeholder">

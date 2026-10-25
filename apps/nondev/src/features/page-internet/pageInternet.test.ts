@@ -11,14 +11,16 @@ describe("the sealed frame and the internet", () => {
     const open = sealedPolicy(["images.dog.ceo"]);
     expect(open).toContain("img-src data: blob: https://dog.ceo https://*.dog.ceo");
     expect(open).toContain("connect-src blob: data: https://dog.ceo https://*.dog.ceo");
-    expect(open).toContain("script-src 'unsafe-inline'");
-    expect(open.match(/script-src [^;]*/u)?.[0]).not.toMatch(/\b(?:data|blob):/u);
+    expect(open).not.toMatch(/script-src [^;]*'unsafe-inline'/u);
+    expect(open.split("; ").find((part) => part.startsWith("script-src"))).not.toMatch(
+      /\b(?:data|blob):/u,
+    );
     expect(open).toContain("frame-src 'none'");
     expect(sealedPolicy(["*", "dog.ceo; script-src *"])).not.toContain("script-src *");
   });
 
-  it("puts the policy and the reporter first in the page", () => {
-    const html = offlinePreviewDocument("<html><head><title>Dogs</title>", ["dog.ceo"]);
+  it("puts the policy and the reporter first in the page", async () => {
+    const html = await offlinePreviewDocument("<html><head><title>Dogs</title>", ["dog.ceo"]);
     expect(html.indexOf("Content-Security-Policy")).toBeLessThan(html.indexOf("<title>"));
     expect(html).toContain("securitypolicyviolation");
     expect(html).toContain("https://*.dog.ceo");

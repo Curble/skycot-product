@@ -190,22 +190,34 @@ describe("previewable page", () => {
 });
 
 describe("offline preview document", () => {
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${OFFLINE_POLICY}">`;
+  const metaStart = '<meta http-equiv="Content-Security-Policy" content="';
 
-  it("puts the offline policy first in the head, before any of the page's scripts", () => {
+  it("puts the offline policy first in the head, before any of the page's scripts", async () => {
     const page = '<!doctype html><html><head><script src="https://x.test/a.js"></script></head>';
-    const out = offlinePreviewDocument(page);
-    expect(out.indexOf(meta)).toBeGreaterThan(out.indexOf("<head>"));
-    expect(out.indexOf(meta)).toBeLessThan(out.indexOf("<script src"));
+    const out = await offlinePreviewDocument(page);
+    expect(out.indexOf(metaStart)).toBeGreaterThan(out.indexOf("<head>"));
+    expect(out.indexOf(metaStart)).toBeLessThan(out.indexOf("<script src"));
   });
 
-  it("keeps the doctype first when the page has no head", () => {
-    const out = offlinePreviewDocument("<!DOCTYPE html><p>Hi</p>");
-    expect(out.startsWith(`<!DOCTYPE html>${meta}`)).toBe(true);
+  it("keeps the doctype first when the page has no head", async () => {
+    const out = await offlinePreviewDocument("<!DOCTYPE html><p>Hi</p>");
+    expect(out.startsWith(`<!DOCTYPE html>${metaStart}`)).toBe(true);
   });
 
-  it("works for a bare fragment", () => {
-    expect(offlinePreviewDocument("<p>Hi</p>").startsWith(meta)).toBe(true);
+  it("works for a bare fragment", async () => {
+    expect((await offlinePreviewDocument("<p>Hi</p>")).startsWith(metaStart)).toBe(true);
+  });
+
+  it("hashes each fallback script and handler only when the Family profile is on", async () => {
+    const page =
+      '<button onclick="jump()">Play</button><script>function jump(){window.played=true}</script>';
+    const safe = await offlinePreviewDocument(page, [], true);
+    const scriptPolicy = safe.match(/script-src [^;]*/u)?.[0] ?? "";
+    expect(scriptPolicy).toContain("'sha256-");
+    expect(scriptPolicy).toContain("'unsafe-hashes'");
+    expect(scriptPolicy).not.toContain("'unsafe-inline'");
+    expect(scriptPolicy).not.toContain("'unsafe-eval'");
+    expect(await offlinePreviewDocument(page)).toContain("script-src 'unsafe-inline'");
   });
 
   it("blocks the network and allows only inline code and data pictures", () => {
@@ -214,3 +226,4 @@ describe("offline preview document", () => {
     expect(OFFLINE_POLICY).not.toMatch(/https?:|\*/);
   });
 });
+// nondev-seam: skycot-page-play-policy-test

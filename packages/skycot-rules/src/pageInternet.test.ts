@@ -6,6 +6,7 @@ import {
   cleanSites,
   MAX_PAGE_SITES,
   pageServerPolicy,
+  pageServerFallbackPolicy,
   sealedPolicy,
   BLOCKED_REPORTER,
   reportedSite,
@@ -139,6 +140,10 @@ describe("pageServerPolicy", () => {
       expect(open.match(new RegExp(`${directive} [^;]*`, "u"))![0]).not.toContain("dog.ceo");
     }
     expect(open).toContain("form-action 'none'");
+    const capped = pageServerFallbackPolicy([]).match(/script-src [^;]*/u)?.[0] ?? "";
+    expect(capped).toContain("'unsafe-inline'");
+    expect(capped).toContain("blob:");
+    expect(capped).not.toContain("'unsafe-eval'");
   });
 
   it("never lets a hand-made site name widen the policy", () => {
@@ -155,11 +160,20 @@ describe("sealed playable policy", () => {
       expect(policy.match(new RegExp(`${directive} [^;]*`, "u"))?.[0]).toContain("dog.ceo");
     }
     for (const directive of ["script-src", "frame-src", "form-action", "default-src"]) {
-      expect(policy.match(new RegExp(`${directive} [^;]*`, "u"))?.[0]).not.toContain("dog.ceo");
+      expect(policy.split("; ").find((part) => part.startsWith(directive))).not.toContain(
+        "dog.ceo",
+      );
     }
-    expect(policy).toContain("script-src 'unsafe-inline'");
-    expect(policy.match(/script-src [^;]*/u)?.[0]).not.toMatch(/\b(?:data|blob):/u);
+    expect(policy).toContain("script-src");
+    const scriptPolicy = policy.split("; ").find((part) => part.startsWith("script-src")) ?? "";
+    expect(scriptPolicy).not.toContain("'unsafe-inline'");
+    expect(scriptPolicy).not.toMatch(/\b(?:data|blob):/u);
     expect(sealedPolicy([])).not.toContain("https:");
+    const pinned = sealedPolicy([], ["script-hash"], ["click-hash"]);
+    expect(pinned).toContain("script-src 'sha256-script-hash' 'sha256-click-hash' 'unsafe-hashes'");
+    expect(pageServerPolicy([], ["script-hash"], ["click-hash"])).toContain(
+      "'self' 'sha256-script-hash' 'sha256-click-hash' 'unsafe-hashes'",
+    );
   });
 
   it("reports the same message to the web parent or phone bridge", () => {
@@ -209,3 +223,4 @@ describe("readBlockedReport", () => {
     expect(readBlockedReport("not json")).toBeNull();
   });
 });
+// nondev-seam: skycot-page-play-policy-test

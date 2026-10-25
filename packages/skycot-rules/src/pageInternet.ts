@@ -105,10 +105,17 @@ export const BLOCKED_REPORT_PATH = "/.skycot/blocked";
  * and the internet only for the allowed sites' pictures, sounds, fonts and data. The browser
  * reports each stopped address to the page server, so SKYCOT can ask a grown-up.
  */
-export function pageServerPolicy(sites: ReadonlyArray<string>): string {
+export function pageServerPolicy(
+  sites: ReadonlyArray<string>,
+  hashes: ReadonlyArray<string> = [],
+  handlerHashes: ReadonlyArray<string> = [],
+): string {
+  const scripts = [...new Set([...hashes, ...handlerHashes])]
+    .map((hash) => `'sha256-${hash}'`)
+    .join(" ");
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+    `script-src 'self' ${scripts}${handlerHashes.length ? " 'unsafe-hashes'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     withSites("img-src 'self' data: blob:", sites),
     withSites("media-src 'self' data: blob:", sites),
@@ -120,6 +127,14 @@ export function pageServerPolicy(sites: ReadonlyArray<string>): string {
     "base-uri 'self'",
     `report-uri ${BLOCKED_REPORT_PATH}`,
   ].join("; ");
+}
+
+/** Size-cap fallback for a page too large to inspect; preserves the prior policy except eval. */
+export function pageServerFallbackPolicy(sites: ReadonlyArray<string>): string {
+  return pageServerPolicy(sites).replace(
+    "script-src 'self'",
+    "script-src 'self' 'unsafe-inline' blob:",
+  );
 }
 
 /**
@@ -160,7 +175,7 @@ export const BLOCKED_REPORTER =
 /** Policy for a page's own runnable copy: local code only, and allowed sites for data only. */
 export const OFFLINE_POLICY = [
   "default-src 'none'",
-  "script-src 'unsafe-inline'",
+  "script-src",
   "style-src 'unsafe-inline'",
   "img-src data: blob:",
   "font-src data: blob:",
@@ -175,12 +190,22 @@ export const STORAGE_SHIM =
   "<script>(function(){try{window.localStorage.length}catch(e){var m=new Map();var s={getItem:function(k){return m.has(String(k))?m.get(String(k)):null},setItem:function(k,v){m.set(String(k),String(v))},removeItem:function(k){m.delete(String(k))},clear:function(){m.clear()},key:function(i){return Array.from(m.keys())[i]||null},get length(){return m.size}};try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});Object.defineProperty(window,'sessionStorage',{value:s,configurable:true})}catch(_){}}})()</script>";
 
 // nondev-seam: skycot-page-play-policy
-export function sealedPolicy(sites: ReadonlyArray<string> = []): string {
+export function sealedPolicy(
+  sites: ReadonlyArray<string> = [],
+  hashes: ReadonlyArray<string> = [],
+  handlerHashes: ReadonlyArray<string> = [],
+): string {
+  const scripts = [...new Set([...hashes, ...handlerHashes])]
+    .map((hash) => `'sha256-${hash}'`)
+    .join(" ");
+  const scriptPolicy = `script-src${scripts ? ` ${scripts}` : ""}${handlerHashes.length ? " 'unsafe-hashes'" : ""}`;
   const allowed = cleanSites(sites)
     .flatMap((site) => [`https://${site}`, `https://*.${site}`])
     .join(" ");
-  if (allowed === "") return OFFLINE_POLICY;
-  return OFFLINE_POLICY.replace("img-src data: blob:", `img-src data: blob: ${allowed}`)
+  const policy = OFFLINE_POLICY.replace("script-src", scriptPolicy);
+  if (allowed === "") return policy;
+  return policy
+    .replace("img-src data: blob:", `img-src data: blob: ${allowed}`)
     .replace("font-src data: blob:", `font-src data: blob: ${allowed}`)
     .replace("media-src data: blob:", `media-src data: blob: ${allowed}`)
     .replace("connect-src blob: data:", `connect-src blob: data: ${allowed}`);

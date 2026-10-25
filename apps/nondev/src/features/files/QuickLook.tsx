@@ -25,7 +25,7 @@ import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import { useSealedInternet } from "../page-internet/useSealedInternet";
 import { FullscreenPage } from "../preview/FullscreenPage";
 import { SealedPreviewFrame } from "../preview/SealedPreviewFrame";
-import { offlinePreviewDocument } from "../starters/preview";
+import { useOfflinePreviewDocument } from "../starters/preview";
 // nondev-seam: skycot-playable-copy
 import { filesApi, pageWithAssets, playablePage, type FilesPlace } from "./api";
 import { KIND_ICON } from "./icons";
@@ -230,6 +230,11 @@ function Body({
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const internet = useSealedInternet(file.mode === "page" ? file.absolutePath : null, frame);
+  const sealedDocument = useOfflinePreviewDocument(
+    page ?? file.contents ?? "",
+    internet.allowed,
+    internet.enabled,
+  );
   const elsewhere = canReveal
     ? "Show in Finder opens it on the Mac."
     : "A grown-up can open it from Finder on the Mac.";
@@ -282,11 +287,7 @@ function Body({
                 frameRef={frame}
                 className="fm-preview-frame fm-ql__frame"
                 title={`Preview of ${file.name}`}
-                srcDoc={
-                  engineCopy
-                    ? (page ?? "")
-                    : offlinePreviewDocument(page ?? file.contents ?? "", internet.allowed)
-                }
+                srcDoc={engineCopy ? (page ?? "") : sealedDocument}
                 onLoad={onFrameLoad}
               />
             </div>

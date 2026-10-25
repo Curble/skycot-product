@@ -15,7 +15,7 @@ describe("playablePage", () => {
         "game/index.html",
         project({
           "game/index.html":
-            '<html><head><script src="main.js"></script><script type="importmap">{"imports":{"alias":"./alias.mjs"}}</script><script type="module" src="main.mjs"></script></head><body></body></html>',
+            '<html><head><script src="main.js"></script><script type="importmap">{"imports":{"alias":"./alias.mjs"}}</script><script type="module" src="main.mjs"></script></head><body><button onclick="jump()">Play</button></body></html>',
           "game/main.js": "window.classicRan=true; window.levels='levels.json'",
           "game/main.mjs":
             'import { value } from "./value.mjs"; import { alias } from "alias"; import { packageValue } from "tiny3"; window.moduleValue=value+alias+packageValue; import("./lazy.mjs").then((m)=>window.lazy=m.value);',
@@ -33,15 +33,20 @@ describe("playablePage", () => {
       assert.isNotNull(result.html);
       assert.include(result.html!, "window.classicRan=true");
       assert.include(result.html!, "skycot-page/game/main.mjs");
-      assert.include(result.html!, "data:text/javascript;base64,");
-      assert.include(result.html!, '"alias":"skycot-page/game/alias.mjs"');
-      assert.include(result.html!, '"skycot-page/node_modules/tiny3/index.mjs"');
-      assert.include(result.html!, "skycot-page/game/lazy.mjs");
+      assert.notInclude(result.html!, "data:text/javascript;base64,");
+      assert.notInclude(result.html!, 'type="importmap"');
+      assert.include(result.html!, 'R("skycot-page/game/main.mjs")');
+      assert.include(result.html!, '"node_modules/tiny3/index.mjs"');
+      assert.include(result.html!, "Promise.resolve(require(");
       assert.include(result.html!, "levels.json");
       assert.include(result.html!, "window.Audio=function(s)");
       assert.include(result.html!, "https://*.dog.ceo");
       assert.include(result.html!, "window.ReactNativeWebView");
       assert.include(result.html!, "frame-src 'none'");
+      const scriptPolicy = result.html!.match(/script-src [^;]*/u)?.[0] ?? "";
+      assert.notInclude(scriptPolicy, "'unsafe-inline'");
+      assert.notInclude(scriptPolicy, "'unsafe-eval'");
+      assert.include(result.html!, "'unsafe-hashes'");
     }),
   );
 

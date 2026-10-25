@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8" /><title>Fetched text stays data</title>
+<output id="result" data-blocked="no"></output>
+<script>
+  fetch("https://json.example.com/payload.json")
+    .then((r) => r.text())
+    .then((text) => {
+      try {
+        eval(text);
+      } catch (e) {
+        document.querySelector("#result").dataset.blocked = "yes";
+      }
+      try {
+        new Function(text)();
+      } catch (e) {
+        document.querySelector("#result").dataset.blocked = "yes";
+      }
+      document.addEventListener("securitypolicyviolation", function (e) {
+        if (e.effectiveDirective === "script-src")
+          document.querySelector("#result").dataset.blocked = "yes";
+      });
+      var s = document.createElement("script");
+      s.textContent = text;
+      document.head.append(s);
+    });
+</script>

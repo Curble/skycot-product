@@ -1,5 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
+// nondev-seam: skycot-page-server-policy-test
 import * as NodeFSP from "node:fs/promises";
+import * as NodeCrypto from "node:crypto";
 import * as NodeHttp from "node:http";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -137,7 +139,10 @@ describe("serveStaticSite", () => {
     await write("style.css", "h1 { color: hotpink; }");
     await write("app.mjs", "await import('./node_modules/three/build/three.module.js');");
     await write("node_modules/three/build/three.module.js", "export const REVISION = '186';");
-    await write("levels/index.html", "<h1>Levels</h1>");
+    await write(
+      "levels/index.html",
+      '<script>window.levelsReady=true</script><button onclick="window.levelsReady=true">Go</button><h1>Levels</h1>',
+    );
     await write("empty/readme.txt", "no page here");
     await write(".env", "SECRET=1");
     await write(".git/config", "[core]");
@@ -163,7 +168,7 @@ describe("serveStaticSite", () => {
     expect(home.headers["content-type"]).toBe("text/html; charset=utf-8");
     expect(home.headers["cache-control"]).toBe("no-store");
     expect(home.body).toBe("<h1>My game</h1>");
-    expect((await rawGet(site.port, "/levels/")).body).toBe("<h1>Levels</h1>");
+    expect((await rawGet(site.port, "/levels/")).body).toContain("<h1>Levels</h1>");
     const bare = await rawGet(site.port, "/levels?x=1");
     expect(bare.status).toBe(301);
     expect(bare.headers.location).toBe("/levels/?x=1");
@@ -230,6 +235,19 @@ describe("serveStaticSite", () => {
       expect(home.body).toBe("<h1>My game</h1>");
       const levels = await rawGet(family.port, "/levels/");
       const allowed = String(levels.headers["content-security-policy"]);
+      const scriptPolicy = allowed.match(/script-src [^;]*/u)?.[0] ?? "";
+      expect(scriptPolicy).not.toContain("'unsafe-inline'");
+      expect(scriptPolicy).not.toContain("'unsafe-eval'");
+      expect(allowed).toContain("'unsafe-hashes'");
+      expect(allowed).toMatch(/script-src 'self' 'sha256-[^']+'/u);
+      const scriptHash = NodeCrypto.createHash("sha256")
+        .update("window.levelsReady=true")
+        .digest("base64");
+      const handlerHash = NodeCrypto.createHash("sha256")
+        .update("window.levelsReady=true")
+        .digest("base64");
+      expect(scriptPolicy).toContain(`'sha256-${scriptHash}'`);
+      expect(scriptPolicy).toContain(`'sha256-${handlerHash}'`);
       expect(allowed).toContain("img-src 'self' data: blob: https://dog.ceo https://*.dog.ceo");
       expect(allowed).toContain("connect-src 'self' https://dog.ceo https://*.dog.ceo");
       expect(allowed).toMatch(/script-src [^;]*;/u);

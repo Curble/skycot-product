@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8" /><title>Quiz</title> <button id="answer">A</button
+><output id="result" data-ok="no"></output>
+<script>
+  document.querySelector("#answer").onclick = function () {
+    document.querySelector("#result").dataset.ok = "yes";
+  };
+  document.querySelector("#answer").click();
+</script>

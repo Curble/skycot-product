@@ -1,0 +1,6 @@
+<!doctype html><meta charset="utf-8" /><title>Remote script stays blocked</title>
+<output id="result" data-blocked="no"></output>
+<script
+  src="https://cdn.example.com/x.js"
+  onerror="document.querySelector('#result').dataset.blocked = 'yes'"
+></script>

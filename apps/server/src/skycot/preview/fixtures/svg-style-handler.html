@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8" /><title>SVG controls</title>
+<svg>
+  <rect
+    id="target"
+    width="80"
+    height="40"
+    style="fill: tomato"
+    onclick="
+      this.dataset.hit = 'yes';
+      document.querySelector('output').dataset.ok = 'yes';
+    "
+  ></rect>
+</svg>
+<output data-ok="no"></output>
+<script>
+  document.querySelector("#target").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+</script>

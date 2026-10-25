@@ -5,13 +5,17 @@
 // no `..`, no links that lead outside, no hidden or secret files (.env, .git, keys), and no
 // folder listings. It stops with the preview, like a dev server's terminal does.
 // @effect-diagnostics nodeBuiltinImport:off
+// nondev-seam: skycot-page-server-policy
 import * as NodeFS from "node:fs";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeHttp from "node:http";
 import * as NodePath from "node:path";
+import * as NodeCrypto from "node:crypto";
+import * as NodeProcess from "node:process";
 
 import {
   BLOCKED_REPORT_PATH,
+  pageServerFallbackPolicy,
   pageServerPolicy,
   readBlockedReport,
 } from "@t3tools/skycot-rules/page-internet";
@@ -142,6 +146,28 @@ export interface StaticSite {
 const MAX_BLOCKED_PAGES = 20;
 const MAX_BLOCKED_SITES = 8;
 const MAX_REPORT_BYTES = 16 * 1024;
+const MAX_POLICY_PAGE_BYTES = 1_000_000;
+
+const inlineHashes = (html: string) => ({
+  scripts: [
+    ...new Set(
+      [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/giu)].map((match) =>
+        NodeCrypto.createHash("sha256")
+          .update((match[1] ?? "").replace(/\r\n?/gu, "\n"))
+          .digest("base64"),
+      ),
+    ),
+  ],
+  handlers: [
+    ...new Set(
+      [...html.matchAll(/\bon[a-z]+\s*=\s*(["'])([\s\S]*?)\1/giu)].map((match) =>
+        NodeCrypto.createHash("sha256")
+          .update((match[2] ?? "").replace(/\r\n?/gu, "\n"))
+          .digest("base64"),
+      ),
+    ),
+  ],
+});
 
 const NOT_FOUND_PAGE =
   '<!doctype html><meta charset="utf-8"><title>Not found</title>' +
@@ -285,7 +311,22 @@ export async function serveStaticSite(
     const sites = options.pageSites
       ? await options.pageSites(found.path).catch(() => [] as ReadonlyArray<string>)
       : null;
-    const policy = sites === null ? {} : { "content-security-policy": pageServerPolicy(sites) };
+    let policy: Record<string, string> = {};
+    if (sites !== null) {
+      if (/\.html?$/iu.test(found.path) && found.size <= MAX_POLICY_PAGE_BYTES) {
+        const page = await NodeFSP.readFile(found.path, "utf8");
+        const hashes = inlineHashes(page);
+        policy = {
+          "content-security-policy": pageServerPolicy(sites, hashes.scripts, hashes.handlers),
+        };
+      } else {
+        if (/\.html?$/iu.test(found.path))
+          NodeProcess.stderr.write(
+            `[skycot-preview] HTML page exceeds ${MAX_POLICY_PAGE_BYTES} bytes; using size-cap policy: ${found.path}\n`,
+          );
+        policy = { "content-security-policy": pageServerFallbackPolicy(sites) };
+      }
+    }
     response.writeHead(200, {
       "content-type": mimeTypeFor(found.path),
       "content-length": String(found.size),

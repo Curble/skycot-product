@@ -1,6 +1,8 @@
 // @effect-diagnostics preferSchemaOverJson:off
+// @effect-diagnostics nodeBuiltinImport:off
 // nondev-seam: skycot-playable-copy
 import * as Effect from "effect/Effect";
+import * as NodeCrypto from "node:crypto";
 
 import {
   BLOCKED_REPORTER,
@@ -71,6 +73,100 @@ function projectFile(from: string, reference: string): string | null {
   return projectPathOf(dir(from), raw);
 }
 
+const sha256 = (value: string) =>
+  NodeCrypto.createHash("sha256").update(value.replace(/\r\n?/gu, "\n")).digest("base64");
+const cspHashes = (html: string) => {
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/giu)].map((match) =>
+    sha256(match[1] ?? ""),
+  );
+  const handlers = [...html.matchAll(/\bon[a-z]+\s*=\s*(["'])([\s\S]*?)\1/giu)].map((match) =>
+    sha256(match[2] ?? ""),
+  );
+  return { scripts, handlers };
+};
+
+function classicBundle(
+  modules: ReadonlyMap<string, string>,
+  entries: ReadonlyArray<string>,
+): string {
+  const records = [...modules].map(([name, source]) => {
+    let code = source;
+    let importIndex = 0;
+    code = code.replace(
+      /\bexport\s+\*\s+as\s+([\w$]+)\s+from\s*(["'])([^"']+)\2\s*;?/gu,
+      (_whole, exported: string, _quote: string, target: string) =>
+        `exports[${JSON.stringify(exported)}]=require(${JSON.stringify(target)});`,
+    );
+    code = code.replace(
+      /\bexport\s+\*\s+from\s*(["'])([^"']+)\1\s*;?/gu,
+      (_whole, _quote: string, target: string) =>
+        `Object.assign(exports,require(${JSON.stringify(target)}));`,
+    );
+    code = code.replace(
+      /\bexport\s*\{([^}]*)\}\s*from\s*(["'])([^"']+)\2\s*;?/gu,
+      (_whole, names: string, _quote: string, target: string) => {
+        const temp = `__m${importIndex++}`;
+        const assignments = names
+          .split(",")
+          .map((part) => {
+            const match = /^\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*$/u.exec(part);
+            return match
+              ? `exports[${JSON.stringify(match[2] ?? match[1])}]=${temp}[${JSON.stringify(match[1])}];`
+              : "";
+          })
+          .join("");
+        return `const ${temp}=require(${JSON.stringify(target)});${assignments}`;
+      },
+    );
+    code = code.replace(
+      /\bimport\s+(?:([\s\S]*?)\s+from\s+)?(["'])([^"']+)\2\s*;?/gu,
+      (_whole, clause: string | undefined, _quote: string, target: string) => {
+        if (!clause) return `require(${JSON.stringify(target)});`;
+        const temp = `__m${importIndex++}`;
+        const bindings: string[] = [];
+        const defaultName = /^\s*([\w$]+)\s*(?:,|$)/u.exec(clause)?.[1];
+        if (defaultName) bindings.push(`${defaultName}=${temp}.default`);
+        const namespace = /\*\s+as\s+([\w$]+)/u.exec(clause)?.[1];
+        if (namespace) bindings.push(`${namespace}=${temp}`);
+        const named = /\{([^}]*)\}/u.exec(clause)?.[1];
+        if (named)
+          for (const item of named.split(",")) {
+            const match = /^\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*$/u.exec(item);
+            if (match)
+              bindings.push(`${match[2] ?? match[1]}=${temp}[${JSON.stringify(match[1])}]`);
+          }
+        return `const ${temp}=require(${JSON.stringify(target)});${bindings.length ? `const ${bindings.join(",")};` : ""}`;
+      },
+    );
+    code = code.replace(
+      /\bimport\s*\(\s*(["'])([^"']+)\1\s*\)/gu,
+      (_m, _q: string, target: string) => `Promise.resolve(require(${JSON.stringify(target)}))`,
+    );
+    const exported: string[] = [];
+    code = code.replace(
+      /\bexport\s+(const|let|var|function|class)\s+([\w$]+)/gu,
+      (_m, kind: string, id: string) => {
+        exported.push(id);
+        return `${kind} ${id}`;
+      },
+    );
+    code = code.replace(/\bexport\s*\{([^}]*)\}\s*;?/gu, (_m, names: string) =>
+      names
+        .split(",")
+        .map((part) => {
+          const match = /^\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*$/u.exec(part);
+          return match ? `exports[${JSON.stringify(match[2] ?? match[1])}]=${match[1]};` : "";
+        })
+        .join(""),
+    );
+    code = code.replace(/\bexport\s+default\s+/gu, "exports.default=");
+    if (exported.length)
+      code += `\n${exported.map((id) => `exports[${JSON.stringify(id)}]=${id};`).join("\n")}`;
+    return `${JSON.stringify(name)}:function(exports,require){${code}\n}`;
+  });
+  return `(function(){var M={${records.join(",")}},C={};function R(n){if(C[n])return C[n];var e=C[n]={};if(!M[n])throw Error('Missing local module '+n);M[n](e,R);return e}function run(){${entries.map((entry) => `R(${JSON.stringify(entry)});`).join("")}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run()})();`;
+}
+
 export type PlayableResult = { readonly html: string | null; readonly reason: "too-big" | null };
 
 /** Packs a project's runnable page and local module graph into one sealed document. */
@@ -112,7 +208,6 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     });
   let html = decoder.decode(source).replace(/<base\b[^>]*>/giu, "");
   const modules = new Map<string, string>();
-  const moduleAliases: Record<string, string> = {};
   const existingImports = new Map<string, string>();
   for (const tag of html.matchAll(
     /<script\b[^>]*type\s*=\s*(["'])importmap\1[^>]*>([\s\S]*?)<\/script\s*>/giu,
@@ -196,10 +291,13 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       for (const match of text.matchAll(specs)) {
         const spec = match[3]!;
         const target = yield* resolve(path, spec);
-        if (target === null) continue;
+        if (target === null) {
+          out += `${text.slice(last, match.index)};`;
+          last = match.index + match[0].length;
+          continue;
+        }
         const name = yield* loadModule(target, undefined, depth + 1);
         if (name === null) continue;
-        if (existingImports.has(spec)) moduleAliases[spec] = name;
         out += `${text.slice(last, match.index)}${match[1]}${match[2]}${name}${match[2]}`;
         last = match.index + match[0].length;
       }
@@ -222,16 +320,14 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       const bytes = path === null ? null : yield* take(path);
       if (bytes !== null && isModule && path !== null) {
         const name = yield* loadModule(path);
-        replacement =
-          name === null ? "" : `<script type="module">import ${JSON.stringify(name)};</script>`;
+        replacement = name === null ? "" : `<!--SKYCOT_MODULE_ENTRY:${name}-->`;
       } else if (bytes !== null && codeExt.test(path ?? ""))
         replacement = `<script>${decoder.decode(bytes).replace(/<\/script/giu, "<\\/script")}</script>`;
       else replacement = "";
     } else if (isModule) {
       const path = `${dir(pagePath)}/__inline-${modules.size}.mjs`.replace(/^\//u, "");
       const name = yield* loadModule(path, body);
-      replacement =
-        name === null ? "" : `<script type="module">import ${JSON.stringify(name)};</script>`;
+      replacement = name === null ? "" : `<!--SKYCOT_MODULE_ENTRY:${name}-->`;
     }
     out += html.slice(last, match.index) + replacement;
     last = match.index + match[0].length;
@@ -309,16 +405,22 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       const address = assets.get(ref);
       return address === undefined ? whole : `url("${address}")`;
     });
-  const map = Object.fromEntries([
-    ...[...modules].map(([path, text]) => [
-      moduleName(path),
-      data(new TextEncoder().encode(text), "text/javascript"),
-    ]),
-    ...Object.entries(moduleAliases),
-  ]);
-  const importmap = `<script type="importmap">${scriptJson({ imports: map })}</script>`;
-  const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites))}">`;
-  const ordered = `${policy}${STORAGE_SHIM}${BLOCKED_REPORTER}<script>${fileShim(assets)}</script>${importmap}`;
+  const entries = [...html.matchAll(/<!--SKYCOT_MODULE_ENTRY:([^>]+)-->/gu)].map(
+    (match) => match[1]!,
+  );
+  if (entries.length > 0) {
+    const bundle = classicBundle(modules, entries);
+    html = html.replace(
+      /<!--SKYCOT_MODULE_ENTRY:[^>]+-->/u,
+      `<script>${bundle.replace(/<\/script/giu, "<\\/script")}</script>`,
+    );
+    html = html.replace(/<!--SKYCOT_MODULE_ENTRY:[^>]+-->/gu, "");
+  }
+  const helpers = `${STORAGE_SHIM}${BLOCKED_REPORTER}<script>${fileShim(assets)}</script>`;
+  const provisional = withHeadStart(html, helpers);
+  const { scripts, handlers } = cspHashes(provisional);
+  const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites, scripts, handlers))}">`;
+  const ordered = `${policy}${helpers}`;
   if (exceeded || graphExceeded) return { html: null, reason: "too-big" } as const;
   return { html: withHeadStart(html, ordered), reason: null } as const;
 });

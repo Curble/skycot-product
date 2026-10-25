@@ -14,8 +14,11 @@
 // cookies), and a Content-Security-Policy keeps it offline: the promise every starter prompt
 // makes ("no internet") is then also what it enforces.
 // nondev-seam: skycot-page-play-policy
+import { useEffect, useState } from "react";
+
 import {
   BLOCKED_REPORTER,
+  cleanSites,
   OFFLINE_POLICY,
   sealedPolicy,
   STORAGE_SHIM,
@@ -111,13 +114,89 @@ export function usesModules(html: string): boolean {
 export const PREVIEW_SANDBOX = "allow-scripts allow-modals allow-forms";
 
 export { OFFLINE_POLICY, sealedPolicy };
+const FAMILY_OFF_POLICY = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "font-src data: blob:",
+  "media-src data: blob:",
+  "connect-src blob: data:",
+  "frame-src 'none'",
+  "form-action 'none'",
+].join("; ");
 
 /**
  * The page with the policy, storage shim and blocked-address reporter as the first things in
  * its head. The reporter only tells SKYCOT's window which address the policy stopped.
  */
-export function offlinePreviewDocument(html: string, sites: ReadonlyArray<string> = []): string {
+export async function offlinePreviewDocument(
+  html: string,
+  sites: ReadonlyArray<string> = [],
+  familyOn = false,
+): Promise<string> {
   // nondev-seam: skycot-page-play-policy
-  const head = `<meta http-equiv="Content-Security-Policy" content="${sealedPolicy(sites)}">${STORAGE_SHIM}${BLOCKED_REPORTER}`;
-  return withHeadStart(html, head);
+  const helpers = `${STORAGE_SHIM}${BLOCKED_REPORTER}`;
+  const withHelpers = withHeadStart(html, helpers);
+  if (!familyOn) {
+    const extra = cleanSites(sites)
+      .flatMap((site) => [`https://${site}`, `https://*.${site}`])
+      .join(" ");
+    const policy = extra
+      ? FAMILY_OFF_POLICY.replace("img-src data: blob:", `img-src data: blob: ${extra}`)
+          .replace("font-src data: blob:", `font-src data: blob: ${extra}`)
+          .replace("media-src data: blob:", `media-src data: blob: ${extra}`)
+          .replace("connect-src blob: data:", `connect-src blob: data: ${extra}`)
+      : FAMILY_OFF_POLICY;
+    return withHeadStart(
+      withHelpers,
+      `<meta http-equiv="Content-Security-Policy" content="${policy}">`,
+    );
+  }
+  const digest = async (source: string) => {
+    const normalized = source.replace(/\r\n?/gu, "\n");
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized));
+    return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  };
+  const scripts = [
+    ...new Set(
+      [...withHelpers.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/giu)].map((match) =>
+        digest(match[1] ?? ""),
+      ),
+    ),
+  ];
+  const handlers = [
+    ...new Set(
+      [...withHelpers.matchAll(/\bon[a-z]+\s*=\s*(["'])([\s\S]*?)\1/giu)].map((match) =>
+        digest(match[2] ?? ""),
+      ),
+    ),
+  ];
+  const [scriptHashes, handlerHashes] = await Promise.all([
+    Promise.all(scripts),
+    Promise.all(handlers),
+  ]);
+  const policy = `<meta http-equiv="Content-Security-Policy" content="${sealedPolicy(sites, scriptHashes, handlerHashes)}">`;
+  return withHeadStart(withHelpers, policy);
+}
+
+export function useOfflinePreviewDocument(
+  html: string,
+  sites: ReadonlyArray<string> = [],
+  familyOn = false,
+): string {
+  const [document, setDocument] = useState("");
+  const siteKey = sites.join("\n");
+  useEffect(() => {
+    let current = true;
+    void offlinePreviewDocument(html, siteKey ? siteKey.split("\n") : [], familyOn).then(
+      (value) => {
+        if (current) setDocument(value);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [html, siteKey, familyOn]);
+  return document;
 }

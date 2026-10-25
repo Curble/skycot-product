@@ -10,7 +10,11 @@ import { useFamily } from "../family/FamilyProvider";
 export function useSealedInternet(
   page: string | null,
   frame: RefObject<HTMLIFrameElement | null>,
-): { readonly allowed: ReadonlyArray<string>; readonly asks: ReadonlyArray<string> } {
+): {
+  readonly enabled: boolean;
+  readonly allowed: ReadonlyArray<string>;
+  readonly asks: ReadonlyArray<string>;
+} {
   const family = useFamily();
   const on = family.enabled && page !== null;
   const allowed = on
@@ -30,5 +34,9 @@ export function useSealedInternet(
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [on, frame]);
-  return { allowed, asks: tried.filter((site) => !allowed.includes(site)) };
+  return {
+    enabled: family.enabled,
+    allowed,
+    asks: tried.filter((site) => !allowed.includes(site)),
+  };
 }

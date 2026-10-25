@@ -19,7 +19,7 @@ import { openPreviewAt } from "../preview/store";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
-import { offlinePreviewDocument, openItChoice, usesModules } from "./preview";
+import { openItChoice, useOfflinePreviewDocument, usesModules } from "./preview";
 import { Mascot } from "../brand/Mascot";
 import { useChildView } from "../../app/useChildView";
 import { PageInternetAsk } from "../page-internet/PageInternetAsk";
@@ -114,6 +114,11 @@ export function PreviewSheet({
   const childView = useChildView();
   const frame = useRef<HTMLIFrameElement>(null);
   const internet = useSealedInternet(load.state === "ready" ? load.absolutePath : null, frame);
+  const sealedDocument = useOfflinePreviewDocument(
+    load.state === "ready" ? load.html : "",
+    internet.allowed,
+    internet.enabled,
+  );
   const name = relativePath.split("/").at(-1) ?? relativePath;
   const { projectId, threadId } = place;
 
@@ -215,7 +220,7 @@ export function PreviewSheet({
                 frameRef={frame}
                 className="fm-preview-frame"
                 title={`Preview of ${name}`}
-                srcDoc={offlinePreviewDocument(load.html, internet.allowed)}
+                srcDoc={sealedDocument}
                 onLoad={() => setFrameLoaded(true)}
               />
             </div>

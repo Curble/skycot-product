@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8" /><title>Timers</title>
+<output id="function" data-ok="no"></output><output id="string" data-blocked="no"></output>
+<script>
+  document.addEventListener("securitypolicyviolation", function (e) {
+    if (e.effectiveDirective === "script-src")
+      document.querySelector("#string").dataset.blocked = "yes";
+  });
+  setTimeout(function () {
+    document.querySelector("#function").dataset.ok = "yes";
+  }, 0);
+  try {
+    setTimeout("document.querySelector('#string').dataset.blocked='nope'", 0);
+  } catch (e) {
+    document.querySelector("#string").dataset.blocked = "yes";
+  }
+</script>
