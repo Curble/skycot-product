@@ -1,7 +1,7 @@
 "use strict";
 // SKYCOT on a grown-up's Apple Watch (Phase 4): adds the SwiftUI Watch app in
 // apps/skycot-mobile/watch/SkycotWatch to the Xcode project `expo prebuild` makes, as the
-// standard companion arrangement: its own watchOS target (one target, watchOS 11 and later,
+// standard companion arrangement: its own watchOS target (one target, watchOS 10 and later,
 // Apple's current layout), bundle id `<iOS bundle id>.watchkitapp`, embedded in the iPhone app's
 // Watch folder, built whenever the iPhone app is built. React Native doesn't run on watchOS, so
 // the Watch app is plain Swift; it talks only to the iPhone app (WatchConnectivity).
@@ -18,7 +18,8 @@ const { withDangerousMod, withXcodeProject } = require("expo/config-plugins");
 const TARGET = "SkycotWatch";
 const SOURCES_DIR = "../watch/SkycotWatch";
 const ASSETS_DIR = "SkycotWatchAssets";
-const WATCHOS = "11.0";
+// nondev-seam: skycot-watchos10-target
+const WATCHOS = "10.0";
 const ICON = "../../nondev/brand/assets/ios-android/ios/AppIcon.appiconset/AppIcon-day-1024.png";
 
 const q = (value) => `"${value}"`;

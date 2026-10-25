@@ -218,6 +218,8 @@ Phase 1 of SKYCOT on iPhone, iPad and Apple Watch: SKYCOT now knows who each dev
 The family's Mac is still the brain; every other device is a window into it. The design note
 for later phases is [WHO-IS-WHO.md](WHO-IS-WHO.md).
 
+The iPhone and iPad app supports iOS/iPadOS 17.0 and later.
+
 - **People.** The profile has children (as before) and **grown-ups** (a first name and a picture
   from the same set). The person who set the profile up is the first grown-up. There is still
   one parent code for everyone: grown-ups are people, not separate accounts. Settings → Family →

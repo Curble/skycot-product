@@ -6,7 +6,8 @@ Pod::Spec.new do |s|
   s.author         = 'Curble Pty Ltd'
   s.homepage       = 'https://www.skycot.com'
   s.license        = { :type => 'Proprietary', :text => 'Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT.' }
-  s.platforms      = { :ios => '18.0' }
+  # nondev-seam: skycot-watch-module-ios17-target
+  s.platforms      = { :ios => '17.0' }
   s.source         = { :path => '.' }
   s.static_framework = true
   s.dependency 'ExpoModulesCore'

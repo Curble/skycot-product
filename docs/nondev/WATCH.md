@@ -9,8 +9,9 @@ what watchOS lets an app check about "unlocked and on the wrist", and what is ho
 
 A small SwiftUI app for a grown-up's Apple Watch, embedded in the SKYCOT iPhone app (the
 standard companion arrangement: one watchOS target, bundle id `com.skycot.app.ios.watchkitapp`,
-`…​.dev.watchkitapp` for development builds, watchOS 11 and later). React Native doesn't run on
-watchOS, so it is plain Swift. Three pages, standard watchOS patterns (vertical paging, lists,
+`…​.dev.watchkitapp` for development builds, watchOS 10 and later). A watchOS 10 Watch can pair
+with an iPhone on iOS 17; newer Watch and phone versions can pair as Apple allows. React Native
+doesn't run on watchOS, so it is plain Swift. Three pages, standard watchOS patterns (vertical paging, lists,
 a card that scrolls with the Digital Crown, a confirmation dialog), SF Symbols, the phone's words:
 
 - **Requests**: "Ava needs a grown-up · Run a command · Just now", then the card (the exact step,

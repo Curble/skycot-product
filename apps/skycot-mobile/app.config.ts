@@ -173,7 +173,8 @@ const config: ExpoConfig = {
         },
       },
     ],
-    ["expo-build-properties", { ios: { deploymentTarget: "18.0" } }],
+    // nondev-seam: skycot-ios17-deployment-target
+    ["expo-build-properties", { ios: { deploymentTarget: "17.0" } }],
     // Must stay BEFORE expo-widgets (see the plugin's own comment).
     "./plugins/withWidgetMarkAsset.cjs",
     widgetsPlugin,

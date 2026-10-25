@@ -548,6 +548,17 @@ variable and still carries upstream's default.
 | skycot-mobile-page-logic-test  | `apps/skycot-mobile/src/screens/shared/pagePreviewLogic.test.ts` | Covers viewer fallback choice, navigation and message filters, fixed keys and default.                            | `// nondev-seam: skycot-mobile-page-logic-test`  |
 | skycot-mobile-family-api-test  | `apps/skycot-mobile/src/family/api.test.ts`                      | Covers playable fridge response parsing.                                                                          | `// nondev-seam: skycot-mobile-family-api-test`  |
 
+## iOS 17 minimum (26 October 2026)
+
+| id                               | file                                                                       | change                                                              | marker                                                 |
+| -------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
+| skycot-ios17-deployment-target   | `apps/skycot-mobile/app.config.ts`                                         | Sets the app and widget deployment minimum to iOS 17.               | `// nondev-seam: skycot-ios17-deployment-target`       |
+| skycot-device-key-ios17-target   | `apps/skycot-mobile/modules/skycot-device-key/ios/SkycotDeviceKey.podspec` | Keeps the Face ID native module available from iOS 17.              | `# nondev-seam: skycot-device-key-ios17-target`        |
+| skycot-speech-ios17-target       | `apps/skycot-mobile/modules/skycot-speech/ios/SkycotSpeech.podspec`        | Keeps the on-device speech native module available from iOS 17.     | `# nondev-seam: skycot-speech-ios17-target`            |
+| skycot-watch-module-ios17-target | `apps/skycot-mobile/modules/skycot-watch/ios/SkycotWatch.podspec`          | Keeps the WatchConnectivity iPhone module available from iOS 17.    | `# nondev-seam: skycot-watch-module-ios17-target`      |
+| skycot-watchos10-target          | `apps/skycot-mobile/plugins/withSkycotWatch.cjs`                           | Uses watchOS 10 so the companion Watch app can pair with iOS 17.    | `// nondev-seam: skycot-watchos10-target`              |
+| skycot-app-store-ios17-minimum   | `docs/legal/app-store/01-app-store-listing.md`                             | Records iOS/iPadOS 17 and watchOS 10 minimums in the listing draft. | `<!-- nondev-seam: skycot-app-store-ios17-minimum -->` |
+
 ## Page internet asks (26 October 2026)
 
 | id                                    | file                                                                | change                                                                                    | marker                                                  |
