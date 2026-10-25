@@ -22,6 +22,7 @@ import { StepBadge } from "../../ui/StepBadge";
 import { TextField } from "../../ui/TextField";
 import { SettingsGroup } from "../settings/SettingsGroup";
 import { familyApi } from "./api";
+import { AVATAR_CHARACTERS, CHARACTER_NAMES } from "./characters";
 import { ChildAvatar } from "./ChildAvatar";
 import { AVATAR_POSES, childLabel, POSE_NAMES, type ChildAvatar as Avatar } from "./children";
 import { useFamily } from "./FamilyProvider";
@@ -174,6 +175,22 @@ function GrownUpSheet({
           onChange={(event) => setName(event.currentTarget.value)}
         />
         <div className="fm-people-poses" role="radiogroup" aria-label="Picture">
+          {AVATAR_CHARACTERS.map((id) => {
+            const chosen = avatar.kind === "character" && avatar.id === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={chosen}
+                aria-label={CHARACTER_NAMES[id]}
+                className={`fm-people-pose${chosen ? " fm-people-pose--chosen" : ""}`}
+                onClick={() => setAvatar({ kind: "character", id })}
+              >
+                <ChildAvatar child={{ avatar: { kind: "character", id }, name }} size={44} />
+              </button>
+            );
+          })}
           {AVATAR_POSES.map((pose) => {
             const chosen = avatar.kind === "mascot" && avatar.pose === pose;
             return (

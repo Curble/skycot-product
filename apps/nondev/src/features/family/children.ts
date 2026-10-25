@@ -11,13 +11,15 @@ export const AVATAR_POSES = [
   "night-night",
 ] as const;
 export type AvatarPose = (typeof AVATAR_POSES)[number];
+import { AVATAR_CHARACTERS, type AvatarCharacter } from "./characters";
 
 export const AVATAR_COLORS = ["sky", "sun", "leaf", "berry", "grape", "coral"] as const;
 export type AvatarColor = (typeof AVATAR_COLORS)[number];
 
 export type ChildAvatar =
   | { readonly kind: "mascot"; readonly pose: AvatarPose }
-  | { readonly kind: "initial"; readonly color: AvatarColor };
+  | { readonly kind: "initial"; readonly color: AvatarColor }
+  | { readonly kind: "character"; readonly id: AvatarCharacter };
 
 export interface ChildLimits {
   readonly bedtime: { readonly start: string; readonly end: string } | null;
@@ -77,6 +79,12 @@ export function parseAvatar(value: unknown): ChildAvatar {
     (AVATAR_POSES as ReadonlyArray<unknown>).includes(input["pose"])
   ) {
     return { kind: "mascot", pose: input["pose"] as AvatarPose };
+  }
+  if (
+    input["kind"] === "character" &&
+    (AVATAR_CHARACTERS as ReadonlyArray<unknown>).includes(input["id"])
+  ) {
+    return { kind: "character", id: input["id"] as AvatarCharacter };
   }
   return {
     kind: "initial",

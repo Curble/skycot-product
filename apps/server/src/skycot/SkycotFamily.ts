@@ -68,6 +68,25 @@ export const AVATAR_POSES = [
   "ask-a-grown-up",
   "night-night",
 ] as const;
+/** SKYCOT's drawn characters a person can pick as their picture (apps/nondev features/family/characters.ts). */
+export const AVATAR_CHARACTERS = [
+  "cloud",
+  "sun",
+  "moon",
+  "star",
+  "rocket",
+  "cat",
+  "dog",
+  "dino",
+  "robot",
+  "penguin",
+  "fox",
+  "owl",
+  "whale",
+  "unicorn",
+  "octopus",
+  "planet",
+] as const;
 /** Colours for a letter picture; the client maps each to a swatch that reads in light and dark. */
 export const AVATAR_COLORS = ["sky", "sun", "leaf", "berry", "grape", "coral"] as const;
 
@@ -127,6 +146,7 @@ type Grant = typeof Grant.Type;
 const ChildAvatar = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("mascot"), pose: Schema.Literals(AVATAR_POSES) }),
   Schema.Struct({ kind: Schema.Literal("initial"), color: Schema.Literals(AVATAR_COLORS) }),
+  Schema.Struct({ kind: Schema.Literal("character"), id: Schema.Literals(AVATAR_CHARACTERS) }),
 ]);
 export type ChildAvatar = typeof ChildAvatar.Type;
 
@@ -866,6 +886,12 @@ function cleanAvatar(value: unknown, fallback: ChildAvatar): ChildAvatar {
     (AVATAR_POSES as ReadonlyArray<unknown>).includes(input["pose"])
   ) {
     return { kind: "mascot", pose: input["pose"] as (typeof AVATAR_POSES)[number] };
+  }
+  if (
+    input["kind"] === "character" &&
+    (AVATAR_CHARACTERS as ReadonlyArray<unknown>).includes(input["id"])
+  ) {
+    return { kind: "character", id: input["id"] as (typeof AVATAR_CHARACTERS)[number] };
   }
   if (
     input["kind"] === "initial" &&

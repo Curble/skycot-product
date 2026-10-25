@@ -402,3 +402,15 @@ html[data-flavour-borders="sketch"] .fm-headsup {
   color: var(--fm-label);
   font: inherit;
 }
+
+/* A drawn character (characters.ts): the artwork brings its own colours. */
+.fm-child-avatar--character {
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--fm-bg-card);
+}
+.fm-child-avatar--character svg {
+  display: block;
+}

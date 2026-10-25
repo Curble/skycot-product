@@ -20,6 +20,7 @@ import {
   KEEP_ALLOWANCE_OPTIONS,
 } from "../family-limits/limits";
 import type { ChildPatch } from "./api";
+import { AVATAR_CHARACTERS, CHARACTER_NAMES } from "./characters";
 import { ChildAvatar } from "./ChildAvatar";
 import {
   AVATAR_COLORS,
@@ -217,6 +218,17 @@ export function ChildEditorSheet({
         <section className="fm-child-editor__section">
           <h3>Picture</h3>
           <div className="fm-child-editor__pictures" role="radiogroup" aria-label="Picture">
+            {/* Drawn pictures only for children, to keep them private (no photos). */}
+            {AVATAR_CHARACTERS.map((id) => (
+              <PictureChoice
+                key={id}
+                avatar={{ kind: "character", id }}
+                name={draft.name}
+                label={CHARACTER_NAMES[id]}
+                selected={draft.avatar.kind === "character" && draft.avatar.id === id}
+                onSelect={(avatar) => change({ avatar })}
+              />
+            ))}
             {AVATAR_COLORS.map((color) => (
               <PictureChoice
                 key={color}
