@@ -54,6 +54,8 @@ import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/
 import { useFamily } from "../family/FamilyProvider";
 import { familyAgeTermsNote } from "../family/assistantAllowance";
 import { FamilySetupForm } from "../family/FamilySetupForm";
+import { tryParentCode } from "../family/store";
+import { PictureStep } from "./PictureStep";
 import { canContinue, onboardingSteps, type Audience, type OnboardingStep } from "./onboarding";
 import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
 import {
@@ -78,6 +80,11 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
     title: `Set up the ${familyCopy.title}`,
     description:
       "A first name for the greeting, and a parent code of 4 to 6 digits. The code guards publishing, automations, the developer tools and turning the profile off.",
+  },
+  picture: {
+    icon: UserRound,
+    title: "Pick a picture",
+    description: "Everyone gets a picture to tap when SKYCOT opens and asks who's making today.",
   },
   assistant: {
     icon: Bot,
@@ -159,7 +166,10 @@ export function OnboardingSheet({
         return;
       }
       setSkipWarning(false);
-      setStep("assistant");
+      // The code just set opens the grown-up settings here, so the pictures save without asking
+      // for it a second time.
+      await tryParentCode(draft.code, "settings");
+      setStep("picture");
       return;
     }
     setStep(steps[index + 1]!);
@@ -255,6 +265,7 @@ export function OnboardingSheet({
           </p>
         </>
       ) : null}
+      {step === "picture" ? <PictureStep /> : null}
       {step === "assistant" ? (
         <AssistantStep environmentId={environmentId} forChild={childPath} />
       ) : null}

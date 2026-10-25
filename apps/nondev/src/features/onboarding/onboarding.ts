@@ -34,7 +34,15 @@ export function welcomeEntry(familyKnown: boolean, locked: boolean): "wait" | "o
 }
 
 export type Audience = "me" | "child";
-export type OnboardingStep = "who" | "family" | "assistant" | "work" | "autonomy" | "look" | "done";
+export type OnboardingStep =
+  | "who"
+  | "family"
+  | "picture"
+  | "assistant"
+  | "work"
+  | "autonomy"
+  | "look"
+  | "done";
 
 /**
  * The steps in order for the chosen audience. "Who is this for?" is always
@@ -45,7 +53,9 @@ export function onboardingSteps(
   audience: Audience | null,
   familyEnabled = false,
 ): ReadonlyArray<OnboardingStep> {
-  const family: OnboardingStep[] = audience === "child" && !familyEnabled ? ["family"] : [];
+  // The Family set-up, then everyone picks the picture they'll tap on "Who's using SKYCOT?".
+  const family: OnboardingStep[] =
+    audience === "child" && !familyEnabled ? ["family", "picture"] : [];
   return [
     "who",
     ...family,

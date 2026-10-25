@@ -9,6 +9,7 @@ describe("onboardingSteps", () => {
     expect(onboardingSteps("child")).toEqual([
       "who",
       "family",
+      "picture",
       "assistant",
       "work",
       "look",
@@ -18,6 +19,7 @@ describe("onboardingSteps", () => {
 
   it("skips the Family set-up when a profile is already on", () => {
     expect(onboardingSteps("child", true)).not.toContain("family");
+    expect(onboardingSteps("child", true)).not.toContain("picture");
     expect(onboardingSteps("child", true)).toEqual(["who", "assistant", "work", "look", "done"]);
   });
 });

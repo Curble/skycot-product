@@ -605,3 +605,78 @@ html[data-flavour-labels="handwritten"] .fm-picker__tag .fm-picker__name {
     transform: none;
   }
 }
+
+/* First-run "Pick a picture": a name tag preview beside the character grid, one row per person. */
+.fm-picture-step {
+  display: grid;
+  gap: 20px;
+}
+.fm-picture-step__row {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 560px) {
+  .fm-picture-step__row {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+.fm-picture-step__tag {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 12px 14px;
+  border-radius: 16px;
+  background: var(--fm-bg-card);
+  border: 1px solid var(--fm-sep);
+  overflow: hidden;
+}
+.fm-picture-step__tag .fm-picker__tag-hello {
+  margin: 0 -12px;
+  align-self: stretch;
+}
+.fm-picture-step__name {
+  font-weight: 600;
+  font-size: 17px;
+}
+.fm-picture-step__title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.fm-picture-step__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+}
+.fm-picture-step__choice {
+  display: grid;
+  place-items: center;
+  min-height: 60px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--fm-bg-button);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.fm-picture-step__choice:hover {
+  transform: translateY(-1px);
+}
+.fm-picture-step__choice--chosen {
+  border-color: var(--fm-accent);
+}
+html[data-flavour-borders="sketch"] .fm-picture-step__tag,
+html[data-flavour-borders="sketch"] .fm-picture-step__choice--chosen {
+  border: 2px solid var(--fm-ink);
+  border-radius: 15px 22px 13px 20px / 20px 13px 22px 15px;
+}
+html[data-flavour-cards="sticky"] .fm-picture-step__tag {
+  box-shadow: 3px 4px 0 rgba(8, 5, 2, 0.45);
+  transform: rotate(-1.2deg);
+}
+html[data-flavour-labels="handwritten"] .fm-picture-step__name,
+html[data-flavour-labels="handwritten"] .fm-picture-step__title {
+  font-family: var(--fm-font-label);
+}
