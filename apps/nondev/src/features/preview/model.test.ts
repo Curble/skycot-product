@@ -42,8 +42,15 @@ describe("parsePreviewStatus", () => {
         command,
         url: "http://localhost:5173/",
         frameable: false,
+        internetAsks: [],
       }),
-    ).toEqual({ state: "running", command, url: "http://localhost:5173/", frameable: false });
+    ).toEqual({
+      state: "running",
+      command,
+      url: "http://localhost:5173/",
+      frameable: false,
+      internetAsks: [],
+    });
     expect(parsePreviewStatus({ state: "stopped", command, output: "Killed" })).toEqual({
       state: "stopped",
       command,
@@ -78,7 +85,9 @@ describe("startApproval (M3)", () => {
     ).toBeNull();
     // A start that needs no question needs no yes either.
     expect(startApproval({ ...ask, decision: { kind: "start" } })).toBeNull();
-    expect(startApproval({ state: "running", command, url: SITE, frameable: true })).toBeNull();
+    expect(
+      startApproval({ state: "running", command, url: SITE, frameable: true, internetAsks: [] }),
+    ).toBeNull();
     expect(startApproval({ state: "stopped", command, output: "" })).toBeNull();
     expect(startApproval(null)).toBeNull();
   });

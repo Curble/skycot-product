@@ -147,6 +147,8 @@ export interface ServerFamilyStatus {
    * engine from before this sends none.
    */
   readonly allowedAssistants?: ReadonlyArray<string>;
+  /** Pages a grown-up let use internet sites. An engine from before it sends none. */
+  readonly pageInternet?: ReadonlyArray<PageInternetEntry>;
   /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
   readonly trustedAddOns?: boolean;
   readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
@@ -182,6 +184,31 @@ export function parseCodeLength(value: unknown): number | null {
     value <= CODE_MAX
     ? value
     : null;
+}
+
+/** One page a grown-up let load things from internet sites (`page`: its path on the Mac). */
+export interface PageInternetEntry {
+  readonly page: string;
+  readonly sites: ReadonlyArray<string>;
+  readonly at: number;
+}
+
+function parsePageInternet(value: unknown): ReadonlyArray<PageInternetEntry> {
+  if (!Array.isArray(value)) return [];
+  const entries: Array<PageInternetEntry> = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const entry = item as Record<string, unknown>;
+    if (typeof entry["page"] !== "string" || !Array.isArray(entry["sites"])) continue;
+    const sites = entry["sites"].filter((site): site is string => typeof site === "string");
+    if (sites.length === 0) continue;
+    entries.push({
+      page: entry["page"],
+      sites,
+      at: typeof entry["at"] === "number" ? entry["at"] : 0,
+    });
+  }
+  return entries;
 }
 
 function parseAllowedAssistants(value: unknown): ReadonlyArray<string> {
@@ -241,6 +268,7 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
       ? {}
       : { session: parseSessionLimits(record["session"])! }),
     allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
+    pageInternet: parsePageInternet(record["pageInternet"]),
     ...(typeof record["trustedAddOns"] === "boolean"
       ? { trustedAddOns: record["trustedAddOns"] }
       : {}),
@@ -347,6 +375,8 @@ export interface FamilyView {
   readonly legacy: boolean;
   /** Assistants a grown-up allowed although SKYCOT can't switch their add-ons off. */
   readonly allowedAssistants: ReadonlyArray<string>;
+  /** Pages a grown-up let use internet sites (Settings › Family lists them). */
+  readonly pageInternet: ReadonlyArray<PageInternetEntry>;
   /** Trusted add-ons (three.js, p5, …) download without a grown-up; the engine decides. */
   readonly trustedAddOns: boolean;
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
@@ -374,6 +404,7 @@ export const EMPTY_VIEW: FamilyView = {
   source: "cache",
   legacy: false,
   allowedAssistants: [],
+  pageInternet: [],
   trustedAddOns: false,
   grownUps: [],
   devices: [],
@@ -453,6 +484,7 @@ export function viewFromStatus(
     // Once the engine has a profile, the browser copy is history.
     legacy: legacy && !status.enabled,
     allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
+    pageInternet: status.enabled ? (status.pageInternet ?? []) : [],
     trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],

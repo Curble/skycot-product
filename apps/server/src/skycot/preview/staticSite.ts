@@ -10,6 +10,12 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeHttp from "node:http";
 import * as NodePath from "node:path";
 
+import {
+  BLOCKED_REPORT_PATH,
+  pageServerPolicy,
+  readBlockedReport,
+} from "@t3tools/skycot-rules/page-internet";
+
 /** Folders (inside the project) whose index.html is shown, best first. "" is the folder itself. */
 export const STATIC_ROOTS = ["", "public", "dist"] as const;
 
@@ -123,23 +129,75 @@ export interface StaticSite {
   /** Always `http://127.0.0.1:<port>/`: an address on this Mac only. */
   readonly url: string;
   readonly close: () => Promise<void>;
+  /**
+   * The internet sites each page (its real path) tried and the policy stopped, newest last;
+   * empty while the Family profile is off. Kept while the site runs, at most a few per page.
+   */
+  readonly blocked: () => ReadonlyArray<{
+    readonly page: string;
+    readonly sites: ReadonlyArray<string>;
+  }>;
 }
+
+const MAX_BLOCKED_PAGES = 20;
+const MAX_BLOCKED_SITES = 8;
+const MAX_REPORT_BYTES = 16 * 1024;
 
 const NOT_FOUND_PAGE =
   '<!doctype html><meta charset="utf-8"><title>Not found</title>' +
   '<p style="font-family:-apple-system,system-ui,sans-serif;padding:2rem;color:#555">' +
   "This page isn't in the project.</p>";
 
+export interface StaticSiteOptions {
+  /**
+   * The internet sites a page (its real, absolute path) may use: null while the Family profile
+   * is off (pages are served as they are), otherwise the grown-up's allowed sites (empty:
+   * offline). See @t3tools/skycot-rules/page-internet.
+   */
+  readonly pageSites?: (page: string) => Promise<ReadonlyArray<string> | null>;
+}
+
 /**
  * Serves `root` (an absolute folder) on 127.0.0.1 at a free port. Rejects when the folder is
  * missing or the port cannot be opened.
  */
-export async function serveStaticSite(root: string): Promise<StaticSite> {
+export async function serveStaticSite(
+  root: string,
+  options: StaticSiteOptions = {},
+): Promise<StaticSite> {
   const realRoot = await NodeFSP.realpath(root);
   if (!(await NodeFSP.stat(realRoot)).isDirectory()) {
     throw new Error("The preview folder is not a folder.");
   }
   let port = 0;
+  const blocked = new Map<string, Set<string>>();
+  const remember = (page: string, site: string) => {
+    const sites = blocked.get(page) ?? new Set<string>();
+    if (sites.size >= MAX_BLOCKED_SITES && !sites.has(site)) return;
+    sites.add(site);
+    blocked.delete(page);
+    blocked.set(page, sites);
+    for (const oldest of blocked.keys()) {
+      if (blocked.size <= MAX_BLOCKED_PAGES) break;
+      blocked.delete(oldest);
+    }
+  };
+
+  /** A browser saying the policy stopped an address on one of this site's pages. */
+  const takeReport = async (request: NodeHttp.IncomingMessage) => {
+    let body = "";
+    for await (const chunk of request) {
+      body += String(chunk);
+      if (body.length > MAX_REPORT_BYTES) return;
+    }
+    const report = readBlockedReport(body);
+    if (report === null || options.pageSites === undefined) return;
+    const target = readRequestPath(report.pagePath);
+    if (target.kind === "refused") return;
+    const found = await findFile(target.segments, target.isFolder || target.segments.length === 0);
+    if (found?.kind !== "file" || !/\.html?$/iu.test(found.path)) return;
+    remember(found.path, report.site);
+  };
 
   const answer = (
     response: NodeHttp.ServerResponse,
@@ -185,13 +243,22 @@ export async function serveStaticSite(root: string): Promise<StaticSite> {
   };
 
   const handle = async (request: NodeHttp.IncomingMessage, response: NodeHttp.ServerResponse) => {
+    const host = (request.headers.host ?? "").toLowerCase();
+    if (
+      request.method === "POST" &&
+      request.url === BLOCKED_REPORT_PATH &&
+      (host === `127.0.0.1:${port}` || host === `localhost:${port}`)
+    ) {
+      await takeReport(request);
+      answer(response, 204, "");
+      return;
+    }
     if (request.method !== "GET" && request.method !== "HEAD") {
       answer(response, 405, "", { allow: "GET, HEAD" });
       return;
     }
     // Only this Mac's own names for it: a web page elsewhere that points its own name at
     // 127.0.0.1 (DNS rebinding) cannot read the project through the browser.
-    const host = (request.headers.host ?? "").toLowerCase();
     if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
       answer(response, 403, "");
       return;
@@ -212,12 +279,20 @@ export async function serveStaticSite(root: string): Promise<StaticSite> {
       answer(response, 301, "", { location });
       return;
     }
+    // A child's page (Family profile on): offline except the sites a grown-up allowed for it;
+    // the browser reports what it stopped (takeReport), so SKYCOT can ask a grown-up. Every
+    // file gets the policy, so a page is never served without one.
+    const sites = options.pageSites
+      ? await options.pageSites(found.path).catch(() => [] as ReadonlyArray<string>)
+      : null;
+    const policy = sites === null ? {} : { "content-security-policy": pageServerPolicy(sites) };
     response.writeHead(200, {
       "content-type": mimeTypeFor(found.path),
       "content-length": String(found.size),
       // The child edits and presses Reload: always the newest file.
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      ...policy,
     });
     if (request.method === "HEAD") {
       response.end();
@@ -248,6 +323,7 @@ export async function serveStaticSite(root: string): Promise<StaticSite> {
   return {
     port,
     url: `http://127.0.0.1:${port}/`,
+    blocked: () => [...blocked].map(([page, sites]) => ({ page, sites: [...sites].sort() })),
     close: () =>
       new Promise<void>((resolve) => {
         server.close(() => resolve());

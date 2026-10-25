@@ -193,6 +193,15 @@ export const familyApi = {
   /** The code goes with the one request; the engine counts the try like any other. */
   allowAssistant: (input: { readonly driver: string; readonly code: string }) =>
     request("POST", "/assistants/allow", input, parseServerStatus),
+  /** "Let this page use the internet": the code goes with the one request, counted as a try. */
+  allowPageInternet: (input: {
+    readonly page: string;
+    readonly sites: ReadonlyArray<string>;
+    readonly code: string;
+  }) => request("POST", "/page-internet/allow", input, parseServerStatus),
+  /** No code: taking a page's internet back only makes the profile stricter. */
+  stopPageInternet: (input: { readonly page: string }) =>
+    request("POST", "/page-internet/stop", input, parseServerStatus),
   /** "Trusted add-ons download by themselves": the code goes with the one request, either way. */
   setTrustedAddOns: (input: { readonly on: boolean; readonly code: string }) =>
     request("POST", "/trusted-add-ons", input, parseServerStatus),

@@ -14,9 +14,10 @@ export const familyCopy = {
   does: [
     "Safe steps inside the project — looking at files, changing them, running a quick check — run by themselves, so a child isn't asked about every step. SKYCOT's engine checks each one first, and no riskier mode can be switched on, from here or anywhere else.",
     "Anything that uses the internet, installs something, deletes files or reaches outside the project waits for a grown-up: the parent code on the Mac, or a linked grown-up's phone or Watch.",
+    "A page the child makes runs offline. If it wants pictures or data from a website, a grown-up says yes once for that page with the parent code, and can take it back in Settings › Family.",
     "The assistant shows its plan first, and nothing changes until the child presses Build it. A parent can also have a child asked before each step, in that child's settings.",
     "Publishing, automations, opening another folder, changing the AI assistants and the developer tools all ask for the parent code.",
-    "The assistant is told it is helping a child: kind, simple, age-appropriate, and never asking for personal details.",
+    "The assistant is told to keep everything kind and simple, to explain things at the youngest child's reading level, and never to ask for personal details. It is never told anyone's name or age.",
     "Codex and Claude start without this Mac's own AI add-ons. Any other assistant waits until a grown-up allows it with the parent code, after reading its age rules.",
     "Uses the Workshop look and larger text (both can be changed).",
   ],

@@ -31,6 +31,7 @@ import { useModal } from "../../ui/useModal";
 import { Mascot } from "../brand/Mascot";
 import { Disclosure } from "../conversation/cards/Disclosure";
 import { useFamily } from "../family/FamilyProvider";
+import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import {
   checkPreviewAddress,
   fetchPreviewStatus,
@@ -63,7 +64,7 @@ import {
 } from "./store";
 
 /** Polls while the panel is open: quickly while starting, slowly otherwise (it also keeps the site alive). */
-function usePreviewAnswer(threadId: string) {
+function usePreviewAnswer(threadId: string, familyOn: boolean) {
   const [answer, setAnswer] = useState<PreviewAnswer | null>(null);
   const askNow = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -77,7 +78,14 @@ function usePreviewAnswer(threadId: string) {
       const next = await fetchPreviewStatus(threadId);
       if (!live || mine !== latest) return;
       setAnswer(next);
-      timer = setTimeout(run, next.ok && next.status.state === "starting" ? 1000 : 8000);
+      // A Family page asks a grown-up soon after it tries the internet (internetAsks).
+      const every =
+        next.ok && next.status.state === "starting"
+          ? 1000
+          : next.ok && next.status.state === "running" && familyOn
+            ? 3000
+            : 8000;
+      timer = setTimeout(run, every);
     };
     askNow.current = () => void run();
     void run();
@@ -86,7 +94,7 @@ function usePreviewAnswer(threadId: string) {
       askNow.current = null;
       if (timer !== undefined) clearTimeout(timer);
     };
-  }, [threadId]);
+  }, [threadId, familyOn]);
   return { answer, setAnswer, refresh: () => askNow.current?.() };
 }
 
@@ -154,7 +162,7 @@ function PreviewPanelBody({
   const builder = crew.builder.name;
   const family = useFamily();
   const childView = useChildView();
-  const { answer, setAnswer, refresh } = usePreviewAnswer(threadId);
+  const { answer, setAnswer, refresh } = usePreviewAnswer(threadId, family.enabled);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [controls, setControls] = useState<FrameControls | null>(null);
@@ -406,6 +414,17 @@ function PreviewPanelBody({
         <div className="fm-preview__notice">
           <Banner tone="info">{problem}</Banner>
         </div>
+      ) : null}
+      {status?.state === "running" && status.internetAsks[0] !== undefined ? (
+        <PageInternetAsk
+          key={`${status.internetAsks[0].page}:${status.internetAsks[0].sites.join(",")}`}
+          page={status.internetAsks[0].page}
+          sites={status.internetAsks[0].sites}
+          onAllowed={() => {
+            controls?.reload();
+            refresh();
+          }}
+        />
       ) : null}
       <div className="fm-preview__body">{body}</div>
       {status?.state === "running" && surface !== "elsewhere" ? (

@@ -221,6 +221,19 @@ export function setTrustedAddOns(
 }
 
 /** Takes an allowance back (no code). That assistant's next Family turn is refused. */
+/** A grown-up lets one page load things from these internet sites (the code, one try). */
+export function allowPageInternet(
+  page: string,
+  sites: ReadonlyArray<string>,
+  code: string,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.allowPageInternet({ page, sites, code }), applyStatus);
+}
+
+export function stopPageInternet(page: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.stopPageInternet({ page }), applyStatus);
+}
+
 export function stopAllowingAssistant(driver: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.stopAllowingAssistant({ driver }), applyStatus);
 }

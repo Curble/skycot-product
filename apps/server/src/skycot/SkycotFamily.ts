@@ -50,6 +50,14 @@ import {
 } from "@t3tools/skycot-rules/people";
 
 import * as ServerConfig from "../config.ts";
+import {
+  cleanPagePath,
+  cleanSites,
+  MAX_PAGE_ENTRIES,
+  sitesForPage,
+  withAllowed,
+  type PageInternetEntry,
+} from "@t3tools/skycot-rules/page-internet";
 
 export const FAMILY_FILE_NAME = "skycot-family.json";
 export const MAX_ATTEMPTS = 5;
@@ -330,6 +338,15 @@ const FamilyFile = Schema.Struct({
   grownUps: Schema.optionalKey(Schema.Array(GrownUp)),
   /** Devices linked to a person (a child's iPad, a grown-up's phone). */
   devices: Schema.optionalKey(Schema.Array(Device)),
+  /**
+   * Pages a grown-up allowed to load things from internet sites (@t3tools/skycot-rules/page-internet).
+   * Optional so files written before it read unchanged.
+   */
+  pageInternet: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({ page: Schema.String, sites: Schema.Array(Schema.String), at: Schema.Number }),
+    ),
+  ),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -452,6 +469,8 @@ export interface FamilyStatus {
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
   /** Devices linked to a person, linked or still waiting for their link. */
   readonly devices: ReadonlyArray<FamilyDeviceView>;
+  /** Pages allowed to load things from internet sites (Settings › Family lists them). */
+  readonly pageInternet: ReadonlyArray<PageInternetEntry>;
 }
 
 /** What a parent sets for a child; anything left out keeps its value (or the default). */
@@ -614,6 +633,24 @@ export class SkycotFamily extends Context.Service<
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** Whether the profile is on with trusted add-ons on. Cheap, like `isEnabled`. */
     readonly trustedAddOnsOn: Effect.Effect<boolean>;
+    /**
+     * A grown-up lets one page (an .html file on this Mac) load things from these internet
+     * sites: one code attempt, counted like every other. Adds to what the page had.
+     */
+    readonly allowPageInternet: (input: {
+      readonly code: string;
+      readonly page: string;
+      readonly sites: ReadonlyArray<string>;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Takes a page's internet back. No code: it only makes the profile stricter. */
+    readonly stopPageInternet: (input: {
+      readonly page: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /**
+     * The sites a page may use: null while the profile is off (no policy at all, as before),
+     * otherwise the allowed sites (empty: offline). Cheap, like `isEnabled`.
+     */
+    readonly pageInternetSites: (page: string) => Effect.Effect<ReadonlyArray<string> | null>;
     /** Ends every grant this session holds (a parent leaving Advanced mode). */
     readonly lock: (input: { readonly sessionId: string }) => Effect.Effect<void, FamilyError>;
     /**
@@ -830,6 +867,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       trustedAddOns: false,
       grownUps: [],
       devices: [],
+      pageInternet: [],
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
@@ -846,7 +884,21 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     trustedAddOns: file.trustedAddOns !== false,
     grownUps: file.grownUps ?? [],
     devices: (file.devices ?? []).map(deviceView),
+    pageInternet: pageInternetOf(file),
   };
+}
+
+/** The file's allowed pages, cleaned: a hand-edited entry can never widen a policy. */
+export function pageInternetOf(
+  file: Pick<FamilyFile, "pageInternet"> | null,
+): ReadonlyArray<PageInternetEntry> {
+  const entries: Array<PageInternetEntry> = [];
+  for (const entry of file?.pageInternet ?? []) {
+    const page = cleanPagePath(entry.page);
+    const sites = cleanSites(entry.sites);
+    if (page !== null && sites.length > 0) entries.push({ page, sites, at: entry.at });
+  }
+  return entries.slice(-MAX_PAGE_ENTRIES);
 }
 
 /**
@@ -1355,6 +1407,59 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return toStatus(next, yield* now);
   }, lock.withPermits(1));
 
+  const allowPageInternet: SkycotFamily["Service"]["allowPageInternet"] = Effect.fn(
+    "SkycotFamily.allowPageInternet",
+  )(function* (input) {
+    const asked = cleanPagePath(input.page);
+    const sites = cleanSites(input.sites);
+    // The page's real place on disk, as SKYCOT's page server sees it: a page that is not there
+    // (or is not a file) is no request at all.
+    const real =
+      asked === null ? null : yield* fs.realPath(asked).pipe(Effect.orElseSucceed(() => null));
+    const info = real === null ? null : yield* fs.stat(real).pipe(Effect.orElseSucceed(() => null));
+    const page = real === null || info?.type !== "File" ? null : cleanPagePath(real);
+    if (page === null || sites.length === 0) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const cleared = yield* attempt(file, input.code, at);
+    const next: FamilyFile = {
+      ...cleared,
+      pageInternet: withAllowed(pageInternetOf(cleared), page, sites, at),
+    };
+    yield* save(next);
+    yield* Effect.logInfo("skycot-family.page-internet-allowed", { sites });
+    return toStatus(next, at);
+  }, lock.withPermits(1));
+
+  const stopPageInternet: SkycotFamily["Service"]["stopPageInternet"] = Effect.fn(
+    "SkycotFamily.stopPageInternet",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const entries = pageInternetOf(file);
+    const page = cleanPagePath(input.page);
+    if (page === null || !entries.some((entry) => entry.page === page)) {
+      return toStatus(file, yield* now);
+    }
+    const next: FamilyFile = {
+      ...file,
+      pageInternet: entries.filter((entry) => entry.page !== page),
+    };
+    yield* save(next);
+    yield* Effect.logInfo("skycot-family.page-internet-stopped");
+    return toStatus(next, yield* now);
+  }, lock.withPermits(1));
+
+  const pageInternetSites: SkycotFamily["Service"]["pageInternetSites"] = (page) =>
+    load.pipe(
+      Effect.map((file) =>
+        file === null || !file.enabled ? null : sitesForPage(pageInternetOf(file), page),
+      ),
+      // An unreadable profile keeps the page offline, never open.
+      Effect.catchCause(() => Effect.succeed([] as ReadonlyArray<string>)),
+    );
+
   const assistantAllowed: SkycotFamily["Service"]["assistantAllowed"] = (driver) =>
     load.pipe(
       Effect.map(
@@ -1692,6 +1797,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     assistantAllowed,
     setTrustedAddOns,
     trustedAddOnsOn,
+    allowPageInternet,
+    stopPageInternet,
+    pageInternetSites,
     lock: lockSession,
     allows,
     tokenAllows,

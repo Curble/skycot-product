@@ -53,6 +53,7 @@ describe("Open it: the Preview or the sealed frame", () => {
       command: pageServer(""),
       url: "http://127.0.0.1:52011/",
       frameable: true,
+      internetAsks: [],
     };
     expect(openItChoice({ page: "about.html", status: running, ...mac })).toEqual({
       kind: "preview",
@@ -109,7 +110,13 @@ describe("Open it: the Preview or the sealed frame", () => {
     expect(
       openItChoice({
         page: "index.html",
-        status: { state: "running", command: site, url: "http://localhost:5173/", frameable: true },
+        status: {
+          state: "running",
+          command: site,
+          url: "http://localhost:5173/",
+          frameable: true,
+          internetAsks: [],
+        },
         ...mac,
       }).kind,
     ).toBe("sealed");

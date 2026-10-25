@@ -36,6 +36,10 @@
       "types": "./src/badges.ts",
       "import": "./src/badges.ts"
     },
+    "./page-internet": {
+      "types": "./src/pageInternet.ts",
+      "import": "./src/pageInternet.ts"
+    },
     "./preview": {
       "types": "./src/preview.ts",
       "import": "./src/preview.ts"

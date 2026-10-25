@@ -325,7 +325,12 @@ export const make = Effect.gen(function* () {
   /** Shows a plain web page: SKYCOT's own server on 127.0.0.1, answering at once. */
   const startPage = Effect.fn("SkycotPreview.startPage")(function* (entry: Running) {
     const root = path.join(entry.folder, entry.command.pageFolder ?? "");
-    const site = yield* Effect.tryPromise(() => serveStaticSite(root)).pipe(
+    const pageSites = Option.isSome(family)
+      ? (page: string) => Effect.runPromise(family.value.pageInternetSites(page))
+      : undefined;
+    const site = yield* Effect.tryPromise(() =>
+      serveStaticSite(root, pageSites === undefined ? {} : { pageSites }),
+    ).pipe(
       Effect.catchCause((cause) =>
         Effect.logWarning("Could not show a page preview.", { cause }).pipe(Effect.as(null)),
       ),
@@ -341,6 +346,18 @@ export const make = Effect.gen(function* () {
     entry.frameable = true;
   });
 
+  /** What the site's pages tried that no grown-up allowed yet (the Family profile only). */
+  const internetAsksFor = Effect.fn("SkycotPreview.internetAsksFor")(function* (entry: Running) {
+    if (entry.site === null || Option.isNone(family)) return [];
+    const asks: Array<{ readonly page: string; readonly sites: ReadonlyArray<string> }> = [];
+    for (const tried of entry.site.blocked()) {
+      const allowed = (yield* family.value.pageInternetSites(tried.page)) ?? [];
+      const sites = tried.sites.filter((site) => !allowed.includes(site));
+      if (sites.length > 0) asks.push({ page: tried.page, sites });
+    }
+    return asks;
+  });
+
   const statusUnlocked = Effect.fn("SkycotPreview.statusUnlocked")(function* (threadId: ThreadId) {
     const context = yield* contextFor(threadId).pipe(Effect.orElseSucceed(() => null));
     if (context === null) return { state: "no-folder" } satisfies PreviewStatus;
@@ -348,7 +365,10 @@ export const make = Effect.gen(function* () {
     if (entry !== undefined) {
       entry.lastSeen = yield* Clock.currentTimeMillis;
       if (entry.url === null && entry.failure === null) yield* findAddress(entry);
-      return describe(entry);
+      const described = describe(entry);
+      if (described.state !== "running") return described;
+      const internetAsks = yield* internetAsksFor(entry);
+      return internetAsks.length === 0 ? described : { ...described, internetAsks };
     }
     const command = findPreviewCommand(yield* readStartFiles(context.folder));
     if (command === null) return { state: "no-site" } satisfies PreviewStatus;

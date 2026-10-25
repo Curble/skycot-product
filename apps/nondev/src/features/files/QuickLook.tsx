@@ -7,7 +7,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { createShellEnvironmentAtoms } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Mascot } from "../brand/Mascot";
@@ -21,6 +21,8 @@ import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Sheet } from "../../ui/Sheet";
 import { Markdown } from "../conversation/cards/Markdown";
+import { PageInternetAsk } from "../page-internet/PageInternetAsk";
+import { useSealedInternet } from "../page-internet/useSealedInternet";
 import { offlinePreviewDocument, PREVIEW_SANDBOX } from "../starters/preview";
 import { filesApi, pageWithAssets, type FilesPlace } from "./api";
 import { KIND_ICON } from "./icons";
@@ -204,6 +206,8 @@ function Body({
   readonly frameLoaded: boolean;
   readonly onFrameLoad: () => void;
 }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const internet = useSealedInternet(file.mode === "page" ? file.absolutePath : null, frame);
   const elsewhere = canReveal
     ? "Show in Finder opens it on the Mac."
     : "A grown-up can open it from Finder on the Mac.";
@@ -233,6 +237,15 @@ function Body({
               this Mac.
             </p>
           ) : null}
+          {internet.asks.length > 0 ? (
+            <PageInternetAsk
+              key={internet.asks.join(",")}
+              page={file.absolutePath}
+              sites={internet.asks}
+              // The allowed sites change the frame's policy, which loads the page again.
+              onAllowed={() => undefined}
+            />
+          ) : null}
           <div className="fm-preview-frame-wrap">
             {childView && !frameLoaded ? (
               <div className="fm-preview-frame-loading">
@@ -242,11 +255,12 @@ function Body({
             ) : null}
             <iframe
               key={run}
+              ref={frame}
               className="fm-preview-frame fm-ql__frame"
               title={`Preview of ${file.name}`}
               sandbox={PREVIEW_SANDBOX}
               referrerPolicy="no-referrer"
-              srcDoc={offlinePreviewDocument(page ?? file.contents ?? "")}
+              srcDoc={offlinePreviewDocument(page ?? file.contents ?? "", internet.allowed)}
               onLoad={onFrameLoad}
             />
           </div>

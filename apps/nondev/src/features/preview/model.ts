@@ -35,6 +35,8 @@ export type PreviewStatusView =
       readonly command: PreviewCommandView;
       readonly url: string;
       readonly frameable: boolean;
+      /** Family profile: pages that tried internet sites no grown-up allowed yet. */
+      readonly internetAsks: ReadonlyArray<InternetAsk>;
     }
   | {
       readonly state: "failed";
@@ -79,6 +81,28 @@ function parseDecision(value: unknown): StartDecisionView | null {
 }
 
 /** The engine's status, or null when the answer is not one (an older engine, a proxy page). */
+
+/** One page that tried internet sites: its path on the Mac and the sites, as the engine named them. */
+export interface InternetAsk {
+  readonly page: string;
+  readonly sites: ReadonlyArray<string>;
+}
+
+function parseInternetAsks(value: unknown): ReadonlyArray<InternetAsk> {
+  if (!Array.isArray(value)) return [];
+  const asks: Array<InternetAsk> = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const ask = item as Record<string, unknown>;
+    const sites = Array.isArray(ask["sites"])
+      ? ask["sites"].filter((site): site is string => typeof site === "string")
+      : [];
+    if (typeof ask["page"] === "string" && sites.length > 0)
+      asks.push({ page: ask["page"], sites });
+  }
+  return asks;
+}
+
 export function parsePreviewStatus(body: unknown): PreviewStatusView | null {
   const status = record(body);
   const state = status?.["state"];
@@ -98,7 +122,13 @@ export function parsePreviewStatus(body: unknown): PreviewStatusView | null {
       const url = text(status["url"]);
       // The engine only ever names this Mac's own addresses; anything else is not drawn.
       return url && isLocalPreviewAddress(url)
-        ? { state, command, url, frameable: status["frameable"] !== false }
+        ? {
+            state,
+            command,
+            url,
+            frameable: status["frameable"] !== false,
+            internetAsks: parseInternetAsks(status["internetAsks"]),
+          }
         : null;
     }
     case "failed":

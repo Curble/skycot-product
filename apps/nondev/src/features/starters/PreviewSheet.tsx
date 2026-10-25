@@ -21,6 +21,8 @@ import { Sheet } from "../../ui/Sheet";
 import { offlinePreviewDocument, openItChoice, PREVIEW_SANDBOX, usesModules } from "./preview";
 import { Mascot } from "../brand/Mascot";
 import { useChildView } from "../../app/useChildView";
+import { PageInternetAsk } from "../page-internet/PageInternetAsk";
+import { useSealedInternet } from "../page-internet/useSealedInternet";
 
 /** One page to open: the conversation that made it, its project, and its project path. */
 export interface OpenItTarget {
@@ -82,7 +84,13 @@ export function useOpenIt(environmentId: EnvironmentId | null): {
 
 type Load =
   | { readonly state: "loading" }
-  | { readonly state: "ready"; readonly html: string; readonly truncated: boolean }
+  | {
+      readonly state: "ready";
+      readonly html: string;
+      readonly truncated: boolean;
+      /** The page's path on the Mac: what a grown-up's internet yes is kept for. */
+      readonly absolutePath: string;
+    }
   | { readonly state: "problem"; readonly message: string };
 
 /** The sealed, offline frame: the page with its own files inside it. Mounted per page. */
@@ -99,6 +107,8 @@ export function PreviewSheet({
   const [run, setRun] = useState(0);
   const [frameLoaded, setFrameLoaded] = useState(false);
   const childView = useChildView();
+  const frame = useRef<HTMLIFrameElement>(null);
+  const internet = useSealedInternet(load.state === "ready" ? load.absolutePath : null, frame);
   const name = relativePath.split("/").at(-1) ?? relativePath;
   const { projectId, threadId } = place;
 
@@ -116,7 +126,14 @@ export function PreviewSheet({
         return;
       }
       const html = await pageWithAssets(at, answer.value);
-      if (!cancelled) setLoad({ state: "ready", html, truncated: answer.value.truncated });
+      if (!cancelled) {
+        setLoad({
+          state: "ready",
+          html,
+          truncated: answer.value.truncated,
+          absolutePath: answer.value.absolutePath,
+        });
+      }
     });
     return () => {
       cancelled = true;
@@ -167,6 +184,14 @@ export function PreviewSheet({
               in a browser, like the Preview in SKYCOT on the Mac.
             </Banner>
           ) : null}
+          {load.state === "ready" && internet.asks.length > 0 ? (
+            <PageInternetAsk
+              key={internet.asks.join(",")}
+              page={load.absolutePath}
+              sites={internet.asks}
+              onAllowed={() => setRun((count) => count + 1)}
+            />
+          ) : null}
           <div className="fm-preview-frame-wrap">
             {!frameLoaded ? (
               <div className="fm-preview-frame-loading">
@@ -176,11 +201,12 @@ export function PreviewSheet({
             ) : null}
             <iframe
               key={run}
+              ref={frame}
               className="fm-preview-frame"
               title={`Preview of ${name}`}
               sandbox={PREVIEW_SANDBOX}
               referrerPolicy="no-referrer"
-              srcDoc={offlinePreviewDocument(load.html)}
+              srcDoc={offlinePreviewDocument(load.html, internet.allowed)}
               onLoad={() => setFrameLoaded(true)}
             />
           </div>

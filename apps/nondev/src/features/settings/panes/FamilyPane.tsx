@@ -50,6 +50,7 @@ import {
   type FamilySetupDraft,
 } from "../../family/family";
 import { FamilyAssistantsGroup } from "../../family/FamilyAssistantsGroup";
+import { PageInternetGroup } from "../../family/PageInternetGroup";
 import { TrustedAddOnsGroup } from "../../family/TrustedAddOnsGroup";
 import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
@@ -176,6 +177,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
       <FamilyAssistantsGroup environmentId={environmentId} />
 
       <TrustedAddOnsGroup />
+      <PageInternetGroup />
 
       <SettingsGroup title="Parent code" footer={familyCopy.storage}>
         <ListRow

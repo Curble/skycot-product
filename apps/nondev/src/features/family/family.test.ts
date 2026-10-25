@@ -240,6 +240,7 @@ describe("the engine's answers", () => {
       children: [],
       timeZone: null,
       allowedAssistants: [],
+      pageInternet: [],
       grownUps: [],
       devices: [],
     });

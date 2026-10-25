@@ -622,6 +622,36 @@ const stopAllowingAssistantRoute = route(
 );
 
 /**
+ * "Let this page use the internet": a grown-up lets one of the child's pages load pictures,
+ * sounds and data from the named sites (https only, never scripts). The code goes with the one
+ * request, counted like every other try; the engine remembers the yes for that page.
+ */
+const allowPageInternetRoute = route(
+  "POST",
+  "/page-internet/allow",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .allowPageInternet({
+        code: text(body["code"]),
+        page: text(body["page"]),
+        sites: Array.isArray(body["sites"]) ? body["sites"] : [],
+      })
+      .pipe(Effect.map((status) => json(status))),
+);
+
+/** Takes a page's internet back: no code, since it only makes the profile stricter. */
+const stopPageInternetRoute = route(
+  "POST",
+  "/page-internet/stop",
+  AuthOrchestrationOperateScope,
+  ({ family, body }) =>
+    family
+      .stopPageInternet({ page: text(body["page"]) })
+      .pipe(Effect.map((status) => json(status))),
+);
+
+/**
  * "Trusted add-ons download by themselves": the parent's switch, either way with the code (one
  * try, counted like every other). The engine keeps it; nothing stays open.
  */
@@ -1526,6 +1556,8 @@ export const layerCore = Layer.mergeAll(
   moreTimeRoute,
   allowAssistantRoute,
   stopAllowingAssistantRoute,
+  allowPageInternetRoute,
+  stopPageInternetRoute,
   trustedAddOnsRoute,
   lockRoute,
 );

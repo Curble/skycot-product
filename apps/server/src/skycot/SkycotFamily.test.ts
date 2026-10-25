@@ -45,6 +45,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               trustedAddOns: false,
               grownUps: [],
               devices: [],
+              pageInternet: [],
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });
@@ -75,6 +76,49 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           assert.isFalse(off.trustedAddOns);
           assert.isFalse(yield* family.trustedAddOnsOn);
           assert.isTrue((yield* family.setTrustedAddOns({ code: CODE, on: true })).trustedAddOns);
+        }),
+      ),
+    );
+
+    it.effect("a page uses internet sites only after the parent code, and can lose them", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const page = path.join(yield* fs.realPath(path.dirname(filePath)), "dog.html");
+          yield* fs.writeFileString(page, "<h1>Dogs</h1>");
+          // Off: no policy at all, as before the profile.
+          assert.isNull(yield* family.pageInternetSites(page));
+          yield* family.enable({ code: CODE, childName: "Ava" });
+          assert.deepStrictEqual(yield* family.pageInternetSites(page), []);
+          const wrong = yield* failureOf(
+            family.allowPageInternet({ code: "000000", page, sites: ["dog.ceo"] }),
+          );
+          assert.equal(wrong.reason, "wrong-code");
+          assert.deepStrictEqual(yield* family.pageInternetSites(page), []);
+          // A page that is not there is no request.
+          const missing = yield* failureOf(
+            family.allowPageInternet({ code: CODE, page: `${page}x.html`, sites: ["dog.ceo"] }),
+          );
+          assert.equal(missing.reason, "invalid-request");
+          const status = yield* family.allowPageInternet({
+            code: CODE,
+            page,
+            sites: ["images.dog.ceo", "localhost"],
+          });
+          assert.deepStrictEqual(
+            status.pageInternet.map((entry) => entry.sites),
+            [["dog.ceo"]],
+          );
+          assert.deepStrictEqual(yield* family.pageInternetSites(page), ["dog.ceo"]);
+          assert.deepStrictEqual(
+            yield* family.pageInternetSites(path.join(path.dirname(page), "other.html")),
+            [],
+          );
+          // Taking it back needs no code: it only makes the profile stricter.
+          const stopped = yield* family.stopPageInternet({ page });
+          assert.lengthOf(stopped.pageInternet, 0);
+          assert.deepStrictEqual(yield* family.pageInternetSites(page), []);
         }),
       ),
     );

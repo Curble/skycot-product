@@ -108,7 +108,7 @@ export function askEachStepTitle(name: string): string {
 export function askEachStepHelp(on: boolean, who: string): string {
   return on
     ? `On: ${who} is asked before every step, even safe ones like looking at files. Anything risky still waits for a grown-up.`
-    : `Off: safe steps inside the project run by themselves, so ${who} isn't asked about every step. Anything risky (the internet, installs, deleting, other folders) still waits for a grown-up, and ${who} still sees the plan before anything is built.`;
+    : `Off: safe steps inside the project run by themselves, so ${who} isn't asked about every step. Anything risky (the internet, installs, deleting, other folders) still waits for a grown-up, a page that loads things from the internet asks a grown-up once, and ${who} still sees the plan before anything is built.`;
 }
 
 /** Why the draft can't be saved, or null. */

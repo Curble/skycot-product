@@ -212,6 +212,75 @@ describe("serveStaticSite", () => {
     expect((await rawGet(site.port, "/", { method: "POST" })).status).toBe(405);
   });
 
+  it("sends a child's page offline except the sites a grown-up allowed (Family profile on)", async () => {
+    const asked: Array<string> = [];
+    const family = await serveStaticSite(NodePath.join(dir, "site"), {
+      pageSites: async (page) => {
+        asked.push(page);
+        return page.endsWith("levels/index.html") ? ["dog.ceo"] : [];
+      },
+    });
+    try {
+      const home = await rawGet(family.port, "/");
+      const policy = String(home.headers["content-security-policy"]);
+      expect(policy).toContain("connect-src 'self';");
+      expect(policy).not.toContain("https://");
+      expect(policy).toContain("report-uri /.skycot/blocked");
+      // The page itself is served untouched.
+      expect(home.body).toBe("<h1>My game</h1>");
+      const levels = await rawGet(family.port, "/levels/");
+      const allowed = String(levels.headers["content-security-policy"]);
+      expect(allowed).toContain("img-src 'self' data: blob: https://dog.ceo https://*.dog.ceo");
+      expect(allowed).toContain("connect-src 'self' https://dog.ceo https://*.dog.ceo");
+      expect(allowed).toMatch(/script-src [^;]*;/u);
+      expect(allowed.match(/script-src [^;]*/u)![0]).not.toContain("dog.ceo");
+      // Other files carry the policy too, and are served as they are.
+      const style = await rawGet(family.port, "/style.css");
+      expect(style.headers["content-security-policy"]).toBeDefined();
+      expect(style.body).toBe("h1 { color: hotpink; }");
+      expect(asked).toContain(NodePath.join(dir, "site", "levels", "index.html"));
+      // The browser reports what the policy stopped; only https sites on real pages are kept.
+      const report = (documentUri: string, blockedUri: string) =>
+        new Promise<{ status: number }>((resolve, reject) => {
+          const request = NodeHttp.request(
+            {
+              host: "127.0.0.1",
+              port: family.port,
+              path: "/.skycot/blocked",
+              method: "POST",
+              headers: { "content-type": "application/csp-report" },
+            },
+            (response) => {
+              response.resume();
+              response.on("end", () => resolve({ status: response.statusCode ?? 0 }));
+            },
+          );
+          request.on("error", reject);
+          request.end(
+            JSON.stringify({
+              "csp-report": { "document-uri": documentUri, "blocked-uri": blockedUri },
+            }),
+          );
+        });
+      expect((await report(`${family.url}levels/`, "https://images.dog.ceo/a.jpg")).status).toBe(
+        204,
+      );
+      await report(`${family.url}levels/`, "http://insecure.example.com/x");
+      await report(`${family.url}nothing.html`, "https://cataas.com/cat");
+      await report(`${family.url}style.css`, "https://cataas.com/cat");
+      expect(family.blocked()).toEqual([
+        { page: NodePath.join(dir, "site", "levels", "index.html"), sites: ["dog.ceo"] },
+      ]);
+      expect(site.blocked()).toEqual([]);
+    } finally {
+      await family.close();
+    }
+    // The Family profile off: pages exactly as before, with no policy.
+    const plain = await rawGet(site.port, "/");
+    expect(plain.headers["content-security-policy"]).toBeUndefined();
+    expect(plain.body).toBe("<h1>My game</h1>");
+  });
+
   it("stops answering once closed", async () => {
     const other = await serveStaticSite(NodePath.join(dir, "site"));
     await other.close();

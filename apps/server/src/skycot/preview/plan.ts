@@ -219,6 +219,14 @@ export type PreviewStatus =
       readonly command: PreviewCommand;
       readonly url: string;
       readonly frameable: boolean;
+      /**
+       * Family profile: pages of this site that tried internet sites no grown-up has allowed
+       * yet (@t3tools/skycot-rules/page-internet). `page` is the page's real path on this Mac.
+       */
+      readonly internetAsks?: ReadonlyArray<{
+        readonly page: string;
+        readonly sites: ReadonlyArray<string>;
+      }>;
     }
   | {
       readonly state: "failed";
