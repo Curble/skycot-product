@@ -16,6 +16,7 @@ import {
   withAllowed,
   readBlockedReport,
   withHeadStart,
+  pageDiagnosticsScript,
 } from "./pageInternet.ts";
 
 describe("siteOf", () => {
@@ -114,6 +115,22 @@ describe("reportedSite", () => {
       }),
     ).toBeNull();
     expect(reportedSite("not json")).toBeNull();
+  });
+});
+
+describe("sealed page diagnostics", () => {
+  it("uses only local messages and keeps diagnostic script content hashable", () => {
+    const script = pageDiagnosticsScript(1234);
+    expect(script).toContain("securitypolicyviolation");
+    expect(script).toContain("unhandledrejection");
+    expect(script).toContain("requestAnimationFrame");
+    expect(script).toContain("packedBytes:1234");
+    expect(script).toContain("skycot='diag'");
+    expect(script).not.toContain("fetch(");
+    expect(script).not.toContain("eval(");
+    expect(withHeadStart("<!doctype html><html></html>", script)).toContain(script);
+    expect(withHeadStart("<html><body></body></html>", script)).toContain(script);
+    expect(withHeadStart("", script)).toBe(script);
   });
 });
 

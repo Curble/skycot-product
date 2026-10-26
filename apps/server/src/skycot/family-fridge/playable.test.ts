@@ -42,6 +42,10 @@ describe("playablePage", () => {
       assert.include(result.html!, "window.Audio=function(s)");
       assert.include(result.html!, "https://*.dog.ceo");
       assert.include(result.html!, "window.ReactNativeWebView");
+      assert.include(result.html!, "m.skycot='diag'");
+      assert.isAbove(result.diag.packedBytes, 0);
+      assert.isAbove(result.diag.embeddedFiles, 1);
+      assert.equal(result.diag.modulesBundled, true);
       assert.include(result.html!, "frame-src 'none'");
       const scriptPolicy = result.html!.match(/script-src [^;]*/u)?.[0] ?? "";
       assert.notInclude(scriptPolicy, "'unsafe-inline'");
@@ -177,6 +181,7 @@ describe("playablePage", () => {
       assert.isNotNull(result.html);
       assert.equal(result.reason, "unpackable-module");
       assert.deepEqual(result.needs, { scripts: [], other: [] });
+      assert.deepEqual(result.diag.missingFiles, ["missing.mjs"]);
     }),
   );
 });

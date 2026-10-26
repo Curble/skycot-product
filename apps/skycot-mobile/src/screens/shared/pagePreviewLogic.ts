@@ -152,6 +152,219 @@ export function reportedSites(
   return [...current, site];
 }
 
+export type PageDiagnosticEntry = {
+  readonly kind: "error" | "rejection" | "policy" | "load" | "warn";
+  readonly text: string;
+};
+
+export type PageDiagnosticFacts = {
+  readonly ios: string | null;
+  readonly safari: string | null;
+  readonly dpr: number | null;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly packedBytes: number | null;
+  readonly frames: number | null;
+  readonly blank: boolean | null;
+};
+
+export type PageDiagnostics = {
+  readonly entries: ReadonlyArray<PageDiagnosticEntry>;
+  readonly facts: PageDiagnosticFacts;
+};
+
+export const EMPTY_PAGE_DIAGNOSTICS: PageDiagnostics = {
+  entries: [],
+  facts: {
+    ios: null,
+    safari: null,
+    dpr: null,
+    width: null,
+    height: null,
+    packedBytes: null,
+    frames: null,
+    blank: null,
+  },
+};
+
+const DIAGNOSTIC_LIMIT = 30;
+const diagnosticText = (value: string) =>
+  value
+    .replace(/https?:\/\/[^\s)]+/giu, "website")
+    .replace(
+      /(?:\/[^\s():]+)+\.(?:js|mjs|html?)(?=[:)]|$)/giu,
+      (path) => path.split("/").at(-1) ?? "game file",
+    )
+    .replace(/\s+at\s+[^\n]+/gu, "")
+    .replace(/[\r\n\t]+/gu, " ")
+    .trim()
+    .slice(0, 200);
+
+export function parsePageDiagnostic(value: unknown, current: PageDiagnostics): PageDiagnostics {
+  let message = value;
+  if (typeof message === "string") {
+    try {
+      message = JSON.parse(message) as unknown;
+    } catch {
+      return current;
+    }
+  }
+  if (typeof message !== "object" || message === null) return current;
+  const record = message as Record<string, unknown>;
+  if (record.skycot !== "diag") return current;
+  const inputFacts =
+    typeof record.facts === "object" && record.facts !== null
+      ? (record.facts as Record<string, unknown>)
+      : {};
+  const number = (key: string) =>
+    typeof inputFacts[key] === "number" && Number.isFinite(inputFacts[key])
+      ? Math.max(0, inputFacts[key] as number)
+      : (current.facts[key as keyof PageDiagnosticFacts] as number | null);
+  const facts: PageDiagnosticFacts = {
+    ios:
+      typeof inputFacts.ios === "string"
+        ? inputFacts.ios
+            .replace(/_/gu, ".")
+            .replace(/[^0-9.]/gu, "")
+            .slice(0, 20)
+        : current.facts.ios,
+    safari:
+      typeof inputFacts.safari === "string"
+        ? inputFacts.safari.replace(/[^0-9.]/gu, "").slice(0, 20)
+        : current.facts.safari,
+    dpr: number("dpr"),
+    width: number("width"),
+    height: number("height"),
+    packedBytes: number("packedBytes"),
+    frames: number("frames"),
+    blank: typeof inputFacts.blank === "boolean" ? inputFacts.blank : current.facts.blank,
+  };
+  const rawEntries = Array.isArray(record.entries) ? record.entries : [];
+  const additions = rawEntries.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const row = entry as Record<string, unknown>;
+    if (
+      !["error", "rejection", "policy", "load", "warn"].includes(String(row.kind)) ||
+      typeof row.text !== "string"
+    )
+      return [];
+    const text = diagnosticText(row.text);
+    return text ? [{ kind: row.kind as PageDiagnosticEntry["kind"], text }] : [];
+  });
+  return {
+    facts,
+    entries: [...current.entries, ...additions].slice(-DIAGNOSTIC_LIMIT),
+  };
+}
+
+export function pageLooksWrong(diagnostics: PageDiagnostics, elapsedAfterLoadMs: number): boolean {
+  return (
+    diagnostics.entries.some((entry) => entry.kind !== "warn") ||
+    diagnostics.facts.blank === true ||
+    (elapsedAfterLoadMs >= 3000 &&
+      (diagnostics.facts.frames === null || diagnostics.facts.frames < 1))
+  );
+}
+
+export function diagnosticSheetCopy(
+  diagnostics: PageDiagnostics,
+  childView: boolean,
+  engine?: FridgePlayDiag,
+): {
+  readonly headline: string;
+  readonly lines: ReadonlyArray<string>;
+  readonly grownUpLines: ReadonlyArray<string>;
+  readonly tellSam: string;
+} {
+  const lines: string[] = [];
+  const facts = diagnostics.facts;
+  if (facts.ios && Number(facts.ios.split(".")[0]) < 18)
+    lines.push(`This iPad's web engine is older (iPadOS ${facts.ios}).`);
+  for (const file of engine?.missingFiles.slice(0, 3) ?? [])
+    lines.push(`A game file is missing: ${safeFileName(file)}`);
+  for (const entry of diagnostics.entries.slice(-4)) {
+    if (entry.kind === "load")
+      lines.push(
+        `A picture or sound couldn't be found: ${entry.text.replace(/^(?:img|audio|video|source):\s*/iu, "") || "game file"}`,
+      );
+    else if (entry.kind === "policy") {
+      const host = /\bblocked ([\w.-]+)/iu.exec(entry.text)?.[1];
+      lines.push(`The iPad stopped the game from using ${host ?? "something it needed"}.`);
+    } else if (entry.kind === "error" || entry.kind === "rejection")
+      lines.push(`The game's code stopped: ${entry.text}`);
+    else lines.push(`The game showed a warning: ${entry.text}`);
+  }
+  if (facts.blank === true) lines.push("The game page looks empty on this iPad.");
+  while (lines.length < 3) {
+    const fallback = [
+      "The game copy opened on this iPad.",
+      "A grown-up can copy these clues to help fix it.",
+      "The game did not start moving on this iPad.",
+    ][lines.length]!;
+    lines.push(fallback);
+  }
+  const shown = lines.slice(0, childView ? 4 : 6);
+  const shortError = (
+    diagnostics.entries.find((entry) => entry.kind !== "warn")?.text ??
+    engine?.missingFiles[0] ??
+    "it did not start"
+  ).slice(0, 100);
+  return {
+    headline: "This game hit a problem on this iPad",
+    lines: shown,
+    grownUpLines: childView
+      ? []
+      : [
+          `Safari ${facts.safari ?? "unknown"}; pixel ratio ${facts.dpr ?? "unknown"}; viewport ${facts.width ?? "?"}×${facts.height ?? "?"}.`,
+          `The packed page has ${engine?.packedBytes ?? 0} bytes across ${engine?.embeddedFiles ?? 0} files; modules ${engine?.modulesBundled ? "were bundled" : "were not bundled"}.`,
+          ...diagnostics.entries.slice(-2).map((entry) => `${entry.kind}: ${entry.text}`),
+        ],
+    tellSam: `My game doesn't work on the iPad: ${shortError}. Please fix it.`,
+  };
+}
+
+export type FridgePlayDiag = {
+  readonly reason: PlayCopy["reason"];
+  readonly needs: PlayCopy["needs"];
+  readonly packedBytes: number;
+  readonly embeddedFiles: number;
+  readonly modulesBundled: boolean;
+  readonly missingFiles: ReadonlyArray<string>;
+};
+
+function safeFileName(value: string): string {
+  const clean = value.replace(/[?#].*$/u, "");
+  return (
+    clean
+      .split(/[\\/]/u)
+      .at(-1)
+      ?.replace(/[^\w.-]/gu, "_")
+      .slice(0, 80) || "game file"
+  );
+}
+
+export function diagnosticReport(
+  diagnostics: PageDiagnostics,
+  engine: FridgePlayDiag,
+  appBuild: string,
+  mode: "playable" | "still copy",
+): string {
+  const lines = [
+    `SKYCOT game report (build ${diagnosticText(appBuild).slice(0, 32) || "unknown"})`,
+    `Viewer: ${mode}`,
+    `Engine reason: ${engine.reason ?? "none"}`,
+    `Needs: scripts=${engine.needs.scripts.map(safeFileName).slice(0, 8).join(",") || "none"}; other=${engine.needs.other.map(safeFileName).slice(0, 8).join(",") || "none"}`,
+    `Pack: ${engine.packedBytes} bytes, ${engine.embeddedFiles} files, modules bundled=${engine.modulesBundled}`,
+    `Missing files: ${engine.missingFiles.slice(0, 8).map(safeFileName).join(",") || "none"}`,
+    `iOS ${diagnostics.facts.ios ?? "unknown"}; Safari ${diagnostics.facts.safari ?? "unknown"}; DPR ${diagnostics.facts.dpr ?? "unknown"}; viewport ${diagnostics.facts.width ?? "?"}x${diagnostics.facts.height ?? "?"}`,
+    `Frames in first 2s: ${diagnostics.facts.frames ?? "unknown"}; blank page: ${diagnostics.facts.blank ?? "unknown"}`,
+    ...diagnostics.entries
+      .slice(-DIAGNOSTIC_LIMIT)
+      .map((entry) => `${entry.kind}: ${diagnosticText(entry.text)}`),
+  ];
+  return lines.join("\n").slice(0, 4000);
+}
+
 export function pageAskWaitingCopy(): string {
   return "We've let your grown-ups know. The parent code stays on this device while they decide.";
 }

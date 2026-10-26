@@ -42,6 +42,12 @@ export interface FridgePlay {
     readonly scripts: ReadonlyArray<string>;
     readonly other: ReadonlyArray<string>;
   };
+  readonly diag: {
+    readonly packedBytes: number;
+    readonly embeddedFiles: number;
+    readonly modulesBundled: boolean;
+    readonly missingFiles: ReadonlyArray<string>;
+  };
   readonly page: string | null;
 }
 export interface PageInternetAskResult {
@@ -139,6 +145,7 @@ export function parseFridgePlay(body: unknown): FridgePlay | null {
   )
     return null;
   const needs = record(input.needs);
+  const diag = record(input.diag);
   const sites = (value: unknown) =>
     Array.isArray(value) && value.every((site) => typeof site === "string")
       ? (value as Array<string>)
@@ -152,6 +159,18 @@ export function parseFridgePlay(body: unknown): FridgePlay | null {
         ? input.reason
         : null,
     needs: { scripts: sites(needs.scripts), other: sites(needs.other) },
+    diag: {
+      packedBytes:
+        typeof diag.packedBytes === "number" && Number.isFinite(diag.packedBytes)
+          ? Math.max(0, diag.packedBytes)
+          : 0,
+      embeddedFiles:
+        typeof diag.embeddedFiles === "number" && Number.isFinite(diag.embeddedFiles)
+          ? Math.max(0, diag.embeddedFiles)
+          : 0,
+      modulesBundled: diag.modulesBundled === true,
+      missingFiles: sites(diag.missingFiles),
+    },
     page: typeof input.page === "string" ? input.page : null,
   };
 }

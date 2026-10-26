@@ -17,6 +17,7 @@ describe("the playable fridge response", () => {
       html: "<main>game</main>",
       reason: null,
       needs: { scripts: [], other: [] },
+      diag: { packedBytes: 0, embeddedFiles: 0, modulesBundled: false, missingFiles: [] },
       page: "/Users/ava/game.html",
     });
     expect(
@@ -30,6 +31,7 @@ describe("the playable fridge response", () => {
       html: null,
       reason: "too-big",
       needs: { scripts: ["example.com"], other: [] },
+      diag: { packedBytes: 0, embeddedFiles: 0, modulesBundled: false, missingFiles: [] },
       page: "/Users/ava/game.html",
     });
   });
@@ -39,13 +41,34 @@ describe("the playable fridge response", () => {
       html: "<main>game</main>",
       reason: null,
       needs: { scripts: [], other: [] },
+      diag: { packedBytes: 0, embeddedFiles: 0, modulesBundled: false, missingFiles: [] },
       page: null,
     });
     expect(parseFridgePlay({ html: "<main>game</main>", reason: null, page: "/g.html" })).toEqual({
       html: "<main>game</main>",
       reason: null,
       needs: { scripts: [], other: [] },
+      diag: { packedBytes: 0, embeddedFiles: 0, modulesBundled: false, missingFiles: [] },
       page: "/g.html",
+    });
+  });
+
+  it("reads pack diagnostics while older engines default them to empty", () => {
+    expect(
+      parseFridgePlay({
+        html: "game",
+        diag: {
+          packedBytes: 1234,
+          embeddedFiles: 4,
+          modulesBundled: true,
+          missingFiles: ["img/cat.png"],
+        },
+      })?.diag,
+    ).toEqual({
+      packedBytes: 1234,
+      embeddedFiles: 4,
+      modulesBundled: true,
+      missingFiles: ["img/cat.png"],
     });
   });
 

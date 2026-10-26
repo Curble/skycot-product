@@ -8,6 +8,7 @@ import {
   BLOCKED_REPORTER,
   sealedPolicy,
   siteOfUrl,
+  pageDiagnosticsScript,
   STORAGE_SHIM,
   withHeadStart,
 } from "@t3tools/skycot-rules/page-internet";
@@ -18,6 +19,12 @@ export const MAX_PLAYABLE_FILE_BYTES = 4_000_000;
 export const MAX_PLAYABLE_TOTAL_BYTES = 12_000_000;
 export const MAX_PLAYABLE_MODULES = 128;
 export const MAX_PLAYABLE_MODULE_DEPTH = 32;
+const EMPTY_DIAG = {
+  packedBytes: 0,
+  embeddedFiles: 0,
+  modulesBundled: false,
+  missingFiles: [],
+} as const;
 
 const decoder = new TextDecoder();
 const mime: Readonly<Record<string, string>> = {
@@ -175,6 +182,12 @@ export type PlayableResult = {
     readonly scripts: ReadonlyArray<string>;
     readonly other: ReadonlyArray<string>;
   };
+  readonly diag: {
+    readonly packedBytes: number;
+    readonly embeddedFiles: number;
+    readonly modulesBundled: boolean;
+    readonly missingFiles: ReadonlyArray<string>;
+  };
 };
 
 /** Packs a project's runnable page and local module graph into one sealed document. */
@@ -185,12 +198,27 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
 ) {
   const pagePath = page.replace(/^\//u, "");
   if (!safeName(pagePath) || !/\.html?$/iu.test(pagePath))
-    return { html: null, reason: null, needs: { scripts: [], other: [] } } as const;
+    return {
+      html: null,
+      reason: null,
+      needs: { scripts: [], other: [] },
+      diag: EMPTY_DIAG,
+    } as const;
   const source = yield* read(pagePath);
   if (source === null)
-    return { html: null, reason: null, needs: { scripts: [], other: [] } } as const;
+    return {
+      html: null,
+      reason: null,
+      needs: { scripts: [], other: [] },
+      diag: EMPTY_DIAG,
+    } as const;
   if (source.byteLength > MAX_PLAYABLE_PAGE_BYTES)
-    return { html: null, reason: "too-big", needs: { scripts: [], other: [] } } as const;
+    return {
+      html: null,
+      reason: "too-big",
+      needs: { scripts: [], other: [] },
+      diag: { ...EMPTY_DIAG, packedBytes: source.byteLength, embeddedFiles: 1 },
+    } as const;
   let remaining = MAX_PLAYABLE_TOTAL_BYTES - source.byteLength;
   let exceeded = false;
   let graphExceeded = false;
@@ -198,6 +226,7 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
   let remoteScript = false;
   const needsScripts = new Set<string>();
   const needsOther = new Set<string>();
+  const missingFiles = new Set<string>();
   const noteSite = (value: string, list: Set<string>) => {
     const host = siteOfUrl(value);
     if (host !== null && /^https:\/\//iu.test(value.trim())) list.add(host);
@@ -213,7 +242,10 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       if (!safeName(path) || path.split("/").includes("..")) return null;
       if (!cache.has(path)) cache.set(path, yield* read(path));
       const bytes = cache.get(path) ?? null;
-      if (bytes === null) return null;
+      if (bytes === null) {
+        missingFiles.add(path);
+        return null;
+      }
       if (
         bytes.byteLength > MAX_PLAYABLE_FILE_BYTES ||
         (!counted.has(path) && bytes.byteLength > remaining)
@@ -472,15 +504,25 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     );
     html = html.replace(/<!--SKYCOT_MODULE_ENTRY:[^>]+-->/gu, "");
   }
-  const helpers = `${STORAGE_SHIM}${BLOCKED_REPORTER}<script>${fileShim(assets)}</script>`;
-  const provisional = withHeadStart(html, helpers);
-  const { scripts, handlers } = cspHashes(provisional);
-  const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites, scripts, handlers))}">`;
-  const ordered = `${policy}${helpers}`;
+  const pack = (packedBytes: number) => {
+    const helpers = `${STORAGE_SHIM}${BLOCKED_REPORTER}${pageDiagnosticsScript(packedBytes)}<script>${fileShim(assets)}</script>`;
+    const provisional = withHeadStart(html, helpers);
+    const { scripts, handlers } = cspHashes(provisional);
+    const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites, scripts, handlers))}">`;
+    return withHeadStart(html, `${policy}${helpers}`);
+  };
+  let packed = pack(0);
+  for (let i = 0; i < 2; i++) packed = pack(new TextEncoder().encode(packed).byteLength);
   const needs = { scripts: [...needsScripts].sort(), other: [...needsOther].sort() };
-  if (exceeded || graphExceeded) return { html: null, reason: "too-big", needs } as const;
+  const diag = {
+    packedBytes: new TextEncoder().encode(packed).byteLength,
+    embeddedFiles: counted.size + 1,
+    modulesBundled: entries.length > 0,
+    missingFiles: [...missingFiles].sort(),
+  };
+  if (exceeded || graphExceeded) return { html: null, reason: "too-big", needs, diag } as const;
   const reason = remoteScript ? "remote-script" : unpackableModule ? "unpackable-module" : null;
-  return { html: withHeadStart(html, ordered), reason, needs } as const;
+  return { html: packed, reason, needs, diag } as const;
 });
 
 function fileShim(assets: ReadonlyMap<string, string>): string {

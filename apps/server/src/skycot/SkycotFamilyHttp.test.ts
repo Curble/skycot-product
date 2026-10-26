@@ -431,8 +431,13 @@ it.layer(
           child,
         );
         assert.equal(packed.status, 200);
-        const body = (yield* packed.json) as { html: string | null };
+        const body = (yield* packed.json) as {
+          html: string | null;
+          diag: { readonly packedBytes: number; readonly missingFiles: ReadonlyArray<string> };
+        };
         assert.isNotNull(body.html);
+        assert.isNumber(body.diag.packedBytes);
+        assert.isArray(body.diag.missingFiles);
         assert.notInclude(body.html!, "ENV_SECRET_SENTINEL");
         assert.notInclude(body.html!, "SSH_SECRET_SENTINEL");
       }),

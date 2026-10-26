@@ -4,12 +4,17 @@ import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 
 import {
   allowsPlayNavigation,
+  diagnosticReport,
+  diagnosticSheetCopy,
+  EMPTY_PAGE_DIAGNOSTICS,
   GAME_BUTTONS_DEFAULT,
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   pageHasOwnGameControls,
+  pageLooksWrong,
   pageToolbarCopy,
   playableCopy,
+  parsePageDiagnostic,
   playNoticeCopy,
   pageAskWaitingCopy,
   reportedSites,
@@ -97,6 +102,74 @@ describe("the sealed page viewer", () => {
     expect(reportedSites(report, ["dog.ceo"])).toEqual(["dog.ceo"]);
     const full = Array.from({ length: MAX_PAGE_SITES }, (_, index) => `site${index}.example`);
     expect(reportedSites(report, full)).toBe(full);
+  });
+
+  it("parses bounded diagnostics, identifies a stalled or broken page, and keeps reports private", () => {
+    let diagnostics = parsePageDiagnostic(
+      {
+        skycot: "diag",
+        facts: { ios: "17_7_11", safari: "17.6", frames: 0, blank: true, packedBytes: 9200 },
+        entries: [{ kind: "error", text: "Can't find variable: score (game.js line 42)" }],
+      },
+      EMPTY_PAGE_DIAGNOSTICS,
+    );
+    diagnostics = parsePageDiagnostic(
+      {
+        skycot: "diag",
+        entries: Array.from({ length: 40 }, (_, index) => ({
+          kind: "warn",
+          text: `warning ${index}`,
+        })),
+      },
+      diagnostics,
+    );
+    expect(diagnostics.entries).toHaveLength(30);
+    expect(pageLooksWrong(EMPTY_PAGE_DIAGNOSTICS, 2999)).toBe(false);
+    expect(pageLooksWrong(EMPTY_PAGE_DIAGNOSTICS, 3000)).toBe(true);
+    expect(
+      pageLooksWrong(
+        parsePageDiagnostic(
+          { skycot: "diag", entries: [{ kind: "warn", text: "FYI" }] },
+          EMPTY_PAGE_DIAGNOSTICS,
+        ),
+        0,
+      ),
+    ).toBe(false);
+    expect(pageLooksWrong(diagnostics, 0)).toBe(true);
+
+    const childCopy = diagnosticSheetCopy(diagnostics, true);
+    expect(childCopy.headline).toBe("This game hit a problem on this iPad");
+    expect(childCopy.lines.length).toBeGreaterThanOrEqual(3);
+    expect(childCopy.lines.length).toBeLessThanOrEqual(6);
+    expect(childCopy.lines.join(" ")).not.toMatch(/stack|https?:|\/Users\//iu);
+    expect(childCopy.lines.some((line) => line.includes("iPadOS 17.7.11"))).toBe(true);
+    const policyCopy = diagnosticSheetCopy(
+      parsePageDiagnostic(
+        { skycot: "diag", entries: [{ kind: "policy", text: "script-src blocked games.example" }] },
+        EMPTY_PAGE_DIAGNOSTICS,
+      ),
+      true,
+    );
+    expect(policyCopy.lines.join(" ")).toContain("stopped the game from using games.example");
+    expect(policyCopy.lines.join(" ")).not.toContain("script-src");
+    const report = diagnosticReport(
+      diagnostics,
+      {
+        reason: "unpackable-module",
+        needs: { scripts: ["https://private.example/a.js?token=secret"], other: [] },
+        packedBytes: 9200,
+        embeddedFiles: 2,
+        modulesBundled: false,
+        missingFiles: ["images/cat.png"],
+      },
+      "7",
+      "playable",
+    );
+    expect(report).toContain("cat.png");
+    expect(report).not.toContain("private.example");
+    expect(report).not.toContain("token=secret");
+    expect(report).not.toContain("/Users/");
+    expect(report.length).toBeLessThanOrEqual(4000);
   });
 
   it("does not reveal which grown-ups were notified while the child is waiting", () => {

@@ -1,5 +1,7 @@
 /** A child's page, packed by the Mac and opened inside a locked, private WebView. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import Constants from "expo-constants";
+import * as Clipboard from "expo-clipboard";
 import { Pressable, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +19,11 @@ import {
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   playableCopy,
+  diagnosticReport,
+  diagnosticSheetCopy,
+  EMPTY_PAGE_DIAGNOSTICS,
+  pageLooksWrong,
+  parsePageDiagnostic,
   playNoticeCopy,
   type PlayNoticeKind,
   pageAskWaitingCopy,
@@ -24,6 +31,7 @@ import {
   pageToolbarCopy,
   rememberGameButtons,
   reportedSites,
+  type PlayCopy,
 } from "./pagePreviewLogic";
 
 // nondev-seam: skycot-mobile-page-preview
@@ -40,7 +48,8 @@ export function PagePreview(props: {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const webView = useRef<WebView<object>>(null);
-  const [play, setPlay] = useState<FridgePlay | null>(null);
+  const [play, setPlay] = useState<PlayCopy | null>(null);
+  const [engineResponse, setEngineResponse] = useState<FridgePlay | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<PlayNoticeKind | null>(null);
@@ -54,6 +63,10 @@ export function PagePreview(props: {
   } | null>(null);
   const [answerLabel, setAnswerLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [diagnostics, setDiagnostics] = useState(EMPTY_PAGE_DIAGNOSTICS);
+  const [diagnosticsElapsed, setDiagnosticsElapsed] = useState(0);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
   const pageKey = `${props.mac.macId}:${props.threadId}:${props.page}`;
   const [gameButtons, setGameButtons] = useState(() => gameButtonsForPage(pageKey));
   const toolbarCopy = pageToolbarCopy(props.childView, props.fullScreen === true);
@@ -62,7 +75,12 @@ export function PagePreview(props: {
   const loadPage = useCallback(async () => {
     setProblem(null);
     setPlay(null);
+    setEngineResponse(null);
     setHtml(null);
+    setDiagnostics(EMPTY_PAGE_DIAGNOSTICS);
+    setDiagnosticsElapsed(0);
+    setDiagnosticsOpen(false);
+    setReportCopied(false);
     setNotice(null);
     setNoticeHosts([]);
     setSites([]);
@@ -70,6 +88,7 @@ export function PagePreview(props: {
     const result = await familyApi.fridgePlay(props.mac.transport, props.threadId, props.page);
     const playable = playableCopy(result);
     if (result.ok) {
+      setEngineResponse(result.value);
       if (result.value.reason === "too-big") setNotice("too-big");
       else if (result.value.reason === "unpackable-module") setNotice("unpackable-module");
       else if (result.value.reason === "remote-script") {
@@ -155,7 +174,32 @@ export function PagePreview(props: {
       return;
     }
     setSites((current) => reportedSites(data, current));
+    setDiagnostics((current) => parsePageDiagnostic(data, current));
   };
+
+  const wrong = pageLooksWrong(diagnostics, diagnosticsElapsed);
+  const diagnosticCopy = diagnosticSheetCopy(
+    diagnostics,
+    props.childView,
+    engineResponse?.diag
+      ? { ...engineResponse.diag, reason: engineResponse.reason, needs: engineResponse.needs }
+      : undefined,
+  );
+  const build =
+    Constants.expoConfig?.ios?.buildNumber ?? Constants.expoConfig?.version ?? "unknown";
+  const report = diagnosticReport(
+    diagnostics,
+    {
+      reason: engineResponse?.reason ?? null,
+      needs: engineResponse?.needs ?? { scripts: [], other: [] },
+      packedBytes: engineResponse?.diag.packedBytes ?? 0,
+      embeddedFiles: engineResponse?.diag.embeddedFiles ?? 0,
+      modulesBundled: engineResponse?.diag.modulesBundled ?? false,
+      missingFiles: engineResponse?.diag.missingFiles ?? [],
+    },
+    build,
+    play !== null ? "playable" : "still copy",
+  );
 
   const toggleGameButtons = () => {
     const next = !gameButtons;
@@ -220,6 +264,12 @@ export function PagePreview(props: {
               <Symbol name={gameButtons ? "checkmark.circle.fill" : "circle"} size={18} />
             </Pressable>
           ) : null}
+          {wrong || (engineResponse?.reason !== null && engineResponse?.reason !== undefined) ? (
+            <ToolbarButton
+              label={props.childView ? "Not working?" : "Why isn't it working?"}
+              onPress={() => setDiagnosticsOpen(true)}
+            />
+          ) : null}
         </View>
       </View>
       {problem !== null ? (
@@ -236,6 +286,10 @@ export function PagePreview(props: {
           originWhitelist={["about:*"]}
           onShouldStartLoadWithRequest={(request) => allowsPlayNavigation(request.url)}
           onMessage={play === null ? undefined : onMessage}
+          onLoadEnd={() => {
+            setDiagnosticsElapsed(0);
+            setTimeout(() => setDiagnosticsElapsed(3000), 3000);
+          }}
           setSupportMultipleWindows={false}
           javaScriptCanOpenWindowsAutomatically={false}
           allowFileAccess={false}
@@ -347,6 +401,43 @@ export function PagePreview(props: {
           ) : null}
         </>
       ) : null}
+      {diagnosticsOpen ? (
+        <View
+          style={{ position: "absolute", top: insets.top + 56, left: 12, right: 12, zIndex: 5 }}
+        >
+          <Card style={{ padding: 16, gap: 10, backgroundColor: theme.color.card }}>
+            <Txt variant="headline">{diagnosticCopy.headline}</Txt>
+            {diagnosticCopy.lines.map((line, index) => (
+              <Txt key={`${index}:${line}`} tone="label2">{`• ${line}`}</Txt>
+            ))}
+            {diagnosticCopy.grownUpLines.map((line, index) => (
+              <Txt key={`grown-up:${index}`} tone="label2">
+                {line}
+              </Txt>
+            ))}
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10 }}>
+              <Button
+                title={reportCopied ? "Copied" : "Copy details"}
+                kind="plain"
+                onPress={() => {
+                  void Clipboard.setStringAsync(report).then(() => setReportCopied(true));
+                }}
+              />
+              {props.onTellSam ? (
+                <Button
+                  title="Tell Sam"
+                  kind="plain"
+                  onPress={() => {
+                    props.onTellSam?.(diagnosticCopy.tellSam);
+                    setDiagnosticsOpen(false);
+                  }}
+                />
+              ) : null}
+              <Button title="Done" kind="plain" onPress={() => setDiagnosticsOpen(false)} />
+            </View>
+          </Card>
+        </View>
+      ) : null}
       {answerLabel !== null ? (
         <View
           style={{ position: "absolute", top: insets.top + 58, left: 12, right: 12, zIndex: 3 }}
@@ -388,7 +479,7 @@ export function PagePreview(props: {
 
 function ToolbarButton(props: {
   readonly label: string;
-  readonly symbol:
+  readonly symbol?:
     | "chevron.left"
     | "arrow.up.left.and.arrow.down.right"
     | "arrow.down.right.and.arrow.up.left";
@@ -409,11 +500,11 @@ function ToolbarButton(props: {
         paddingHorizontal: 6,
       }}
     >
-      {props.leading ? <Symbol name={props.symbol} size={18} /> : null}
+      {props.leading && props.symbol ? <Symbol name={props.symbol} size={18} /> : null}
       <Txt variant="footnote" weight="600" tone="accent">
         {props.label}
       </Txt>
-      {!props.leading ? <Symbol name={props.symbol} size={18} /> : null}
+      {!props.leading && props.symbol ? <Symbol name={props.symbol} size={18} /> : null}
     </Pressable>
   );
 }
