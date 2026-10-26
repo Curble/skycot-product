@@ -2,6 +2,7 @@ import { Wrench } from "lucide-react";
 
 import { ADVANCED_MODE_LABEL, PRODUCT_NAME } from "../brand";
 import { familyCopy } from "../features/family/copy";
+import { familyGrantOpen } from "../features/family/family";
 import { attemptFor, useFamily } from "../features/family/FamilyProvider";
 import { ParentCodeEntry, useParentCodeEntry } from "../features/family/ParentCodeEntry";
 import { Button } from "../ui/Button";
@@ -27,7 +28,9 @@ export function AdvancedModeSheet({
   readonly reason?: string;
 }) {
   const family = useFamily();
-  const locked = family.isLocked("advancedMode");
+  // A grown-up already in grown-up mode has proved the code: no second ask (the session renews).
+  const locked =
+    family.isLocked("advancedMode") && !familyGrantOpen(family.profile, "advancedMode", Date.now());
   // The engine checks the code, records the grant and sets the short-lived cookie the
   // developer interface's page needs; only then does the browser go there.
   const entry = useParentCodeEntry(attemptFor("advancedMode", {}), () => openAdvancedMode(path));
@@ -67,7 +70,14 @@ export function AdvancedModeSheet({
               {entry.busy ? "Checking…" : `Open ${ADVANCED_MODE_LABEL}`}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => openAdvancedMode(path)}>
+            <Button
+              variant="primary"
+              onClick={() =>
+                void family
+                  .requireParentCode("advancedMode")
+                  .then((ok) => (ok ? openAdvancedMode(path) : undefined))
+              }
+            >
               Open {ADVANCED_MODE_LABEL}
             </Button>
           )}

@@ -122,35 +122,47 @@ export function PreviewSheet({
   const name = relativePath.split("/").at(-1) ?? relativePath;
   const { projectId, threadId } = place;
 
+  // The page as last read: when Sam changes the file while the sheet is open, the frame reloads
+  // by itself (checked every few seconds) so the child never wonders whether anything happened.
+  const lastSeen = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const at: FilesPlace = { projectId, threadId };
-    void filesApi.read(at, relativePath).then(async (answer) => {
+    const read = async (watching: boolean) => {
+      const answer = await filesApi.read(at, relativePath);
       if (cancelled) return;
       if (!answer.ok) {
-        setLoad({ state: "problem", message: answer.message });
+        if (!watching) setLoad({ state: "problem", message: answer.message });
         return;
       }
       if (answer.value.encoding !== "utf8" || answer.value.contents === null) {
-        setLoad({ state: "problem", message: "This page is too big to open here." });
+        if (!watching) setLoad({ state: "problem", message: "This page is too big to open here." });
         return;
       }
       // nondev-seam: skycot-playable-copy
       const engineHtml = await playablePage(at.threadId, answer.value.absolutePath);
       const html = engineHtml ?? (await pageWithAssets(at, answer.value));
-      if (!cancelled) {
-        setLoad({
-          state: "ready",
-          html,
-          truncated: answer.value.truncated,
-          // nondev-seam: skycot-playable-copy
-          engineCopy: engineHtml !== null,
-          absolutePath: answer.value.absolutePath,
-        });
+      // The packed page holds the page's own files too, so a change to any of them shows up here.
+      if (cancelled || (watching && html === lastSeen.current)) return;
+      lastSeen.current = html;
+      setLoad({
+        state: "ready",
+        html,
+        truncated: answer.value.truncated,
+        // nondev-seam: skycot-playable-copy
+        engineCopy: engineHtml !== null,
+        absolutePath: answer.value.absolutePath,
+      });
+      if (watching) {
+        setFrameLoaded(false);
+        setRun((count) => count + 1);
       }
-    });
+    };
+    void read(false);
+    const timer = window.setInterval(() => void read(true), 3000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [projectId, threadId, relativePath]);
 

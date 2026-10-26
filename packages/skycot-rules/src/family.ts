@@ -57,13 +57,59 @@ export function projectApprovalCoverFor(
   )
     return "addOns";
   if (evaluation.base.decision === "hold") return null;
-  if (
-    ids.size === 1 &&
-    ids.has("uses-internet") &&
-    /^\s*(?:curl|wget)\s+https:\/\/[^\s|;&]+(?:\s+-[A-Za-z]+\s*)*$/iu.test(request.command)
-  )
+  if (ids.size === 1 && ids.has("uses-internet") && isSimpleHttpsFetch(request.command)) {
     return "internetFetch";
+  }
   return null;
+}
+
+// nondev-seam: skycot-project-approval-covers
+/**
+ * Pure: a plain `curl` or `wget` of one https address, optionally saving to a file inside the
+ * project (a font or picture a page wants): no pipes, no quotes, no other options with values.
+ */
+export function isSimpleHttpsFetch(command: string): boolean {
+  const tokens = command.trim().split(/\s+/u);
+  if (tokens.length < 2 || !/^(?:curl|wget)$/iu.test(tokens[0]!)) return false;
+  const isWget = /^wget$/iu.test(tokens[0]!);
+  const plainFlag = /^-(?:[LsSfqO]+|-location|-silent|-fail|-show-error)$/u;
+  const inside = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
+  const address =
+    /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?(?:\/[A-Za-z0-9._~%!$&'()*+,=:@/-]*)?(?:\?[A-Za-z0-9._~%!$&()*+,=:@/?-]*)?$/u;
+  let urls = 0;
+  for (let i = 1; i < tokens.length; i += 1) {
+    const token = tokens[i]!;
+    if (address.test(token)) {
+      urls += 1;
+    } else if (token === "-o" || token === "--output" || (isWget && token === "-O")) {
+      const target = tokens[i + 1];
+      if (target === undefined || !inside.test(target) || target.split("/").includes("..")) {
+        return false;
+      }
+      i += 1;
+    } else if (plainFlag.test(token)) {
+      continue;
+    } else if (
+      /^--(?:max-time|connect-timeout|retry)$/u.test(token) &&
+      /^\d{1,3}$/u.test(tokens[i + 1] ?? "")
+    ) {
+      i += 1;
+    } else {
+      return false;
+    }
+  }
+  if (urls !== 1) return false;
+  // Pictures, sounds, fonts and plain data only: code from the internet (.js, .html, .sh, ...)
+  // stays a grown-up's call each time, because the page would then run it.
+  const named = tokens.find(
+    (_, i) =>
+      tokens[i - 1] === "-o" || tokens[i - 1] === "--output" || (isWget && tokens[i - 1] === "-O"),
+  );
+  const fromAddress = tokens.find((token) => token.startsWith("https://"))!.split(/[?#]/u)[0]!;
+  const file = (named ?? fromAddress.split("/").at(-1) ?? "").toLowerCase();
+  return /\.(?:woff2?|ttf|otf|png|jpe?g|gif|webp|svg|ico|mp3|wav|ogg|m4a|json|txt|csv)$/u.test(
+    file,
+  );
 }
 
 export interface FamilyRule {

@@ -77,7 +77,7 @@ export const FAMILY_RULES_TEXT = [
   "- Never load internet scripts or libraries. Keep them in this project folder: install what you need with plain npm install, then import it from here.",
   "- Check work by reading the file or running plain node; do not use eval, vm or new Function.",
   '- Give timers and callbacks functions, never text: setTimeout(fn, ms), not setTimeout("code", ms).',
-  "- Never ask for, repeat or save personal information: name, school, address, phone, email, photos, passwords or location.",
+  "- Never ask for personal information: full name, school, address, phone, email, photos, passwords or location. A first name typed for a page is fine.",
   "- Do not make unsafe, violent, gory, scary, sexual or hateful things or contact people. If asked, say you can't make that kind of thing in SKYCOT; offer a safe idea. Never suggest it could be unlocked.",
   "- Stay in this project folder; don't read or change other computer files.",
   "- Never install or use the internet alone. If needed, run it normally so SKYCOT pauses it for approval; don't skip it or wait in chat. If declined, find another way. For page pictures, sounds, fonts or data, say in the plan: approved once.",

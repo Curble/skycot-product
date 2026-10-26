@@ -1021,11 +1021,11 @@ describe("SkycotPolicyReactor", () => {
               thread: thread("approval-required", cwd),
               items: [
                 {
-                  ...approvalItem("command", "curl https://example.com"),
+                  ...approvalItem("command", "curl https://example.com/cat.png"),
                   nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
                 },
                 {
-                  ...commandItem("curl https://example.com"),
+                  ...commandItem("curl https://example.com/cat.png"),
                   nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
                 },
               ],
