@@ -190,10 +190,15 @@ export function tryParentCode(
   code: string,
   purpose: FamilyPurpose,
   requestId?: string,
-  options?: { readonly quiet?: boolean },
+  options?: { readonly quiet?: boolean; readonly scope?: "once" | "project" },
 ): Promise<FamilyResult<UnlockToken>> {
   return settle(
-    familyApi.verify({ code, purpose, ...(requestId === undefined ? {} : { requestId }) }),
+    familyApi.verify({
+      code,
+      purpose,
+      ...(requestId === undefined ? {} : { requestId }),
+      ...(options?.scope === undefined ? {} : { scope: options.scope }),
+    }),
     () => {
       setView({ ...view, attemptsLeft: 5, lockedUntil: null });
       // The engine says how long the new "yes" lasts.
@@ -202,6 +207,28 @@ export function tryParentCode(
       for (const listener of parentYesListeners) listener(purpose);
     },
   );
+}
+
+export async function renewGrownUpSession(): Promise<boolean> {
+  const result = await settle(familyApi.renew(), () => undefined);
+  if (!result.ok) return false;
+  await refreshFamily();
+  return true;
+}
+
+export async function approveInGrownUpSession(
+  requestId: string,
+  scope: "once" | "project" = "once",
+): Promise<boolean> {
+  if (!(await renewGrownUpSession())) return false;
+  return (await settle(familyApi.approveSession(requestId, scope))).ok;
+}
+
+export async function prepareUpdateInGrownUpSession(): Promise<boolean> {
+  const result = await settle(familyApi.prepareUpdate(), () => undefined);
+  if (!result.ok) return false;
+  await refreshFamily();
+  return true;
 }
 
 /** A grown-up allows an assistant SKYCOT can't lock down, with the parent code. */
@@ -226,8 +253,9 @@ export function allowPageInternet(
   page: string,
   sites: ReadonlyArray<string>,
   code: string,
+  options: { readonly threadId: string; readonly scope: "once" | "project" },
 ): Promise<FamilyResult<ServerFamilyStatus>> {
-  return settle(familyApi.allowPageInternet({ page, sites, code }), applyStatus);
+  return settle(familyApi.allowPageInternet({ page, sites, code, ...options }), applyStatus);
 }
 
 /** Sends a child's page through the ordinary grown-up approval list. */
@@ -241,6 +269,10 @@ export function askPageInternet(input: {
 
 export function stopPageInternet(page: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.stopPageInternet({ page }), applyStatus);
+}
+
+export function stopProjectApproval(id: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settle(familyApi.stopProjectApproval(id), applyStatus);
 }
 
 export function stopAllowingAssistant(driver: string): Promise<FamilyResult<ServerFamilyStatus>> {

@@ -133,15 +133,17 @@ export function useTidy() {
   };
 
   /**
-   * Deletes for good. In a Family profile the parent-code sheet opens first (over the delete
-   * sheet) and the engine records a yes for this one conversation, spent by the delete.
+   * Deletes for good. In a Family profile the delete sheet collects the code and the engine
+   * records a yes for this one conversation, spent by the delete.
    */
   const remove = async (
     shell: EnvironmentThreadShell,
     options: { readonly archived?: boolean; readonly title?: string } = {},
+    parentCode?: string,
   ): Promise<DeleteOutcome> => {
     const allowed = await family.requireParentCode("deleteConversation", {
       requestId: deleteConversationApprovalId(shell.id),
+      ...(parentCode === undefined ? {} : { code: parentCode }),
     });
     if (!allowed) return { kind: "cancelled" };
     const wasOpen = isOpen(shell);

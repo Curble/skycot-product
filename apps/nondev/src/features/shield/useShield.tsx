@@ -9,7 +9,13 @@ import { newMessageId } from "~/lib/utils";
 
 import { useFamily } from "../family/FamilyProvider";
 import { reportShieldCatch } from "../recap/api";
-import { shieldFinding, type ShieldFinding } from "./shield";
+import {
+  pictureContentKey,
+  rememberNoFacePictures,
+  shieldFinding,
+  unknownPictureKeysForChild,
+  type ShieldFinding,
+} from "./shield";
 import { ShieldCard, type ShieldChoice } from "./ShieldCard";
 
 export type ShieldOutcome =
@@ -21,35 +27,51 @@ export type ShieldOutcome =
 interface Pending {
   readonly finding: ShieldFinding;
   readonly messageId: MessageId;
+  readonly childId: string;
+  readonly pictureKeys: ReadonlyArray<string | null>;
   readonly resolve: (outcome: ShieldOutcome) => void;
 }
+
+const picturesAskedByChild = new Map<string, Set<string>>();
 
 export function useShield() {
   const family = useFamily();
   const [pending, setPending] = useState<Pending | null>(null);
 
-  const clear = (text: string, pictureCount = 0): Promise<ShieldOutcome> => {
+  const clear = async (
+    text: string,
+    pictureData: ReadonlyArray<string> = [],
+  ): Promise<ShieldOutcome> => {
     const messageId = newMessageId();
-    const finding = family.enabled ? shieldFinding(text, pictureCount) : null;
-    if (finding === null) return Promise.resolve({ kind: "send", text, messageId });
+    const childId = family.profile.currentChildId ?? "solo";
+    const pictureKeys = await Promise.all(pictureData.map(pictureContentKey));
+    const unknown = unknownPictureKeysForChild(pictureKeys, picturesAskedByChild, childId);
+    const finding = family.enabled ? shieldFinding(text, unknown.length) : null;
+    if (finding === null) return { kind: "send", text, messageId };
     // For the grown-up recap: the kinds of detail only, once per card.
     if (pending === null) reportShieldCatch(finding.categories);
     // A second Return while the card is up starts over with what is in the field now.
     pending?.resolve({ kind: "edit", dropPictures: false });
-    return new Promise((resolve) => setPending({ finding, messageId, resolve }));
+    return new Promise((resolve) =>
+      setPending({ finding, messageId, childId, pictureKeys: unknown, resolve }),
+    );
   };
 
   const finish = (choice: ShieldChoice) => {
     if (pending === null) return;
-    const { finding, messageId, resolve } = pending;
+    const { finding, messageId, childId, pictureKeys, resolve } = pending;
     setPending(null);
     if (choice.kind === "edit") resolve(choice);
-    else
+    else {
+      if (finding.hasPictures) {
+        rememberNoFacePictures(picturesAskedByChild, childId, pictureKeys);
+      }
       resolve({
         kind: "send",
         text: choice.kind === "nicknames" ? choice.text : finding.text,
         messageId,
       });
+    }
   };
 
   const card =

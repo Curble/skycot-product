@@ -59,6 +59,7 @@ import {
   withAllowed,
   type PageInternetEntry,
 } from "@t3tools/skycot-rules/page-internet";
+import { PROJECT_APPROVAL_COVERS, type ProjectApprovalCover } from "@t3tools/skycot-rules/family";
 
 export const FAMILY_FILE_NAME = "skycot-family.json";
 export const MAX_ATTEMPTS = 5;
@@ -82,6 +83,21 @@ const PageInternetAsk = Schema.Struct({
   status: Schema.Literals(["pending", "allowed", "declined", "superseded"]),
 });
 export type PageInternetAsk = typeof PageInternetAsk.Type;
+
+// nondev-seam: skycot-project-approval-grants
+const ProjectApprovalGrant = Schema.Struct({
+  id: Schema.String,
+  childId: Schema.String,
+  projectPath: Schema.String,
+  covers: Schema.Array(Schema.Literals(PROJECT_APPROVAL_COVERS)),
+  grantedBy: Schema.String,
+  how: Schema.Literals(["parent-code", "face-id", "watch", "grown-up-session"]),
+  createdAt: Schema.Number,
+  expiresAt: Schema.Number,
+});
+export type ProjectApprovalGrant = typeof ProjectApprovalGrant.Type;
+export const PROJECT_APPROVAL_TTL_MS = 30 * 24 * 60 * 60_000;
+export const MAX_PROJECT_APPROVAL_GRANTS = 200;
 
 /** The mascot's poses a child can pick as their picture (apps/nondev features/brand/Mascot). */
 export const AVATAR_POSES = [
@@ -122,10 +138,11 @@ export const LIMIT_BOUNDS = {
 } as const;
 
 /**
- * What a grown-up can say yes to. `advanced` (the developer interface) is the master grant:
- * a parent working there can also publish, approve and set up automations until it expires.
+ * What a grown-up can say yes to. The shared grown-up session covers the listed actions; update
+ * restarts and exact-request approvals keep their own short grants.
  */
 export const FAMILY_PURPOSES = [
+  // nondev-seam: skycot-grown-up-session-grants
   "approve",
   "publish",
   "automation",
@@ -141,6 +158,7 @@ export const FAMILY_PURPOSES = [
    * add-ons, build output) and Show in Finder (skycot/files).
    */
   "files",
+  "grownUpSession",
 ] as const;
 export type FamilyPurpose = (typeof FAMILY_PURPOSES)[number];
 
@@ -155,15 +173,22 @@ export const GRANT_TTL_MS: Readonly<Record<FamilyPurpose, number>> = {
   // Long enough to read the warning and press Restart (the desktop's note lasts as long).
   update: 2 * 60_000,
   files: 10 * 60_000,
+  grownUpSession: 15 * 60_000,
 };
+export const GROWN_UP_SESSION_MAX_MS = 2 * 60 * 60_000;
 
 export const UNLOCK_COOKIE_NAME = "skycot_family_unlock";
 
+// nondev-seam: skycot-grown-up-session-grants
 const Grant = Schema.Struct({
   sessionId: Schema.String,
   purpose: Schema.Literals(FAMILY_PURPOSES),
   requestId: Schema.optionalKey(Schema.String),
+  scope: Schema.optionalKey(Schema.Literal("project")),
+  how: Schema.optionalKey(Schema.Literals(["parent-code", "grown-up-session"])),
   expiresAt: Schema.Number,
+  startedAt: Schema.optionalKey(Schema.Number),
+  renewals: Schema.optionalKey(Schema.Number),
 });
 type Grant = typeof Grant.Type;
 
@@ -365,6 +390,8 @@ const FamilyFile = Schema.Struct({
   ),
   /** Bounded requests to allow one page's exact internet sites. */
   pageInternetAsks: Schema.optionalKey(Schema.Array(PageInternetAsk)),
+  /** Project-scoped approvals; optional so older Family files continue to load. */
+  projectApprovalGrants: Schema.optionalKey(Schema.Array(ProjectApprovalGrant)),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -489,7 +516,16 @@ export interface FamilyStatus {
   readonly devices: ReadonlyArray<FamilyDeviceView>;
   /** Pages allowed to load things from internet sites (Settings › Family lists them). */
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
+  readonly projectApprovalGrants: ReadonlyArray<ProjectApprovalGrant>;
 }
+
+const projectApprovalGrantsOf = (
+  file: Pick<FamilyFile, "projectApprovalGrants"> | null,
+  now: number,
+): ReadonlyArray<ProjectApprovalGrant> =>
+  (file?.projectApprovalGrants ?? [])
+    .filter((grant) => grant.expiresAt > now && grant.covers.length > 0)
+    .slice(-MAX_PROJECT_APPROVAL_GRANTS);
 
 const pageInternetAsksOf = (
   file: Pick<FamilyFile, "pageInternetAsks"> | null,
@@ -571,10 +607,13 @@ export interface VerifyInput {
   readonly sessionId: string;
   /** Required for `approve`: the one card the grown-up is allowing. */
   readonly requestId?: string | undefined;
+  /** The scope on the existing request-bound approval; missing means once. */
+  readonly scope?: "once" | "project";
 }
 
 export interface UnlockToken {
   readonly token: string;
+  readonly sessionToken?: string;
   readonly expiresAt: number;
   readonly purpose: FamilyPurpose;
 }
@@ -599,6 +638,24 @@ export class SkycotFamily extends Context.Service<
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** One code attempt; on success records a grant for this session and returns its token. */
     readonly verify: (input: VerifyInput) => Effect.Effect<UnlockToken, FamilyError>;
+    readonly renew: (input: {
+      readonly sessionId: string;
+    }) => Effect.Effect<UnlockToken, FamilyError>;
+    readonly approveRequest: (input: {
+      readonly sessionId: string;
+      readonly requestId: string;
+      readonly scope?: "once" | "project";
+    }) => Effect.Effect<void, FamilyError>;
+    readonly approvalScope: (input: {
+      readonly sessionId: string;
+      readonly requestId: string;
+    }) => Effect.Effect<{
+      readonly scope: "once" | "project";
+      readonly how: "parent-code" | "grown-up-session";
+    }>;
+    readonly prepareUpdate: (input: {
+      readonly sessionId: string;
+    }) => Effect.Effect<UnlockToken, FamilyError>;
     readonly disable: (input: {
       readonly code: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
@@ -663,6 +720,11 @@ export class SkycotFamily extends Context.Service<
       readonly code: string;
       readonly page: string;
       readonly sites: ReadonlyArray<string>;
+      readonly projectApproval?: {
+        readonly childId: string;
+        readonly projectPath: string;
+        readonly grantedBy: string;
+      };
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** Creates or reuses a child's pending request for one page and exact site set. */
     readonly askPageInternet: (input: {
@@ -682,11 +744,26 @@ export class SkycotFamily extends Context.Service<
     readonly stopPageInternet: (input: {
       readonly page: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Records a project yes after the caller has verified the grown-up's answer. */
+    readonly grantProjectApproval: (input: {
+      readonly childId: string;
+      readonly projectPath: string;
+      readonly covers: ReadonlyArray<ProjectApprovalCover>;
+      readonly grantedBy: string;
+      readonly how: ProjectApprovalGrant["how"];
+    }) => Effect.Effect<ProjectApprovalGrant, FamilyError>;
+    /** Takes away a project yes. No code is needed to make Family stricter. */
+    readonly stopProjectApproval: (input: {
+      readonly id: string;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
     /**
      * The sites a page may use: null while the profile is off (no policy at all, as before),
      * otherwise the allowed sites (empty: offline). Cheap, like `isEnabled`.
      */
-    readonly pageInternetSites: (page: string) => Effect.Effect<ReadonlyArray<string> | null>;
+    readonly pageInternetSites: (
+      page: string,
+      project?: { readonly childId: string; readonly projectPath: string },
+    ) => Effect.Effect<ReadonlyArray<string> | null>;
     /** Ends every grant this session holds (a parent leaving Advanced mode). */
     readonly lock: (input: { readonly sessionId: string }) => Effect.Effect<void, FamilyError>;
     /**
@@ -712,6 +789,11 @@ export class SkycotFamily extends Context.Service<
     readonly tokenAllows: (
       token: string | undefined,
       purpose: FamilyPurpose,
+      sessionId?: string,
+    ) => Effect.Effect<boolean>;
+    readonly tokenBelongsToSession: (
+      token: string | undefined,
+      sessionId: string,
     ) => Effect.Effect<boolean>;
     /** Ends every grant on every device (a grown-up's "Lock everything"). No code: it only takes away. */
     readonly lockAll: Effect.Effect<void, FamilyError>;
@@ -841,7 +923,11 @@ export function signToken(
 export function readToken(
   secret: string,
   token: string,
-): { readonly purpose: FamilyPurpose; readonly expiresAt: number } | null {
+): {
+  readonly purpose: FamilyPurpose;
+  readonly expiresAt: number;
+  readonly sessionId: string;
+} | null {
   const [version, body, signature] = token.split(".");
   if (version !== "v1" || body === undefined || signature === undefined) return null;
   const expected = NodeCrypto.createHmac("sha256", secret).update(`v1.${body}`).digest();
@@ -854,14 +940,16 @@ export function readToken(
     >;
     const purpose = parsed["p"];
     const expiresAt = parsed["e"];
+    const sessionId = parsed["s"];
     if (
       typeof purpose !== "string" ||
       !(FAMILY_PURPOSES as ReadonlyArray<string>).includes(purpose) ||
-      typeof expiresAt !== "number"
+      typeof expiresAt !== "number" ||
+      typeof sessionId !== "string"
     ) {
       return null;
     }
-    return { purpose: purpose as FamilyPurpose, expiresAt };
+    return { purpose: purpose as FamilyPurpose, expiresAt, sessionId };
   } catch {
     return null;
   }
@@ -904,6 +992,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       grownUps: [],
       devices: [],
       pageInternet: [],
+      projectApprovalGrants: [],
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
@@ -921,6 +1010,7 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     grownUps: file.grownUps ?? [],
     devices: (file.devices ?? []).map(deviceView),
     pageInternet: pageInternetOf(file),
+    projectApprovalGrants: projectApprovalGrantsOf(file, now),
   };
 }
 
@@ -1192,8 +1282,18 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       : Effect.succeed(file);
 
   const status: SkycotFamily["Service"]["status"] = Effect.gen(function* () {
-    return toStatus(yield* load, yield* now);
-  }).pipe(Effect.withSpan("SkycotFamily.status"));
+    const file = yield* load;
+    const at = yield* now;
+    if (file === null) return toStatus(null, at);
+    const grants = projectApprovalGrantsOf(file, at);
+    const savedGrants = file.projectApprovalGrants ?? [];
+    if (grants.length !== savedGrants.length) {
+      const next = { ...file, projectApprovalGrants: grants };
+      yield* save(next);
+      return toStatus(next, at);
+    }
+    return toStatus(file, at);
+  }).pipe(Effect.withSpan("SkycotFamily.status"), lock.withPermits(1));
 
   const codeLength: SkycotFamily["Service"]["codeLength"] = load.pipe(
     Effect.map((file) => knownCodeLength(file)),
@@ -1242,7 +1342,13 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     if (!(FAMILY_PURPOSES as ReadonlyArray<string>).includes(input.purpose)) {
       return yield* new FamilyError({ reason: "invalid-request" });
     }
+    if (input.purpose === "grownUpSession") {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
     if (input.purpose === "approve" && !input.requestId) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    if (input.scope === "project" && (input.purpose !== "approve" || !input.requestId)) {
       return yield* new FamilyError({ reason: "invalid-request" });
     }
     const file = yield* requireEnabled(yield* load);
@@ -1253,18 +1359,161 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       sessionId: input.sessionId,
       purpose: input.purpose,
       ...(input.purpose === "approve" && input.requestId ? { requestId: input.requestId } : {}),
+      ...(input.purpose === "approve" && input.scope === "project"
+        ? { scope: "project" as const }
+        : {}),
+      ...(input.purpose === "approve" && input.scope === "project"
+        ? { how: "parent-code" as const }
+        : {}),
       expiresAt,
     };
-    yield* save({ ...cleared, grants: [...liveGrants(cleared.grants, at), grant] });
+    const grants = [...liveGrants(cleared.grants, at), grant];
+    if (input.purpose !== "approve" && input.purpose !== "update") {
+      grants.push({
+        sessionId: input.sessionId,
+        purpose: "grownUpSession",
+        expiresAt: at + GRANT_TTL_MS.grownUpSession,
+        startedAt: at,
+        renewals: 0,
+      });
+    }
+    yield* save({ ...cleared, grants });
     return {
       token: signToken(cleared.tokenSecret, {
         purpose: input.purpose,
         expiresAt,
         sessionId: input.sessionId,
       }),
+      ...(input.purpose !== "approve" && input.purpose !== "update"
+        ? {
+            sessionToken: signToken(cleared.tokenSecret, {
+              purpose: "advanced",
+              expiresAt: at + GRANT_TTL_MS.grownUpSession,
+              sessionId: input.sessionId,
+            }),
+          }
+        : {}),
       expiresAt,
       purpose: input.purpose,
     } satisfies UnlockToken;
+  }, lock.withPermits(1));
+
+  const renew: SkycotFamily["Service"]["renew"] = Effect.fn("SkycotFamily.renew")(function* (
+    input,
+  ) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const live = liveGrants(file.grants, at);
+    const current = live.find(
+      (grant) => grant.sessionId === input.sessionId && grant.purpose === "grownUpSession",
+    );
+    if (current === undefined || current.expiresAt <= at) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const startedAt = current.startedAt ?? at;
+    const cap = startedAt + GROWN_UP_SESSION_MAX_MS;
+    if (at >= cap) return yield* new FamilyError({ reason: "invalid-request" });
+    const expiresAt = Math.min(at + GRANT_TTL_MS.grownUpSession, cap);
+    yield* save({
+      ...file,
+      grants: live.map((grant) =>
+        grant === current
+          ? { ...grant, startedAt, renewals: (grant.renewals ?? 0) + 1, expiresAt }
+          : grant,
+      ),
+    });
+    const token = signToken(file.tokenSecret, {
+      purpose: "advanced",
+      expiresAt,
+      sessionId: input.sessionId,
+    });
+    return { token, sessionToken: token, expiresAt, purpose: "advanced" as const };
+  }, lock.withPermits(1));
+
+  const approveRequest: SkycotFamily["Service"]["approveRequest"] = Effect.fn(
+    "SkycotFamily.approveRequest",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    if (
+      !liveGrants(file.grants, at).some(
+        (grant) => grant.sessionId === input.sessionId && grant.purpose === "grownUpSession",
+      )
+    ) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    yield* save({
+      ...file,
+      grants: [
+        ...liveGrants(file.grants, at),
+        {
+          sessionId: input.sessionId,
+          purpose: "approve",
+          requestId: input.requestId,
+          ...(input.scope === "project" ? { scope: "project" as const } : {}),
+          ...(input.scope === "project" ? { how: "grown-up-session" as const } : {}),
+          expiresAt: at + GRANT_TTL_MS.approve,
+        },
+      ],
+    });
+  }, lock.withPermits(1));
+
+  const approvalScope: SkycotFamily["Service"]["approvalScope"] = (input) =>
+    Effect.gen(function* () {
+      const file = yield* load;
+      const at = yield* now;
+      const grant = liveGrants(file?.grants ?? [], at).find(
+        (entry) =>
+          entry.sessionId === input.sessionId &&
+          entry.purpose === "approve" &&
+          entry.requestId === input.requestId,
+      );
+      return {
+        scope: grant?.scope === "project" ? ("project" as const) : ("once" as const),
+        how: grant?.how ?? "parent-code",
+      };
+    });
+
+  const prepareUpdate: SkycotFamily["Service"]["prepareUpdate"] = Effect.fn(
+    "SkycotFamily.prepareUpdate",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const live = liveGrants(file.grants, at);
+    const current = live.find(
+      (grant) => grant.sessionId === input.sessionId && grant.purpose === "grownUpSession",
+    );
+    if (
+      current === undefined ||
+      current.expiresAt <= at ||
+      at >= (current.startedAt ?? at) + GROWN_UP_SESSION_MAX_MS
+    ) {
+      return yield* new FamilyError({ reason: "invalid-request" });
+    }
+    const sessionExpiresAt = Math.min(
+      at + GRANT_TTL_MS.grownUpSession,
+      (current.startedAt ?? at) + GROWN_UP_SESSION_MAX_MS,
+    );
+    const updateExpiresAt = at + GRANT_TTL_MS.update;
+    const grants = live
+      .filter((grant) => !(grant.sessionId === input.sessionId && grant.purpose === "update"))
+      .map((grant) =>
+        grant === current
+          ? { ...grant, expiresAt: sessionExpiresAt, renewals: (grant.renewals ?? 0) + 1 }
+          : grant,
+      );
+    grants.push({
+      sessionId: input.sessionId,
+      purpose: "update",
+      expiresAt: updateExpiresAt,
+    });
+    yield* save({ ...file, grants });
+    const token = signToken(file.tokenSecret, {
+      purpose: "advanced",
+      expiresAt: sessionExpiresAt,
+      sessionId: input.sessionId,
+    });
+    return { token, sessionToken: token, expiresAt: updateExpiresAt, purpose: "update" as const };
   }, lock.withPermits(1));
 
   const disable: SkycotFamily["Service"]["disable"] = Effect.fn("SkycotFamily.disable")(function* (
@@ -1470,10 +1719,45 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
         ? { ...ask, status: "allowed" as const }
         : ask,
     );
+    let projectApprovalGrants = projectApprovalGrantsOf(cleared, at);
+    if (input.projectApproval !== undefined) {
+      const { childId, projectPath, grantedBy } = input.projectApproval;
+      const canonicalProjectPath = yield* fs
+        .realPath(projectPath)
+        .pipe(Effect.orElseSucceed(() => null));
+      const pageFromProject = path.relative(projectPath, page);
+      if (
+        !cleared.children.some((child) => child.id === childId) ||
+        projectPath.length === 0 ||
+        grantedBy.length === 0 ||
+        canonicalProjectPath !== projectPath ||
+        pageFromProject.startsWith("..") ||
+        path.isAbsolute(pageFromProject)
+      )
+        return yield* new FamilyError({ reason: "invalid-request" });
+      const existing = projectApprovalGrants.find(
+        (grant) => grant.childId === childId && grant.projectPath === projectPath,
+      );
+      const grant: ProjectApprovalGrant = {
+        id: existing?.id ?? hex(NodeCrypto.randomBytes(16)),
+        childId,
+        projectPath,
+        covers: [...new Set([...(existing?.covers ?? []), "internetAssets" as const])],
+        grantedBy,
+        how: "parent-code",
+        createdAt: at,
+        expiresAt: at + PROJECT_APPROVAL_TTL_MS,
+      };
+      projectApprovalGrants = [
+        ...projectApprovalGrants.filter((entry) => entry.id !== existing?.id),
+        grant,
+      ].slice(-MAX_PROJECT_APPROVAL_GRANTS);
+    }
     const next: FamilyFile = {
       ...cleared,
       pageInternet,
       pageInternetAsks,
+      ...(input.projectApproval === undefined ? {} : { projectApprovalGrants }),
     };
     yield* save(next);
     yield* Effect.logInfo("skycot-family.page-internet-allowed", { sites });
@@ -1598,14 +1882,86 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return toStatus(next, yield* now);
   }, lock.withPermits(1));
 
-  const pageInternetSites: SkycotFamily["Service"]["pageInternetSites"] = (page) =>
-    load.pipe(
-      Effect.map((file) =>
-        file === null || !file.enabled ? null : sitesForPage(pageInternetOf(file), page),
-      ),
+  // nondev-seam: skycot-project-approval-page-internet
+  const pageInternetSites: SkycotFamily["Service"]["pageInternetSites"] = (page, project) =>
+    Effect.gen(function* () {
+      const file = yield* load;
+      if (file === null || !file.enabled) return null;
+      const entries = pageInternetOf(file);
+      const direct = sitesForPage(entries, page);
+      if (project === undefined) return direct;
+      const at = yield* now;
+      const grants = projectApprovalGrantsOf(file, at).filter(
+        (grant) =>
+          grant.childId === project.childId &&
+          grant.projectPath === project.projectPath &&
+          grant.covers.includes("internetAssets"),
+      );
+      if (grants.length === 0) return direct;
+      const inProject = entries.filter((entry) => {
+        const relative = path.relative(project.projectPath, entry.page);
+        return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+      });
+      return [...new Set([...direct, ...inProject.flatMap((entry) => entry.sites)])].toSorted();
+    }).pipe(
       // An unreadable profile keeps the page offline, never open.
       Effect.catchCause(() => Effect.succeed([] as ReadonlyArray<string>)),
     );
+
+  // nondev-seam: skycot-project-approval-grants
+  const grantProjectApproval: SkycotFamily["Service"]["grantProjectApproval"] = Effect.fn(
+    "SkycotFamily.grantProjectApproval",
+  )(function* (input) {
+    const file = yield* requireEnabled(yield* load);
+    if (
+      !file.children.some((child) => child.id === input.childId) ||
+      input.projectPath.length === 0 ||
+      input.covers.length === 0 ||
+      input.covers.some(
+        (cover) => !(PROJECT_APPROVAL_COVERS as ReadonlyArray<string>).includes(cover),
+      )
+    )
+      return yield* new FamilyError({ reason: "invalid-request" });
+    const at = yield* now;
+    const grant: ProjectApprovalGrant = {
+      id: hex(NodeCrypto.randomBytes(16)),
+      childId: input.childId,
+      projectPath: input.projectPath,
+      covers: [...new Set(input.covers)],
+      grantedBy: input.grantedBy,
+      how: input.how,
+      createdAt: at,
+      expiresAt: at + PROJECT_APPROVAL_TTL_MS,
+    };
+    const existing = projectApprovalGrantsOf(file, at);
+    const sameProject = existing.find(
+      (entry) => entry.childId === grant.childId && entry.projectPath === grant.projectPath,
+    );
+    const saved =
+      sameProject === undefined
+        ? grant
+        : {
+            ...grant,
+            id: sameProject.id,
+            covers: [...new Set([...sameProject.covers, ...grant.covers])],
+          };
+    const grants = [...existing.filter((entry) => entry.id !== sameProject?.id), saved].slice(
+      -MAX_PROJECT_APPROVAL_GRANTS,
+    );
+    yield* save({ ...file, projectApprovalGrants: grants });
+    return saved;
+  }, lock.withPermits(1));
+
+  const stopProjectApproval: SkycotFamily["Service"]["stopProjectApproval"] = Effect.fn(
+    "SkycotFamily.stopProjectApproval",
+  )(function* ({ id }) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const grants = projectApprovalGrantsOf(file, at).filter((grant) => grant.id !== id);
+    const next = { ...file, projectApprovalGrants: grants };
+    yield* save(next);
+    return toStatus(next, at);
+  }, lock.withPermits(1));
 
   const assistantAllowed: SkycotFamily["Service"]["assistantAllowed"] = (driver) =>
     load.pipe(
@@ -1650,7 +2006,15 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const at = yield* now;
     const live = liveGrants(file.grants, at);
     const forSession = live.filter((grant) => grant.sessionId === input.sessionId);
-    if (forSession.some((grant) => grant.purpose === "advanced")) return true;
+    if (
+      input.purpose !== "approve" &&
+      input.purpose !== "update" &&
+      forSession.some((grant) => grant.purpose === "grownUpSession")
+    ) {
+      return true;
+    }
+    if (input.purpose !== "approve" && forSession.some((grant) => grant.purpose === "advanced"))
+      return true;
     const match = forSession.find(
       (grant) =>
         grant.purpose === input.purpose &&
@@ -1677,17 +2041,29 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
   );
 
   const tokenAllows: SkycotFamily["Service"]["tokenAllows"] = Effect.fn("SkycotFamily.tokenAllows")(
-    function* (token, purpose) {
+    function* (token, purpose, sessionId) {
       const file = yield* load;
       if (file === null || !file.enabled) return true;
       if (token === undefined || token.length === 0) return false;
       const read = readToken(file.tokenSecret, token);
       if (read === null) return false;
       return (
-        read.expiresAt > (yield* now) && (read.purpose === purpose || read.purpose === "advanced")
+        read.expiresAt > (yield* now) &&
+        (sessionId === undefined || read.sessionId === sessionId) &&
+        (read.purpose === purpose || read.purpose === "advanced")
       );
     },
   );
+
+  const tokenBelongsToSession: SkycotFamily["Service"]["tokenBelongsToSession"] = Effect.fn(
+    "SkycotFamily.tokenBelongsToSession",
+  )(function* (token, sessionId) {
+    const file = yield* load;
+    if (file === null || !file.enabled) return true;
+    if (!token) return false;
+    const read = readToken(file.tokenSecret, token);
+    return read !== null && read.sessionId === sessionId && read.expiresAt > (yield* now);
+  });
 
   const lockAll: SkycotFamily["Service"]["lockAll"] = Effect.gen(function* () {
     const file = yield* load;
@@ -1931,6 +2307,10 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     isEnabled,
     enable,
     verify,
+    renew,
+    approveRequest,
+    approvalScope,
+    prepareUpdate,
     disable,
     changeCode,
     rename,
@@ -1950,9 +2330,12 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     settlePageInternetAsk,
     stopPageInternet,
     pageInternetSites,
+    grantProjectApproval,
+    stopProjectApproval,
     lock: lockSession,
     allows,
     tokenAllows,
+    tokenBelongsToSession,
   });
 });
 

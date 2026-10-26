@@ -6,6 +6,8 @@ import {
   shieldFinding,
   shieldProblem,
   shieldSentence,
+  rememberNoFacePictures,
+  unknownPictureKeysForChild,
 } from "./shield";
 
 const SHOWPIECE = "my name is Ava Smith and I go to St Kilda Primary";
@@ -35,6 +37,18 @@ describe("shieldFinding", () => {
 
   it("asks about both together", () => {
     expect(shieldFinding(SHOWPIECE, 2)?.categories).toEqual(["full-name", "school", "photo"]);
+  });
+});
+
+describe("remembered picture questions", () => {
+  it("asks about each unknown picture and keeps no-face answers for known content", () => {
+    const remembered = new Map<string, Set<string>>();
+    rememberNoFacePictures(remembered, "child-a", ["same", null]);
+    expect(unknownPictureKeysForChild(["same", "new", null], remembered, "child-a")).toEqual([
+      "new",
+      null,
+    ]);
+    expect(unknownPictureKeysForChild(["same"], remembered, "child-b")).toEqual(["same"]);
   });
 });
 

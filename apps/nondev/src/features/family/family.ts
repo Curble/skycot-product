@@ -81,7 +81,8 @@ export type FamilyPurpose =
   | "advanced"
   | "recap"
   | "update"
-  | "files";
+  | "files"
+  | "grownUpSession";
 
 /**
  * The engine grant an action asks for. Turning the profile off and changing the code are not
@@ -149,6 +150,7 @@ export interface ServerFamilyStatus {
   readonly allowedAssistants?: ReadonlyArray<string>;
   /** Pages a grown-up let use internet sites. An engine from before it sends none. */
   readonly pageInternet?: ReadonlyArray<PageInternetEntry>;
+  readonly projectApprovalGrants?: ReadonlyArray<ProjectApprovalGrant>;
   /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
   readonly trustedAddOns?: boolean;
   readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
@@ -211,6 +213,46 @@ function parsePageInternet(value: unknown): ReadonlyArray<PageInternetEntry> {
   return entries;
 }
 
+export interface ProjectApprovalGrant {
+  readonly id: string;
+  readonly childId: string;
+  readonly projectPath: string;
+  readonly covers: ReadonlyArray<"webSearch" | "addOns" | "internetFetch" | "internetAssets">;
+  readonly expiresAt: number;
+}
+
+function parseProjectApprovalGrants(value: unknown): ReadonlyArray<ProjectApprovalGrant> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry: unknown) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const record = entry as Record<string, unknown>;
+    const covers = Array.isArray(record["covers"])
+      ? record["covers"].filter(
+          (cover): cover is ProjectApprovalGrant["covers"][number] =>
+            cover === "webSearch" ||
+            cover === "addOns" ||
+            cover === "internetFetch" ||
+            cover === "internetAssets",
+        )
+      : [];
+    return typeof record["id"] === "string" &&
+      typeof record["childId"] === "string" &&
+      typeof record["projectPath"] === "string" &&
+      typeof record["expiresAt"] === "number" &&
+      covers.length > 0
+      ? [
+          {
+            id: record["id"],
+            childId: record["childId"],
+            projectPath: record["projectPath"],
+            covers,
+            expiresAt: record["expiresAt"],
+          },
+        ]
+      : [];
+  });
+}
+
 function parseAllowedAssistants(value: unknown): ReadonlyArray<string> {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
@@ -226,6 +268,7 @@ const PURPOSES: ReadonlySet<string> = new Set<FamilyPurpose>([
   "advanced",
   "recap",
   "files",
+  "grownUpSession",
 ]);
 
 function parseGrants(value: unknown): ReadonlyArray<OpenGrant> | undefined {
@@ -269,6 +312,7 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
       : { session: parseSessionLimits(record["session"])! }),
     allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
     pageInternet: parsePageInternet(record["pageInternet"]),
+    projectApprovalGrants: parseProjectApprovalGrants(record["projectApprovalGrants"]),
     ...(typeof record["trustedAddOns"] === "boolean"
       ? { trustedAddOns: record["trustedAddOns"] }
       : {}),
@@ -377,6 +421,7 @@ export interface FamilyView {
   readonly allowedAssistants: ReadonlyArray<string>;
   /** Pages a grown-up let use internet sites (Settings › Family lists them). */
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
+  readonly projectApprovalGrants: ReadonlyArray<ProjectApprovalGrant>;
   /** Trusted add-ons (three.js, p5, …) download without a grown-up; the engine decides. */
   readonly trustedAddOns: boolean;
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
@@ -405,6 +450,7 @@ export const EMPTY_VIEW: FamilyView = {
   legacy: false,
   allowedAssistants: [],
   pageInternet: [],
+  projectApprovalGrants: [],
   trustedAddOns: false,
   grownUps: [],
   devices: [],
@@ -485,6 +531,7 @@ export function viewFromStatus(
     legacy: legacy && !status.enabled,
     allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
     pageInternet: status.enabled ? (status.pageInternet ?? []) : [],
+    projectApprovalGrants: status.enabled ? (status.projectApprovalGrants ?? []) : [],
     trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],
@@ -567,7 +614,7 @@ export function viewLockRemainingMs(view: Pick<FamilyView, "lockedUntil">, now: 
 
 /** True while the parent code has Family and AI settings (or Advanced mode) open on this device. */
 export function grownUpSettingsOpen(view: Pick<FamilyView, "openUntil">, now: number): boolean {
-  return [view.openUntil.settings, view.openUntil.advanced].some(
+  return [view.openUntil.grownUpSession, view.openUntil.settings, view.openUntil.advanced].some(
     (until) => until !== undefined && until > now,
   );
 }
@@ -579,6 +626,13 @@ export function familyGrantOpen(
   now: number,
 ): boolean {
   const purpose = purposeFor(action);
+  if (
+    action !== "restartToUpdate" &&
+    action !== "approve" &&
+    action !== "deleteConversation" &&
+    (view.openUntil.grownUpSession ?? 0) > now
+  )
+    return true;
   if (purpose === null || action === "approve" || action === "deleteConversation") return false;
   const grants: ReadonlyArray<FamilyPurpose> =
     action === "seeRecap"
@@ -591,8 +645,12 @@ export function familyGrantOpen(
 
 /** Whole minutes left in the shared Mac's grown-up mode bar. */
 export function grownUpMinutesLeft(view: Pick<FamilyView, "openUntil">, now: number): number {
-  const until = Math.max(view.openUntil.settings ?? 0, view.openUntil.advanced ?? 0);
-  return until <= now ? 0 : Math.max(1, Math.round((until - now) / 60_000));
+  const until = Math.max(
+    view.openUntil.grownUpSession ?? 0,
+    view.openUntil.settings ?? 0,
+    view.openUntil.advanced ?? 0,
+  );
+  return until <= now ? 0 : Math.max(1, Math.floor((until - now) / 60_000));
 }
 
 const OPEN_LABELS: ReadonlyArray<readonly [FamilyPurpose, string]> = [
@@ -614,6 +672,10 @@ export function openGrantsSentence(
 ): string | null {
   const minutes = (until: number | undefined) =>
     until === undefined || until <= now ? 0 : Math.ceil((until - now) / 60_000);
+  const session = minutes(view.openUntil.grownUpSession);
+  if (session > 0) {
+    return `Grown-up mode for ${session === 1 ? "1 more minute" : `${session} more minutes`}.`;
+  }
   const advanced = minutes(view.openUntil.advanced);
   const open =
     advanced > 0

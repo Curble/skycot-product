@@ -47,6 +47,7 @@ import { parseApprovedDownload, parseApprovedInstall } from "@t3tools/skycot-rul
 import {
   evaluateFamilyRequest,
   isReadOnlyCommand,
+  projectApprovalCoverFor,
   type FamilyEvaluation,
 } from "@t3tools/skycot-rules/family";
 import { workRootsFor } from "@t3tools/skycot-rules/questions";
@@ -191,10 +192,13 @@ export function needsBranchContext(facts: RuleRequest): boolean {
   );
 }
 
+// nondev-seam: skycot-project-approval-enforcement
 const make = Effect.gen(function* () {
   const engine = yield* Orchestrator.OrchestratorV2;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const fsOption = yield* Effect.serviceOption(FileSystem.FileSystem);
+  const pathOption = yield* Effect.serviceOption(Path.Path);
   const git = yield* GitVcsDriver.GitVcsDriver;
   // Optional so the layer's type is unchanged; server.ts provides it at the top.
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
@@ -234,6 +238,41 @@ const make = Effect.gen(function* () {
             }),
           ),
         );
+
+  const projectGrantCovers = Effect.fnUntraced(function* (
+    thread: { readonly id: ThreadId; readonly projectId: ProjectId },
+    cwd: string,
+    cover: ReturnType<typeof projectApprovalCoverFor>,
+    childId: string,
+  ) {
+    if (
+      cover === null ||
+      Option.isNone(family) ||
+      Option.isNone(fsOption) ||
+      Option.isNone(pathOption)
+    )
+      return false;
+    const project = yield* projects.get(thread.projectId);
+    if (Option.isNone(project)) return false;
+    const path = pathOption.value;
+    const projectPath = yield* fsOption.value
+      .realPath(project.value.workspaceRoot)
+      .pipe(Effect.orElseSucceed(() => ""));
+    const workingPath = yield* fsOption.value.realPath(cwd).pipe(Effect.orElseSucceed(() => ""));
+    if (projectPath.length === 0 || workingPath.length === 0) return false;
+    const relative = path.relative(projectPath, workingPath);
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+      return false;
+    const status = yield* family.value.status.pipe(Effect.orElseSucceed(() => null));
+    return (
+      status?.projectApprovalGrants.some(
+        (grant) =>
+          grant.childId === childId &&
+          grant.projectPath === projectPath &&
+          grant.covers.includes(cover),
+      ) ?? false
+    );
+  });
 
   /**
    * The branch the push would send and the branch everyone sees. A thread with a private
@@ -379,6 +418,36 @@ const make = Effect.gen(function* () {
           { ...roots, ...branches, ...extras },
         )
       : undefined;
+    const projectCover =
+      familyEvaluation === undefined
+        ? null
+        : projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, familyEvaluation);
+    const stepRule = inFamily ? yield* familyStepRule(input.threadId) : null;
+    if (
+      familyEvaluation?.needsGrownUp === true &&
+      familyEvaluation.base.decision !== "hold" &&
+      stepRule?.type === "auto" &&
+      (yield* projectGrantCovers(thread, roots.projectRoot ?? "", projectCover, stepRule.childId))
+    ) {
+      yield* engine.dispatch({
+        type: "runtime-request.respond",
+        commandId: policyCommandId(input.threadId, input.requestId),
+        threadId: input.threadId,
+        requestId: input.requestId,
+        decision: "accept",
+        answers: policyDecisionAnswers(evaluation),
+      });
+      yield* Effect.logInfo("skycot-policy.project-approved", {
+        threadId: input.threadId,
+        requestId: input.requestId,
+        cover: projectCover,
+      });
+      return {
+        type: "approved",
+        evaluation,
+        family: familyEvaluation,
+      } satisfies SkycotPolicyOutcome;
+    }
     if (
       familyEvaluation !== undefined &&
       !familyEvaluation.needsGrownUp &&

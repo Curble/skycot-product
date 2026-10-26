@@ -19,8 +19,15 @@ import {
   grownUpSessionFor,
   useGrownUpSessionId,
 } from "../family/grownUpSession";
-import { pickerAfterIdle, PICKER_IDLE_MS } from "./idlePicker";
-import { startLimitsClock, useLimits } from "./store";
+import {
+  forgetRememberedChild,
+  pickerAfterIdle,
+  PICKER_IDLE_MS,
+  rememberedChild,
+  rememberChild,
+  shouldShowChildPicker,
+} from "./idlePicker";
+import { chooseChild, startLimitsClock, useLimits } from "./store";
 
 const PICKED_KEY = "skycot:family:picked";
 
@@ -92,6 +99,7 @@ const subscribeMinute = (onChange: () => void) => {
 export function FamilyLimitsHost() {
   const family = useFamily();
   const view = family.profile;
+  const { session } = useLimits();
   const requested = usePickerRequested();
   const [picked, setPicked] = useState(pickedThisWindow);
   useEffect(() => {
@@ -101,9 +109,38 @@ export function FamilyLimitsHost() {
   }, []);
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const engineKnown = view.source === "engine" && view.enabled;
+  const restoreAttempted = useRef(false);
   // A grown-up's time on the shared Mac ended (their code's grant lapsed): back to the picker.
   const grownUpId = useGrownUpSessionId();
   const grownUpActive = grownUpSessionFor(grownUpId, view, now) !== null;
+  useEffect(() => {
+    if (
+      !engineKnown ||
+      session === null ||
+      view.me.kind !== "shared" ||
+      view.children.length === 0 ||
+      restoreAttempted.current
+    ) {
+      return;
+    }
+    restoreAttempted.current = true;
+    const asleep = session?.limits?.asleep === true;
+    if (asleep) forgetRememberedChild();
+    if (view.needsChoice && !asleep) {
+      const saved = rememberedChild(Date.now());
+      const child = view.children.find((entry) => entry.id === saved);
+      const restore = child ?? (view.children.length === 1 ? view.children[0] : undefined);
+      if (restore) {
+        void chooseChild(restore.id).then((result) => {
+          if (result.ok) {
+            rememberChild(restore.id, Date.now());
+            rememberPicked();
+            setPicked(true);
+          }
+        });
+      }
+    }
+  }, [engineKnown, session, view.children, view.me.kind, view.needsChoice]);
   // Only a change from open to closed ends it: right after the code, the session is marked a
   // moment before the refreshed view shows the grant open, and that is not an ending.
   const wasActive = useRef(false);
@@ -125,7 +162,11 @@ export function FamilyLimitsHost() {
     const checkIdle = () => {
       if (!pickerAfterIdle(lastInputAt, Date.now())) return;
       const current = readFamilyView();
-      const grantUntil = Math.max(current.openUntil.settings ?? 0, current.openUntil.advanced ?? 0);
+      const grantUntil = Math.max(
+        current.openUntil.grownUpSession ?? 0,
+        current.openUntil.settings ?? 0,
+        current.openUntil.advanced ?? 0,
+      );
       const waitForGrant = grantUntil - Date.now();
       if (waitForGrant > 0) {
         timer = window.setTimeout(checkIdle, waitForGrant + 50);
@@ -198,12 +239,20 @@ function LimitsCover({
   const { session } = useLimits();
   const child = currentChild(view);
   // Everyone in the family picks their own picture: children, and grown-ups (with the code).
-  const several = view.children.length + view.grownUps.length > 1;
   // Only the family's Mac asks "Who's using SKYCOT?": a child's own device is always that
   // child, and a grown-up's device is nobody's child (the engine says which, never this tab).
   const shared = view.me.kind === "shared";
   // A grown-up using the Mac (after their code) is not asked again until Switch or Done.
-  if (shared && (requested || (!grownUpActive && (view.needsChoice || (several && !picked))))) {
+  if (
+    shouldShowChildPicker({
+      shared,
+      requested,
+      childCount: view.children.length,
+      grownUpActive,
+      needsChoice: view.needsChoice,
+      picked,
+    })
+  ) {
     return (
       <ChildPicker
         dismissible={requested && !view.needsChoice}
@@ -223,7 +272,7 @@ function LimitsCover({
         state={limits}
         timeZone={view.timeZone ?? deviceTimeZone()}
         now={now}
-        onSomeoneElse={several && shared ? openChildPicker : null}
+        onSomeoneElse={view.children.length > 1 && shared ? openChildPicker : null}
       />
     );
   }

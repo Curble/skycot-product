@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
+import { TextField } from "../../ui/TextField";
 import { useFamily } from "../family/FamilyProvider";
 import { deleteSheetCopy } from "./tidy";
 import { useTidy } from "./useTidy";
@@ -53,15 +54,21 @@ function DeleteSheetBody({
   const family = useFamily();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const copy = deleteSheetCopy({ title: currentTitle, archived, family: family.enabled });
 
   const remove = async () => {
     setBusy(true);
     setProblem(null);
-    const outcome = await tidy.remove(shell, { archived, title: currentTitle });
+    const outcome = await tidy.remove(
+      shell,
+      { archived, title: currentTitle },
+      family.enabled ? code : undefined,
+    );
     setBusy(false);
     if (outcome.kind === "deleted") onClose();
     else if (outcome.kind === "failed") setProblem(outcome.message);
+    else if (family.enabled) setProblem("That wasn't the parent code. Try again.");
   };
 
   return (
@@ -79,7 +86,12 @@ function DeleteSheetBody({
           <Button onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="destructive" filled onClick={() => void remove()} disabled={busy}>
+          <Button
+            variant="destructive"
+            filled
+            onClick={() => void remove()}
+            disabled={busy || (family.enabled && !/^\d{4,6}$/.test(code))}
+          >
             {busy ? "Deleting…" : copy.button}
           </Button>
         </>
@@ -94,6 +106,17 @@ function DeleteSheetBody({
         ))}
       </ul>
       {copy.alternative ? <p className="fm-help fm-delete-alt">{copy.alternative}</p> : null}
+      {family.enabled ? (
+        <TextField
+          label="Parent code"
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={code}
+          onChange={(event) => setCode(event.currentTarget.value.replace(/\D/g, ""))}
+        />
+      ) : null}
       <p className="fm-delete-final">{copy.final}</p>
       {problem ? (
         <div style={{ marginTop: 10 }}>

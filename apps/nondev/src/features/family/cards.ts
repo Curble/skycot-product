@@ -3,7 +3,11 @@
 // can say "Ask a grown-up" before anyone clicks; the engine still refuses the Allow without
 // the parent code if the two ever disagree, and the card then asks for it.
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
-import { describeFamilyMatches, evaluateFamilyRequest } from "@t3tools/skycot-rules/family";
+import {
+  describeFamilyMatches,
+  evaluateFamilyRequest,
+  projectApprovalCoverFor,
+} from "@t3tools/skycot-rules/family";
 import { filesFromPrompt } from "@t3tools/skycot-rules/files";
 import { describeMatches, readCommandAsk, type RuleRequest } from "@t3tools/skycot-rules/rules";
 
@@ -25,6 +29,7 @@ export function isFamilyRefusal(message: string | null): boolean {
  * themselves). Still waiting after this means the engine left it to the child (a change while
  * the plan is being made, an engine without the policy), so the ordinary card shows.
  */
+export const ENGINE_CHECK_LINE_DELAY_MS = 1_500;
 export const ENGINE_CHECK_GRACE_MS = 4_000;
 
 /** Whether a pending card is one the engine is expected to answer itself (see above). */
@@ -111,6 +116,17 @@ export function familyHoldFor(
     .filter((part) => part.length > 0)
     .join(", and ");
   return parts.length > 0 ? `It ${parts}.` : "SKYCOT can't tell exactly what this does.";
+}
+
+export function projectApprovalFor(item: ApprovalItem, ctx: Parameters<typeof familyHoldFor>[1]) {
+  const facts = { ...factsFor(item, ctx.toolCallInput), toolItemType: ctx.toolItemType };
+  const evaluation = evaluateFamilyRequest(facts, {
+    projectRoot: ctx.projectRoot ?? null,
+    projectFolder: ctx.projectFolder ?? null,
+    skycotFetchesAddOns: item.nativeItemRef?.driver === "codex",
+    trustedAddOns: ctx.trustedAddOns === true,
+  });
+  return projectApprovalCoverFor(facts, evaluation);
 }
 
 const WIDENING = new Set(["acceptForSession", "acceptAlways"]);

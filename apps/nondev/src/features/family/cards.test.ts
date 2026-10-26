@@ -5,6 +5,8 @@ import { items } from "../../plain/fixtures.test-helpers";
 import {
   familyCard,
   familyHoldFor,
+  ENGINE_CHECK_GRACE_MS,
+  ENGINE_CHECK_LINE_DELAY_MS,
   isFamilyRefusal,
   toolItemTypeFor,
   waitsForEngineCheck,
@@ -115,5 +117,10 @@ describe("a safe step the engine answers itself (Family)", () => {
     expect(waitsForEngineCheck({ ...base, grownUpDevice: true })).toBe(false);
     expect(waitsForEngineCheck({ ...base, isApproval: false })).toBe(false);
     expect(waitsForEngineCheck({ ...base, familyOn: false })).toBe(false);
+  });
+
+  it("keeps the check line quiet for 1.5 seconds before showing it", () => {
+    expect(ENGINE_CHECK_LINE_DELAY_MS).toBe(1_500);
+    expect(ENGINE_CHECK_GRACE_MS).toBe(4_000);
   });
 });

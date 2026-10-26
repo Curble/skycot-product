@@ -5,6 +5,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as TestClock from "effect/testing/TestClock";
 
+// nondev-seam: skycot-grown-up-session-grants-test
+// nondev-seam: skycot-project-approval-grants-test
 import * as SkycotFamily from "./SkycotFamily.ts";
 
 // nondev-seam: skycot-page-internet-ask-storage-test
@@ -48,6 +50,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               grownUps: [],
               devices: [],
               pageInternet: [],
+              projectApprovalGrants: [],
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });
@@ -159,6 +162,49 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
             (yield* failureOf(family.settlePageInternetAsk({ id: changed.id, decision: "allow" })))
               .reason,
             "invalid-request",
+          );
+        }),
+      ),
+    );
+
+    it.effect("a project page yes carries approved sites to another page for the same child", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const requestedProjectPath = path.join(path.dirname(filePath), "project");
+          yield* fs.makeDirectory(requestedProjectPath);
+          const projectPath = yield* fs.realPath(requestedProjectPath);
+          const firstPage = path.join(projectPath, "dogs.html");
+          const secondPage = path.join(projectPath, "cats.html");
+          yield* fs.writeFileString(firstPage, "dogs");
+          yield* fs.writeFileString(secondPage, "cats");
+          const enabled = yield* family.enable({ code: CODE, childName: "Ava" });
+          const childId = enabled.children[0]!.id;
+          assert.equal(path.relative(projectPath, yield* fs.realPath(firstPage)), "dogs.html");
+          const saved = yield* family.allowPageInternet({
+            code: CODE,
+            page: firstPage,
+            sites: ["pictures.example.com"],
+            projectApproval: { childId, projectPath, grantedBy: "grown-up" },
+          });
+          assert.deepEqual(yield* family.pageInternetSites(secondPage), []);
+          assert.deepEqual(yield* family.pageInternetSites(secondPage, { childId, projectPath }), [
+            "example.com",
+          ]);
+          assert.deepEqual(
+            yield* family.pageInternetSites(secondPage, { childId: "another-child", projectPath }),
+            [],
+          );
+          const grant = saved.projectApprovalGrants[0]!;
+          assert.deepEqual(grant.covers, ["internetAssets"]);
+          assert.equal(
+            (yield* family.stopProjectApproval({ id: grant.id })).projectApprovalGrants.length,
+            0,
+          );
+          assert.deepEqual(
+            yield* family.pageInternetSites(secondPage, { childId, projectPath }),
+            [],
           );
         }),
       ),
@@ -405,9 +451,95 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           yield* family.verify({ code: CODE, purpose: "publish", sessionId: SESSION });
           assert.isTrue(yield* family.allows({ sessionId: SESSION, purpose: "publish" }));
           assert.isFalse(yield* family.allows({ sessionId: "session-child", purpose: "publish" }));
-          assert.isFalse(yield* family.allows({ sessionId: SESSION, purpose: "automation" }));
+          assert.isTrue(yield* family.allows({ sessionId: SESSION, purpose: "automation" }));
           yield* TestClock.adjust(SkycotFamily.GRANT_TTL_MS.publish);
+          assert.isTrue(yield* family.allows({ sessionId: SESSION, purpose: "publish" }));
+          yield* TestClock.adjust(10 * 60_000);
           assert.isFalse(yield* family.allows({ sessionId: SESSION, purpose: "publish" }));
+        }),
+      ),
+    );
+
+    it.effect(
+      "grown-up renewal slides to 15 minutes, expires on lapse, and stops at two hours",
+      () =>
+        withFamily((family) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: null });
+            yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+            assert.isFalse(
+              (yield* family.openGrants({ sessionId: SESSION })).some(
+                (g) => g.purpose === "approve",
+              ),
+            );
+            assert.equal(
+              (yield* family.openGrants({ sessionId: SESSION })).find(
+                (g) => g.purpose === "grownUpSession",
+              )?.remainingMs,
+              15 * 60_000,
+            );
+            yield* TestClock.adjust(14 * 60_000);
+            yield* family.renew({ sessionId: SESSION });
+            assert.isTrue(yield* family.allows({ sessionId: SESSION, purpose: "publish" }));
+            yield* TestClock.adjust(15 * 60_000);
+            assert.equal(
+              (yield* failureOf(family.renew({ sessionId: SESSION }))).reason,
+              "invalid-request",
+            );
+          }),
+        ),
+    );
+
+    it.effect("renewal refuses a missing, expired, or different session and lock ends it", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          assert.equal(
+            (yield* failureOf(family.renew({ sessionId: SESSION }))).reason,
+            "invalid-request",
+          );
+          yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+          assert.equal(
+            (yield* failureOf(family.renew({ sessionId: "other" }))).reason,
+            "invalid-request",
+          );
+          yield* family.lock({ sessionId: SESSION });
+          assert.equal(
+            (yield* failureOf(family.renew({ sessionId: SESSION }))).reason,
+            "invalid-request",
+          );
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          yield* TestClock.adjust(15 * 60_000);
+          assert.equal(
+            (yield* failureOf(family.renew({ sessionId: SESSION }))).reason,
+            "invalid-request",
+          );
+        }),
+      ),
+    );
+
+    it.effect("grown-up renewal never passes the two-hour limit from the code", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          yield* TestClock.adjust(14 * 60_000);
+          for (let minute = 0; minute < 4; minute += 1) {
+            yield* family.renew({ sessionId: SESSION });
+            yield* TestClock.adjust(14 * 60_000);
+          }
+          yield* family.renew({ sessionId: SESSION });
+          yield* TestClock.adjust(14 * 60_000);
+          yield* family.renew({ sessionId: SESSION });
+          yield* TestClock.adjust(14 * 60_000);
+          yield* family.renew({ sessionId: SESSION });
+          yield* TestClock.adjust(14 * 60_000);
+          yield* family.renew({ sessionId: SESSION });
+          yield* TestClock.adjust(8 * 60_000);
+          assert.equal(
+            (yield* failureOf(family.renew({ sessionId: SESSION }))).reason,
+            "invalid-request",
+          );
         }),
       ),
     );
@@ -446,6 +578,32 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
       ),
     );
 
+    it.effect("an open grown-up session can approve only the exact request explicitly shown", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          assert.equal(
+            (yield* failureOf(family.approveRequest({ sessionId: SESSION, requestId: "r1" })))
+              .reason,
+            "invalid-request",
+          );
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          yield* family.approveRequest({ sessionId: SESSION, requestId: "r1" });
+          assert.isTrue(
+            yield* family.allows({
+              sessionId: SESSION,
+              purpose: "approve",
+              requestId: "r1",
+              consume: true,
+            }),
+          );
+          assert.isFalse(
+            yield* family.allows({ sessionId: SESSION, purpose: "approve", requestId: "r2" }),
+          );
+        }),
+      ),
+    );
+
     it.effect("Advanced mode is the master grant; locking ends it", () =>
       withFamily((family) =>
         Effect.gen(function* () {
@@ -456,10 +614,12 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
             sessionId: SESSION,
           });
           assert.isTrue(yield* family.allows({ sessionId: SESSION, purpose: "automation" }));
-          assert.isTrue(
+          assert.isFalse(
             yield* family.allows({ sessionId: SESSION, purpose: "approve", requestId: "any" }),
           );
           assert.isTrue(yield* family.tokenAllows(unlock.token, "advanced"));
+          assert.isFalse(yield* family.tokenBelongsToSession(unlock.token, "session-child"));
+          assert.isTrue(yield* family.tokenBelongsToSession(unlock.sessionToken, SESSION));
           yield* family.lock({ sessionId: SESSION });
           assert.isFalse(yield* family.allows({ sessionId: SESSION, purpose: "automation" }));
         }),
@@ -632,6 +792,48 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
             assert.equal((yield* family.setTimeZone("Mars/Base")).timeZone, "UTC");
           }),
         ),
+    );
+
+    it.effect("stores bounded, expiring project approvals and removes them immediately", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const enabled = yield* family.enable({ code: CODE, childName: "Ava" });
+          const grant = yield* family.grantProjectApproval({
+            childId: enabled.children[0]!.id,
+            projectPath: "/games/space",
+            covers: ["webSearch"],
+            grantedBy: "parent",
+            how: "parent-code",
+          });
+          const merged = yield* family.grantProjectApproval({
+            childId: enabled.children[0]!.id,
+            projectPath: "/games/space",
+            covers: ["addOns"],
+            grantedBy: "parent",
+            how: "grown-up-session",
+          });
+          assert.equal(merged.id, grant.id);
+          assert.deepEqual(merged.covers, ["webSearch", "addOns"]);
+          assert.deepEqual((yield* family.status).projectApprovalGrants, [merged]);
+          const saved = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
+          assert.include(saved, '"projectApprovalGrants"');
+          yield* family.stopProjectApproval({ id: grant.id });
+          assert.deepEqual((yield* family.status).projectApprovalGrants, []);
+
+          const expired = yield* family.grantProjectApproval({
+            childId: enabled.children[0]!.id,
+            projectPath: "/games/space",
+            covers: ["addOns"],
+            grantedBy: "parent",
+            how: "parent-code",
+          });
+          yield* TestClock.adjust(SkycotFamily.PROJECT_APPROVAL_TTL_MS);
+          assert.deepEqual((yield* family.status).projectApprovalGrants, []);
+          const afterExpiry = yield* (yield* FileSystem.FileSystem).readFileString(filePath);
+          assert.notInclude(afterExpiry, expired.id);
+          assert.notEqual(expired.id, grant.id);
+        }),
+      ),
     );
   });
 });

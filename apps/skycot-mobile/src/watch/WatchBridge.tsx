@@ -162,12 +162,14 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
           keyId: issued.value.keyId,
         };
       }
-      // The answer, exactly as the phone's own card sends it: one request, once.
+      // nondev-seam: skycot-watch-project-approval-answer
+      // The answer uses the same scope-bound fingerprint as the phone's Requests card.
       const result = await familyApi.answerRequest(mac.transport, {
         threadId: message.threadId,
         requestId: message.requestId,
         decision: message.decision,
         fingerprint: message.fingerprint,
+        ...(message.scope === "project" ? { scope: "project" as const } : {}),
         proof: message.proof === null ? null : { type: "watch", ...message.proof },
         ...(message.decision === "decline" ? { via: "watch" as const } : {}),
       });
@@ -178,7 +180,9 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
         ok: true,
         sentence:
           message.decision === "accept"
-            ? "Allowed, this once."
+            ? message.scope === "project"
+              ? "Allowed for this project."
+              : "Allowed, this once."
             : "Declined. They see that on their screen.",
       };
     },

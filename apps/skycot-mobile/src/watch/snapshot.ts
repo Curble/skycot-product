@@ -52,6 +52,14 @@ export function bedtimePhrase(child: Pick<FamilyChild, "limits">): string | null
     : `Bedtime ${wallTimePhrase(bedtime.start)} to ${wallTimePhrase(bedtime.end)}`;
 }
 
+// nondev-seam: skycot-watch-project-approval-snapshot
+const projectCoverWords: Record<string, string> = {
+  webSearch: "look things up on the internet",
+  addOns: "install the add-ons this project needs",
+  internetFetch: "fetch plain pages and data",
+  internetAssets: "load pictures, sounds, fonts and data from allowed sites",
+};
+
 export function buildWatchSnapshot(input: {
   readonly mode: DeviceMode;
   readonly macs: ReadonlyArray<MacLink>;
@@ -109,6 +117,20 @@ export function buildWatchSnapshot(input: {
         threadId: request.threadId,
         requestId: request.requestId,
         fingerprint: request.fingerprint,
+        ...(request.projectFingerprint === undefined
+          ? {}
+          : {
+              projectFingerprint: request.projectFingerprint,
+              projectCovers: request.projectCovers,
+              projectTitle: request.projectTitle ?? request.threadTitle,
+              projectSentence: `For ${request.projectTitle ?? request.threadTitle}: ${(
+                request.projectCovers ?? []
+              )
+                .map((cover) => projectCoverWords[cover])
+                .filter(Boolean)
+                .join("; ")}.`,
+              goal: request.threadTitle,
+            }),
         childName: name,
         childInitial: who ? avatarLetter(who.child) : "★",
         childColour: who ? childColour(who.child) : AVATAR_COLORS.sky!.dark,

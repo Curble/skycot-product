@@ -51,6 +51,7 @@ import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
 import { filterShellSnapshot, folderOwner, referencedBy } from "./visibility.ts";
 
 // nondev-seam: skycot-page-internet-approver-test
+// nondev-seam: skycot-project-approval-fingerprint-test
 
 describe("page ask fingerprints", () => {
   it("binds the child, conversation, page and sorted exact sites", () => {
@@ -90,6 +91,30 @@ describe("page ask fingerprints", () => {
     );
     assert.notEqual(fingerprint, anotherChild);
     assert.notEqual(fingerprint, anotherConversation);
+  });
+});
+
+describe("project approval fingerprints", () => {
+  it("binds a yes to its scope and closed cover list", () => {
+    const card = {
+      threadId: "thread-ava",
+      requestId: "request-1",
+      what: "curl https://example.com",
+      why: "It uses the internet.",
+    };
+    const once = SkycotFamilyDevices.fingerprintFor(card);
+    const project = SkycotFamilyDevices.fingerprintFor({
+      ...card,
+      scope: "project",
+      covers: ["internetFetch"],
+    });
+    const otherCovers = SkycotFamilyDevices.fingerprintFor({
+      ...card,
+      scope: "project",
+      covers: ["webSearch"],
+    });
+    assert.notEqual(once, project);
+    assert.notEqual(project, otherCovers);
   });
 });
 
@@ -664,6 +689,8 @@ const withDevices = <A, E, R>(
     };
     return yield* withWorld((world) =>
       Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const projectRoot = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-device-project-" });
         const layer = SkycotFamilyDevices.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
@@ -676,6 +703,7 @@ const withDevices = <A, E, R>(
                     why: "It uses the internet.",
                     what: "npm install three",
                     kind: "command" as const,
+                    projectCovers: ["addOns" as const],
                   }),
               }),
               Layer.succeed(SkycotFamilyLimits.SkycotFamilyLimits, world.limits),
@@ -730,6 +758,7 @@ const withDevices = <A, E, R>(
                 },
               }),
               Layer.mock(ProjectionStore.ProjectionStoreV2)({
+                getThread: () => Effect.succeed(THREADS[0] as never),
                 getRuntimeRequest: () =>
                   Effect.succeed({
                     id: "req-1",
@@ -756,6 +785,8 @@ const withDevices = <A, E, R>(
               }),
               Layer.mock(ProjectStore.ProjectStoreV2)({
                 list: () => Effect.succeed(PROJECTS as never),
+                get: (projectId) =>
+                  Effect.succeed(Option.some({ projectId, workspaceRoot: projectRoot } as never)),
               }),
             ),
           ),
@@ -958,6 +989,57 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
         const listed = yield* devices.approvals;
         assert.equal(listed.length, 1);
         assert.isTrue(listed[0]!.needsGrownUp);
+      }),
+    ),
+  );
+
+  it.effect("a once fingerprint cannot answer the project scope", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const [pending] = yield* world.devices.approvals;
+        assert.isTrue(
+          yield* refused(
+            world.devices.answer({
+              who: mum(world),
+              sessionId: "mum-phone",
+              origin: "http://localhost:3790",
+              threadId: "thread-ava",
+              requestId: "req-1",
+              decision: "accept",
+              scope: "project",
+              fingerprint: pending!.fingerprint,
+              proof: { type: "code", code: CODE },
+            }),
+          ),
+        );
+        assert.deepEqual(world.recorded.dispatched, []);
+        assert.deepEqual((yield* world.family.status).projectApprovalGrants, []);
+      }),
+    ),
+  );
+
+  it.effect("a grown-up's project answer creates the closed cover grant after proof", () =>
+    withDevices((world) =>
+      Effect.gen(function* () {
+        const pending = (yield* world.devices.approvals)[0]!;
+        assert.deepEqual(pending.projectCovers, ["addOns"]);
+        yield* world.devices.answer({
+          who: mum(world),
+          sessionId: "mum-phone",
+          origin: "http://localhost:3790",
+          threadId: "thread-ava",
+          requestId: "req-1",
+          decision: "accept",
+          scope: "project",
+          fingerprint: pending.projectFingerprint!,
+          proof: { type: "code", code: CODE },
+        });
+        assert.equal(world.recorded.dispatched.length, 1);
+        const [grant] = (yield* world.family.status).projectApprovalGrants;
+        assert.equal(grant?.childId, world.avaId);
+        assert.deepEqual(grant?.covers, ["addOns"]);
+        assert.equal(grant?.how, "parent-code");
+        assert.equal(grant?.expiresAt! - grant?.createdAt!, SkycotFamily.PROJECT_APPROVAL_TTL_MS);
       }),
     ),
   );

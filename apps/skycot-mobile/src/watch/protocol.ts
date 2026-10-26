@@ -9,6 +9,7 @@
  */
 export const WATCH_PROTOCOL = 1;
 
+// nondev-seam: skycot-watch-project-approval-protocol
 /** One "Ask a grown-up" waiting, as the Watch lists it. */
 export interface WatchRequest {
   /** `<macId>:<requestId>`: unique across a family's Macs. */
@@ -18,6 +19,13 @@ export interface WatchRequest {
   readonly requestId: string;
   /** The Mac's fingerprint of the card; the Watch checks it against `what` and `why`. */
   readonly fingerprint: string;
+  readonly projectFingerprint?: string;
+  readonly projectSentence?: string;
+  readonly projectCovers?: ReadonlyArray<
+    "webSearch" | "addOns" | "internetFetch" | "internetAssets"
+  >;
+  readonly projectTitle?: string;
+  readonly goal?: string;
   readonly childName: string;
   readonly childInitial: string;
   readonly childColour: string;
@@ -116,6 +124,7 @@ export type WatchMessage =
       readonly threadId: string;
       readonly requestId: string;
       readonly fingerprint: string;
+      readonly scope?: "once" | "project";
     }
   | {
       readonly type: "answer";
@@ -124,6 +133,7 @@ export type WatchMessage =
       readonly requestId: string;
       readonly fingerprint: string;
       readonly decision: "accept" | "decline";
+      readonly scope?: "once" | "project";
       /** A yes only: the Watch's signature over the Mac's challenge. */
       readonly proof: {
         readonly keyId: string;
@@ -199,7 +209,14 @@ export function parseWatchMessage(json: string): WatchMessage | null {
         return null;
       }
       if (input.type === "challenge") {
-        return { type: "challenge", macId, threadId, requestId, fingerprint };
+        return {
+          type: "challenge",
+          macId,
+          threadId,
+          requestId,
+          fingerprint,
+          ...(input.scope === "project" ? { scope: "project" as const } : {}),
+        };
       }
       const decision = input.decision;
       if (decision !== "accept" && decision !== "decline") return null;
@@ -219,6 +236,7 @@ export function parseWatchMessage(json: string): WatchMessage | null {
         threadId,
         requestId,
         fingerprint,
+        ...(input.scope === "project" ? { scope: "project" as const } : {}),
         decision,
         proof: decision === "accept" ? proof : null,
       };

@@ -4,7 +4,7 @@
 // page with the parent code; the engine keeps it, and only pictures, sounds, fonts and data from
 // those sites come in (never scripts). "Not now" only hides the card: the page stays offline.
 import { Globe } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useGrownUpAnswers } from "../conversation/useGrownUpAnswers";
 import { useChildView } from "../../app/useChildView";
@@ -48,13 +48,14 @@ export function PageInternetAsk({
   const [refreshKey, setRefreshKey] = useState(0);
   const [answerText, setAnswerText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const allowScopeRef = useRef<"once" | "project">("once");
   const answers = useGrownUpAnswers(
     threadId,
     `${requestId ?? ""}:${refreshKey}`,
     requestId !== null,
   );
   const entry = useParentCodeEntry(
-    (code) => allowPageInternet(page, sites, code),
+    (code) => allowPageInternet(page, sites, code, { threadId, scope: allowScopeRef.current }),
     () => {
       setStep("hidden");
       onAllowed();
@@ -145,6 +146,13 @@ export function PageInternetAsk({
               <p className="fm-preview__card-text">
                 {`${pageName(page)} may then load pictures, sounds, fonts and data from ${named}, over a secure connection. Scripts never come from the internet. Take it back any time in Settings › Family.`}
               </p>
+              {allowScopeRef.current === "project" ? (
+                <p className="fm-preview__card-text">
+                  This also lets other pages in this project load pictures, sounds, fonts and data
+                  from sites already allowed for a page here, over a secure connection. Scripts
+                  never come from the internet.
+                </p>
+              ) : null}
               <div data-sober="">
                 <ParentCodeEntry entry={entry} autoFocus />
               </div>
@@ -157,11 +165,27 @@ export function PageInternetAsk({
               <Button onClick={() => setStep("hidden")}>Not now</Button>
               <Button
                 variant="primary"
-                onClick={() => (childView ? void ask() : setStep("code"))}
+                onClick={() => {
+                  if (childView) void ask();
+                  else {
+                    allowScopeRef.current = "once";
+                    setStep("code");
+                  }
+                }}
                 disabled={busy}
               >
-                {busy ? "Asking…" : childView ? "Get a grown-up" : "Allow…"}
+                {busy ? "Asking…" : childView ? "Get a grown-up" : "Allow once"}
               </Button>
+              {!childView ? (
+                <Button
+                  onClick={() => {
+                    allowScopeRef.current = "project";
+                    setStep("code");
+                  }}
+                >
+                  Allow for this project
+                </Button>
+              ) : null}
             </>
           ) : step === "waiting" ? (
             <p className="fm-preview__card-text">Waiting for an answer.</p>
@@ -175,7 +199,11 @@ export function PageInternetAsk({
                 disabled={!entry.canSubmit}
                 onClick={() => void entry.submit()}
               >
-                {entry.busy ? "Checking…" : "Allow for this page"}
+                {entry.busy
+                  ? "Checking…"
+                  : allowScopeRef.current === "project"
+                    ? "Allow for this project"
+                    : "Allow once"}
               </Button>
             </>
           )}

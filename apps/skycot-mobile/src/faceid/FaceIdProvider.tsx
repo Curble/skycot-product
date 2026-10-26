@@ -29,6 +29,7 @@ import {
   type AllowOutcome,
 } from "./faceId";
 
+// nondev-seam: skycot-mobile-project-approval-faceid-provider
 interface FaceIdValue {
   /** What the Secure Enclave says, or null where there is no Face ID key at all. */
   readonly native: DeviceKeyStatus | null;
@@ -48,6 +49,7 @@ interface FaceIdValue {
       readonly fingerprint: string;
     },
     childName: string | null,
+    scope?: "once" | "project",
   ) => Promise<AllowOutcome>;
 }
 
@@ -118,12 +120,13 @@ export function FaceIdProvider(props: { readonly children: ReactNode }) {
         await Promise.all(macs.map((mac) => refresh(mac.macId)));
         return problem;
       },
-      allow: async (mac, request, childName) => {
+      allow: async (mac, request, childName, scope = "once") => {
         const outcome = await allowWithFaceId({
           api: familyApi,
           signer,
           transport: mac.transport,
           request,
+          scope,
           reason: allowReason(childName),
           label,
         });

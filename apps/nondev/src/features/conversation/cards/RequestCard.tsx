@@ -52,8 +52,10 @@ import { shortTime } from "./time";
 import {
   approves,
   ENGINE_CHECK_GRACE_MS,
+  ENGINE_CHECK_LINE_DELAY_MS,
   familyCard,
   familyHoldFor,
+  projectApprovalFor,
   isFamilyRefusal,
   toolItemTypeFor,
   waitsForEngineCheck,
@@ -97,6 +99,19 @@ function iconFor(item: RequestItem, risk: ApprovalRisk): LucideIcon {
 
 function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
+}
+
+function projectCoverSentence(cover: "webSearch" | "addOns" | "internetFetch" | "internetAssets") {
+  switch (cover) {
+    case "webSearch":
+      return "look things up on the internet";
+    case "addOns":
+      return "install the add-ons this project needs";
+    case "internetFetch":
+      return "fetch plain pages and data";
+    case "internetAssets":
+      return "load pictures, sounds, fonts and data from allowed sites";
+  }
 }
 
 const SETTLED_RUN = new Set<OrchestrationV2Run["status"]>([
@@ -250,6 +265,16 @@ export function RequestCard({
         })
       : null;
   const shown = familyApplies ? familyCard(card, grownUp) : card;
+  const projectCover =
+    familyApplies && item.type === "approval_request"
+      ? projectApprovalFor(item, {
+          projectRoot,
+          projectFolder,
+          toolCallInput,
+          toolItemType: toolItemTypeFor(item, projection.turnItems),
+          trustedAddOns: family.profile.trustedAddOns,
+        })
+      : null;
   const remoteGrownUps = family.profile.devices.some((device) => device.kind === "grown-up");
   const grownUpNames = family.profile.grownUps
     .map((person) => person.name)
@@ -277,10 +302,20 @@ export function RequestCard({
     grownUpDevice: family.profile.me.kind === "grown-up",
   });
   const [graceOver, setGraceOver] = useState(false);
+  const [checkLineVisible, setCheckLineVisible] = useState(false);
   useEffect(() => {
     if (!checking) return;
+    setGraceOver(false);
+    setCheckLineVisible(false);
+    const lineTimer = window.setTimeout(
+      () => setCheckLineVisible(true),
+      ENGINE_CHECK_LINE_DELAY_MS,
+    );
     const timer = window.setTimeout(() => setGraceOver(true), ENGINE_CHECK_GRACE_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(lineTimer);
+      window.clearTimeout(timer);
+    };
   }, [checking]);
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -303,12 +338,16 @@ export function RequestCard({
     cardRef.current?.focus({ preventScroll: true });
   }, [pendingOnMount]);
 
-  const choose = async (option: ApprovalOption, extras?: Parameters<DispatchDecision>[1]) => {
+  const choose = async (
+    option: ApprovalOption,
+    extras?: Parameters<DispatchDecision>[1],
+    scope: "once" | "project" = "once",
+  ) => {
     // Never answer into a stopped run, even from a click that raced the Stop.
     if (askRunEnded(item, projection, shell)) return;
     const askParent = () =>
       item.type === "approval_request"
-        ? family.requireParentCode("approve", { requestId: item.requestId, reason: grownUp })
+        ? family.requireParentCode("approve", { requestId: item.requestId, reason: grownUp, scope })
         : Promise.resolve(false);
     const needsParent = familyApplies && approves(option);
     if (needsParent && grownUp !== null && !(await askParent())) return;
@@ -329,7 +368,7 @@ export function RequestCard({
     if (result !== null) setProblem(result);
   };
 
-  if (checking && !graceOver) {
+  if (checking && !graceOver && checkLineVisible) {
     return (
       <Bubble author="crew" full meta={shortTime(item.startedAt ?? item.updatedAt)}>
         <p className="fm-help" role="status">
@@ -413,6 +452,12 @@ export function RequestCard({
                   : card.whatItWants}
               </p>
             )}
+            {projectCover !== null && grownUp !== null && !decided && !childView ? (
+              <p className="fm-help">
+                Goal: {shell?.title ?? "this conversation"}. For {projectName ?? "this project"}:{" "}
+                {projectCoverSentence(projectCover)}. This lasts 30 days.
+              </p>
+            ) : null}
             {childView && !decided && grownUp !== null && remoteGrownUps ? (
               <p className="fm-help">
                 {grownUpNames.length > 0
@@ -503,6 +548,19 @@ export function RequestCard({
                     {busyId === option.id ? "Sending…" : option.label}
                   </Button>
                 ))}
+                {projectCover !== null && grownUp !== null && !childView ? (
+                  <Button
+                    size="md"
+                    variant="secondary"
+                    disabled={busyId !== null}
+                    onClick={() => {
+                      const option = shown.options.find(approves);
+                      if (option) void choose(option, undefined, "project");
+                    }}
+                  >
+                    {busyId !== null ? "Sending…" : "Allow for this project"}
+                  </Button>
+                ) : null}
               </div>
             </CardFooter>
           )}

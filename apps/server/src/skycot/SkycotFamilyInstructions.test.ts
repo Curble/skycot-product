@@ -234,6 +234,27 @@ describe("plan first in the Family profile", () => {
     assert.equal(Instructions.familyInteractionMode("plan", "grown-up"), "plan");
   });
 
+  it("lets a small tweak build without a plan, and keeps bigger asks planned", () => {
+    assert.equal(Instructions.familyInteractionMode("plan", "small-follow-up"), "default");
+    for (const text of [
+      "make the ball bigger",
+      "change the colour to blue",
+      "fix the typo in the title",
+    ]) {
+      assert.equal(Instructions.isSmallTweak(text), true, text);
+    }
+    for (const text of [
+      "make a new game about dogs",
+      "add a leaderboard from the internet and make the colour red",
+      "make the ball bigger. then add sounds. then add a menu.",
+      "install a package to make it faster",
+      "",
+      "make it faster ".repeat(20),
+    ]) {
+      assert.equal(Instructions.isSmallTweak(text), false, text);
+    }
+  });
+
   it.effect("runs a child's ordinary turn as a plan, and says so in the rules", () =>
     Effect.gen(function* () {
       const wrapped = yield* Instructions.familyTurnInput(family(true), turn("plan-ordinary"));

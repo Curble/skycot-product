@@ -36,7 +36,9 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 
 import {
@@ -57,6 +59,7 @@ import {
   type WatchKeyProtection,
   type WatchPurpose,
 } from "@t3tools/skycot-rules/people";
+import type { ProjectApprovalCover } from "@t3tools/skycot-rules/family";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../../config.ts";
@@ -152,6 +155,7 @@ export interface LinkResult {
   readonly expiresAt: number;
 }
 
+// nondev-seam: skycot-project-approval-answer
 export interface PendingApproval {
   /** Older clients may omit this; absent means the existing runtime request. */
   readonly target?: "runtime-request" | "page-internet";
@@ -170,6 +174,9 @@ export interface PendingApproval {
   readonly kind: string;
   /** What the phone shows, hashed: a yes names it, so a changed card can't be approved unseen. */
   readonly fingerprint: string;
+  /** The project-scoped answer has a separate fingerprint, bound to this exact cover set. */
+  readonly projectFingerprint?: string;
+  readonly projectCovers?: ReadonlyArray<ProjectApprovalCover>;
   readonly page?: string;
   readonly sites?: ReadonlyArray<string>;
 }
@@ -230,11 +237,12 @@ export function fingerprintFor(input: {
   readonly requestId: string;
   readonly what: string;
   readonly why: string | null;
+  readonly scope?: "once" | "project";
+  readonly covers?: ReadonlyArray<ProjectApprovalCover>;
 }): string {
-  return NodeCrypto.createHash("sha256")
-    .update([input.threadId, input.requestId, input.what, input.why ?? ""].join("\n"))
-    .digest("hex")
-    .slice(0, 24);
+  const material = [input.threadId, input.requestId, input.what, input.why ?? ""];
+  if (input.scope === "project") material.push("project", ...(input.covers ?? []).toSorted());
+  return NodeCrypto.createHash("sha256").update(material.join("\n")).digest("hex").slice(0, 24);
 }
 
 const approveAction = (threadId: string, requestId: string, fingerprint: string) =>
@@ -376,6 +384,8 @@ export class SkycotFamilyDevices extends Context.Service<
       readonly requestId: string;
       readonly decision: ApproverDecision;
       readonly fingerprint: string;
+      /** Missing on older clients: the original one-request answer. */
+      readonly scope?: "once" | "project";
       readonly proof: Proof | null;
       /**
        * A no said on the grown-up's Watch and carried by their phone (a no needs no proof, so
@@ -402,6 +412,7 @@ const make = Effect.gen(function* () {
   const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
+  const fs = yield* Effect.serviceOption(FileSystem.FileSystem);
   const engine = yield* Orchestrator.OrchestratorV2;
   const config = yield* ServerConfig.ServerConfig;
   // Challenges live in memory only: an engine restart forgets them (ask again), nothing to leak.
@@ -915,6 +926,7 @@ const make = Effect.gen(function* () {
       // program) never reaches it: noise there trains a grown-up to tap yes.
       if (!described.needsGrownUp) continue;
       const createdAt = pending.createdAt.epochMilliseconds;
+      const projectCovers = described.projectCovers ?? [];
       found.push({
         threadId: thread.id,
         requestId: pending.id,
@@ -933,12 +945,34 @@ const make = Effect.gen(function* () {
           what: described.what,
           why: described.why,
         }),
+        ...(projectCovers.length === 0
+          ? {}
+          : {
+              projectCovers,
+              projectFingerprint: fingerprintFor({
+                threadId: thread.id,
+                requestId: pending.id,
+                what: described.what,
+                why: described.why,
+                scope: "project",
+                covers: projectCovers,
+              }),
+            }),
       });
     }
     for (const ask of yield* family.pendingPageInternetAsks) {
       const thread = threadsById.get(ask.threadId as ThreadId);
       if (thread === undefined || owners[ask.threadId] !== ask.childId) continue;
       const material = pageAskMaterial(ask.childId, ask.page, ask.sites);
+      const projectCovers = ["internetAssets"] as const;
+      const projectFingerprint = fingerprintFor({
+        threadId: ask.threadId,
+        requestId: ask.id,
+        what: material,
+        why: PAGE_ASK_WHY,
+        scope: "project",
+        covers: projectCovers,
+      });
       found.push({
         target: "page-internet",
         threadId: ask.threadId,
@@ -958,6 +992,8 @@ const make = Effect.gen(function* () {
           what: material,
           why: PAGE_ASK_WHY,
         }),
+        projectFingerprint,
+        projectCovers,
         page: ask.page,
         sites: ask.sites,
       });
@@ -1094,11 +1130,14 @@ const make = Effect.gen(function* () {
           return yield* fail("gone", "That page or conversation can't be read any more.");
         }
         const material = pageAskMaterial(ask.childId, ask.page, ask.sites);
+        const scope = input.scope ?? "once";
+        const covers = ["internetAssets"] as const;
         const fingerprint = fingerprintFor({
           threadId: ask.threadId,
           requestId: ask.id,
           what: material,
           why: PAGE_ASK_WHY,
+          ...(scope === "project" ? { scope, covers } : {}),
         });
         if (fingerprint !== input.fingerprint) {
           return yield* fail(
@@ -1133,6 +1172,44 @@ const make = Effect.gen(function* () {
           id: ask.id,
           decision: input.decision === "accept" ? "allow" : "decline",
         });
+        if (input.decision === "accept" && scope === "project") {
+          const thread = yield* projections
+            .getThread(ask.threadId as ThreadId)
+            .pipe(
+              Effect.mapError(
+                () => new DevicesError("gone", "That project can't be found any more."),
+              ),
+            );
+          const project = yield* projects
+            .get(thread.projectId)
+            .pipe(
+              Effect.mapError(
+                () => new DevicesError("gone", "That project can't be found any more."),
+              ),
+            );
+          if (Option.isNone(project) || Option.isNone(fs)) {
+            return yield* fail("gone", "That project can't be found any more.");
+          }
+          const projectPath = yield* fs.value
+            .realPath(project.value.workspaceRoot)
+            .pipe(
+              Effect.mapError(
+                () => new DevicesError("gone", "That project can't be found any more."),
+              ),
+            );
+          yield* family.grantProjectApproval({
+            childId: ask.childId,
+            projectPath,
+            covers,
+            grantedBy: input.who.personId,
+            how:
+              proven?.how === "watch"
+                ? "watch"
+                : proven?.how === "face-id" || proven?.how === "passkey"
+                  ? "face-id"
+                  : "parent-code",
+          });
+        }
         yield* limits.recordEvent({
           sessionId: input.sessionId,
           kind: input.decision === "accept" ? "approved" : "declined",
@@ -1179,11 +1256,17 @@ const make = Effect.gen(function* () {
       }
       const described = yield* gate.describeRequest({ threadId, requestId });
       if (described === null) return yield* fail("gone", "That request can't be read any more.");
+      const scope = input.scope ?? "once";
+      const covers = described.projectCovers ?? [];
+      if (scope === "project" && covers.length === 0) {
+        return yield* fail("changed", "This request can only be allowed once.");
+      }
       const fingerprint = fingerprintFor({
         threadId: input.threadId,
         requestId: input.requestId,
         what: described.what,
         why: described.why,
+        ...(scope === "project" ? { scope, covers } : {}),
       });
       if (fingerprint !== input.fingerprint) {
         return yield* fail("changed", "That request changed. Have another look before you answer.");
@@ -1230,6 +1313,46 @@ const make = Effect.gen(function* () {
             () => new DevicesError("gone", "That request was already answered, or it stopped."),
           ),
         );
+      if (input.decision === "accept" && scope === "project") {
+        const owner = (yield* limits.today).threads[input.threadId];
+        const thread = yield* projections
+          .getThread(threadId)
+          .pipe(
+            Effect.mapError(
+              () => new DevicesError("gone", "That project can't be found any more."),
+            ),
+          );
+        const project = yield* projects
+          .get(thread.projectId)
+          .pipe(
+            Effect.mapError(
+              () => new DevicesError("gone", "That project can't be found any more."),
+            ),
+          );
+        if (owner === undefined || Option.isNone(project) || Option.isNone(fs)) {
+          return yield* fail("gone", "That project can't be found any more.");
+        }
+        const projectPath = yield* fs.value
+          .realPath(project.value.workspaceRoot)
+          .pipe(
+            Effect.mapError(
+              () => new DevicesError("gone", "That project can't be found any more."),
+            ),
+          );
+        const how: SkycotFamily.ProjectApprovalGrant["how"] =
+          proven?.how === "face-id" || proven?.how === "watch"
+            ? proven.how
+            : proven?.how === "passkey"
+              ? "face-id"
+              : "parent-code";
+        yield* family.grantProjectApproval({
+          childId: owner,
+          projectPath,
+          covers,
+          grantedBy: input.who.personId,
+          how,
+        });
+      }
       const owner = (yield* limits.today).threads[input.threadId];
       yield* limits.recordEvent({
         sessionId: input.sessionId,

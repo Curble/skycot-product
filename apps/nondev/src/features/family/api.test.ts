@@ -7,7 +7,7 @@ vi.mock("~/environments/primary/desktopAuth", () => ({
   readDesktopPrimaryBearerToken: async () => "token",
 }));
 
-import { engineRequest, request } from "./api";
+import { callEngine, engineRequest, request } from "./api";
 
 // Regression: a merge left `engineRequest` prefixing the Family path a second time, so every
 // Family and update call went to `/api/skycot/family/api/skycot/...` and failed. The first-run
@@ -25,5 +25,24 @@ describe("engine requests", () => {
       "http://127.0.0.1:47391/api/skycot/family/status",
       "http://127.0.0.1:47391/api/skycot/updates",
     ]);
+  });
+
+  it("keeps desktop bearer auth and same-origin cookies for Family session routes", async () => {
+    vi.stubGlobal("window", {
+      location: { origin: "http://127.0.0.1:47391" },
+      desktopBridge: {},
+    });
+    let init: RequestInit | undefined;
+    using _fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
+      init = options;
+      return new Response("{}", { status: 200 });
+    });
+    try {
+      await callEngine("POST", "/api/skycot/family/renew", {});
+      expect(init?.credentials).toBe("include");
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer token");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

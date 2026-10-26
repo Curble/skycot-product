@@ -369,6 +369,7 @@ export const familyApi = {
       { method: "POST", path: `${FAMILY_API_PATH}/approver/notes/seen`, body: { id } },
       ok,
     ),
+  // nondev-seam: skycot-mobile-project-approval-answer
   answerRequest: (
     transport: MacTransport,
     input: {
@@ -377,6 +378,7 @@ export const familyApi = {
       readonly decision: "accept" | "decline";
       readonly fingerprint: string;
       readonly proof: ApproverProof | null;
+      readonly scope?: "once" | "project";
       /** A no said on the Watch (a yes from the Watch is known by its proof). */
       readonly via?: "watch";
     },

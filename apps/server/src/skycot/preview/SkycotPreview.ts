@@ -30,6 +30,7 @@ import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as PortScanner from "../../preview/PortScanner.ts";
 import * as TerminalManager from "../../terminal/Manager.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
+import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import {
   findPreviewCommand,
   frameableFromHeaders,
@@ -152,6 +153,7 @@ export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const httpClient = (yield* HttpClient.HttpClient).pipe(HttpClient.withScope);
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
+  const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
   /** Keyed by folder: conversations sharing a folder share its site. */
   const running = new Map<string, Running>();
@@ -201,10 +203,19 @@ export const make = Effect.gen(function* () {
         : null;
     const folder = thread.value.worktreePath ?? projectFolder;
     if (folder === null) return null;
+    const projectPath =
+      projectFolder === null
+        ? null
+        : yield* fs.realPath(projectFolder).pipe(Effect.orElseSucceed(() => null));
+    const childId = Option.isSome(familyLimits)
+      ? (yield* familyLimits.value.today).threads[threadId]
+      : undefined;
     return {
       folder,
       worktreePath: thread.value.worktreePath,
       projectFolder,
+      projectPath,
+      childId,
       runtimeMode: thread.value.runtimeMode as RuntimeMode,
     };
   });
@@ -322,11 +333,24 @@ export const make = Effect.gen(function* () {
     );
   };
 
+  // nondev-seam: skycot-project-approval-page-internet-preview
   /** Shows a plain web page: SKYCOT's own server on 127.0.0.1, answering at once. */
   const startPage = Effect.fn("SkycotPreview.startPage")(function* (entry: Running) {
     const root = path.join(entry.folder, entry.command.pageFolder ?? "");
     const pageSites = Option.isSome(family)
-      ? (page: string) => Effect.runPromise(family.value.pageInternetSites(page))
+      ? (page: string) =>
+          Effect.runPromise(
+            contextFor(entry.ownerThreadId as ThreadId).pipe(
+              Effect.flatMap((context) =>
+                family.value.pageInternetSites(
+                  page,
+                  context?.projectPath && context.childId
+                    ? { childId: context.childId, projectPath: context.projectPath }
+                    : undefined,
+                ),
+              ),
+            ),
+          )
       : undefined;
     const site = yield* Effect.tryPromise(() =>
       serveStaticSite(root, pageSites === undefined ? {} : { pageSites }),
@@ -351,7 +375,16 @@ export const make = Effect.gen(function* () {
     if (entry.site === null || Option.isNone(family)) return [];
     const asks: Array<{ readonly page: string; readonly sites: ReadonlyArray<string> }> = [];
     for (const tried of entry.site.blocked()) {
-      const allowed = (yield* family.value.pageInternetSites(tried.page)) ?? [];
+      const context = yield* contextFor(entry.ownerThreadId as ThreadId).pipe(
+        Effect.orElseSucceed(() => null),
+      );
+      const allowed =
+        (yield* family.value.pageInternetSites(
+          tried.page,
+          context?.projectPath && context.childId
+            ? { childId: context.childId, projectPath: context.projectPath }
+            : undefined,
+        )) ?? [];
       const sites = tried.sites.filter((site) => !allowed.includes(site));
       if (sites.length > 0) asks.push({ page: tried.page, sites });
     }

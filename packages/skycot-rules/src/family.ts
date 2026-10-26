@@ -27,6 +27,45 @@ import {
 
 export type FamilyRuleId = "uses-internet" | "installs-software" | "admin-rights" | "opaque-code";
 
+// nondev-seam: skycot-project-approval-covers
+/** The only kinds a grown-up may let a child use without asking again for this project. */
+export const PROJECT_APPROVAL_COVERS = [
+  "webSearch",
+  "addOns",
+  "internetFetch",
+  "internetAssets",
+] as const;
+export type ProjectApprovalCover = (typeof PROJECT_APPROVAL_COVERS)[number];
+
+// nondev-seam: skycot-project-approval-covers
+/** Only a simple, held internet or add-on request can offer a project yes. */
+export function projectApprovalCoverFor(
+  request: FamilyRequest,
+  evaluation: FamilyEvaluation,
+): ProjectApprovalCover | null {
+  if (!evaluation.needsGrownUp) return null;
+  if (request.toolItemType === "web_search") {
+    return evaluation.base.decision === "hold" ? null : "webSearch";
+  }
+  if (request.kind !== "command" || request.command === undefined) return null;
+  const ids = new Set(evaluation.family.map((match) => match.rule.id));
+  if (
+    ids.has("installs-software") &&
+    addOnAskOf(request.command)?.names.length &&
+    [...ids].every((id) => id === "uses-internet" || id === "installs-software") &&
+    evaluation.base.matches.every((match) => match.rule.id === "leaves-sandbox")
+  )
+    return "addOns";
+  if (evaluation.base.decision === "hold") return null;
+  if (
+    ids.size === 1 &&
+    ids.has("uses-internet") &&
+    /^\s*(?:curl|wget)\s+https:\/\/[^\s|;&]+(?:\s+-[A-Za-z]+\s*)*$/iu.test(request.command)
+  )
+    return "internetFetch";
+  return null;
+}
+
 export interface FamilyRule {
   readonly id: FamilyRuleId;
   /** Settings row: "Using the internet". */

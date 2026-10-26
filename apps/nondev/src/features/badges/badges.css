@@ -302,6 +302,32 @@
 }
 
 /* ---- a sticker arrives ---- */
+.fm-sticker-toast {
+  position: fixed;
+  z-index: 70;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(280px, calc(100vw - 36px));
+  padding: 8px 14px 8px 8px;
+  border: 2px solid #2b2420;
+  border-radius: 18px;
+  background: #fffaf0;
+  box-shadow: 3px 3px 0 #2b2420;
+  color: #2b2420;
+  font:
+    700 14px/1.2 "SF Pro Rounded",
+    "Nunito",
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+.fm-sticker-toast:hover {
+  transform: translateY(-2px);
+}
+
 .fm-arrive-backdrop {
   position: fixed;
   inset: 0;

@@ -25,9 +25,14 @@ func watchSignedMessage(purpose: String, challenge: String, action: String) -> S
 /// The Mac's fingerprint of a card: the first 24 hex characters of SHA-256 over the request's
 /// thread, id, what and why (fingerprintFor in SkycotFamilyDevices.ts). The Watch checks it
 /// against the card it shows, so it never signs a yes for words it didn't show.
-func cardFingerprint(threadId: String, requestId: String, what: String, why: String?) -> String {
-  let lines = [threadId, requestId, what, why ?? ""].joined(separator: "\n")
-  let digest = SHA256.hash(data: Data(lines.utf8))
+// nondev-seam: skycot-watch-project-approval-fingerprint
+func cardFingerprint(
+  threadId: String, requestId: String, what: String, why: String?, scope: String = "once",
+  covers: [String] = []) -> String {
+  var lines = [threadId, requestId, what, why ?? ""]
+  if scope == "project" { lines += ["project"] + covers.sorted() }
+  let material = lines.joined(separator: "\n")
+  let digest = SHA256.hash(data: Data(material.utf8))
   return String(digest.map { String(format: "%02x", $0) }.joined().prefix(24))
 }
 

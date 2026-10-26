@@ -29,12 +29,10 @@ export async function callEngine(
   // The query goes separately: the path is set as a URL's pathname, which would escape a "?".
   const url = resolvePrimaryEnvironmentHttpUrl(fullPath, query);
   const sameOrigin =
-    typeof window !== "undefined" &&
-    window.desktopBridge === undefined &&
-    new URL(url).origin === window.location.origin;
+    typeof window !== "undefined" && new URL(url).origin === window.location.origin;
   const headers: Record<string, string> = { accept: "application/json" };
   if (body !== undefined) headers["content-type"] = "application/json";
-  if (!sameOrigin) {
+  if (!sameOrigin || window.desktopBridge !== undefined) {
     const token = await readDesktopPrimaryBearerToken();
     if (token) headers["authorization"] = `Bearer ${token}`;
   }
@@ -75,6 +73,7 @@ export async function engineRequest<A>(
 
 export interface UnlockToken {
   readonly token: string;
+  readonly sessionToken?: string;
   readonly expiresAt: number;
   readonly purpose: FamilyPurpose;
 }
@@ -86,6 +85,9 @@ function parseUnlock(body: unknown): UnlockToken | null {
   return typeof record["token"] === "string" && typeof record["expiresAt"] === "number"
     ? {
         token: record["token"],
+        ...(typeof record["sessionToken"] === "string"
+          ? { sessionToken: record["sessionToken"] }
+          : {}),
         expiresAt: record["expiresAt"],
         purpose: record["purpose"] as FamilyPurpose,
       }
@@ -182,7 +184,12 @@ export const familyApi = {
     readonly code: string;
     readonly purpose: FamilyPurpose;
     readonly requestId?: string;
+    readonly scope?: "once" | "project";
   }) => request("POST", "/verify", input, parseUnlock),
+  renew: () => request("POST", "/renew", {}, parseUnlock),
+  approveSession: (requestId: string, scope: "once" | "project" = "once") =>
+    request("POST", "/approve-session", { requestId, scope }, (body) => body !== null),
+  prepareUpdate: () => request("POST", "/prepare-update", {}, parseUnlock),
   disable: (input: { readonly code: string }) =>
     request("POST", "/disable", input, parseServerStatus),
   changeCode: (input: { readonly oldCode: string; readonly newCode: string }) =>
@@ -198,6 +205,8 @@ export const familyApi = {
     readonly page: string;
     readonly sites: ReadonlyArray<string>;
     readonly code: string;
+    readonly threadId?: string;
+    readonly scope?: "once" | "project";
   }) => request("POST", "/page-internet/allow", input, parseServerStatus),
   askPageInternet: (input: {
     readonly threadId: string;
@@ -213,6 +222,8 @@ export const familyApi = {
   /** No code: taking a page's internet back only makes the profile stricter. */
   stopPageInternet: (input: { readonly page: string }) =>
     request("POST", "/page-internet/stop", input, parseServerStatus),
+  stopProjectApproval: (id: string) =>
+    request("POST", "/project-approvals/stop", { id }, parseServerStatus),
   /** "Trusted add-ons download by themselves": the code goes with the one request, either way. */
   setTrustedAddOns: (input: { readonly on: boolean; readonly code: string }) =>
     request("POST", "/trusted-add-ons", input, parseServerStatus),

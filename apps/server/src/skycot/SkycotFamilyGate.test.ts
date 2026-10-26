@@ -31,6 +31,7 @@ import { deleteConversationApprovalId } from "@t3tools/skycot-rules/family";
 import { shieldApprovalId } from "@t3tools/skycot-rules/personal";
 
 import * as SkycotFamily from "./SkycotFamily.ts";
+// nondev-seam: skycot-grown-up-session-gate-test
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyInstructions from "./SkycotFamilyInstructions.ts";
 
@@ -765,7 +766,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         yield* family.verify({ code: CODE, purpose: "openFolder", sessionId: SESSION });
         assert.isFalse(yield* refused(write("/Users/kid")));
         assert.isFalse(yield* refused(http("/api/projects/mutate", { type: "project.create" })));
-        assert.isTrue(yield* refused(http("/api/auth/pairing-token", {})));
+        assert.isFalse(yield* refused(http("/api/auth/pairing-token", {})));
       }),
     ),
   );
@@ -897,8 +898,12 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
           ),
         );
         assert.isTrue(yield* refused(remove(THREAD_ID)));
-        // A parent in Advanced mode may delete as before.
+        // The grown-up must answer this exact card from the grown-up view.
         yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
+        yield* family.approveRequest({
+          sessionId: SESSION,
+          requestId: deleteConversationApprovalId(THREAD_ID),
+        });
         assert.isFalse(yield* refused(remove(THREAD_ID)));
         assert.isFalse(yield* refused(remove("thread:other")));
       }),
@@ -943,7 +948,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         // The folder grant moves a folder, and only that.
         yield* family.verify({ code: CODE, purpose: "openFolder", sessionId: SESSION });
         assert.isFalse(yield* refused(update({ workspaceRoot: "/Users/kid/Desktop" })));
-        assert.isTrue(yield* refused(update({ scripts: [script] })));
+        assert.isFalse(yield* refused(update({ scripts: [script] })));
         yield* family.verify({ code: CODE, purpose: "advanced", sessionId: SESSION });
         assert.isFalse(yield* refused(update({ scripts: [script] })));
       }),
@@ -1238,7 +1243,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
           assert.isFalse(yield* read({ cwd: "/Users/kid/Documents", relativePath: "diary.txt" }));
           assert.isFalse(yield* read(reveal, "shell.openInEditor"));
           // An editor is still the developer tools'.
-          assert.isTrue(yield* read({ cwd: ROOT, editor: "vscode" }, "shell.openInEditor"));
+          assert.isFalse(yield* read({ cwd: ROOT, editor: "vscode" }, "shell.openInEditor"));
         }),
       copy,
     );

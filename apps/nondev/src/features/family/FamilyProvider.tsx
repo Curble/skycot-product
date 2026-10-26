@@ -17,7 +17,12 @@ import {
 import { Button } from "../../ui/Button";
 import { HOME_HREF, navigate } from "../../router";
 import { openChildPicker } from "../family-limits/FamilyLimitsHost";
-import { endGrownUpSession } from "./grownUpSession";
+import {
+  endGrownUpSession,
+  grownUpSessionFor,
+  readGrownUpSessionId,
+  startGrownUpSession,
+} from "./grownUpSession";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
 import { actionReason, familySteps } from "./copy";
@@ -34,10 +39,13 @@ import {
 import { ParentCodeEntry, useParentCodeEntry, type ParentCodeAttempt } from "./ParentCodeEntry";
 import {
   disableFamily,
+  approveInGrownUpSession,
+  prepareUpdateInGrownUpSession,
   lockFamilyGrants,
   moveLegacyProfile,
   readFamilyView,
   refreshFamily,
+  renewGrownUpSession,
   tryParentCode,
   useFamilyView,
 } from "./store";
@@ -47,6 +55,8 @@ export interface ParentCodeOptions {
   readonly requestId?: string;
   /** For "approve": the card's own reason, shown on the code sheet. */
   readonly reason?: string | null;
+  readonly code?: string;
+  readonly scope?: "once" | "project";
 }
 
 export interface FamilyApi {
@@ -82,7 +92,12 @@ export function attemptFor(action: FamilyAction, options: ParentCodeOptions): Pa
     if (purpose === null) {
       return { ok: true, value: null } satisfies FamilyResult<null>;
     }
-    return tryParentCode(code, purpose, options.requestId);
+    return tryParentCode(
+      code,
+      purpose,
+      options.requestId,
+      options.scope === undefined ? undefined : { scope: options.scope },
+    );
   };
 }
 
@@ -97,6 +112,20 @@ function makeApi(
     enabled: familyOn(view),
     isLocked: (action) => isFamilyLocked(view, action),
     requireParentCode: (action, options = {}) => {
+      if (options.code !== undefined) {
+        return attemptFor(action, options)(options.code).then((result) => result.ok);
+      }
+      const grownUp =
+        view.me.kind === "shared" &&
+        grownUpSessionFor(readGrownUpSessionId(), view, Date.now()) !== null;
+      if (grownUp && action === "approve" && options.requestId) {
+        return approveInGrownUpSession(options.requestId, options.scope);
+      }
+      if (grownUp && action === "restartToUpdate") return prepareUpdateInGrownUpSession();
+      if (grownUp && familyGrantOpen(view, action, Date.now())) {
+        void renewGrownUpSession();
+        return Promise.resolve(true);
+      }
       if (!isFamilyLocked(view, action) || familyGrantOpen(view, action, Date.now()))
         return Promise.resolve(true);
       return open === null ? Promise.resolve(false) : open({ action, options });
@@ -121,7 +150,11 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
 
   useEffect(() => {
     if (!view.enabled || view.me.kind !== "shared") return;
-    const expiresAt = Math.max(view.openUntil.settings ?? 0, view.openUntil.advanced ?? 0);
+    const expiresAt = Math.max(
+      view.openUntil.grownUpSession ?? 0,
+      view.openUntil.settings ?? 0,
+      view.openUntil.advanced ?? 0,
+    );
     const delay = expiresAt - Date.now();
     if (delay <= 0) return;
     const timer = window.setTimeout(() => void refreshFamily(), delay + 50);
@@ -169,10 +202,22 @@ const subscribeBarClock = (onChange: () => void) => {
 function GrownUpModeBar({ view }: { readonly view: FamilyView }) {
   const now = useSyncExternalStore(subscribeBarClock, readBarClock, readBarClock);
   const minutes = grownUpMinutesLeft(view, now);
-  if (!view.enabled || view.me.kind !== "shared" || minutes === 0) return null;
+  if (
+    !view.enabled ||
+    view.me.kind !== "shared" ||
+    minutes === 0 ||
+    grownUpSessionFor(readGrownUpSessionId(), view, now) === null
+  ) {
+    return null;
+  }
   return (
     <div className="fm-grown-up-bar" role="status">
       <span>Grown-up mode · {minutes} min</span>
+      {minutes <= 2 ? (
+        <Button size="sm" onClick={() => void renewGrownUpSession()}>
+          Stay
+        </Button>
+      ) : null}
       <Button
         size="sm"
         onClick={() => {
@@ -210,9 +255,18 @@ export function useFamilySteps():
 }
 
 function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
-  const entry = useParentCodeEntry(attemptFor(pending.action, pending.options), () =>
-    pending.resolve(true),
-  );
+  const view = useFamilyView();
+  const entry = useParentCodeEntry(attemptFor(pending.action, pending.options), () => {
+    if (
+      view.me.kind === "shared" &&
+      pending.action !== "approve" &&
+      pending.action !== "deleteConversation" &&
+      pending.action !== "restartToUpdate" &&
+      view.grownUps[0] !== undefined
+    )
+      startGrownUpSession(view.grownUps[0].id);
+    pending.resolve(true);
+  });
   const cancel = () => pending.resolve(false);
   return (
     <Sheet

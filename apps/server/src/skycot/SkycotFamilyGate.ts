@@ -68,7 +68,9 @@ import {
   deleteConversationApprovalId,
   describeFamilyMatches,
   evaluateFamilyRequest,
+  projectApprovalCoverFor,
   type FamilyEvaluation,
+  type ProjectApprovalCover,
 } from "@t3tools/skycot-rules/family";
 import { describeMatches } from "@t3tools/skycot-rules/rules";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
@@ -345,10 +347,9 @@ export function gateNeedFor(method: string, payload: unknown): GateNeed | null {
         ? { type: "projectFolder", cwd: input["worktreePath"] }
         : null;
     }
-    // Deleting a conversation cannot be undone (putting it away can), so it is a grown-up's
-    // call: a parent code for this one conversation (spent by the delete), or Advanced mode.
-    // Not the Advanced grant itself: that would also lift plan first and the limits for the
-    // child's session while it lasts.
+    // nondev-seam: skycot-grown-up-session-approval
+    // Deleting a conversation cannot be undone (putting it away can), so the grown-up approves
+    // this exact conversation; the session never grants a general delete permission.
     if (input["type"] === "thread.delete") {
       return typeof input["threadId"] === "string"
         ? {
@@ -730,6 +731,7 @@ export class SkycotFamilyGate extends Context.Service<
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 
 /** A pending request as a grown-up's phone shows it. */
+// nondev-seam: skycot-project-approval-description
 export interface RequestDescription {
   readonly needsGrownUp: boolean;
   /** "It uses the internet." */
@@ -737,6 +739,8 @@ export interface RequestDescription {
   /** What it wants to do: the command, or the files, as the assistant asked. */
   readonly what: string;
   readonly kind: ApprovalItem["requestKind"];
+  /** A second answer scope is available only for these closed, project-safe request kinds. */
+  readonly projectCovers?: ReadonlyArray<ProjectApprovalCover>;
 }
 
 const make = Effect.gen(function* () {
@@ -863,6 +867,13 @@ const make = Effect.gen(function* () {
         why: parts.length > 0 ? `It ${parts.join(", and ")}.` : null,
         what: what.slice(0, 400),
         kind: approval.requestKind,
+        ...(projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, evaluation) === null
+          ? {}
+          : {
+              projectCovers: [
+                projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, evaluation)!,
+              ],
+            }),
       } satisfies RequestDescription;
     },
     Effect.orElseSucceed(() => null),
@@ -997,6 +1008,10 @@ const make = Effect.gen(function* () {
       }
       return;
     }
+    const projectScope =
+      need.widens || need.requestId === undefined
+        ? { scope: "once" as const, how: "parent-code" as const }
+        : yield* family.approvalScope({ sessionId, requestId: need.requestId });
     const allowed = yield* family.allows({
       sessionId,
       purpose: "approve",
@@ -1004,6 +1019,35 @@ const make = Effect.gen(function* () {
       consume: true,
     });
     if (allowed) {
+      if (
+        projectScope.scope === "project" &&
+        need.requestId !== undefined &&
+        Option.isSome(limits)
+      ) {
+        yield* Effect.gen(function* () {
+          const step = yield* limits.value.stepRuleFor({ threadId: need.threadId });
+          const described = yield* describeRequest({
+            threadId: need.threadId,
+            requestId: need.requestId,
+          });
+          const thread = yield* projections.getThread(need.threadId);
+          const project = yield* projects.get(thread.projectId);
+          if (step.type === "auto" && described?.projectCovers?.length && Option.isSome(project)) {
+            const projectPath = yield* fs
+              .realPath(project.value.workspaceRoot)
+              .pipe(Effect.orElseSucceed(() => ""));
+            if (projectPath.length > 0) {
+              yield* family.grantProjectApproval({
+                childId: step.childId,
+                projectPath,
+                covers: described.projectCovers,
+                grantedBy: "grown-up",
+                how: projectScope.how,
+              });
+            }
+          }
+        }).pipe(Effect.catchCause(() => Effect.void));
+      }
       if (Option.isSome(limits)) {
         yield* limits.value.recordEvent({
           sessionId,
@@ -1106,6 +1150,19 @@ const make = Effect.gen(function* () {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "builds-plan");
     } else if (yield* family.allows({ sessionId, purpose: "advanced" })) {
       yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "grown-up");
+    } else if (
+      source === null &&
+      message.threadId !== undefined &&
+      SkycotFamilyInstructions.isSmallTweak(message.text)
+    ) {
+      // A small change to something this conversation already built: no plan card for it.
+      const builtBefore = yield* projections.getThreadProjection(message.threadId as ThreadId).pipe(
+        Effect.map((projection) => projection.plans.some((plan) => plan.runId !== null)),
+        Effect.orElseSucceed(() => false),
+      );
+      if (builtBefore) {
+        yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "small-follow-up");
+      }
     }
   });
 

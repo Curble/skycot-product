@@ -112,7 +112,8 @@ export type AllowOutcome =
 /** The Mac's reasons that mean "this key can't say yes here; the code still can". */
 const KEY_REASONS = new Set(["device-key", "proof-needed"]);
 
-/** Allow once with Face ID: a fresh challenge, a fresh signature, one answer. */
+// nondev-seam: skycot-mobile-project-approval-faceid
+/** The card fingerprint binds Face ID to its selected one-time or project scope. */
 export async function allowWithFaceId(input: {
   readonly api: FaceIdApi;
   readonly signer: FaceIdSigner;
@@ -122,6 +123,7 @@ export async function allowWithFaceId(input: {
     readonly requestId: string;
     readonly fingerprint: string;
   };
+  readonly scope?: "once" | "project";
   readonly reason: string;
   readonly label?: string;
 }): Promise<AllowOutcome> {
@@ -160,6 +162,7 @@ export async function allowWithFaceId(input: {
     requestId: request.requestId,
     decision: "accept",
     fingerprint: request.fingerprint,
+    ...(input.scope === undefined ? {} : { scope: input.scope }),
     proof: {
       type: "device-key",
       keyId: issued.value.keyId,

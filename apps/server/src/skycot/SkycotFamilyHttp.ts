@@ -91,6 +91,9 @@ type Handler = (input: {
   readonly query: URLSearchParams;
   readonly family: SkycotFamily.SkycotFamily["Service"];
   readonly limits: SkycotFamilyLimits.SkycotFamilyLimits["Service"];
+  readonly projects: Option.Option<ProjectStore.ProjectStoreV2["Service"]>;
+  readonly projections: Option.Option<ProjectionStore.ProjectionStoreV2["Service"]>;
+  readonly fileSystem: Option.Option<FileSystem.FileSystem>;
   /**
    * Pins the engine default to "Ask me first". The runtime policy downgrades every turn
    * anyway; this keeps Settings and new threads honest about it.
@@ -119,6 +122,9 @@ const route = (
   Layer.unwrap(
     Effect.gen(function* () {
       const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
+      const projects = yield* Effect.serviceOption(ProjectStore.ProjectStoreV2);
+      const projections = yield* Effect.serviceOption(ProjectionStore.ProjectionStoreV2);
+      const fileSystem = yield* Effect.serviceOption(FileSystem.FileSystem);
       const identities = yield* Effect.serviceOption(SkycotFamilyIdentity.SkycotFamilyIdentity);
       const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
       const devices = yield* Effect.serviceOption(SkycotFamilyDevices.SkycotFamilyDevices);
@@ -185,6 +191,9 @@ const route = (
             query: Option.isSome(url) ? url.value.searchParams : new URLSearchParams(),
             family,
             limits,
+            projects,
+            projections,
+            fileSystem,
             pinSafeDefault,
             who,
             devices,
@@ -281,12 +290,12 @@ const verifyRoute = route(
     Effect.gen(function* () {
       const purpose = text(body["purpose"]) as SkycotFamily.FamilyPurpose;
       const requestId = nullableText(body["requestId"]) ?? undefined;
-      if (who.kind === "child" && purpose === "advanced") {
+      const scope = body["scope"] === "project" ? ("project" as const) : ("once" as const);
+      if (who.kind === "child") {
         return json(
           {
             error: "forbidden",
-            message: "Advanced mode is only on the family's Mac.",
-            requiredPermission: SkycotFamilyGate.FAMILY_DEVICE_PERMISSION,
+            message: "A child device cannot answer requests or open grown-up mode.",
           },
           403,
         );
@@ -296,19 +305,99 @@ const verifyRoute = route(
         purpose,
         sessionId,
         requestId,
+        scope,
       });
       // The developer interface is a page load, not an RPC: it needs a cookie the static
       // handler can read. HttpOnly, so nothing in either client can copy it.
       const headers =
-        unlock.purpose === "advanced"
+        purpose !== "approve" && purpose !== "update"
           ? {
               "set-cookie": unlockCookie(
-                unlock.token,
-                Math.floor(SkycotFamily.GRANT_TTL_MS.advanced / 1000),
+                unlock.sessionToken ?? unlock.token,
+                Math.floor(SkycotFamily.GRANT_TTL_MS.grownUpSession / 1000),
               ),
             }
           : {};
       return json(unlock, 200, headers);
+    }),
+);
+
+// nondev-seam: skycot-grown-up-session-routes
+const renewRoute = route(
+  "POST",
+  "/renew",
+  AuthOrchestrationOperateScope,
+  ({ family, sessionId, who, request }) =>
+    Effect.gen(function* () {
+      if (who.kind === "child") {
+        return json(
+          { error: "forbidden", message: "A child device cannot renew grown-up mode." },
+          403,
+        );
+      }
+      const cookie = request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
+      if (!(yield* family.tokenBelongsToSession(cookie, sessionId))) {
+        return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
+      }
+      const unlock = yield* family.renew({ sessionId });
+      return json(unlock, 200, {
+        "set-cookie": unlockCookie(unlock.token, SkycotFamily.GRANT_TTL_MS.grownUpSession / 1000),
+      });
+    }),
+);
+
+const approveSessionRoute = route(
+  "POST",
+  "/approve-session",
+  AuthOrchestrationOperateScope,
+  ({ family, sessionId, who, body, request }) =>
+    Effect.gen(function* () {
+      if (who.kind === "child") {
+        return json(
+          { error: "forbidden", message: "A child device cannot approve a request." },
+          403,
+        );
+      }
+      const cookie = request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
+      if (!(yield* family.tokenBelongsToSession(cookie, sessionId))) {
+        return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
+      }
+      const requestId = text(body["requestId"]);
+      const scope = body["scope"] === "project" ? ("project" as const) : ("once" as const);
+      if (!requestId)
+        return json({ error: "invalid-request", message: "That request was not understood." }, 400);
+      yield* family.approveRequest({ sessionId, requestId, scope });
+      return json({ ok: true });
+    }),
+);
+
+const prepareUpdateRoute = route(
+  "POST",
+  "/prepare-update",
+  AuthOrchestrationOperateScope,
+  ({ family, sessionId, who, request }) =>
+    Effect.gen(function* () {
+      if (who.kind === "child") {
+        return json(
+          { error: "forbidden", message: "A child device cannot prepare an update." },
+          403,
+        );
+      }
+      if (
+        !(yield* family.tokenBelongsToSession(
+          request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME],
+          sessionId,
+        ))
+      ) {
+        return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
+      }
+      const unlock = yield* family.prepareUpdate({ sessionId });
+      return json(unlock, 200, {
+        "set-cookie": unlockCookie(
+          unlock.sessionToken ?? unlock.token,
+          SkycotFamily.GRANT_TTL_MS.grownUpSession / 1000,
+        ),
+      });
     }),
 );
 
@@ -467,7 +556,11 @@ const chooseRoute = route(
     Effect.gen(function* () {
       const grownUp = yield* family.allows({ sessionId, purpose: "settings" });
       return yield* limits.choose({ sessionId, childId: text(body["childId"]), grownUp }).pipe(
-        Effect.map((session) => json(session)),
+        Effect.flatMap((session) =>
+          (grownUp ? family.lock({ sessionId }) : Effect.void).pipe(
+            Effect.as(json(session, 200, grownUp ? { "set-cookie": expiredUnlockCookie } : {})),
+          ),
+        ),
         Effect.catchTags({
           SkycotFamilyLimitRefusal: (refusal) =>
             Effect.succeed(
@@ -626,18 +719,58 @@ const stopAllowingAssistantRoute = route(
  * sounds and data from the named sites (https only, never scripts). The code goes with the one
  * request, counted like every other try; the engine remembers the yes for that page.
  */
+// nondev-seam: skycot-project-approval-page-internet-route
 const allowPageInternetRoute = route(
   "POST",
   "/page-internet/allow",
   AuthOrchestrationOperateScope,
-  ({ family, body }) =>
-    family
-      .allowPageInternet({
+  ({ family, body, who, childView, limits, projections, projects, fileSystem }) =>
+    Effect.gen(function* () {
+      const projectScope = body["scope"] === "project";
+      if (who.kind === "child" || childView !== null) {
+        return json({ error: "forbidden", message: "A grown-up must answer this request." }, 403);
+      }
+      let projectApproval: Parameters<typeof family.allowPageInternet>[0]["projectApproval"];
+      if (projectScope) {
+        const threadId = text(body["threadId"]);
+        const childId = (yield* limits.today).threads[threadId];
+        if (Option.isNone(projections)) return json({ error: "invalid-request" }, 400);
+        const thread =
+          threadId.length > 0
+            ? yield* projections.value.getThread(threadId as never).pipe(Effect.option)
+            : Option.none();
+        if (
+          childId === undefined ||
+          Option.isNone(thread) ||
+          Option.isNone(fileSystem) ||
+          Option.isNone(projects)
+        ) {
+          return json({ error: "invalid-request", message: "That project can't be found." }, 400);
+        }
+        if (Option.isNone(projects)) return json({ error: "invalid-request" }, 400);
+        const project = yield* projects.value.get(thread.value.projectId).pipe(Effect.option);
+        if (Option.isNone(project) || Option.isNone(project.value)) {
+          return json({ error: "invalid-request", message: "That project can't be found." }, 400);
+        }
+        const projectPath = yield* fileSystem.value
+          .realPath(project.value.value.workspaceRoot)
+          .pipe(Effect.orElseSucceed(() => null));
+        if (projectPath === null) return json({ error: "invalid-request" }, 400);
+        const grownUps = (yield* family.status).grownUps;
+        projectApproval = {
+          childId,
+          projectPath,
+          grantedBy: who.kind === "grown-up" ? who.personId : (grownUps[0]?.id ?? "parent-code"),
+        };
+      }
+      const status = yield* family.allowPageInternet({
         code: text(body["code"]),
         page: text(body["page"]),
         sites: Array.isArray(body["sites"]) ? body["sites"] : [],
-      })
-      .pipe(Effect.map((status) => json(status))),
+        ...(projectApproval === undefined ? {} : { projectApproval }),
+      });
+      return json(status);
+    }),
 );
 
 /** Takes a page's internet back: no code, since it only makes the profile stricter. */
@@ -649,6 +782,24 @@ const stopPageInternetRoute = route(
     family
       .stopPageInternet({ page: text(body["page"]) })
       .pipe(Effect.map((status) => json(status))),
+);
+
+// nondev-seam: skycot-project-approval-revoke-route
+const stopProjectApprovalRoute = route(
+  "POST",
+  "/project-approvals/stop",
+  AuthOrchestrationOperateScope,
+  ({ family, body, who }) =>
+    who.kind === "child"
+      ? Effect.succeed(
+          json(
+            { error: "forbidden", message: "A child device cannot change Family permissions." },
+            403,
+          ),
+        )
+      : family
+          .stopProjectApproval({ id: text(body["id"]) })
+          .pipe(Effect.map((status) => json(status))),
 );
 
 /**
@@ -1329,6 +1480,7 @@ const approverAnswerRoute = approverRoute(
         requestId: text(body["requestId"]),
         decision,
         fingerprint: text(body["fingerprint"]),
+        ...(body["scope"] === "project" ? { scope: "project" as const } : {}),
         proof: proofOf(body["proof"]),
         via: body["via"] === "watch" ? "watch" : null,
       });
@@ -1610,6 +1762,9 @@ export const layerCore = Layer.mergeAll(
   statusRoute,
   enableRoute,
   verifyRoute,
+  renewRoute,
+  approveSessionRoute,
+  prepareUpdateRoute,
   disableRoute,
   changeCodeRoute,
   renameRoute,
@@ -1627,6 +1782,7 @@ export const layerCore = Layer.mergeAll(
   stopAllowingAssistantRoute,
   allowPageInternetRoute,
   stopPageInternetRoute,
+  stopProjectApprovalRoute,
   trustedAddOnsRoute,
   lockRoute,
 );

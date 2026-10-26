@@ -52,6 +52,20 @@ export function countSentence(count: number): string {
   return count === 1 ? "1 request needs a grown-up." : `${count} requests need a grown-up.`;
 }
 
+// nondev-seam: skycot-mobile-project-approval-choice
+function projectCoverSentence(covers: ReadonlyArray<string>): string {
+  const words: Record<string, string> = {
+    webSearch: "look things up on the internet",
+    addOns: "install the add-ons this project needs",
+    internetFetch: "fetch plain pages and data",
+    internetAssets: "load pictures, sounds, fonts and data from allowed sites",
+  };
+  return covers
+    .map((cover) => words[cover])
+    .filter((word): word is string => word !== undefined)
+    .join("; ");
+}
+
 function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
   const { refresh } = useMacData();
@@ -187,6 +201,7 @@ function RequestCard(props: {
   const [asking, setAsking] = useState(false);
   /** Why the code is asked for, when Face ID was tried and didn't say yes. */
   const [codeNote, setCodeNote] = useState<string | null>(null);
+  const [allowScope, setAllowScope] = useState<"once" | "project">("once");
   const [allowing, setAllowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -229,8 +244,11 @@ function RequestCard(props: {
   const useFace = faceId.readyOn(mac);
   const allowingRef = useRef(false);
   /** Allow once: Face ID's fresh signature when it is set up; the parent code otherwise. */
-  const allow = async () => {
+  const allow = async (scope: "once" | "project" = "once") => {
     if (allowingRef.current || done !== null || request.lapsed) return;
+    if (scope === "project" && (!request.projectFingerprint || !request.projectCovers?.length))
+      return;
+    setAllowScope(scope);
     setProblem(null);
     setCodeNote(null);
     if (!faceId.readyOn(mac)) {
@@ -240,10 +258,23 @@ function RequestCard(props: {
     allowingRef.current = true;
     setAllowing(true);
     try {
-      const outcome = await faceId.allow(mac, request, child?.name ?? null);
+      const outcome = await faceId.allow(
+        mac,
+        {
+          threadId: request.threadId,
+          requestId: request.requestId,
+          fingerprint: scope === "project" ? request.projectFingerprint! : request.fingerprint,
+        },
+        child?.name ?? null,
+        scope,
+      );
       if (outcome.kind === "allowed") {
         haptic("success");
-        settle(`Allowed with ${faceId.label}, this once.`);
+        settle(
+          scope === "project"
+            ? `Allowed for this project with ${faceId.label}.`
+            : `Allowed with ${faceId.label}, this once.`,
+        );
       } else if (outcome.kind === "use-code") {
         setCodeNote(outcome.note);
         setAsking(true);
@@ -287,6 +318,12 @@ function RequestCard(props: {
       </View>
       {/* nondev-seam: skycot-grownup-request-sentence */}
       <Txt variant="title3">{grownUpRequestSentence(request, name)}</Txt>
+      {request.projectCovers?.length ? (
+        <Txt tone="label2">
+          For this project ({request.projectTitle ?? request.threadTitle}):{" "}
+          {projectCoverSentence(request.projectCovers)}.
+        </Txt>
+      ) : null}
       <Button
         title={showDetails ? "Hide details" : "Show details"}
         kind="plain"
@@ -316,6 +353,15 @@ function RequestCard(props: {
             style={{ flex: 1 }}
             size="medium"
           />
+          {request.projectCovers?.length && request.projectFingerprint ? (
+            <Button
+              title="Allow for this project"
+              busy={allowing}
+              onPress={() => void allow("project")}
+              style={{ flex: 1 }}
+              size="medium"
+            />
+          ) : null}
           <Button
             title="Allow once"
             {...(useFace
@@ -330,9 +376,9 @@ function RequestCard(props: {
       )}
       <ParentCodeSheet
         visible={asking}
-        title="Allow this once?"
-        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${request.kind === "page-internet" ? `${name}'s ${request.page?.split("/").at(-1) ?? "page"} wants internet from ${request.sites?.join(", ") ?? "the listed sites"}.` : `${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}.`} Enter the parent code to allow it, this once.`}
-        actionLabel="Allow once"
+        title={allowScope === "project" ? "Allow for this project?" : "Allow this once?"}
+        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${request.kind === "page-internet" ? `${name}'s ${request.page?.split("/").at(-1) ?? "page"} wants internet from ${request.sites?.join(", ") ?? "the listed sites"}.` : `${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}.`} ${allowScope === "project" ? `This allows ${projectCoverSentence(request.projectCovers ?? [])} for ${request.projectTitle ?? request.threadTitle} for 30 days.` : "Enter the parent code to allow it, this once."}`}
+        actionLabel={allowScope === "project" ? "Allow for this project" : "Allow once"}
         length={codeLength}
         onClose={() => {
           setAsking(false);
@@ -343,13 +389,15 @@ function RequestCard(props: {
             threadId: request.threadId,
             requestId: request.requestId,
             decision: "accept",
-            fingerprint: request.fingerprint,
+            fingerprint:
+              allowScope === "project" ? request.projectFingerprint! : request.fingerprint,
             proof: { type: "code", code },
+            ...(allowScope === "project" ? { scope: "project" as const } : {}),
           });
           if (!result.ok) return result.message;
           setAsking(false);
           haptic("success");
-          settle("Allowed, this once.");
+          settle(allowScope === "project" ? "Allowed for this project." : "Allowed, this once.");
           return null;
         }}
       />

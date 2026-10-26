@@ -10,11 +10,12 @@ import { Mascot } from "../brand/Mascot";
 import { useModal } from "../../ui/useModal";
 import { ChildAvatar } from "../family/ChildAvatar";
 import { childLabel } from "../family/children";
-import { startGrownUpSession } from "../family/grownUpSession";
+import { endGrownUpSession, startGrownUpSession } from "../family/grownUpSession";
 import { grownUpLabel } from "../family/people";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { tryParentCode, useFamilyView } from "../family/store";
 import { chooseChild } from "./store";
+import { rememberChild } from "./idlePicker";
 
 export function ChildPicker({
   onDone,
@@ -44,9 +45,11 @@ export function ChildPicker({
   const choose = async (childId: string) => {
     setBusy(childId);
     setProblem(null);
+    endGrownUpSession();
     const result = await chooseChild(childId);
     setBusy(null);
     if (result.ok) {
+      rememberChild(childId, Date.now());
       onDone();
       return;
     }

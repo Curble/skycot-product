@@ -50,7 +50,8 @@ final class PhoneLink: NSObject, ObservableObject {
 
   /// A no that couldn't reach the phone right now: watchOS delivers it when it can.
   func queueDecline(_ request: WatchRequest) {
-    guard let data = try? encoder.encode(WatchMessage.answer(request, decision: "decline", proof: nil))
+    // nondev-seam: skycot-watch-project-approval-encoding
+    guard let data = try? encoder.encode(WatchMessage.answer(request, decision: "decline", proof: nil, scope: nil))
     else { return }
     WCSession.default.transferUserInfo(["json": String(decoding: data, as: UTF8.self)])
   }

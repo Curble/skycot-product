@@ -241,6 +241,7 @@ describe("the engine's answers", () => {
       timeZone: null,
       allowedAssistants: [],
       pageInternet: [],
+      projectApprovalGrants: [],
       grownUps: [],
       devices: [],
     });
@@ -570,6 +571,15 @@ describe("grownUpSettingsOpen", () => {
 });
 
 describe("grown-up grants", () => {
+  it("uses the one sliding session for grown-up actions and keeps update and approvals separate", () => {
+    const view = { openUntil: { grownUpSession: 10_000 } };
+    expect(familyGrantOpen(view, "publish", 9_999)).toBe(true);
+    expect(familyGrantOpen(view, "seeRecap", 9_999)).toBe(true);
+    expect(familyGrantOpen(view, "restartToUpdate", 9_999)).toBe(false);
+    expect(familyGrantOpen(view, "approve", 9_999)).toBe(false);
+    expect(grownUpMinutesLeft(view, 1)).toBe(1);
+  });
+
   it("lets a settings grant cover later settings actions until it ends", () => {
     const view = { openUntil: { settings: 10_000 } };
     expect(familyGrantOpen(view, "aiSettings", 9_999)).toBe(true);
@@ -584,5 +594,11 @@ describe("grown-up grants", () => {
     expect(grownUpMinutesLeft({ openUntil: { settings: 7 * 60_000 + 1 } }, 0)).toBe(7);
     expect(grownUpMinutesLeft({ openUntil: { settings: 5 } }, 5)).toBe(0);
     expect(grownUpMinutesLeft({ openUntil: { settings: 10 * 60_000 + 25_000 } }, 0)).toBe(10);
+  });
+
+  it("describes the single grown-up session instead of its old purpose grants", () => {
+    expect(
+      openGrantsSentence({ openUntil: { grownUpSession: 15 * 60_000, settings: 10 * 60_000 } }, 0),
+    ).toBe("Grown-up mode for 15 more minutes.");
   });
 });

@@ -78,6 +78,45 @@ export interface Segment {
   readonly detail?: PersonalDetail;
 }
 
+/** Content keys stay in memory; a failed digest means the picture is asked about again. */
+export async function pictureContentKey(dataUrl: string): Promise<string | null> {
+  if (typeof crypto === "undefined" || crypto.subtle === undefined) return null;
+  try {
+    const bytes = new TextEncoder().encode(dataUrl);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(
+      "",
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function unknownPictureKeys(
+  keys: ReadonlyArray<string | null>,
+  remembered: ReadonlySet<string>,
+): ReadonlyArray<string | null> {
+  return keys.filter((key) => key === null || !remembered.has(key));
+}
+
+export function unknownPictureKeysForChild(
+  keys: ReadonlyArray<string | null>,
+  rememberedByChild: ReadonlyMap<string, ReadonlySet<string>>,
+  childId: string,
+): ReadonlyArray<string | null> {
+  return unknownPictureKeys(keys, rememberedByChild.get(childId) ?? new Set());
+}
+
+export function rememberNoFacePictures(
+  rememberedByChild: Map<string, Set<string>>,
+  childId: string,
+  keys: ReadonlyArray<string | null>,
+): void {
+  const remembered = rememberedByChild.get(childId) ?? new Set<string>();
+  for (const key of keys) if (key !== null) remembered.add(key);
+  rememberedByChild.set(childId, remembered);
+}
+
 /** The message cut into plain parts and caught parts, for highlighting. */
 export function segmentsOf(text: string, details: ReadonlyArray<PersonalDetail>): Array<Segment> {
   const segments: Array<Segment> = [];

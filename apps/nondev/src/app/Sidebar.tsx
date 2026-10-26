@@ -471,8 +471,8 @@ export function AppSidebar({
             />
           )}
         </div>
-        {/* The Family profile keeps the developer tools out of reach; Settings › Family has the parent's way in. */}
-        {family.enabled ? null : (
+        {/* A child's view keeps the developer tools out of reach; a grown-up in grown-up mode gets the button (it still asks for the code). */}
+        {family.enabled && childView ? null : (
           <div className="fm-sidebar__footer-row">
             {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
             <Button size="sm" variant="quiet" icon={Wrench} block onClick={sheets.openAdvanced}>

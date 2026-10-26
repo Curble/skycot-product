@@ -205,6 +205,10 @@ export interface PendingRequest {
   readonly what: string;
   readonly kind: string;
   readonly fingerprint: string;
+  readonly projectFingerprint?: string;
+  readonly projectCovers?: ReadonlyArray<
+    "webSearch" | "addOns" | "internetFetch" | "internetAssets"
+  >;
   readonly page?: string;
   readonly sites?: ReadonlyArray<string>;
 }
@@ -239,6 +243,20 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
         what: text(input["what"]) ?? "",
         kind: text(input["kind"]) ?? "command",
         fingerprint,
+        ...(text(input["projectFingerprint"]) === null
+          ? {}
+          : { projectFingerprint: text(input["projectFingerprint"])! }),
+        ...(Array.isArray(input["projectCovers"])
+          ? {
+              projectCovers: input["projectCovers"].filter(
+                (cover): cover is "webSearch" | "addOns" | "internetFetch" | "internetAssets" =>
+                  cover === "webSearch" ||
+                  cover === "addOns" ||
+                  cover === "internetFetch" ||
+                  cover === "internetAssets",
+              ),
+            }
+          : {}),
         ...(input["target"] === "page-internet" ? { target: "page-internet" as const } : {}),
         ...(typeof input["page"] === "string" ? { page: input["page"] } : {}),
         ...(Array.isArray(input["sites"])

@@ -297,6 +297,7 @@ struct NoteView: View {
 }
 
 /// One request, and Allow once / Decline.
+// nondev-seam: skycot-watch-project-approval-choice
 struct RequestView: View {
   let key: String
   let declineNow: Bool
@@ -358,6 +359,11 @@ struct RequestView: View {
       cardFingerprint(
         threadId: request.threadId, requestId: request.requestId, what: request.what,
         why: request.why) == request.fingerprint
+    let projectMatches = request.projectFingerprint.map { fingerprint in
+      cardFingerprint(
+        threadId: request.threadId, requestId: request.requestId, what: request.what,
+        why: request.why, scope: "project", covers: request.projectCovers ?? []) == fingerprint
+    } ?? false
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
         Avatar(initial: request.childInitial, colour: request.childColour, size: 28)
@@ -365,15 +371,19 @@ struct RequestView: View {
       }
       // nondev-seam: skycot-watch-request-sentence-view
       Text(request.sentence).font(.title3).fixedSize(horizontal: false, vertical: true)
+      if let goal = request.goal { Text("Goal: \(goal)").font(.footnote).foregroundStyle(.secondary) }
+      if let projectSentence = request.projectSentence {
+        Text(projectSentence).font(.footnote).foregroundStyle(.secondary)
+      }
       if let mac = request.macName {
         Label(mac, systemImage: "desktopcomputer").font(.footnote).foregroundStyle(.secondary)
       }
-      outcome(request, matches: matches)
+      outcome(request, matches: matches, projectMatches: projectMatches)
     }
     .padding(.horizontal, 2)
   }
 
-  @ViewBuilder private func outcome(_ request: WatchRequest, matches: Bool) -> some View {
+  @ViewBuilder private func outcome(_ request: WatchRequest, matches: Bool, projectMatches: Bool) -> some View {
     switch stage {
     case .working(let words):
       HStack(spacing: 8) {
@@ -404,7 +414,7 @@ struct RequestView: View {
       } else {
         if request.watchCanSayYes {
           Button {
-            Task { await allow(request) }
+            Task { await allow(request, scope: "once") }
           } label: {
             Label("Allow once", systemImage: "checkmark")
               .frame(maxWidth: .infinity)
@@ -412,6 +422,16 @@ struct RequestView: View {
           .buttonStyle(.borderedProminent)
           .tint(.blue)
           .padding(.top, 6)
+          if request.projectFingerprint != nil && projectMatches {
+            Button {
+              Task { await allow(request, scope: "project") }
+            } label: {
+              Label("Allow for this project", systemImage: "folder.badge.checkmark")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 4)
+          }
         } else {
           Text("To say yes here, set it up on your iPhone: SKYCOT, This device, Apple Watch.")
             .font(.footnote).foregroundStyle(.secondary).padding(.top, 4)
@@ -429,8 +449,8 @@ struct RequestView: View {
     }
   }
 
-  private func allow(_ request: WatchRequest) async {
-    switch await WristCheck.confirm(reason: "Allow \(request.childName)'s request once") {
+  private func allow(_ request: WatchRequest, scope: String = "once") async {
+    switch await WristCheck.confirm(reason: scope == "project" ? "Allow \(request.childName)'s request for this project" : "Allow \(request.childName)'s request once") {
     case .cancelled: return
     case .openOnIPhone(let words):
       stage = .openOnIPhone(words)
@@ -439,7 +459,8 @@ struct RequestView: View {
     }
     stage = .working("Asking your iPhone…")
     do {
-      let issued = try await phone.send(.challenge(request))
+      let fingerprint = scope == "project" ? request.projectFingerprint ?? request.fingerprint : request.fingerprint
+      let issued = try await phone.send(.challenge(request, scope: scope))
       guard issued.ok, let challenge = issued.challenge, let action = issued.action,
         let keyId = issued.keyId
       else {
@@ -448,7 +469,7 @@ struct RequestView: View {
       }
       // Sign only the request this card shows, whatever comes back.
       guard
-        action == "approve:\(request.threadId):\(request.requestId):\(request.fingerprint)"
+        action == "approve:\(request.threadId):\(request.requestId):\(fingerprint)"
       else {
         stage = .problem("That didn't match this request. Have another look on your iPhone.")
         return
@@ -463,9 +484,9 @@ struct RequestView: View {
         return
       }
       let answered = try await phone.send(
-        .answer(
-          request, decision: "accept",
-          proof: Proof(keyId: keyId, challenge: challenge, signature: signature)))
+          .answer(
+            request, decision: "accept",
+          proof: Proof(keyId: keyId, challenge: challenge, signature: signature), scope: scope))
       if answered.ok {
         stage = .done(answered.sentence ?? "Allowed, this once.")
         tap(.success)
@@ -488,7 +509,7 @@ struct RequestView: View {
     }
     stage = .working("Declining…")
     do {
-      let answered = try await phone.send(.answer(request, decision: "decline", proof: nil))
+      let answered = try await phone.send(.answer(request, decision: "decline", proof: nil, scope: nil))
       if answered.ok {
         stage = .done(answered.sentence ?? "Declined.")
         tap(.success)

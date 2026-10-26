@@ -926,7 +926,10 @@ function ReplyComposer({
       trimmed,
       pointers.map((draft) => draft.pointer),
     );
-    const cleared = await shield.clear(outgoing, pictures.pictures.length);
+    const cleared = await shield.clear(
+      outgoing,
+      pictures.pictures.map((picture) => picture.dataUrl),
+    );
     if (cleared.kind === "edit") {
       if (cleared.dropPictures) pictures.clear();
       return;

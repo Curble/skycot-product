@@ -4,12 +4,18 @@ import Foundation
 
 let watchProtocol = 1
 
+// nondev-seam: skycot-watch-project-approval-model
 struct WatchRequest: Codable, Identifiable, Hashable {
   let id: String
   let macId: String
   let threadId: String
   let requestId: String
   let fingerprint: String
+  let projectFingerprint: String?
+  let projectSentence: String?
+  let projectCovers: [String]?
+  let projectTitle: String?
+  let goal: String?
   let childName: String
   let childInitial: String
   let childColour: String
@@ -87,14 +93,14 @@ struct Proof: Encodable {
 enum WatchMessage: Encodable {
   case hello
   case lock
-  case challenge(WatchRequest)
-  case answer(WatchRequest, decision: String, proof: Proof?)
+  case challenge(WatchRequest, scope: String?)
+  case answer(WatchRequest, decision: String, proof: Proof?, scope: String?)
   /// "Not tonight" to a note asking for more time. No proof, and no minutes: the Watch can't
   /// give more time (the Mac needs the parent code, on the iPhone).
   case noteNotTonight(WatchNote)
 
   private enum Keys: String, CodingKey {
-    case type, macId, threadId, requestId, fingerprint, decision, proof, noteId
+    case type, macId, threadId, requestId, fingerprint, decision, proof, noteId, scope
   }
 
   func encode(to encoder: Encoder) throws {
@@ -104,20 +110,22 @@ enum WatchMessage: Encodable {
       try out.encode("hello", forKey: .type)
     case .lock:
       try out.encode("lock", forKey: .type)
-    case .challenge(let request):
+    case .challenge(let request, let scope):
       try out.encode("challenge", forKey: .type)
       try out.encode(request.macId, forKey: .macId)
       try out.encode(request.threadId, forKey: .threadId)
       try out.encode(request.requestId, forKey: .requestId)
-      try out.encode(request.fingerprint, forKey: .fingerprint)
-    case .answer(let request, let decision, let proof):
+      try out.encode(scope == "project" ? request.projectFingerprint ?? request.fingerprint : request.fingerprint, forKey: .fingerprint)
+      try out.encodeIfPresent(scope, forKey: .scope)
+    case .answer(let request, let decision, let proof, let scope):
       try out.encode("answer", forKey: .type)
       try out.encode(request.macId, forKey: .macId)
       try out.encode(request.threadId, forKey: .threadId)
       try out.encode(request.requestId, forKey: .requestId)
-      try out.encode(request.fingerprint, forKey: .fingerprint)
+      try out.encode(scope == "project" ? request.projectFingerprint ?? request.fingerprint : request.fingerprint, forKey: .fingerprint)
       try out.encode(decision, forKey: .decision)
       try out.encodeIfPresent(proof, forKey: .proof)
+      try out.encodeIfPresent(scope, forKey: .scope)
     case .noteNotTonight(let note):
       try out.encode("noteNotTonight", forKey: .type)
       try out.encode(note.macId, forKey: .macId)

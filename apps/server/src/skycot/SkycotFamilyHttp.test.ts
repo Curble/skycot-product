@@ -337,7 +337,7 @@ it.layer(
       };
       assert.deepEqual(
         status.grants.map((grant) => grant.purpose),
-        ["advanced"],
+        ["advanced", "grownUpSession"],
       );
       assert.isAbove(status.grants[0]!.remainingMs, 14 * 60_000);
       yield* send("POST", "/api/skycot/family/lock", { body: {} });
@@ -345,6 +345,59 @@ it.layer(
         grants: ReadonlyArray<unknown>;
       };
       assert.deepEqual(locked.grants, []);
+    }),
+  );
+
+  it.effect("only the code-owning non-child session can renew grown-up mode", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const enabled = yield* send("POST", "/api/skycot/family/enable", {
+        body: { code: CODE, childName: null },
+      });
+      const childId = ((yield* enabled.json) as { children: ReadonlyArray<{ id: string }> })
+        .children[0]!.id;
+      for (const scope of ["once", "project"] as const) {
+        const childVerify = yield* send("POST", "/api/skycot/family/verify", {
+          headers: { authorization: CHILD_BEARER },
+          body: { code: CODE, purpose: "approve", requestId: "req-1", scope },
+        });
+        assert.equal(childVerify.status, 403);
+      }
+      const unlock = yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "settings" },
+      });
+      const cookieHeader = unlock.headers["set-cookie"];
+      const cookie = (Array.isArray(cookieHeader) ? cookieHeader[0]! : String(cookieHeader)).split(
+        ";",
+      )[0]!;
+      assert.equal((yield* send("POST", "/api/skycot/family/renew", { body: {} })).status, 403);
+      assert.equal(
+        (yield* send("POST", "/api/skycot/family/renew", {
+          headers: { cookie, authorization: CHILD_BEARER },
+          body: {},
+        })).status,
+        403,
+      );
+      const renewed = yield* send("POST", "/api/skycot/family/renew", {
+        headers: { cookie },
+        body: {},
+      });
+      assert.equal(renewed.status, 200);
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        grants: ReadonlyArray<{ purpose: string; remainingMs: number }>;
+      };
+      assert.isAtLeast(
+        status.grants.find((grant) => grant.purpose === "grownUpSession")?.remainingMs ?? 0,
+        14 * 60_000,
+      );
+      assert.equal(
+        (yield* send("POST", "/api/skycot/family/choose", { body: { childId } })).status,
+        200,
+      );
+      const ended = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        grants: ReadonlyArray<unknown>;
+      };
+      assert.deepEqual(ended.grants, []);
     }),
   );
 
@@ -608,7 +661,9 @@ it.layer(
 
       // "Ask Leo before each step" is a parent's setting: the grown-up's yes saves it, and the
       // child's own look route cannot switch it off.
+      yield* post("/verify", { code: CODE, purpose: "settings" });
       const asks = yield* post("/children/update", { childId: leo, patch: { askEachStep: true } });
+      assert.equal(asks.status, 200, JSON.stringify(asks.json));
       assert.isTrue(asks.json["children"][1].askEachStep);
       const sneaky = yield* post("/look", { look: "classic", askEachStep: false });
       assert.isTrue(sneaky.json["children"][1].askEachStep);
@@ -673,6 +728,26 @@ it.layer(
         headers: { authorization: "Bearer stranger" },
       });
       assert.equal(response.status, 401);
+    }),
+  );
+
+  it.effect("a child session cannot answer a page request for this page or its project", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: null } });
+      for (const scope of ["once", "project"] as const) {
+        const response = yield* send("POST", "/api/skycot/family/page-internet/allow", {
+          headers: { authorization: CHILD_BEARER },
+          body: {
+            scope,
+            code: CODE,
+            threadId: "thread-1",
+            page: "/game.html",
+            sites: ["example.com"],
+          },
+        });
+        assert.equal(response.status, 403);
+      }
     }),
   );
 });

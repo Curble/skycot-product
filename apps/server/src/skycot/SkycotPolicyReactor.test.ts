@@ -1,4 +1,5 @@
 // nondev-seam: skycot-policy-reactor-network-guard-test
+// nondev-seam: skycot-project-approval-enforcement-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -194,6 +195,8 @@ interface Scenario {
   readonly checkpoints?: ReadonlyArray<{ readonly status: string }>;
   /** SKYCOT's add-on memory, written to a temporary engine home first. */
   readonly addOnFile?: AddOnFile;
+  readonly projectPath?: string;
+  readonly projectGrants?: ReadonlyArray<SkycotFamily.ProjectApprovalGrant>;
 }
 
 const gitFailure = (operation: string) =>
@@ -222,6 +225,7 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
             return dir;
           }).pipe(Effect.provide(NodeServices.layer));
     const layerDependencies = Layer.mergeAll(
+      NodeServices.layer,
       Layer.mock(ProjectionStore.ProjectionStoreV2)({
         getThread: () =>
           Effect.succeed(scenario.thread ?? thread("auto-accept-edits", "/work/site")),
@@ -298,7 +302,7 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
             Option.some({
               projectId: PROJECT_ID,
               title: "Project",
-              workspaceRoot: "/projects/site",
+              workspaceRoot: scenario.projectPath ?? "/projects/site",
               defaultModelSelection: null,
               defaultThreadEnvMode: null,
               autoPull: false,
@@ -315,6 +319,13 @@ const run = (scenario: Scenario, event: OrchestrationV2DomainEvent) =>
         ? Layer.empty
         : Layer.mock(SkycotFamily.SkycotFamily)({
             isEnabled: Effect.succeed(true),
+            ...(scenario.projectGrants === undefined
+              ? {}
+              : {
+                  status: Effect.succeed({
+                    projectApprovalGrants: scenario.projectGrants,
+                  } as never),
+                }),
             ...(scenario.trustedAddOns === undefined
               ? {}
               : { trustedAddOnsOn: Effect.succeed(scenario.trustedAddOns) }),
@@ -978,6 +989,63 @@ describe("SkycotPolicyReactor", () => {
           assert.deepEqual(dispatched, [], prompt);
         }
       }),
+    );
+
+    it.effect("a project yes skips only its matching child, project and held kind", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const createdProjectPath = yield* fs.makeTempDirectory({
+          prefix: "skycot-project-approval-",
+        });
+        const projectPath = yield* fs.realPath(createdProjectPath);
+        const grant: SkycotFamily.ProjectApprovalGrant = {
+          id: "grant-1",
+          childId: "c-ava",
+          projectPath,
+          covers: ["internetFetch"],
+          grantedBy: "grown-up",
+          how: "parent-code",
+          createdAt: 0,
+          expiresAt: Number.MAX_SAFE_INTEGER,
+        };
+        const runHeld = (
+          cwd: string,
+          childId: string,
+          covers: SkycotFamily.ProjectApprovalGrant["covers"],
+        ) =>
+          run(
+            {
+              family: AUTO,
+              projectPath,
+              projectGrants: [{ ...grant, childId, covers }],
+              thread: thread("approval-required", cwd),
+              items: [
+                {
+                  ...approvalItem("command", "curl https://example.com"),
+                  nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
+                },
+                {
+                  ...commandItem("curl https://example.com"),
+                  nativeItemRef: { ...base.nativeItemRef, driver: CLAUDE },
+                },
+              ],
+            },
+            { ...requestEvent(request("command")), driver: CLAUDE },
+          );
+        const matching = yield* runHeld(projectPath, "c-ava", ["internetFetch"]);
+        assert.equal(matching.outcome.type, "approved");
+        assert.equal(matching.dispatched.length, 1);
+        const wrongChild = yield* runHeld(projectPath, "c-leo", ["internetFetch"]);
+        assert.equal(wrongChild.outcome.type, "held");
+        assert.equal(wrongChild.dispatched.length, 0);
+        const uncovered = yield* runHeld(projectPath, "c-ava", ["webSearch"]);
+        assert.equal(uncovered.outcome.type, "held");
+        assert.equal(uncovered.dispatched.length, 0);
+        const outside = yield* fs.makeTempDirectory({ prefix: "skycot-project-escape-" });
+        const escaped = yield* runHeld(outside, "c-ava", ["internetFetch"]);
+        assert.equal(escaped.outcome.type, "held");
+        assert.equal(escaped.dispatched.length, 0);
+      }).pipe(Effect.provide(NodeServices.layer)),
     );
 
     it.effect("runs the node:vm self-check only inside Codex's network-locked sandbox", () =>

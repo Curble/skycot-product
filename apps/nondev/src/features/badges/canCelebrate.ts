@@ -14,3 +14,10 @@ export function canCelebrateNow(): boolean {
   if (document.visibilityState !== "visible") return false;
   return document.querySelector(BUSY) === null;
 }
+
+export function isFirstStickerArrival(
+  ids: ReadonlyArray<string>,
+  hasSeenSticker: boolean,
+): boolean {
+  return !hasSeenSticker && ids[0] === "first-creation";
+}

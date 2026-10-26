@@ -192,7 +192,9 @@ export type PlanSkip =
   /** The message carries `sourcePlanRef`: it builds a plan the child approved with Build it. */
   | "builds-plan"
   /** Sent by a grown-up working in Advanced mode (parent code): the thread's own mode stands. */
-  | "grown-up";
+  | "grown-up"
+  /** A small tweak to something already built in this conversation: it just builds (see isSmallTweak). */
+  | "small-follow-up";
 
 const PLAN_PASS_TTL_MS = 12 * 60 * 60_000;
 const PLAN_PASS_LIMIT = 500;
@@ -225,6 +227,24 @@ export const carryPlanPass = (fromMessageId: string, toMessageId: string): Effec
   );
 
 /**
+ * Pure: whether a message is a small tweak that needs no plan card: short, one thought, and
+ * about how something looks or feels (colour, size, speed, wording), with no word that points
+ * at bigger work or the outside world. Only used after something was already built in the
+ * conversation; the gate still holds every step that needs a grown-up, so a plan is a courtesy
+ * here, not a safety rule.
+ */
+const TWEAK_WORDS =
+  /\b(colou?r|bigger|smaller|larger|faster|slower|speed|size|font|bold|bright|dark|light|rename|spell|typo|wording|text|title|heading|move|left|right|centre|center|top|bottom|round|rounder|space|margin|padding|border|shadow|louder|quieter|score|lives|button|shape|fix)\b/i;
+const BIG_WORDS =
+  /\b(internet|website|web ?site|online|download|install|login|log in|password|account|delete|remove|everything|database|server|api|new (game|project|app|page|site)|from scratch|start over|rebuild|redo (it )?all|publish|share|send|email|buy|pay|camera|microphone|location|http|www)\b/i;
+export function isSmallTweak(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.length > 140) return false;
+  if (trimmed.split(/\n/).length > 2 || (trimmed.match(/[.!?]\s/g) ?? []).length > 1) return false;
+  return TWEAK_WORDS.test(trimmed) && !BIG_WORDS.test(trimmed);
+}
+
+/**
  * Pure: the mode a turn runs in while the Family profile is on. Building an approved plan
  * builds; a grown-up's message keeps the thread's mode; everything else plans.
  */
@@ -232,7 +252,7 @@ export function familyInteractionMode(
   requested: ProviderInteractionMode,
   skip: PlanSkip | null,
 ): ProviderInteractionMode {
-  if (skip === "builds-plan") return "default";
+  if (skip === "builds-plan" || skip === "small-follow-up") return "default";
   if (skip === "grown-up") return requested;
   return "plan";
 }

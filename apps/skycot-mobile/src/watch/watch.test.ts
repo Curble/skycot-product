@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
+// nondev-seam: skycot-watch-project-approval-test
+
 import { parseServerStatus } from "../../../nondev/src/features/family/family";
 import { parsePendingRequests } from "../../../nondev/src/features/family/people";
 import type { MacState } from "../data/MacData";
@@ -346,6 +348,16 @@ describe("what the Watch may ask", () => {
     expect(parseWatchMessage(JSON.stringify({ type: "unlink" }))).toBeNull();
     expect(parseWatchMessage("not json")).toBeNull();
     expect(parseWatchMessage(JSON.stringify({ type: "lock" }))).toEqual({ type: "lock" });
+    expect(
+      parseWatchMessage(
+        JSON.stringify({
+          ...answer,
+          decision: "accept",
+          scope: "project",
+          proof: { keyId: "k", challenge: "c", signature: "s" },
+        }),
+      ),
+    ).toMatchObject({ decision: "accept", scope: "project" });
   });
 
   it("reads the Watch's new key only when it names where the key lives", () => {

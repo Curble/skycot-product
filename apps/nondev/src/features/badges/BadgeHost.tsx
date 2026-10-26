@@ -4,11 +4,13 @@
 import type { BadgeId } from "@t3tools/skycot-rules/badges";
 import { useEffect, useEffectEvent, useState } from "react";
 
-import { useRoute } from "../../router";
+import { STICKERS_HREF, navigate, useRoute } from "../../router";
 import { useFamily } from "../family/FamilyProvider";
 import { useLimits } from "../family-limits/store";
-import { canCelebrateNow } from "./canCelebrate";
+import { canCelebrateNow, isFirstStickerArrival } from "./canCelebrate";
+import { BADGE_COPY } from "./catalog";
 import { StickerArrives } from "./StickerArrives";
+import { Sticker } from "./stickers/Sticker";
 import { markBadgesSeen, refreshBadges, unseenBadges, useBadges } from "./store";
 import "./badges.css";
 
@@ -48,21 +50,52 @@ export function BadgeHost() {
   const onBookPage = route.name === "stickers" || route.name === "certificate";
   const asleep = sleep?.asleep === true;
   const [showing, setShowing] = useState<ReadonlyArray<BadgeId> | null>(null);
+  const [toast, setToast] = useState<BadgeId | null>(null);
   const [tick, setTick] = useState(0);
   const waiting = showing === null && unseen.length > 0 && !onBookPage && !asleep;
 
   // A short pause first lets the moment that earned it land (the What-changed card, the
   // message going out); then again every few seconds while something needs the child.
   const tryToShow = useEffectEvent(() => {
-    if (canCelebrateNow()) setShowing(unseen);
-    else setTick((value) => value + 1);
+    if (canCelebrateNow()) {
+      const earnedBefore =
+        book?.badges.some((badge) => badge.earned !== null && badge.earned.seen) ?? false;
+      if (!isFirstStickerArrival(unseen, earnedBefore)) setToast(unseen[0] ?? null);
+      else setShowing(unseen);
+    } else setTick((value) => value + 1);
   });
   useEffect(() => {
     if (!waiting) return;
     const timer = window.setTimeout(tryToShow, tick === 0 ? FIRST_PAUSE_MS : RETRY_MS);
     return () => window.clearTimeout(timer);
-  }, [waiting, tick]);
+  }, [waiting, tick, book]);
 
+  useEffect(() => {
+    if (toast === null) return;
+    const timer = window.setTimeout(() => {
+      void markBadgesSeen([toast]);
+      setToast(null);
+    }, 7_000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  if (toast !== null) {
+    return (
+      <button
+        className="fm-sticker-toast"
+        type="button"
+        aria-label={`${BADGE_COPY[toast].title} sticker. Open your sticker book.`}
+        onClick={() => {
+          void markBadgesSeen([toast]);
+          setToast(null);
+          navigate(STICKERS_HREF);
+        }}
+      >
+        <Sticker id={toast} size={48} label={`${BADGE_COPY[toast].title} sticker`} />
+        <span>{BADGE_COPY[toast].title}</span>
+      </button>
+    );
+  }
   if (showing === null || showing.length === 0) return null;
   return (
     <StickerArrives
