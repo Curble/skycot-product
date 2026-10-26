@@ -51,6 +51,7 @@ import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
+import * as SkycotProjectMemory from "./SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory-http-test
 import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
 import { SWITCH_FILE_NAME, makeSwitchStore } from "./model-fallback/switchLog.ts";
@@ -142,6 +143,9 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
       filterShellStream: (_sessionId, stream) => stream,
       filterArchivedStream: (_sessionId, stream) => stream,
     }),
+    SkycotProjectMemory.layerAt(path.join(dir, SkycotProjectMemory.PROJECT_MEMORY_FILE)).pipe(
+      Layer.provide(NodeServices.layer),
+    ),
   );
   // Stand-ins: the recap and fridge contents have their own tests; these check the doors.
   const layerMade = SkycotFamilyHttp.layerMadeRoutes.pipe(
@@ -236,7 +240,12 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
             headers: { authorization: BEARER, ...options.headers },
           }).pipe(HttpClientRequest.bodyJsonUnsafe(options.body)),
     );
-  return { send, pinned, dir };
+  return {
+    send,
+    pinned,
+    dir,
+    projectMemory: Context.get(services, SkycotProjectMemory.SkycotProjectMemory),
+  };
 });
 
 it.layer(
@@ -244,6 +253,28 @@ it.layer(
     Layer.provideMerge(NodeServices.layer),
   ),
 )("Family profile over HTTP", (it) => {
+  // nondev-seam: skycot-project-memory-http-test
+  it.effect("lets clients check ownership but not create a trusted folder record", () =>
+    Effect.gen(function* () {
+      const { send, dir, projectMemory } = yield* makeClient();
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const folder = path.join(dir, "engine-created");
+      yield* fs.makeDirectory(folder);
+      const resource = `/api/skycot/family/created-folder?path=${encodeURIComponent(folder)}`;
+      const unknown = yield* send("GET", resource);
+      assert.deepEqual(yield* unknown.json, { createdBySkycot: false });
+
+      const forged = yield* send("POST", "/api/skycot/family/created-folder", {
+        body: { path: folder, createdBy: "skycot" },
+      });
+      assert.equal(forged.status, 404);
+      assert.deepEqual(yield* (yield* send("GET", resource)).json, { createdBySkycot: false });
+
+      yield* projectMemory.recordCreatedFolder({ path: folder });
+      assert.deepEqual(yield* (yield* send("GET", resource)).json, { createdBySkycot: true });
+    }),
+  );
   it.effect(
     "turns on, refuses a wrong code in plain words, and locks the developer interface",
     () =>

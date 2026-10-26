@@ -123,6 +123,17 @@ function browserZone(): string | null {
 }
 
 export const familyApi = {
+  isSkycotCreatedFolder: (path: string) =>
+    request(
+      "GET",
+      "/created-folder",
+      undefined,
+      (body) => {
+        const created = (body as { createdBySkycot?: unknown } | null)?.createdBySkycot;
+        return typeof created === "boolean" ? created : null;
+      },
+      { path },
+    ),
   familyNotes: () =>
     request("GET", "/approver/notes", undefined, (body) => {
       const notes = (body as { notes?: unknown } | null)?.notes;
@@ -224,6 +235,8 @@ export const familyApi = {
     request("POST", "/page-internet/stop", input, parseServerStatus),
   stopProjectApproval: (id: string) =>
     request("POST", "/project-approvals/stop", { id }, parseServerStatus),
+  stopRememberedStart: (id: string) =>
+    request("POST", "/remembered-starts/stop", { id }, () => true),
   /** "Trusted add-ons download by themselves": the code goes with the one request, either way. */
   setTrustedAddOns: (input: { readonly on: boolean; readonly code: string }) =>
     request("POST", "/trusted-add-ons", input, parseServerStatus),

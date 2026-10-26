@@ -416,7 +416,7 @@ function areaNoun(area: ChangeArea, count: number): string {
     case "settings":
       return count === 1 ? "settings file" : "settings files";
     case "behind the scenes":
-      return count === 1 ? "behind-the-scenes file" : "behind-the-scenes files";
+      return count === 1 ? "helper file" : "helper files";
   }
 }
 

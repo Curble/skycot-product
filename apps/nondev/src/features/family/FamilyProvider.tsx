@@ -16,11 +16,15 @@ import {
 
 import { Button } from "../../ui/Button";
 import {
+  clearGrownUpReturnChild,
   endGrownUpSession,
+  grownUpReturnChild,
   grownUpSessionFor,
   readGrownUpSessionId,
   startGrownUpSession,
 } from "./grownUpSession";
+import { openChildPicker } from "../family-limits/FamilyLimitsHost";
+import { chooseChild } from "../family-limits/store";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
 import { actionReason, familySteps } from "./copy";
@@ -220,8 +224,14 @@ function GrownUpModeBar({ view }: { readonly view: FamilyView }) {
         size="sm"
         onClick={() => {
           void lockFamilyGrants();
-          // Keep the child's current screen in place while returning control.
+          const childId = grownUpReturnChild();
+          clearGrownUpReturnChild();
           endGrownUpSession();
+          if (childId !== null && view.children.some((child) => child.id === childId)) {
+            void chooseChild(childId);
+          } else {
+            openChildPicker();
+          }
         }}
       >
         Done
@@ -260,7 +270,7 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
       pending.action !== "restartToUpdate" &&
       view.grownUps[0] !== undefined
     )
-      startGrownUpSession(view.grownUps[0].id);
+      startGrownUpSession(view.grownUps[0].id, view.currentChildId);
     pending.resolve(true);
   });
   const cancel = () => pending.resolve(false);

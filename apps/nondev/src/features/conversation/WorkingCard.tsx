@@ -410,7 +410,7 @@ export function WorkingCard({
               You said no to {deniedAsks === 1 ? "a step" : `${deniedAsks} steps`}, so nothing in
               the project was changed. Reply below to say what you'd like instead.
             </p>
-          ) : failed > 0 ? (
+          ) : run?.status === "failed" && failed > 0 ? (
             <p className="fm-work__hint">
               {failed === 1 ? "One step didn't work" : `${failed} steps didn't work`} — the details
               below say which.

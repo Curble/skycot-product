@@ -25,6 +25,8 @@ import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as PortScanner from "../../preview/PortScanner.ts";
 import * as TerminalManager from "../../terminal/Manager.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
+// nondev-seam: skycot-project-memory-preview-test
+import * as SkycotProjectMemory from "../SkycotProjectMemory.ts";
 import { IDLE_STOP_MS } from "./plan.ts";
 import * as SkycotPreview from "./SkycotPreview.ts";
 
@@ -66,6 +68,7 @@ interface World {
   readonly folder: string;
   /** Every terminal call, in order: "open <cwd> PORT=<n>", "write <data>", "close <thread>". */
   readonly calls: Array<string>;
+  readonly setPackageJson: (value: string) => Effect.Effect<void>;
   /** Sends a terminal event as the engine's terminal manager would. */
   readonly emit: (event: TerminalEvent) => Effect.Effect<void>;
   /** Addresses answering, with their headers. */
@@ -133,6 +136,7 @@ const withPreview = <A, E>(
         }),
       ),
       SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME)),
+      SkycotProjectMemory.layerAt(path.join(dir, SkycotProjectMemory.PROJECT_MEMORY_FILE)),
     );
 
     return yield* Effect.gen(function* () {
@@ -142,6 +146,8 @@ const withPreview = <A, E>(
         preview,
         family,
         folder,
+        setPackageJson: (value) =>
+          fs.writeFileString(path.join(folder, "package.json"), value).pipe(Effect.orDie),
         calls,
         serving,
         emit: (event) =>
@@ -486,6 +492,51 @@ it.layer(NodeServices.layer)("SkycotPreview", (it) => {
   });
 
   describe("Family profile", () => {
+    it.effect("remembers only the grown-up-approved command for this project", () =>
+      withPreview(
+        { packageJson: JSON.stringify({ scripts: { dev: "npx serve ." } }) },
+        ({ preview, family, setPackageJson }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: "Ava" });
+            const first = yield* preview.status(THREAD);
+            assert.equal(first.state, "ready");
+            if (first.state !== "ready") return;
+            yield* family.verify({
+              code: CODE,
+              purpose: "approve",
+              sessionId: SESSION,
+              requestId: first.requestId,
+            });
+            const started = yield* preview.start({
+              threadId: THREAD,
+              sessionId: SESSION,
+              approved: true,
+              requestId: first.requestId,
+            });
+            assert.equal(started.state, "starting");
+            yield* preview.stop(THREAD);
+            const repeat = yield* preview.status(THREAD);
+            assert.equal(repeat.state === "ready" ? repeat.decision.kind : null, "start");
+            const unprompted = yield* preview.start({
+              threadId: THREAD,
+              sessionId: SESSION,
+              approved: false,
+            });
+            assert.equal(unprompted.state, "starting");
+            yield* preview.stop(THREAD);
+
+            yield* setPackageJson(JSON.stringify({ scripts: { dev: "npm run serve" } }));
+            const changed = yield* preview.status(THREAD);
+            assert.equal(changed.state === "ready" ? changed.decision.kind : null, "ask");
+            assert.equal(
+              (yield* Effect.flip(
+                preview.start({ threadId: THREAD, sessionId: SESSION, approved: false }),
+              )).reason,
+              "needs-approval",
+            );
+          }),
+      ),
+    );
     it.effect("lets the child start ordinary work but holds an install for the parent code", () =>
       withPreview(
         { packageJson: JSON.stringify({ scripts: { dev: "npx serve ." } }) },

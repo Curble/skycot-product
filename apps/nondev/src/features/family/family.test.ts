@@ -242,6 +242,7 @@ describe("the engine's answers", () => {
       allowedAssistants: [],
       pageInternet: [],
       projectApprovalGrants: [],
+      rememberedStarts: [],
       grownUps: [],
       devices: [],
     });

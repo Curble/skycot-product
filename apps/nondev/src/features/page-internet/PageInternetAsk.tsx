@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useGrownUpAnswers } from "../conversation/useGrownUpAnswers";
 import { useChildView } from "../../app/useChildView";
 import { useFamily } from "../family/FamilyProvider";
+import { friendlySiteName } from "../family/cards";
 import { Button } from "../../ui/Button";
 import { Banner } from "../../ui/Banner";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
@@ -18,8 +19,9 @@ import { grownUpAnswerLabel } from "../../plain/grownUpAnswers";
 
 /** "dog.ceo", "dog.ceo and cataas.com", "a.org, b.org and c.org". */
 export function sitesSentence(sites: ReadonlyArray<string>): string {
-  if (sites.length <= 1) return sites[0] ?? "";
-  return `${sites.slice(0, -1).join(", ")} and ${sites.at(-1)}`;
+  const names = sites.map(friendlySiteName);
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 /** The page's own file name, for the grown-up ("dog.html"). */
@@ -129,8 +131,8 @@ export function PageInternetAsk({
           {step === "ask" ? (
             <p className="fm-preview__card-text">
               {childView
-                ? `It wants to get things from ${named}. A grown-up says yes once for this page.`
-                : `${pageName(page)} wants to get things from ${named}. It stays offline until a grown-up says yes, once for this page.`}
+                ? `It wants pictures and information from ${named}. A grown-up can let this page or the whole project use them.`
+                : `${pageName(page)} wants pictures and information from ${named}. It stays offline until a grown-up says yes for this page or the whole project.`}
             </p>
           ) : step === "waiting" ? (
             <p className="fm-preview__card-text">

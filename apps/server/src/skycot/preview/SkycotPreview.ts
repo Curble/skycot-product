@@ -31,6 +31,7 @@ import * as PortScanner from "../../preview/PortScanner.ts";
 import * as TerminalManager from "../../terminal/Manager.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
+import * as SkycotProjectMemory from "../SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
 import {
   findPreviewCommand,
   frameableFromHeaders,
@@ -124,6 +125,9 @@ const hashOf = (text: string) =>
 export const startRequestId = (folder: string, command: PreviewCommand) =>
   `skycot-preview:${hashOf(`${folder}\u0000${command.runner}\u0000${command.script}`)}`;
 
+const exactCommandOf = (command: PreviewCommand) =>
+  `${command.runner.length}:${command.runner}${command.script.length}:${command.script}`;
+
 export const addressRequestId = (url: string) => {
   let origin = url;
   try {
@@ -154,6 +158,7 @@ export const make = Effect.gen(function* () {
   const httpClient = (yield* HttpClient.HttpClient).pipe(HttpClient.withScope);
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
   const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
+  const projectMemory = yield* Effect.serviceOption(SkycotProjectMemory.SkycotProjectMemory);
   const lock = yield* Semaphore.make(1);
   /** Keyed by folder: conversations sharing a folder share its site. */
   const running = new Map<string, Running>();
@@ -411,16 +416,28 @@ export const make = Effect.gen(function* () {
     }
     const command = findPreviewCommand(yield* readStartFiles(context.folder));
     if (command === null) return { state: "no-site" } satisfies PreviewStatus;
+    const requestId = startRequestId(context.folder, command);
+    const exactCommand = exactCommandOf(command);
+    const remembered =
+      projectMemory._tag === "Some" && context.projectPath !== null
+        ? yield* projectMemory.value.rememberedStart({
+            projectRealPath: context.projectPath,
+            exactCommand,
+          })
+        : null;
     return {
       state: "ready",
       command,
-      decision: startDecision({
-        command,
-        runtimeMode: context.runtimeMode,
-        familyOn: yield* familyOn,
-        ctx: { projectRoot: context.folder, projectFolder: context.projectFolder },
-      }),
-      requestId: startRequestId(context.folder, command),
+      decision:
+        remembered !== null
+          ? { kind: "start" }
+          : startDecision({
+              command,
+              runtimeMode: context.runtimeMode,
+              familyOn: yield* familyOn,
+              ctx: { projectRoot: context.folder, projectFolder: context.projectFolder },
+            }),
+      requestId,
     } satisfies PreviewStatus;
   });
 
@@ -443,8 +460,15 @@ export const make = Effect.gen(function* () {
             return current;
           }
           const { decision, requestId, command } = current;
+          const exactCommand = exactCommandOf(command);
           const approved =
             input.approved && (input.requestId === undefined || input.requestId === requestId);
+          const approvalScope =
+            decision.kind === "grown-up" && approved && Option.isSome(family)
+              ? yield* family.value
+                  .approvalScope({ sessionId: input.sessionId, requestId })
+                  .pipe(Effect.option, Effect.orElseSucceed(Option.none))
+              : Option.none();
           if (decision.kind === "ask" && !approved) {
             return yield* new SkycotPreviewError({ reason: "needs-approval", requestId });
           }
@@ -453,6 +477,20 @@ export const make = Effect.gen(function* () {
             !(approved && (yield* grownUpSaid(input.sessionId, requestId)))
           ) {
             return yield* new SkycotPreviewError({ reason: "needs-grown-up", requestId });
+          }
+          if (
+            decision.kind === "grown-up" &&
+            Option.isSome(approvalScope) &&
+            projectMemory._tag === "Some" &&
+            context.projectPath !== null
+          ) {
+            yield* projectMemory.value.rememberStart({
+              projectRealPath: context.projectPath,
+              exactCommand,
+              approvedBy: approvalScope.value.how,
+              how:
+                approvalScope.value.how === "grown-up-session" ? "grown-up-session" : "parent-code",
+            });
           }
           const now = yield* Clock.currentTimeMillis;
           const isPage = command.source === "static";

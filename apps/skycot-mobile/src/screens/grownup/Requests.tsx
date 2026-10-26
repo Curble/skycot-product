@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-request-notes
 /**
  * Requests: every "Ask a grown-up" waiting on any linked Mac. Allow once (Face ID when it is set
  * up on this phone, src/faceid; the parent code otherwise, or when Face ID is cancelled or
@@ -41,6 +42,7 @@ import {
   haptic,
 } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
+import { requestCountSentence } from "./requestsCopy";
 
 export function ageOf(createdAt: number, now: number = Date.now()): string {
   const minutes = Math.floor((now - createdAt) / 60_000);
@@ -49,8 +51,7 @@ export function ageOf(createdAt: number, now: number = Date.now()): string {
 }
 
 export function countSentence(count: number): string {
-  if (count === 0) return "Nothing needs you right now.";
-  return count === 1 ? "1 request needs a grown-up." : `${count} requests need a grown-up.`;
+  return requestCountSentence(count) ?? "";
 }
 
 // nondev-seam: skycot-mobile-project-approval-choice
@@ -124,14 +125,14 @@ function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
       {note.kind === "shown" ? (
         <ButtonRow minWidthEach={95}>
           <Button
-            title="Open it"
+            title="Have a look"
             kind="filled"
             busy={busy}
             onPress={() => void openIt()}
             style={{ flex: 1 }}
           />
           <Button
-            title="Seen"
+            title="Got it"
             kind="grey"
             busy={busy}
             onPress={() => void settle(0)}
@@ -500,7 +501,7 @@ export function RequestsScreen() {
         <Mascot pose={count > 0 ? "ask-a-grown-up" : "hello"} size={64} />
         <View style={{ flex: 1 }}>
           <Txt variant="title2">{`Hi ${grownUp.name}`}</Txt>
-          <Txt tone="label2">{countSentence(count)}</Txt>
+          {countSentence(count) ? <Txt tone="label2">{countSentence(count)}</Txt> : null}
         </View>
       </View>
       {!grownUp.loaded ? (

@@ -113,6 +113,7 @@ export function PageRoute() {
 }
 
 // nondev-seam: skycot-mobile-page-screen
+// nondev-seam: skycot-iphone-q39-about-entry
 export const pageOptions = (params: StackRoutes["Page"]) => ({
   title: params.title,
   presentation: "card" as const,
@@ -136,11 +137,12 @@ export function MacsRoute() {
 /** The ⓘ at the top right of every main screen: linked Macs and About. */
 export function MacsHeaderButton() {
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const { mode } = useLinks();
   return (
     <HeaderButton
       symbol="info.circle"
-      label="This device and About"
-      onPress={() => navigation.navigate("Macs")}
+      label={mode === "child" ? "About SKYCOT" : "This device and About"}
+      onPress={() => navigation.navigate(mode === "child" ? "About" : "Macs")}
     />
   );
 }

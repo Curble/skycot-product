@@ -25,6 +25,7 @@ import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectService from "./ProjectService.ts";
 import * as SkycotQuestions from "../skycot/questions/SkycotQuestions.ts"; // nondev-seam: skycot-questions-history
+import * as SkycotProjectMemory from "../skycot/SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
 
 export class ScratchUnavailableError extends Schema.TaggedError<ScratchUnavailableError>()(
   "ScratchUnavailableError",
@@ -216,6 +217,7 @@ const make = Effect.gen(function* () {
   const gitWorkflow = yield* GitWorkflow.GitWorkflowService;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const projects = yield* ProjectService.ProjectService;
+  const projectMemory = yield* Effect.serviceOption(SkycotProjectMemory.SkycotProjectMemory);
   const crypto = yield* Crypto.Crypto;
 
   /**
@@ -297,6 +299,8 @@ const make = Effect.gen(function* () {
           Effect.mapError((cause) => new ScratchProjectError({ workspaceRoot, cause })),
         );
       if (bootstrapped.created) {
+        if (projectMemory._tag === "Some")
+          yield* projectMemory.value.recordCreatedFolder({ path: workspaceRoot });
         // Set once at create, so a user's own icon choice is never overwritten.
         yield* projects
           .update({
@@ -354,6 +358,9 @@ const make = Effect.gen(function* () {
               ),
       (folder, cause) => new ScratchFolderError({ folder, cause }),
     );
+    if (projectMemory._tag === "Some" && Option.isSome(claimed)) {
+      yield* projectMemory.value.recordCreatedFolder({ path: claimed.value });
+    }
     return yield* SkycotQuestions.keepVersions(git, claimed); // nondev-seam: skycot-questions-history
   });
 
@@ -471,6 +478,8 @@ const make = Effect.gen(function* () {
         ),
         Effect.mapError((cause) => new NamedProjectCreateError({ workspaceRoot, cause })),
       );
+    if (projectMemory._tag === "Some")
+      yield* projectMemory.value.recordCreatedFolder({ path: workspaceRoot });
     return {
       projectId: project.id,
       workspaceRoot,

@@ -1,4 +1,5 @@
 // nondev-seam: skycot-ipad-conversation-width
+// nondev-seam: skycot-iphone-q39-conversation-retry
 /**
  * One conversation, as SKYCOT's plain cards: what you said, what Sam said, the plan (Build it /
  * Change the plan), Ask a grown-up, What changed (Open it / Undo all of it). On a grown-up's
@@ -144,6 +145,22 @@ export function ConversationView(props: {
     }
   };
 
+  const retry = async (text: string) => {
+    if (sending || props.demo) return;
+    setSending(true);
+    setProblem(null);
+    try {
+      await sendMessage(props.mac.transport, { threadId: props.threadId, text });
+      setDraft("");
+      haptic("success");
+      await thread.refresh();
+    } catch (cause) {
+      setProblem(plainFailure(cause));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const allow = async (entry: Extract<TimelineEntry, { kind: "ask" }>) => {
     if (entry.card.grownUp !== null) {
       setParentAsk({ requestId: entry.requestId, reason: entry.card.grownUp });
@@ -225,6 +242,7 @@ export function ConversationView(props: {
               }
               onUndo={(target) => setUndo(target)}
               onOpenPage={props.onOpenPage}
+              onRetry={(text) => void retry(text)}
             />
           ))}
           {working && !waitingAsk ? <WorkingLine /> : null}
@@ -395,6 +413,7 @@ function TimelineCard(props: {
   readonly onDecline: (entry: Extract<TimelineEntry, { kind: "ask" }>) => void;
   readonly onUndo: (target: { readonly scopeId: string; readonly checkpointId: string }) => void;
   readonly onOpenPage: (() => void) | undefined;
+  readonly onRetry: (text: string) => void;
 }) {
   const theme = useTheme();
   const { entry } = props;
@@ -404,7 +423,17 @@ function TimelineCard(props: {
     case "crew":
       return <Bubble mine={false} text={entry.text} />;
     case "oops":
-      return <Banner tone="warning" text={entry.text} />;
+      return (
+        <Banner
+          tone="warning"
+          text={entry.text}
+          action={
+            entry.retryText === null || props.readOnly
+              ? undefined
+              : { title: "Try again", onPress: () => props.onRetry(entry.retryText!) }
+          }
+        />
+      );
     case "plan": {
       const steps = planSteps(entry.markdown);
       const subtitle =

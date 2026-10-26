@@ -27,6 +27,7 @@ import {
   ScratchProjectError,
 } from "../../project/ManagedProjectFolders.ts";
 import * as ProjectService from "../../project/ProjectService.ts";
+import * as SkycotProjectMemory from "../SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
 
 export class SkycotQuestionSpaces extends Context.Service<
   SkycotQuestionSpaces,
@@ -54,6 +55,7 @@ const make = Effect.gen(function* () {
   const projects = yield* ProjectService.ProjectService;
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
+  const projectMemory = yield* Effect.serviceOption(SkycotProjectMemory.SkycotProjectMemory);
 
   const ensureChildSpace: SkycotQuestionSpaces["Service"]["ensureChildSpace"] = Effect.fn(
     "SkycotQuestionSpaces.ensureChildSpace",
@@ -88,6 +90,12 @@ const make = Effect.gen(function* () {
       );
     const projectId = bootstrapped.project.id;
     if (bootstrapped.created) {
+      if (projectMemory._tag === "Some") {
+        yield* projectMemory.value.recordCreatedFolder({
+          path: workspaceRoot,
+          childId: input.childId,
+        });
+      }
       yield* projects
         .update({
           commandId: CommandId.make(`skycot-questions-icon:${id}`),

@@ -6,7 +6,7 @@ import { ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
 import { SettingsGroup } from "../settings/SettingsGroup";
 import { useFamily } from "./FamilyProvider";
-import { stopProjectApproval } from "./store";
+import { stopProjectApproval, stopRememberedStart } from "./store";
 
 const coverWords: Record<string, string> = {
   webSearch: "look things up on the internet",
@@ -20,7 +20,8 @@ const folderName = (path: string) => path.split(/[\\/]/u).filter(Boolean).at(-1)
 export function ProjectApprovalsGroup() {
   const { profile } = useFamily();
   const [removing, setRemoving] = useState<string | null>(null);
-  if (profile.projectApprovalGrants.length === 0) return null;
+  if (profile.projectApprovalGrants.length === 0 && profile.rememberedStarts.length === 0)
+    return null;
   return (
     <SettingsGroup
       title="Project permissions"
@@ -54,6 +55,26 @@ export function ProjectApprovalsGroup() {
           />
         );
       })}
+      {profile.rememberedStarts.map((start) => (
+        <ListRow
+          key={start.id}
+          leading={<StepBadge state="ok" icon={FolderOpen} />}
+          title={`Open the website in ${folderName(start.projectRealPath)}`}
+          subtitle="The exact preview command was approved once. A different command will ask again."
+          trailing={
+            <Button
+              size="sm"
+              disabled={removing !== null}
+              onClick={() => {
+                setRemoving(start.id);
+                void stopRememberedStart(start.id).finally(() => setRemoving(null));
+              }}
+            >
+              {removing === start.id ? "Stopping…" : "Stop"}
+            </Button>
+          }
+        />
+      ))}
     </SettingsGroup>
   );
 }

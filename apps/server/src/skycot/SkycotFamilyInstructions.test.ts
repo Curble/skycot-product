@@ -1,3 +1,4 @@
+// nondev-seam: skycot-plan-tweak-test
 // The personal-details shield and explain mode, as the provider receives them.
 import { assert, describe, it } from "@effect/vitest";
 import { MessageId } from "@t3tools/contracts";
@@ -245,6 +246,11 @@ describe("plan first in the Family profile", () => {
     }
     for (const text of [
       "make a new game about dogs",
+      "turn it into a game where Hello bounces",
+      "make a game with a menu and a score system",
+      "add levels and multiple pages",
+      "redo this and rebuild the whole thing",
+      "make it faster but turn it into a game",
       "add a leaderboard from the internet and make the colour red",
       "make the ball bigger. then add sounds. then add a menu.",
       "install a package to make it faster",

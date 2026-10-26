@@ -11,6 +11,7 @@ import * as SkycotPolicyReactor from "./skycot/SkycotPolicyReactor.ts"; // nonde
 import * as SkycotFamily from "./skycot/SkycotFamily.ts"; // nondev-seam: skycot-family
 import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts"; // nondev-seam: skycot-family
 import * as SkycotFamilyHttp from "./skycot/SkycotFamilyHttp.ts"; // nondev-seam: skycot-family
+import * as SkycotProjectMemory from "./skycot/SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
 import * as SkycotFamilyMcp from "./skycot/SkycotFamilyMcp.ts"; // nondev-seam: skycot-family-mcp-guard
 import * as SkycotBadgesHttp from "./skycot/badges/SkycotBadgesHttp.ts"; // nondev-seam: skycot-family
 import * as SkycotPreviewHttp from "./skycot/preview/SkycotPreviewHttp.ts"; // nondev-seam: skycot-preview
@@ -1094,6 +1095,7 @@ const layerMakeServer = Layer.unwrap(
       Layer.provideMerge(AgentScopeLive.layer),
       // nondev-seam: skycot-family (one instance under everything; inert until a parent turns it on)
       Layer.provideMerge(SkycotFamily.layer),
+      Layer.provideMerge(SkycotProjectMemory.layer),
       Layer.provideMerge(layerPlatformServices),
     );
   }),

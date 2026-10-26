@@ -851,10 +851,11 @@ const make = Effect.gen(function* () {
       if (facts === null) {
         return { needsGrownUp: true, why: null, what, kind: approval.requestKind };
       }
+      const roots = yield* projectRootsFor(thread);
       const evaluation = evaluateFamilyRequest(
         { ...facts, toolItemType: toolCall?.type },
         {
-          ...(yield* projectRootsFor(thread)),
+          ...roots,
           ...(yield* familyExtras({ threadId: input.threadId, driver })),
         },
       );
@@ -862,18 +863,17 @@ const make = Effect.gen(function* () {
         describeFamilyMatches(evaluation.family),
         describeMatches(evaluation.base.matches),
       ].filter((part) => part.length > 0);
+      const projectCover = projectApprovalCoverFor(
+        { ...facts, toolItemType: toolCall?.type },
+        evaluation,
+        roots,
+      );
       return {
         needsGrownUp: evaluation.needsGrownUp,
         why: parts.length > 0 ? `It ${parts.join(", and ")}.` : null,
         what: what.slice(0, 400),
         kind: approval.requestKind,
-        ...(projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, evaluation) === null
-          ? {}
-          : {
-              projectCovers: [
-                projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, evaluation)!,
-              ],
-            }),
+        ...(projectCover === null ? {} : { projectCovers: [projectCover] }),
       } satisfies RequestDescription;
     },
     Effect.orElseSucceed(() => null),

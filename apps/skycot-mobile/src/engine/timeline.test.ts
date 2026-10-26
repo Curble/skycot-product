@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-timeline-test
 import { describe, expect, it } from "vite-plus/test";
 
 import { demoConversation } from "../dev/demoConversation";
@@ -40,5 +41,57 @@ describe("a conversation as SKYCOT's cards", () => {
     expect(changed).toMatchObject({ kind: "changed", fileCount: 2, undone: false });
     expect(changed?.kind === "changed" && changed.undo).not.toBeNull();
     expect(JSON.stringify(changed)).not.toMatch(/space-game\.html|rocket\.css/u);
+  });
+
+  it("shows one plain, retryable failure until the child sends another message", () => {
+    const projection = demoConversation("plan");
+    const visible = projection.visibleTurnItems as unknown as Array<{
+      readonly position: number;
+      readonly item: Record<string, unknown>;
+    }>;
+    const user = visible[0]!.item;
+    const failed = {
+      ...user,
+      id: "turn-item:failed",
+      type: "error",
+      failure: {
+        class: "transport_error",
+        message: "socket broke",
+        code: null,
+        retryable: true,
+        resetAt: null,
+      },
+    };
+    (projection as unknown as { visibleTurnItems: unknown }).visibleTurnItems = [
+      visible[0]!,
+      { position: 2, item: failed },
+    ];
+    expect(buildTimeline(projection, context).at(-1)).toMatchObject({
+      kind: "oops",
+      text: "The Mac lost its connection for a moment.",
+      retryText: user.text,
+    });
+    (projection as unknown as { visibleTurnItems: unknown }).visibleTurnItems = [
+      visible[0]!,
+      { position: 2, item: failed },
+      { position: 3, item: { ...user, id: "turn-item:retry", text: "Try again" } },
+    ];
+    expect(buildTimeline(projection, context).some((entry) => entry.kind === "oops")).toBe(false);
+  });
+
+  it("hides inline SKYCOT starter instructions from both sides of the conversation", () => {
+    const projection = demoConversation("plan");
+    const visible = projection.visibleTurnItems as unknown as Array<{
+      readonly position: number;
+      readonly item: Record<string, unknown>;
+    }>;
+    const user = { ...visible[0]!.item, text: "Make a pet [SKYCOT: starter pet] please" };
+    (projection as unknown as { visibleTurnItems: unknown }).visibleTurnItems = [
+      { position: 0, item: user },
+    ];
+    expect(buildTimeline(projection, context)[0]).toMatchObject({
+      kind: "me",
+      text: "Make a pet please",
+    });
   });
 });

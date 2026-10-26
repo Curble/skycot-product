@@ -5,6 +5,8 @@ import { items } from "../../plain/fixtures.test-helpers";
 import {
   familyCard,
   familyHoldFor,
+  projectApprovalFor,
+  projectFetchSentence,
   ENGINE_CHECK_GRACE_MS,
   ENGINE_CHECK_LINE_DELAY_MS,
   isFamilyRefusal,
@@ -18,6 +20,22 @@ const ROOT = "/Users/kid/projects/space-game";
 const allowLabels = (card: ReturnType<typeof familyCard>) => card.options.map((o) => o.label);
 
 describe("family approval cards", () => {
+  it("shows a project yes for the held, wrapped font download and names it plainly", () => {
+    const command =
+      "/bin/zsh -lc 'cd pages && mkdir -p fonts && curl -fL https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf -o fonts/Lobster-Regular.ttf'";
+    const item = items.approval("command", { prompt: command });
+    expect(projectApprovalFor(item, { projectRoot: ROOT })).toBe("internetFetch");
+    expect(projectFetchSentence(command, "Sam")).toBe(
+      "Sam is asking a grown-up to let this page get the Lobster Regular font from GitHub's files. This works for the whole project once a grown-up says yes.",
+    );
+  });
+
+  it("keeps a short node download held without offering a project yes", () => {
+    const command = `node -e "fetch('https://fonts.gstatic.com/s/lobster/v1/lobster.ttf')"`;
+    const item = items.approval("command", { prompt: command });
+    expect(projectApprovalFor(item, { projectRoot: ROOT })).toBeNull();
+  });
+
   it("lets the child allow ordinary work, without any 'always' choice", () => {
     const item = items.approval("command", { prompt: "npm run build" });
     const grownUp = familyHoldFor(item, { projectRoot: ROOT });

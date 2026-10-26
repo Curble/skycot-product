@@ -138,8 +138,8 @@ export function ShowGrownUpButton({
         open={confirming}
         onClose={() => setConfirming(false)}
         icon={Share}
-        title="Show this to a grown-up?"
-        description={`Your conversation “${title}” will be shared with a grown-up.${includesPictures ? " It includes pictures you sent." : ""}`}
+        title="Send this whole conversation (and its pictures, if any) to a grown-up?"
+        description={`This sends ${title ? `“${title}” and all its messages` : "all its messages"} to a grown-up${includesPictures ? ", with its pictures" : ""}.`}
         actions={
           <>
             <Button disabled={busy} onClick={() => setConfirming(false)}>

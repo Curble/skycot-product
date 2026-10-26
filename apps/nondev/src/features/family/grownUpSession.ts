@@ -7,6 +7,7 @@ import { useSyncExternalStore } from "react";
 import { grownUpSettingsOpen, type FamilyView } from "./family";
 
 const KEY = "skycot:family:grown-up";
+const CHILD_KEY = "skycot:family:grown-up-return-child";
 const listeners = new Set<() => void>();
 
 /** The grown-up marked on this window (read outside React; still check the grant). */
@@ -27,13 +28,31 @@ function notify() {
 }
 
 /** Marks this window as a grown-up's (after the parent code opened the grant). */
-export function startGrownUpSession(personId: string) {
+export function startGrownUpSession(personId: string, childId: string | null = null) {
   try {
     window.sessionStorage.setItem(KEY, personId);
+    if (childId !== null) window.sessionStorage.setItem(CHILD_KEY, childId);
   } catch {
     // Blocked storage: the window simply stays in the child view.
   }
   notify();
+}
+
+/** Child who was using this window before a grown-up took over. */
+export function grownUpReturnChild(): string | null {
+  try {
+    return window.sessionStorage.getItem(CHILD_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearGrownUpReturnChild() {
+  try {
+    window.sessionStorage.removeItem(CHILD_KEY);
+  } catch {
+    // Nothing stored.
+  }
 }
 
 export function endGrownUpSession() {

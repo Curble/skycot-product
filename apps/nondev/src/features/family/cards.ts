@@ -126,7 +126,44 @@ export function projectApprovalFor(item: ApprovalItem, ctx: Parameters<typeof fa
     skycotFetchesAddOns: item.nativeItemRef?.driver === "codex",
     trustedAddOns: ctx.trustedAddOns === true,
   });
-  return projectApprovalCoverFor(facts, evaluation);
+  return projectApprovalCoverFor(facts, evaluation, {
+    projectRoot: ctx.projectRoot ?? null,
+    projectFolder: ctx.projectFolder ?? null,
+  });
+}
+
+const friendlyHosts: Readonly<Record<string, string>> = {
+  "raw.githubusercontent.com": "GitHub's files",
+  "fonts.gstatic.com": "Google Fonts' files",
+  "fonts.googleapis.com": "Google Fonts",
+  "cdn.jsdelivr.net": "jsDelivr's files",
+  "upload.wikimedia.org": "Wikimedia's files",
+};
+
+export function friendlySiteName(site: string): string {
+  return friendlyHosts[site] ?? site;
+}
+
+/** Plain words for the one-file picture or font download that a project yes can cover. */
+export function projectFetchSentence(command: string, assistantName: string): string | null {
+  const description = projectFetchDescription(command);
+  if (description === null) return null;
+  return `${assistantName} is asking a grown-up to let this page get ${description}. This works for the whole project once a grown-up says yes.`;
+}
+
+export function projectFetchDescription(command: string): string | null {
+  const url = /https:\/\/[^\s'"<>]+/u.exec(command)?.[0];
+  if (url === undefined) return null;
+  const name = url.split(/[?#]/u)[0]!.split("/").at(-1) ?? "";
+  if (!name) return null;
+  const stem = name.replace(/\.[^.]+$/u, "").replace(/[-_]+/gu, " ");
+  const what = /\.(?:woff2?|ttf|otf)$/iu.test(name)
+    ? `${stem} font`
+    : /\.(?:png|jpe?g|gif|webp|svg|ico)$/iu.test(name)
+      ? `${stem} picture`
+      : name;
+  const host = /^https:\/\/([^/:?#]+)/iu.exec(url)?.[1]?.toLowerCase() ?? "";
+  return `the ${what} from ${friendlySiteName(host)}`;
 }
 
 const WIDENING = new Set(["acceptForSession", "acceptAlways"]);

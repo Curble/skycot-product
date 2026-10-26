@@ -275,6 +275,12 @@ export function stopProjectApproval(id: string): Promise<FamilyResult<ServerFami
   return settle(familyApi.stopProjectApproval(id), applyStatus);
 }
 
+export async function stopRememberedStart(id: string): Promise<FamilyResult<boolean>> {
+  const result = await settle(familyApi.stopRememberedStart(id));
+  if (result.ok) await refreshFamily();
+  return result;
+}
+
 export function stopAllowingAssistant(driver: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.stopAllowingAssistant({ driver }), applyStatus);
 }

@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-about
 /**
  * About SKYCOT: the version, Curble's copyright, and the credit and licence T3 Code's MIT
  * licence asks for (docs/legal/t3code-attribution-and-licensing.md). T3's names appear only to
@@ -5,14 +6,37 @@
  */
 import Constants from "expo-constants";
 import { useState } from "react";
-import { View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 
+import { useOptionalChild } from "../../app/child/ChildContext";
+import { CHILD_ABOUT_COPY } from "./aboutCopy";
 import { MIT_LICENCE_T3_CODE, NOT_AFFILIATED } from "../../legal/licences";
 import { Mascot, Row, Section, Sheet, Txt } from "../../ui/kit";
 
 export function AboutContent() {
+  const child = useOptionalChild();
   const [licence, setLicence] = useState(false);
   const version = Constants.expoConfig?.version ?? "0.1.0";
+  if (child !== null) {
+    return (
+      <View style={{ alignItems: "center", gap: 10, padding: 20 }}>
+        <Mascot pose="hello" size={96} />
+        <Txt variant="title2">{CHILD_ABOUT_COPY.title}</Txt>
+        <Txt center>{CHILD_ABOUT_COPY.sam}</Txt>
+        <Txt tone="label2" center>
+          {CHILD_ABOUT_COPY.privacy}
+        </Txt>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Ask a grown-up about SKYCOT"
+          onPress={() => Alert.alert("Ask a grown-up", "A grown-up can help you with SKYCOT.")}
+          hitSlop={10}
+        >
+          <Txt tone="accent">{CHILD_ABOUT_COPY.ask}</Txt>
+        </Pressable>
+      </View>
+    );
+  }
   return (
     <View>
       <View style={{ alignItems: "center", gap: 6, paddingTop: 12 }}>

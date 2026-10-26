@@ -171,7 +171,7 @@ describe("describeChanges", () => {
   it("summarises, groups by area, counts, and flags", () => {
     const what = describeTurnDiff(DIFF);
     expect(what.summary).toBe(
-      "Changed 7 files: 2 pages, 1 style file, 2 content files, 1 settings file and 1 behind-the-scenes file (+8 / −3 lines).",
+      "Changed 7 files: 2 pages, 1 style file, 2 content files, 1 settings file and 1 helper file (+8 / −3 lines).",
     );
     expect(what.groups.map((g) => [g.area, g.label, g.files.length])).toEqual([
       ["pages", "Pages", 2],

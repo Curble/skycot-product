@@ -209,6 +209,23 @@ const withGate = <A, E, R>(
 const refused = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.exit(effect).pipe(Effect.map((exit) => Exit.isFailure(exit)));
 
+it.layer(NodeServices.layer)("project-cover descriptions", (it) => {
+  it.effect("describes a wrapped Google Fonts download as a project-coverable held request", () => {
+    const command = `/bin/zsh -lc 'cd ${ROOT} && mkdir -p fonts && curl -fL https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf -o fonts/Lobster-Regular.ttf'`;
+    return withGate([approval("command", command), commandCall(command)], ({ gate }) =>
+      Effect.gen(function* () {
+        const described = yield* gate.describeRequest({
+          threadId: THREAD_ID,
+          requestId: REQUEST_ID,
+        });
+        assert.isTrue(described?.needsGrownUp);
+        assert.deepEqual(described?.projectCovers, ["internetFetch"]);
+        assert.equal(described?.what, command);
+      }),
+    );
+  });
+});
+
 describe("gateNeedFor", () => {
   it("leaves ordinary work open", () => {
     for (const [method, payload] of [

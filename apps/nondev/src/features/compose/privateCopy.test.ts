@@ -2,7 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { VcsStatusResult } from "@t3tools/contracts";
 
-import { branchNameFor, folderReadiness, plainPrivateCopyProblem } from "./privateCopy";
+import {
+  branchNameFor,
+  folderReadiness,
+  plainPrivateCopyProblem,
+  shouldAskTrackingSheet,
+  STARTER_GITIGNORE,
+} from "./privateCopy";
 
 const status = (over: Partial<VcsStatusResult>): VcsStatusResult =>
   ({
@@ -47,6 +53,17 @@ describe("folderReadiness", () => {
       kind: "ready",
       baseBranch: "develop",
     });
+  });
+  it("keeps the prompt for unknown folders and skips it for SKYCOT-created folders", () => {
+    const needsInit = folderReadiness(status({ isRepo: false }));
+    expect(shouldAskTrackingSheet(needsInit, false)).toBe(true);
+    expect(shouldAskTrackingSheet(needsInit, true)).toBe(false);
+    expect(shouldAskTrackingSheet({ kind: "ready", baseBranch: "main" }, false)).toBe(false);
+  });
+  it("omits common secret files from the first saved version by default", () => {
+    expect(STARTER_GITIGNORE.split("\n")).toEqual(
+      expect.arrayContaining([".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx"]),
+    );
   });
 });
 

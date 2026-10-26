@@ -65,6 +65,7 @@ function navigationTheme(theme: Theme): NavigationTheme {
 }
 
 // nondev-seam: skycot-ipad-shell
+// nondev-seam: skycot-iphone-q39-accessibility
 function screenOptions(
   theme: Theme,
   sidebarControl?: () => ReactNode,
@@ -532,6 +533,7 @@ export function HeaderButton(props: {
       accessibilityLabel={props.label}
       onPress={props.onPress}
       hitSlop={10}
+      style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}
     >
       <Symbol name={props.symbol} size={22} />
     </Pressable>

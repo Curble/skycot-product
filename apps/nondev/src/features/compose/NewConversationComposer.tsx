@@ -40,6 +40,7 @@ import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { noteStartedHere } from "../family-limits/store";
+import { familyApi } from "../family/api"; // nondev-seam: skycot-project-memory
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
   autonomyLabel,
@@ -61,6 +62,7 @@ import {
   folderReadiness,
   plainPrivateCopyProblem,
   PRIVATE_COPY_COPY,
+  shouldAskTrackingSheet,
   STARTER_GITIGNORE,
 } from "./privateCopy";
 import { rememberStartNote } from "./startNotes";
@@ -470,7 +472,11 @@ function ComposerField({
     }
     let readiness = folderReadiness(first.value);
     if (readiness.kind === "needs-init") {
-      const choice = await askTracking();
+      const recorded = await familyApi.isSkycotCreatedFolder(cwd);
+      const createdBySkycot = recorded.ok && recorded.value;
+      const choice = shouldAskTrackingSheet(readiness, createdBySkycot)
+        ? await askTracking()
+        : { confirmed: true, starterIgnore: true };
       if (!choice.confirmed) return { cancelled: true };
       setPhase(PRIVATE_COPY_COPY.settingUp);
       if (choice.starterIgnore) {

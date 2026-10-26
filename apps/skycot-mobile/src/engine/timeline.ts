@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-timeline
 /**
  * A conversation as SKYCOT's plain cards: what the child said, what Sam said, the plan (Build
  * it / Change the plan), Ask a grown-up, What changed (Undo), and a working line. The words
@@ -20,6 +21,7 @@ import {
   type FamilyCard,
 } from "../../../nondev/src/features/family/cards";
 import type { Checkpoint, ThreadProjection, TurnItem } from "./types";
+import { visibleMessageText } from "./displayText";
 
 export type TimelineEntry =
   | { readonly kind: "me"; readonly id: string; readonly text: string; readonly at: string }
@@ -55,7 +57,12 @@ export type TimelineEntry =
       readonly undo: { readonly scopeId: string; readonly checkpointId: string } | null;
       readonly undone: boolean;
     }
-  | { readonly kind: "oops"; readonly id: string; readonly text: string };
+  | {
+      readonly kind: "oops";
+      readonly id: string;
+      readonly text: string;
+      readonly retryText: string | null;
+    };
 
 const LIVE_RUN = new Set(["preparing", "starting", "running", "waiting"]);
 
@@ -97,19 +104,24 @@ export function buildTimeline(
   const working = isWorking(projection);
   const out: Array<TimelineEntry> = [];
 
-  for (const item of items) {
+  for (const [index, item] of items.entries()) {
     switch (item.type) {
       case "user_message":
-        if (item.text.trim().length > 0) {
-          out.push({ kind: "me", id: item.id, text: item.text, at: String(item.updatedAt) });
+        if (visibleMessageText(item.text).length > 0) {
+          out.push({
+            kind: "me",
+            id: item.id,
+            text: visibleMessageText(item.text),
+            at: String(item.updatedAt),
+          });
         }
         break;
       case "assistant_message":
-        if (item.text.trim().length > 0) {
+        if (visibleMessageText(item.text).length > 0) {
           out.push({
             kind: "crew",
             id: item.id,
-            text: item.text,
+            text: visibleMessageText(item.text),
             streaming: item.streaming,
             at: String(item.updatedAt),
           });
@@ -190,11 +202,25 @@ export function buildTimeline(
         break;
       }
       case "error":
-        out.push({
-          kind: "oops",
-          id: item.id,
-          text: "Something went wrong on the Mac. Try asking again in a moment.",
-        });
+        if (!items.slice(index + 1).some((later) => later.type === "user_message")) {
+          const previousMessage = items
+            .slice(0, index)
+            .findLast((earlier) => earlier.type === "user_message");
+          const reason = {
+            usage_limit: "Sam has reached a limit for now.",
+            provider_error: "Sam had trouble answering.",
+            transport_error: "The Mac lost its connection for a moment.",
+            permission_error: "The Mac needs a grown-up to check something.",
+            validation_error: "That message needs a small change.",
+            unknown: "Sam couldn't finish that message.",
+          }[item.failure.class];
+          out.push({
+            kind: "oops",
+            id: item.id,
+            text: reason,
+            retryText: previousMessage?.type === "user_message" ? previousMessage.text : null,
+          });
+        }
         break;
       default:
         break;

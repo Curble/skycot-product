@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-new-conversation
 /**
  * A new conversation: where it goes (a project, or Just ask), the words (a starter card's, or
  * the child's own), voice typing when a grown-up allowed it, and the personal-details shield
@@ -14,7 +15,7 @@ import {
 } from "@t3tools/skycot-rules/personal";
 import type { ModelSelection } from "@t3tools/contracts";
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, ScrollView, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from "react-native";
 
 import {
   KID_STARTERS,
@@ -32,6 +33,8 @@ import { Banner, Button, Card, Row, Section, Symbol, Txt, haptic } from "../../u
 import { useTheme } from "../../ui/theme";
 import { VoiceButton } from "./VoiceButton";
 import { titleFrom } from "./titles";
+import { starterPlaceholders } from "./starterPlaceholders";
+import { shouldShowDestinationPicker } from "./destinationPicker";
 
 type Target = { readonly macId: string; readonly projectId: string | null };
 
@@ -47,6 +50,10 @@ export function NewConversationScreen() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [shieldShown, setShieldShown] = useState(false);
+  const [selection, setSelection] = useState<{
+    readonly start: number;
+    readonly end: number;
+  } | null>(null);
 
   const projects = useMemo(
     () =>
@@ -71,7 +78,8 @@ export function NewConversationScreen() {
   const me = mac === null ? null : child.childOn(mac);
   const voiceAllowed = me?.voice.typing === true;
   const asleep = mac === null ? false : child.sessionOn(mac)?.limits?.asleep === true;
-  const several = child.macs.length > 1;
+  const showPicker = shouldShowDestinationPicker(projects.length, child.macs.length);
+  const placeholders = starter ? starterPlaceholders(text) : [];
 
   const details = findPersonalDetails(text);
   const caught =
@@ -143,40 +151,37 @@ export function NewConversationScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         <View style={{ width: "100%", maxWidth: 720, alignSelf: "center" }}>
-          <Section title="Where it goes">
-            {projects.map(({ mac: owner, project }) => (
-              <Row
-                key={`${owner.macId}:${project.id}`}
-                title={project.title}
-                subtitle={several ? owner.macName : null}
-                leading={<Symbol name="folder.fill" size={22} />}
-                trailing={
-                  target?.projectId === project.id && target.macId === owner.macId ? (
-                    <Symbol name="checkmark" size={17} weight="semibold" />
-                  ) : null
-                }
-                onPress={() => setTarget({ macId: owner.macId, projectId: project.id })}
-              />
-            ))}
-            {child.macs.map((owner) => (
-              <Row
-                key={`${owner.macId}:questions`}
-                title={JUST_ASK_COPY.choice}
-                subtitle={
-                  several
-                    ? `${JUST_ASK_COPY.choiceHint} · ${owner.macName}`
-                    : JUST_ASK_COPY.choiceHint
-                }
-                leading={<Symbol name="questionmark.bubble.fill" size={22} />}
-                trailing={
-                  target?.projectId === null && target.macId === owner.macId ? (
-                    <Symbol name="checkmark" size={17} weight="semibold" />
-                  ) : null
-                }
-                onPress={() => setTarget({ macId: owner.macId, projectId: null })}
-              />
-            ))}
-          </Section>
+          {showPicker ? (
+            <Section title="Where it goes">
+              {projects.map(({ mac: owner, project }) => (
+                <Row
+                  key={`${owner.macId}:${project.id}`}
+                  title={project.title}
+                  leading={<Symbol name="folder.fill" size={22} />}
+                  trailing={
+                    target?.projectId === project.id && target.macId === owner.macId ? (
+                      <Symbol name="checkmark" size={17} weight="semibold" />
+                    ) : null
+                  }
+                  onPress={() => setTarget({ macId: owner.macId, projectId: project.id })}
+                />
+              ))}
+              {child.macs.map((owner) => (
+                <Row
+                  key={`${owner.macId}:questions`}
+                  title={JUST_ASK_COPY.choice}
+                  subtitle={JUST_ASK_COPY.choiceHint}
+                  leading={<Symbol name="questionmark.bubble.fill" size={22} />}
+                  trailing={
+                    target?.projectId === null && target.macId === owner.macId ? (
+                      <Symbol name="checkmark" size={17} weight="semibold" />
+                    ) : null
+                  }
+                  onPress={() => setTarget({ macId: owner.macId, projectId: null })}
+                />
+              ))}
+            </Section>
+          ) : null}
 
           <View style={{ marginHorizontal: 16, marginTop: 22, gap: 10 }}>
             <Txt
@@ -189,8 +194,10 @@ export function NewConversationScreen() {
             <Card padded={false}>
               <TextInput
                 value={text}
+                selection={selection ?? undefined}
                 onChangeText={(value) => {
                   setText(value);
+                  setSelection(null);
                   setShieldShown(false);
                 }}
                 multiline
@@ -234,6 +241,20 @@ export function NewConversationScreen() {
                 ) : null}
               </View>
             </Card>
+            {placeholders.length > 0 ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 4 }}>
+                {placeholders.map((placeholder) => (
+                  <Pressable
+                    key={`${placeholder.start}:${placeholder.end}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Replace ${placeholder.text}`}
+                    onPress={() => setSelection({ start: placeholder.start, end: placeholder.end })}
+                  >
+                    <Txt tone="accent">{placeholder.text}</Txt>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             {shieldShown && caught !== null ? (
               <Card style={{ gap: 10 }}>
                 <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>

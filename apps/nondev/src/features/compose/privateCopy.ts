@@ -36,6 +36,14 @@ export function folderReadiness(status: VcsStatusResult): FolderReadiness {
   return { kind: "ready", baseBranch: status.refName };
 }
 
+/** Engine-created folders already have the user's choice baked into their ownership. */
+export function shouldAskTrackingSheet(
+  readiness: FolderReadiness,
+  skycotCreatedFolder: boolean,
+): boolean {
+  return readiness.kind === "needs-init" && !skycotCreatedFolder;
+}
+
 /**
  * The ignore list written before the first version of a previously untracked
  * folder: secrets, keys, dependency caches and OS litter never belong in a

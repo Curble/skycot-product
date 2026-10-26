@@ -29,6 +29,7 @@ import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import { RECAP_RANGES, type RecapRange } from "./family-recap/recap.ts";
 import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotProjectMemory from "./SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotUpdatesHttp from "./updates/SkycotUpdatesHttp.ts";
 import * as SkycotFamilyDevices from "./family-devices/SkycotFamilyDevices.ts";
@@ -109,6 +110,7 @@ type Handler = (input: {
   /** SKYCOT Relay, when the server has it. */
   readonly relay: Option.Option<SkycotRelay.SkycotRelay["Service"]>;
   readonly notes: Option.Option<SkycotFamilyNotes.SkycotFamilyNotes["Service"]>;
+  readonly projectMemory: Option.Option<SkycotProjectMemory.SkycotProjectMemory["Service"]>;
 }) => Effect.Effect<HttpServerResponse.HttpServerResponse, SkycotFamily.FamilyError, never>;
 
 const route = (
@@ -130,6 +132,7 @@ const route = (
       const devices = yield* Effect.serviceOption(SkycotFamilyDevices.SkycotFamilyDevices);
       const relay = yield* Effect.serviceOption(SkycotRelay.SkycotRelay);
       const notes = yield* Effect.serviceOption(SkycotFamilyNotes.SkycotFamilyNotes);
+      const projectMemory = yield* Effect.serviceOption(SkycotProjectMemory.SkycotProjectMemory);
       return HttpRouter.add(
         method,
         `${FAMILY_ROUTE}${path}`,
@@ -201,6 +204,7 @@ const route = (
             request,
             relay,
             notes,
+            projectMemory,
           }).pipe(
             Effect.catchTags({
               SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
@@ -232,14 +236,41 @@ const statusRoute = route(
   "GET",
   "",
   AuthOrchestrationReadScope,
-  ({ family, limits, sessionId, who }) =>
+  ({ family, limits, sessionId, who, projectMemory }) =>
     Effect.gen(function* () {
       const status = yield* family.status;
       const grants = yield* family.openGrants({ sessionId });
       const session = yield* limits.forSession({ sessionId });
       const length = yield* codeLengthFor(family, who);
-      return json({ ...status, ...length, grants, session, me: meOf(who) });
+      const rememberedStarts =
+        who.kind !== "child" && Option.isSome(projectMemory)
+          ? (yield* projectMemory.value.rememberedStarts).map(
+              ({ id, projectRealPath, approvedBy, how, createdAt }) => ({
+                id,
+                projectRealPath,
+                approvedBy,
+                how,
+                createdAt,
+              }),
+            )
+          : [];
+      return json({ ...status, ...length, grants, session, me: meOf(who), rememberedStarts });
     }),
+);
+
+// nondev-seam: skycot-project-memory
+const createdFolderRoute = route(
+  "GET",
+  "/created-folder",
+  AuthOrchestrationReadScope,
+  ({ query, projectMemory }) => {
+    const folder = query.get("path") ?? "";
+    return folder.length === 0 || folder.length > 4096 || Option.isNone(projectMemory)
+      ? Effect.succeed(json({ createdBySkycot: false }))
+      : projectMemory.value
+          .isSkycotCreatedFolder(folder)
+          .pipe(Effect.map((createdBySkycot) => json({ createdBySkycot })));
+  },
 );
 
 /** Who this device is, for the screens (and a future phone app): never more than the engine decided. */
@@ -800,6 +831,20 @@ const stopProjectApprovalRoute = route(
       : family
           .stopProjectApproval({ id: text(body["id"]) })
           .pipe(Effect.map((status) => json(status))),
+);
+
+// nondev-seam: skycot-project-memory
+const stopRememberedStartRoute = route(
+  "POST",
+  "/remembered-starts/stop",
+  AuthOrchestrationOperateScope,
+  ({ body, who, projectMemory }) =>
+    who.kind === "child" || Option.isNone(projectMemory)
+      ? Effect.succeed(json({ error: "forbidden" }, 403))
+      : Effect.gen(function* () {
+          yield* projectMemory.value.stopRememberedStartById(text(body["id"]));
+          return json({ ok: true });
+        }),
 );
 
 /**
@@ -1794,6 +1839,7 @@ export const layerMadeRoutes = Layer.mergeAll(
 export const layerCore = Layer.mergeAll(
   shieldCaughtRoute,
   statusRoute,
+  createdFolderRoute,
   enableRoute,
   verifyRoute,
   renewRoute,
@@ -1817,6 +1863,7 @@ export const layerCore = Layer.mergeAll(
   allowPageInternetRoute,
   stopPageInternetRoute,
   stopProjectApprovalRoute,
+  stopRememberedStartRoute,
   trustedAddOnsRoute,
   lockRoute,
 );

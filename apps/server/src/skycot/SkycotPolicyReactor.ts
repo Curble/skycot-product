@@ -421,7 +421,11 @@ const make = Effect.gen(function* () {
     const projectCover =
       familyEvaluation === undefined
         ? null
-        : projectApprovalCoverFor({ ...facts, toolItemType: toolCall?.type }, familyEvaluation);
+        : projectApprovalCoverFor(
+            { ...facts, toolItemType: toolCall?.type },
+            familyEvaluation,
+            roots,
+          );
     const stepRule = inFamily ? yield* familyStepRule(input.threadId) : null;
     if (
       familyEvaluation?.needsGrownUp === true &&

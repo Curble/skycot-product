@@ -1,4 +1,5 @@
 // nondev-seam: skycot-mobile-page-logic
+// nondev-seam: skycot-iphone-q39-page-copy
 import { MAX_PAGE_SITES, reportedSite } from "@t3tools/skycot-rules/page-internet";
 
 export const GAME_BUTTONS_DEFAULT = false;
@@ -77,6 +78,7 @@ export function playNoticeCopy(
   kind: PlayNoticeKind,
   childView: boolean,
   hosts: ReadonlyArray<string> = [],
+  device = "iPad",
 ): {
   readonly title: string;
   readonly message: string;
@@ -97,16 +99,15 @@ export function playNoticeCopy(
   if (kind === "remote-script")
     return {
       title: "This game can't play here yet",
-      message: `This game uses a tool from the internet (${hosts.length > 0 ? hosts.join(", ") : "a website"}), which can't run on the iPad. It works on the Mac. Ask Sam to make it work without the internet.`,
+      message: `This game uses a tool from the internet (${hosts.length > 0 ? hosts.join(", ") : "a website"}), which can't run on this ${device}. It works on the Mac. Ask Sam to make it work without the internet.`,
       grownUp: null,
       tellSamLabel: "Tell Sam",
-      tellSam:
-        "Please make my game work without loading anything from the internet, so it plays on the iPad.",
+      tellSam: `Please make my game work without loading anything from the internet, so it plays on this ${device}.`,
     };
   if (kind === "too-big")
     return {
       title: "This game can't play here yet",
-      message: "This game is too big to play on the iPad. You're seeing a picture of the game.",
+      message: `This game is too big to play on this ${device}. You're seeing a picture of the game.`,
       grownUp: childView
         ? null
         : "The Mac could not pack this page within the playable size limit.",
@@ -115,8 +116,7 @@ export function playNoticeCopy(
     };
   return {
     title: "This game can't play here yet",
-    message:
-      "A part of this game is missing from its project, so it can't play on the iPad. You're seeing a picture of the game.",
+    message: `A part of this game is missing, so it can't play on this ${device}. You're seeing a picture of the game.`,
     grownUp: childView
       ? null
       : "Keep the game's modules inside the project folder, then try again.",
@@ -258,6 +258,7 @@ export function parsePageDiagnostic(value: unknown, current: PageDiagnostics): P
 }
 
 export function pageLooksWrong(diagnostics: PageDiagnostics, elapsedAfterLoadMs: number): boolean {
+  if ((diagnostics.facts.frames ?? 0) > 0 && diagnostics.facts.blank !== true) return false;
   return (
     diagnostics.entries.some((entry) => entry.kind !== "warn") ||
     diagnostics.facts.blank === true ||
@@ -270,6 +271,7 @@ export function diagnosticSheetCopy(
   diagnostics: PageDiagnostics,
   childView: boolean,
   engine?: FridgePlayDiag,
+  device = "iPad",
 ): {
   readonly headline: string;
   readonly lines: ReadonlyArray<string>;
@@ -279,7 +281,9 @@ export function diagnosticSheetCopy(
   const lines: string[] = [];
   const facts = diagnostics.facts;
   if (facts.ios && Number(facts.ios.split(".")[0]) < 18)
-    lines.push(`This iPad's web engine is older (iPadOS ${facts.ios}).`);
+    lines.push(
+      `This ${device}'s web engine is older (${device === "iPad" ? "iPadOS" : "iOS"} ${facts.ios}).`,
+    );
   for (const file of engine?.missingFiles.slice(0, 3) ?? [])
     lines.push(`A game file is missing: ${safeFileName(file)}`);
   for (const entry of diagnostics.entries.slice(-4)) {
@@ -289,28 +293,40 @@ export function diagnosticSheetCopy(
       );
     else if (entry.kind === "policy") {
       const host = /\bblocked ([\w.-]+)/iu.exec(entry.text)?.[1];
-      lines.push(`The iPad stopped the game from using ${host ?? "something it needed"}.`);
+      lines.push(`The ${device} stopped the game from using ${host ?? "something it needed"}.`);
     } else if (entry.kind === "error" || entry.kind === "rejection")
-      lines.push(`The game's code stopped: ${entry.text}`);
+      lines.push("Something in the game's code went wrong.");
     else lines.push(`The game showed a warning: ${entry.text}`);
   }
-  if (facts.blank === true) lines.push("The game page looks empty on this iPad.");
+  if (facts.blank === true) lines.push(`The game page looks empty on this ${device}.`);
+  const running = (facts.frames ?? 0) > 0 && facts.blank !== true;
+  if (running)
+    lines.splice(
+      0,
+      lines.length,
+      `The game is running on this ${device}. Tell Sam what you'd like changed.`,
+    );
   while (lines.length < 3) {
-    const fallback = [
-      "The game copy opened on this iPad.",
-      "A grown-up can copy these clues to help fix it.",
-      "The game did not start moving on this iPad.",
-    ][lines.length]!;
+    const fallback = running
+      ? ["You can keep playing.", "Tell Sam what you'd like to be different."][lines.length - 1]!
+      : [
+          `The game copy opened on this ${device}.`,
+          "A grown-up can copy these clues to help fix it.",
+          `The game did not start moving on this ${device}.`,
+        ][lines.length]!;
     lines.push(fallback);
   }
   const shown = lines.slice(0, childView ? 4 : 6);
+  const firstProblem = diagnostics.entries.find((entry) => entry.kind !== "warn");
   const shortError = (
-    diagnostics.entries.find((entry) => entry.kind !== "warn")?.text ??
-    engine?.missingFiles[0] ??
-    "it did not start"
+    running
+      ? "one small thing needs changing"
+      : firstProblem?.kind === "error" || firstProblem?.kind === "rejection"
+        ? "something in the game's code went wrong"
+        : (firstProblem?.text ?? engine?.missingFiles[0] ?? "it did not start")
   ).slice(0, 100);
   return {
-    headline: "This game hit a problem on this iPad",
+    headline: running ? "Is something not working?" : `This game hit a problem on this ${device}`,
     lines: shown,
     grownUpLines: childView
       ? []
@@ -319,7 +335,9 @@ export function diagnosticSheetCopy(
           `The packed page has ${engine?.packedBytes ?? 0} bytes across ${engine?.embeddedFiles ?? 0} files; modules ${engine?.modulesBundled ? "were bundled" : "were not bundled"}.`,
           ...diagnostics.entries.slice(-2).map((entry) => `${entry.kind}: ${entry.text}`),
         ],
-    tellSam: `My game doesn't work on the iPad: ${shortError}. Please fix it.`,
+    tellSam: running
+      ? `My game is running on this ${device}, but ${shortError}. Please change that.`
+      : `My game doesn't work on this ${device}: ${shortError}. Please fix it.`,
   };
 }
 

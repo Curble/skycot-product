@@ -27,7 +27,13 @@ import { pageOf } from "../family-recap/recap.ts";
 import { loadThread } from "../family-recap/threads.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import { fridgeItems, type FridgeItem } from "./fridge.ts";
-import { MAX_ASSET_BYTES, selfContainedPage } from "./thumbnail.ts";
+import { MAX_ASSET_BYTES, MAX_PAGE_BYTES, selfContainedPage } from "./thumbnail.ts";
+import {
+  cachedThumbnail,
+  rememberThumbnail,
+  secretLookingPath,
+  type ThumbnailCacheEntry,
+} from "./thumbnailCache.ts"; // nondev-seam: skycot-fridge-thumbnail-cache
 // nondev-seam: skycot-playable-copy
 import { MAX_PLAYABLE_FILE_BYTES, playablePage } from "./playable.ts";
 
@@ -40,6 +46,20 @@ const EMPTY_PLAYABLE_DIAG = {
 
 export const FRIDGE_FILE_NAME = "skycot-fridge.json";
 const PINS_KEEP = 500;
+const THUMBNAIL_CACHE_FILE = "skycot-fridge-thumbnails.json";
+const ThumbnailCacheFile = Schema.Struct({
+  version: Schema.Literal(1),
+  entries: Schema.Array(
+    Schema.Struct({
+      pagePath: Schema.String,
+      contentHash: Schema.String,
+      html: Schema.String,
+      storedAt: Schema.Number,
+    }),
+  ),
+});
+const decodeThumbnailCache = Schema.decodeUnknownOption(Schema.fromJsonString(ThumbnailCacheFile));
+const encodeThumbnailCache = Schema.encodeEffect(Schema.fromJsonString(ThumbnailCacheFile));
 
 const FridgeFile = Schema.Struct({
   version: Schema.Literal(1),
@@ -108,6 +128,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
+  const thumbnailCachePath = path.join(path.dirname(filePath), THUMBNAIL_CACHE_FILE);
 
   const readPins = fs.readFileString(filePath).pipe(
     Effect.map((raw) => decodeFridge(raw)),
@@ -126,6 +147,23 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     },
     Effect.catchCause((cause) => Effect.logWarning("Could not save the fridge.", { cause })),
   );
+
+  const readThumbnailCache = fs.readFileString(thumbnailCachePath).pipe(
+    Effect.map((raw) => decodeThumbnailCache(raw)),
+    Effect.map((result) =>
+      result._tag === "Some" ? (result.value.entries as ReadonlyArray<ThumbnailCacheEntry>) : [],
+    ),
+    Effect.orElseSucceed(() => [] as ReadonlyArray<ThumbnailCacheEntry>),
+  );
+  const writeThumbnailCache = (entries: ReadonlyArray<ThumbnailCacheEntry>) =>
+    Effect.gen(function* () {
+      yield* fs.makeDirectory(path.dirname(thumbnailCachePath), { recursive: true });
+      const temp = `${thumbnailCachePath}.${NodeCrypto.randomBytes(6).toString("hex")}.tmp`;
+      yield* fs.writeFileString(temp, `${yield* encodeThumbnailCache({ version: 1, entries })}\n`, {
+        mode: 0o600,
+      });
+      yield* fs.rename(temp, thumbnailCachePath);
+    });
 
   const owners = Effect.gen(function* () {
     if (limits._tag === "None") return {};
@@ -186,8 +224,40 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     const relativePage = path.isAbsolute(input.page)
       ? path.relative(root, input.page).split(path.sep).join("/")
       : input.page;
-    return yield* selfContainedPage(relativePage, (relativePath) =>
+    if (!relativePage || secretLookingPath(relativePage)) return null;
+    const pageTarget = yield* fs
+      .realPath(path.join(root, relativePage))
+      .pipe(Effect.orElseSucceed(() => null));
+    if (
+      pageTarget === null ||
+      (pageTarget !== root && !pageTarget.startsWith(`${root}${path.sep}`))
+    )
+      return null;
+    const pageInfo = yield* fs.stat(pageTarget).pipe(Effect.orElseSucceed(() => null));
+    if (pageInfo?.type !== "File" || Number(pageInfo.size) > MAX_PAGE_BYTES) return null;
+    const source = yield* fs.readFile(pageTarget).pipe(Effect.orElseSucceed(() => null));
+    if (source === null) return null;
+    const checkpointVersion = thread.checkpoints
+      .map(
+        (checkpoint) =>
+          `${checkpoint.id.length}:${checkpoint.id}${checkpoint.files
+            .map(
+              (file) =>
+                `${file.path.length}:${file.path}${file.kind}${file.additions}:${file.deletions};`,
+            )
+            .join("")}`,
+      )
+      .join("\n");
+    const contentHash = NodeCrypto.createHash("sha256")
+      .update(source)
+      .update(checkpointVersion)
+      .digest("hex");
+    const cached = yield* readThumbnailCache;
+    const cachedHtml = cachedThumbnail(cached, pageTarget, contentHash);
+    if (cachedHtml !== null) return cachedHtml;
+    const html = yield* selfContainedPage(relativePage, (relativePath) =>
       Effect.gen(function* () {
+        if (secretLookingPath(relativePath)) return null;
         const target = yield* fs.realPath(path.join(root, relativePath));
         // Links and `..` that leave the project are refused, like the project's own file reads.
         if (target !== root && !target.startsWith(`${root}${path.sep}`)) return null;
@@ -196,6 +266,17 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
         return yield* fs.readFile(target);
       }).pipe(Effect.orElseSucceed(() => null)),
     );
+    if (html === null) return null;
+    const entries = rememberThumbnail(cached, {
+      pagePath: pageTarget,
+      contentHash,
+      html,
+      storedAt: yield* Clock.currentTimeMillis,
+    });
+    yield* writeThumbnailCache(entries).pipe(
+      Effect.ignoreCause({ log: true, message: "Could not save a fridge thumbnail." }),
+    );
+    return html;
   });
 
   // nondev-seam: skycot-playable-copy

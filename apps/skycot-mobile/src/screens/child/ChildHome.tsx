@@ -1,4 +1,5 @@
 // nondev-seam: skycot-ipad-child-makes
+// nondev-seam: skycot-iphone-q39-child-home
 /**
  * A child's Home: the greeting, "What shall we make?" starter cards, Just ask, their own
  * conversations (from every linked Mac, each labelled by its Mac when there are several), and
@@ -6,7 +7,7 @@
  */
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, useWindowDimensions, View } from "react-native";
 
 import {
   KID_STARTERS,
@@ -25,6 +26,8 @@ import { Banner, Card, Mascot, Row, Section, Symbol, Txt, haptic, Page } from ".
 import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
 import { FridgeTile } from "./Fridge";
+import { recentRows } from "./recentConversations";
+import { accessibleMascotSize } from "./homeAccessibility";
 
 const ICONS: Readonly<Partial<Record<StarterIcon, Parameters<typeof Symbol>[0]["name"]>>> = {
   game: "gamecontroller.fill",
@@ -108,8 +111,8 @@ export function ChildHome() {
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
   const child = useChild();
   const { byMac } = useMacData();
+  const { fontScale } = useWindowDimensions();
   const rows = conversationRows(child.macs, byMac, child.questionsRoots);
-  const several = child.macs.length > 1;
   const heads = child.macs
     .map((mac) => child.sessionOn(mac)?.limits)
     .map((limits) => (limits ? headsUpSentence(limits) : null))
@@ -127,7 +130,11 @@ export function ChildHome() {
           gap: 14,
         }}
       >
-        <Mascot pose="hello" size={72} />
+        <Mascot
+          pose="hello"
+          size={accessibleMascotSize(fontScale, Platform.OS === "ios" && Platform.isPad)}
+          accessibilityLabel="SKYCOT's friendly cloud"
+        />
         <View style={{ flex: 1 }}>
           <Txt variant="footnote" tone="label2">
             SKYCOT says hello
@@ -144,7 +151,7 @@ export function ChildHome() {
         <View key={mac.macId} style={{ marginHorizontal: 16, marginTop: 14 }}>
           <Banner
             tone="warning"
-            text={`${mac.macName} isn't answering. Check it's awake and on the same Wi-Fi.`}
+            text="A Mac isn't answering. Ask a grown-up to check it's awake."
           />
         </View>
       ))}
@@ -191,16 +198,18 @@ export function ChildHome() {
         />
       </Section>
 
+      <FridgeTile onSeeAll={() => navigation.navigate("Fridge")} />
+
       <Section
-        title="My conversations"
+        title="Recent"
         footer={rows.length === 0 ? "When you start a conversation, it shows here." : undefined}
       >
-        {rows.slice(0, 12).map((row) => (
+        {recentRows(rows).map((row) => (
           <Row
             key={row.key}
             title={row.thread.title}
             subtitle={[
-              rowLabel(row, several),
+              rowLabel(row),
               stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt),
             ].join(" · ")}
             leading={
@@ -225,9 +234,10 @@ export function ChildHome() {
             }
           />
         ))}
+        {rows.length > 3 ? (
+          <Row title="See all" chevron onPress={() => navigation.navigate("MyMakes")} />
+        ) : null}
       </Section>
-
-      <FridgeTile onSeeAll={() => navigation.navigate("Fridge")} />
     </Page>
   );
 }
@@ -248,7 +258,7 @@ export function MyMakesScreen() {
             key={row.key}
             title={row.thread.title}
             subtitle={[
-              rowLabel(row, child.macs.length > 1),
+              rowLabel(row),
               stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt),
             ].join(" · ")}
             leading={<Symbol name="bubble.left.fill" size={22} />}

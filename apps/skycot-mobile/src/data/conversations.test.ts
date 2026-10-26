@@ -1,9 +1,10 @@
+// nondev-seam: skycot-iphone-q39-conversation-labels-test
 // Just ask, one space per child, in the app: a child's own space counts as Questions (so it is
 // never listed as a project to pick), and each space is named for whoever holds the device.
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ProjectShell } from "../engine/types";
-import { childStatusLabel, isQuestionsProject, projectTitleFor } from "./conversations";
+import { childStatusLabel, isQuestionsProject, projectTitleFor, rowLabel } from "./conversations";
 
 const ROOT = "/Users/family/.skycot/scratch";
 const AVA = "c0a0a0a0a0a";
@@ -39,6 +40,11 @@ describe("Questions spaces in the app", () => {
 });
 
 describe("a child's conversation status", () => {
+  it("labels a child's conversation with its project only", () => {
+    const row = { projectTitle: "Our site", mac: { macName: "skycot-wt-device" } } as never;
+    expect(rowLabel(row)).toBe("Our site");
+  });
+
   it("uses friendly words while Sam works and when a page is ready", () => {
     expect(childStatusLabel("working", "Sam", false)).toBe("Sam is working");
     expect(childStatusLabel("done", "Sam", true)).toBe("Ready to play");

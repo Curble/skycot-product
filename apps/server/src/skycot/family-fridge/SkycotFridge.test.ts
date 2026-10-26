@@ -1,4 +1,5 @@
 // nondev-seam: skycot-playable-copy-test
+// nondev-seam: skycot-fridge-thumbnail-cache-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
@@ -99,15 +100,36 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
       // A link that leaves the project is refused even though its name looks like the project's.
       yield* fs.symlink(path.join(dir, "secret.css"), path.join(root, "leak.css"));
       const live = records("live", "Space game", false);
+      let revision = 0;
       const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
-        getThreadRecords: (() => Effect.succeed(live as never)) as never,
+        getThreadRecords: (() =>
+          Effect.succeed({
+            ...live,
+            checkpoints: live.checkpoints.map((checkpoint) => ({
+              ...checkpoint,
+              id: `checkpoint:${revision}`,
+            })),
+          } as never)) as never,
       });
       const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
         get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
       });
-      const [made, other, unmade] = yield* Effect.gen(function* () {
+      const [made, cached, assetChanged, changed, other, unmade] = yield* Effect.gen(function* () {
         const fridge = yield* SkycotFridge.SkycotFridge;
+        const first = yield* fridge.page({ threadId: "live", page: "index.html" });
+        yield* fs.remove(path.join(root, "style.css"));
+        const second = yield* fridge.page({ threadId: "live", page: "index.html" });
+        yield* fs.writeFileString(path.join(root, "style.css"), "body { color: purple }");
+        revision += 1;
+        const updatedAsset = yield* fridge.page({ threadId: "live", page: "index.html" });
+        yield* fs.writeFileString(
+          path.join(root, "index.html"),
+          '<html><head><link rel="stylesheet" href="style.css"></head><body>Moon</body></html>',
+        );
         return [
+          first,
+          second,
+          updatedAsset,
           yield* fridge.page({ threadId: "live", page: "index.html" }),
           yield* fridge.page({ threadId: "live", page: "style.css" }),
           yield* fridge.playable({
@@ -124,6 +146,12 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
         ),
       );
       assert.include(made ?? "", "<style>body { color: hotpink }</style>");
+      assert.equal(cached, made);
+      assert.include(assetChanged ?? "", "color: purple");
+      assert.include(changed ?? "", "Moon");
+      assert.notInclude(changed ?? "", "Space");
+      const cache = yield* fs.readFileString(path.join(dir, "skycot-fridge-thumbnails.json"));
+      assert.include(cache, "Moon");
       assert.notInclude(made ?? "", "secret");
       assert.notInclude(made ?? "", "<link");
       assert.isNull(other);

@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-child-about-gate
 /**
  * This device's Macs: each one it is linked to, by name, how it is reached, and who this
  * device is there; "Link another Mac" for a family with two working Macs (their conversations
@@ -13,6 +14,7 @@ import { codeLengthOf } from "../../family/codeLength";
 import { useLinks, type Mac } from "../../links/store";
 import { AboutSheet } from "./About";
 import { Page, ParentCodeSheet, Row, RowIcon, Section } from "../../ui/kit";
+import { AboutContent } from "./About";
 import { useTheme } from "../../ui/theme";
 import { ScanSheet, TypeCodeSheet } from "../link/LinkSheets";
 
@@ -38,6 +40,13 @@ export function MacsScreen() {
     setSheet("type");
     deep.consume();
   }, [deep]);
+  if (links.mode === "child") {
+    return (
+      <Page>
+        <AboutContent />
+      </Page>
+    );
+  }
   return (
     <Page>
       <Section

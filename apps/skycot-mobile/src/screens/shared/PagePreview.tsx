@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -35,6 +35,7 @@ import {
 } from "./pagePreviewLogic";
 
 // nondev-seam: skycot-mobile-page-preview
+// nondev-seam: skycot-iphone-q39-page-preview
 export function PagePreview(props: {
   readonly mac: Mac;
   readonly threadId: string;
@@ -46,6 +47,7 @@ export function PagePreview(props: {
   readonly onTellSam?: (message: string) => void;
 }) {
   const theme = useTheme();
+  const device = Platform.OS === "ios" && Platform.isPad ? "iPad" : "iPhone";
   const insets = useSafeAreaInsets();
   const webView = useRef<WebView<object>>(null);
   const [play, setPlay] = useState<PlayCopy | null>(null);
@@ -184,6 +186,7 @@ export function PagePreview(props: {
     engineResponse?.diag
       ? { ...engineResponse.diag, reason: engineResponse.reason, needs: engineResponse.needs }
       : undefined,
+    device,
   );
   const build =
     Constants.expoConfig?.ios?.buildNumber ?? Constants.expoConfig?.version ?? "unknown";
@@ -209,7 +212,8 @@ export function PagePreview(props: {
 
   const shownSites = sites.filter((site) => !hiddenSites.includes(site));
   const allowedPage = play?.page ?? null;
-  const noticeCopy = notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts);
+  const noticeCopy =
+    notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts, device);
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF", paddingTop: insets.top }}>
       <View

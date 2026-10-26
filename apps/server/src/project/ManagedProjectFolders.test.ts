@@ -27,6 +27,7 @@ import * as ProjectFaviconResolver from "./ProjectFaviconResolver.ts";
 import * as ProjectService from "./ProjectService.ts";
 import * as RepositoryIdentityResolver from "./RepositoryIdentityResolver.ts";
 import * as ManagedProjectFolders from "./ManagedProjectFolders.ts";
+import * as SkycotProjectMemory from "../skycot/SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory-test
 
 const layerGitWorkflow = (vcsProcess?: Layer.Layer<VcsProcess.VcsProcess>) =>
   GitWorkflow.layer.pipe(
@@ -76,6 +77,11 @@ const layer = (baseDir: string, options?: HarnessOptions) =>
     Layer.provideMerge(SqlitePersistence.layerMemory),
     Layer.provideMerge(ServerSettings.layerTest()),
     Layer.provideMerge(ServerConfig.layerTest(baseDir, baseDir)),
+    Layer.provideMerge(
+      SkycotProjectMemory.layerAt(`${baseDir}/${SkycotProjectMemory.PROJECT_MEMORY_FILE}`).pipe(
+        Layer.provide(NodeServices.layer),
+      ),
+    ),
     Layer.provideMerge(NodeServices.layer),
   );
 
@@ -87,6 +93,7 @@ const withScratch = <A, E>(
     E,
     | ManagedProjectFolders.ManagedProjectFolders
     | ProjectService.ProjectService
+    | SkycotProjectMemory.SkycotProjectMemory
     | NodeServices.NodeServices
     | Scope.Scope
   >,
@@ -160,6 +167,7 @@ it.effect("creates one Scratch project, even for concurrent first requests", () 
     Effect.gen(function* () {
       const scratch = yield* ManagedProjectFolders.ManagedProjectFolders;
       const projects = yield* ProjectService.ProjectService;
+      const memory = yield* SkycotProjectMemory.SkycotProjectMemory;
       const racers = yield* Effect.all(
         Array.from({ length: 8 }, () => scratch.ensureScratchProject),
         { concurrency: "unbounded" },
@@ -175,6 +183,7 @@ it.effect("creates one Scratch project, even for concurrent first requests", () 
       const scratchProjects = snapshot.projects.filter((project) => project.workspaceRoot === root);
       assert.lengthOf(scratchProjects, 1);
       assert.equal(scratchProjects[0]?.title, "No project");
+      assert.isTrue(yield* memory.isSkycotCreatedFolder(root));
       assert.deepEqual(scratchProjects[0]?.projectIcon, {
         kind: "lucide",
         name: "message-square-dashed",
@@ -344,6 +353,7 @@ it.effect("starts a named project as a committed repository, and suffixes a take
       Effect.gen(function* () {
         const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
         const projects = yield* ProjectService.ProjectService;
+        const memory = yield* SkycotProjectMemory.SkycotProjectMemory;
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = path.resolve(baseDir, "projects");
@@ -358,6 +368,7 @@ it.effect("starts a named project as a committed repository, and suffixes a take
         const project = Option.getOrThrow(yield* projects.getById(first.projectId));
         assert.equal(project.title, "Pinball Stats");
         assert.equal(project.workspaceRoot, first.workspaceRoot);
+        assert.isTrue(yield* memory.isSkycotCreatedFolder(first.workspaceRoot));
 
         const readme = yield* fileSystem.readFileString(
           path.join(first.workspaceRoot, "README.md"),

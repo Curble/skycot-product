@@ -1,4 +1,5 @@
 // nondev-seam: skycot-mobile-page-logic-test
+// nondev-seam: skycot-iphone-q39-page-copy-test
 import { describe, expect, it } from "vite-plus/test";
 import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 
@@ -52,14 +53,17 @@ describe("the sealed page viewer", () => {
     const adultUpdate = playNoticeCopy("engine-update", false);
     expect(adultUpdate.grownUp).toBe("Update SKYCOT on the Mac (Settings > About).");
 
-    const remote = playNoticeCopy("remote-script", true, ["example.com"]);
+    const remote = playNoticeCopy("remote-script", true, ["example.com"], "iPad");
     expect(remote.message).toContain("tool from the internet (example.com)");
     expect(remote.message).toContain("It works on the Mac.");
     expect(remote.tellSam).toBe(
-      "Please make my game work without loading anything from the internet, so it plays on the iPad.",
+      "Please make my game work without loading anything from the internet, so it plays on this iPad.",
     );
+    const phoneRemote = playNoticeCopy("remote-script", true, ["example.com"], "iPhone");
+    expect(phoneRemote.message).toContain("can't run on this iPhone");
+    expect(phoneRemote.tellSam).toContain("plays on this iPhone");
     expect(remote.tellSamLabel).toBe("Tell Sam");
-    expect(playNoticeCopy("too-big", true).message).toContain("too big to play on the iPad");
+    expect(playNoticeCopy("too-big", true).message).toContain("too big to play on this iPad");
     expect(playNoticeCopy("unpackable-module", true).message).toContain(
       "part of this game is missing",
     );
@@ -136,6 +140,19 @@ describe("the sealed page viewer", () => {
       ),
     ).toBe(false);
     expect(pageLooksWrong(diagnostics, 0)).toBe(true);
+    const moving = parsePageDiagnostic(
+      {
+        skycot: "diag",
+        facts: { frames: 120 },
+        entries: [{ kind: "error", text: "Script error" }],
+      },
+      EMPTY_PAGE_DIAGNOSTICS,
+    );
+    expect(pageLooksWrong(moving, 3000)).toBe(false);
+    const movingCopy = diagnosticSheetCopy(moving, true, undefined, "iPhone");
+    expect(movingCopy.headline).toBe("Is something not working?");
+    expect(movingCopy.lines.join(" ")).toContain("game is running");
+    expect(movingCopy.lines.join(" ")).not.toMatch(/did not start|Script error|code stopped/iu);
 
     const childCopy = diagnosticSheetCopy(diagnostics, true);
     expect(childCopy.headline).toBe("This game hit a problem on this iPad");
@@ -143,6 +160,9 @@ describe("the sealed page viewer", () => {
     expect(childCopy.lines.length).toBeLessThanOrEqual(6);
     expect(childCopy.lines.join(" ")).not.toMatch(/stack|https?:|\/Users\//iu);
     expect(childCopy.lines.some((line) => line.includes("iPadOS 17.7.11"))).toBe(true);
+    const phoneCopy = diagnosticSheetCopy(diagnostics, true, undefined, "iPhone");
+    expect(phoneCopy.headline).toContain("iPhone");
+    expect(phoneCopy.lines.join(" ")).not.toContain("Script error");
     const policyCopy = diagnosticSheetCopy(
       parsePageDiagnostic(
         { skycot: "diag", entries: [{ kind: "policy", text: "script-src blocked games.example" }] },

@@ -1,6 +1,7 @@
+// nondev-seam: skycot-question-project-approval-test
 import { describe, expect, it } from "vite-plus/test";
 
-import { evaluateFamilyRequest } from "./family.ts";
+import { evaluateFamilyRequest, projectApprovalCoverFor } from "./family.ts";
 import { isInQuestionsSpace, isQuestionsSpace, sameFolder, workRootsFor } from "./questions.ts";
 
 const SPACE = "/Users/me/.skycot/scratch";
@@ -56,6 +57,22 @@ describe("where a question may work", () => {
     expect(
       workRootsFor({ projectFolder: SPACE, worktreePath: null, questionsRoot: SPACE }),
     ).toEqual({ projectRoot: SPACE, projectFolder: SPACE });
+  });
+
+  it("a question made into a project keeps its own folder as the grant root", () => {
+    const convertedProject = workRootsFor({
+      projectFolder: MINE,
+      worktreePath: null,
+      questionsRoot: SPACE,
+    });
+    expect(convertedProject).toEqual({ projectRoot: MINE, projectFolder: MINE });
+    const context = { ...convertedProject };
+    const request = {
+      kind: "command" as const,
+      command: "curl -fL https://fonts.gstatic.com/lobster.ttf -o lobster.ttf",
+    };
+    const evaluation = evaluateFamilyRequest(request, context);
+    expect(projectApprovalCoverFor(request, evaluation, context)).toBe("internetFetch");
   });
 
   it("Family rules: the child's own question folder is open", () => {

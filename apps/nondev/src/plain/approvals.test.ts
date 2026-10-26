@@ -149,6 +149,16 @@ describe("describeRuntimeRequest — commands", () => {
 });
 
 describe("childApprovalSentence", () => {
+  it("explains a short node download plainly and keeps the no-project boundary", () => {
+    const card = {
+      whatItWants: 'The assistant wants to run "node -e fetch".',
+      technical: `node -e "fetch('https://fonts.gstatic.com/lobster.ttf')"`,
+    };
+    expect(childApprovalSentence(card, "Sam")).toBe(
+      "Sam wants to use a short program to get something from the internet. A grown-up needs to say yes.",
+    );
+  });
+
   it.each(["--cache .npm-cache", "--cache=.npm-cache", "--registry https://registry.npmjs.org"])(
     "does not call an option value an add-on: %s",
     (option) => {

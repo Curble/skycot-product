@@ -56,6 +56,8 @@ import {
   familyCard,
   familyHoldFor,
   projectApprovalFor,
+  projectFetchDescription,
+  projectFetchSentence,
   isFamilyRefusal,
   toolItemTypeFor,
   waitsForEngineCheck,
@@ -275,6 +277,17 @@ export function RequestCard({
           trustedAddOns: family.profile.trustedAddOns,
         })
       : null;
+  const fetchSentence =
+    projectCover === "internetFetch" && item.type === "approval_request"
+      ? projectFetchSentence(
+          toolCallInput ?? item.prompt ?? card.technical,
+          crew.named ? crew.builder.name : "Sam",
+        )
+      : null;
+  const fetchDescription =
+    projectCover === "internetFetch" && item.type === "approval_request"
+      ? projectFetchDescription(toolCallInput ?? item.prompt ?? card.technical)
+      : null;
   const remoteGrownUps = family.profile.devices.some((device) => device.kind === "grown-up");
   const grownUpNames = family.profile.grownUps
     .map((person) => person.name)
@@ -450,8 +463,13 @@ export function RequestCard({
             {childView && decided ? null : (
               <p className="fm-approval__what">
                 {childView && grownUp !== null
-                  ? childApprovalSentence(card, crew.named ? crew.builder.name : "Sam")
-                  : card.whatItWants}
+                  ? (fetchSentence ??
+                    childApprovalSentence(card, crew.named ? crew.builder.name : "Sam"))
+                  : fetchDescription === null
+                    ? card.whatItWants
+                    : family.profile.childName
+                      ? `${family.profile.childName}'s page wants to download ${fetchDescription}.`
+                      : `This page wants to download ${fetchDescription}.`}
               </p>
             )}
             {projectCover !== null && grownUp !== null && !decided && !childView ? (

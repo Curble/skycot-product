@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-face-id-row
 /**
  * This device, on a grown-up's phone: Face ID (this phone's own Secure Enclave key, set up once
  * with the parent code; src/faceid), Apple Watch (say yes from the wrist, Phase 4), Lock everything
@@ -99,54 +100,58 @@ export function ThisDeviceScreen() {
 
   return (
     <Page>
-      <Section
-        title={faceId.label}
-        footer={
-          faceIdProblem ??
-          `Allow once asks you to confirm with ${faceId.label}. The parent code always works too, and saying no never needs either.`
-        }
-      >
-        <Row
-          leading={
-            <RowIcon
-              name={faceId.label === "Touch ID" ? "touchid" : "faceid"}
-              color={faceId.everywhere ? theme.color.green : "#8E8E93"}
+      {faceId.native?.available || faceId.native?.hasKey ? (
+        <Section
+          title={faceId.label}
+          footer={
+            faceIdProblem ??
+            `Allow once asks you to confirm with ${faceId.label}. The parent code always works too, and saying no never needs either.`
+          }
+        >
+          {faceId.native?.available || faceId.everywhere ? (
+            <Row
+              leading={
+                <RowIcon
+                  name={faceId.label === "Touch ID" ? "touchid" : "faceid"}
+                  color={faceId.everywhere ? theme.color.green : "#8E8E93"}
+                />
+              }
+              title={faceIdRowTitle(faceId.label, faceId.everywhere)}
+              subtitle={faceIdRowSubtitle({
+                label: faceId.label,
+                available: faceId.native?.available ?? false,
+                everywhere: faceId.everywhere,
+              })}
+              trailing={
+                faceId.native?.available && !faceId.everywhere ? (
+                  <Button
+                    title="Set up"
+                    kind="tinted"
+                    size="small"
+                    onPress={() => {
+                      setFaceIdProblem(null);
+                      setSettingUpFaceId(true);
+                    }}
+                  />
+                ) : null
+              }
             />
-          }
-          title={faceIdRowTitle(faceId.label, faceId.everywhere)}
-          subtitle={faceIdRowSubtitle({
-            label: faceId.label,
-            available: faceId.native?.available ?? false,
-            everywhere: faceId.everywhere,
-          })}
-          trailing={
-            faceId.native?.available && !faceId.everywhere ? (
-              <Button
-                title="Set up"
-                kind="tinted"
-                size="small"
-                onPress={() => {
-                  setFaceIdProblem(null);
-                  setSettingUpFaceId(true);
-                }}
-              />
-            ) : null
-          }
-        />
-        {faceId.native?.hasKey ? (
-          <Row
-            title={`Stop using ${faceId.label}`}
-            subtitle="Allow once asks for the parent code again."
-            destructive
-            onPress={async () => {
-              if (faceIdBusy) return;
-              setFaceIdBusy(true);
-              setFaceIdProblem(await faceId.stop());
-              setFaceIdBusy(false);
-            }}
-          />
-        ) : null}
-      </Section>
+          ) : null}
+          {faceId.native?.hasKey ? (
+            <Row
+              title={`Stop using ${faceId.label}`}
+              subtitle="Allow once asks for the parent code again."
+              destructive
+              onPress={async () => {
+                if (faceIdBusy) return;
+                setFaceIdBusy(true);
+                setFaceIdProblem(await faceId.stop());
+                setFaceIdBusy(false);
+              }}
+            />
+          ) : null}
+        </Section>
+      ) : null}
       {watch.link.supported ? (
         <Section
           title="Apple Watch"
@@ -201,7 +206,7 @@ export function ThisDeviceScreen() {
         title="Lock"
         footer={
           problem ??
-          "Ends every grown-up's yes on every device, such as Advanced mode left open on the Mac. Nothing else changes."
+          "Advanced mode lets a grown-up change more things on the Mac. Lock everything closes it on every device."
         }
       >
         <Row

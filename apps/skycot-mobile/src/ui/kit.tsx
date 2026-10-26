@@ -89,6 +89,7 @@ export function haptic(kind: "tap" | "success" | "warning" = "tap") {
 }
 
 // nondev-seam: skycot-ipad-page-header
+// nondev-seam: skycot-iphone-q39-accessible-controls
 /** A scrolling page on the grouped background, under a large title. */
 export function Page(
   props: ScrollViewProps & { readonly children: ReactNode; readonly maxWidth?: number },
@@ -438,7 +439,11 @@ export function Banner(props: {
   );
 }
 
-export function Mascot(props: { readonly pose: MascotPose; readonly size?: number }) {
+export function Mascot(props: {
+  readonly pose: MascotPose;
+  readonly size?: number;
+  readonly accessibilityLabel?: string;
+}) {
   const size = props.size ?? 96;
   return (
     <Image
@@ -446,7 +451,8 @@ export function Mascot(props: { readonly pose: MascotPose; readonly size?: numbe
       style={{ width: size, height: size }}
       resizeMode="contain"
       accessibilityIgnoresInvertColors
-      accessible={false}
+      accessible={props.accessibilityLabel !== undefined}
+      accessibilityLabel={props.accessibilityLabel}
     />
   );
 }

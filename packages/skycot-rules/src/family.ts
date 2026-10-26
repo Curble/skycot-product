@@ -42,22 +42,24 @@ export type ProjectApprovalCover = (typeof PROJECT_APPROVAL_COVERS)[number];
 export function projectApprovalCoverFor(
   request: FamilyRequest,
   evaluation: FamilyEvaluation,
+  ctx: FamilyContext = {},
 ): ProjectApprovalCover | null {
   if (!evaluation.needsGrownUp) return null;
   if (request.toolItemType === "web_search") {
     return evaluation.base.decision === "hold" ? null : "webSearch";
   }
   if (request.kind !== "command" || request.command === undefined) return null;
+  const projectCommand = commandForProjectCover(request.command, ctx.projectRoot);
   const ids = new Set(evaluation.family.map((match) => match.rule.id));
   if (
     ids.has("installs-software") &&
-    addOnAskOf(request.command)?.names.length &&
+    addOnAskOf(projectCommand)?.names.length &&
     [...ids].every((id) => id === "uses-internet" || id === "installs-software") &&
     evaluation.base.matches.every((match) => match.rule.id === "leaves-sandbox")
   )
     return "addOns";
   if (evaluation.base.decision === "hold") return null;
-  if (ids.size === 1 && ids.has("uses-internet") && isSimpleHttpsFetch(request.command)) {
+  if (ids.size === 1 && ids.has("uses-internet") && isSimpleHttpsFetch(projectCommand)) {
     return "internetFetch";
   }
   return null;
@@ -69,10 +71,10 @@ export function projectApprovalCoverFor(
  * project (a font or picture a page wants): no pipes, no quotes, no other options with values.
  */
 export function isSimpleHttpsFetch(command: string): boolean {
-  const tokens = command.trim().split(/\s+/u);
+  const tokens = tokenize(command.trim());
   if (tokens.length < 2 || !/^(?:curl|wget)$/iu.test(tokens[0]!)) return false;
   const isWget = /^wget$/iu.test(tokens[0]!);
-  const plainFlag = /^-(?:[LsSfqO]+|-location|-silent|-fail|-show-error)$/u;
+  const plainFlag = /^-(?:[fLsSfqO]+|-location|-silent|-fail|-show-error)$/u;
   const inside = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
   const address =
     /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?(?:\/[A-Za-z0-9._~%!$&'()*+,=:@/-]*)?(?:\?[A-Za-z0-9._~%!$&()*+,=:@/?-]*)?$/u;
@@ -109,6 +111,48 @@ export function isSimpleHttpsFetch(command: string): boolean {
   const file = (named ?? fromAddress.split("/").at(-1) ?? "").toLowerCase();
   return /\.(?:woff2?|ttf|otf|png|jpe?g|gif|webp|svg|ico|mp3|wav|ogg|m4a|json|txt|csv)$/u.test(
     file,
+  );
+}
+
+/** Peel only shell forms that keep a single, plain command inside the project. */
+function commandForProjectCover(command: string, projectRoot?: string | null): string {
+  const unwrapped = unwrapShellWrapper(command.trim());
+  if (/[|;<>`$()\n]/u.test(unwrapped)) return "";
+  const segments = unwrapped.split(/\s+&&\s+/u);
+  if (segments.length === 1) return segments[0]!.trim();
+  if (segments.length > 3) return "";
+  let index = 0;
+  for (; index < segments.length - 1; index += 1) {
+    const words = tokenize(segments[index]!);
+    if (
+      words.length === 2 &&
+      words[0] === "cd" &&
+      (safeProjectFolder(words[1]!) || safeAbsoluteProjectFolder(words[1]!, projectRoot))
+    )
+      continue;
+    if (
+      words.length === 3 &&
+      words[0] === "mkdir" &&
+      words[1] === "-p" &&
+      safeProjectFolder(words[2]!)
+    )
+      continue;
+    return "";
+  }
+  return segments.at(-1)!.trim();
+}
+
+function safeAbsoluteProjectFolder(folder: string, projectRoot?: string | null): boolean {
+  if (projectRoot === null || projectRoot === undefined || !folder.startsWith("/")) return false;
+  const root = projectRoot.replace(/\/+$/u, "");
+  const target = folder.replace(/\/+$/u, "");
+  return target === root || target.startsWith(`${root}/`);
+}
+
+function safeProjectFolder(folder: string): boolean {
+  return (
+    /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u.test(folder) &&
+    !folder.split("/").some((part) => part === "." || part === "..")
   );
 }
 

@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q39-conversation-labels
 /**
  * Every conversation this device may see, from every linked Mac, in one list. Each row says
  * which Mac it lives on: conversations are never copied between Macs, they are shown side by
@@ -113,9 +114,9 @@ export function conversationRows(
   return rows.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/** "MamaBear · Space game" when there are several Macs, else just the project. */
-export function rowLabel(row: ConversationRow, severalMacs: boolean): string {
-  return severalMacs ? `${row.mac.macName} · ${row.projectTitle}` : row.projectTitle;
+/** A child's list names the project, never the computer that stores it. */
+export function rowLabel(row: ConversationRow): string {
+  return row.projectTitle;
 }
 
 export function relativeTime(at: number, now: number = Date.now()): string {

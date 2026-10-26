@@ -151,6 +151,7 @@ export interface ServerFamilyStatus {
   /** Pages a grown-up let use internet sites. An engine from before it sends none. */
   readonly pageInternet?: ReadonlyArray<PageInternetEntry>;
   readonly projectApprovalGrants?: ReadonlyArray<ProjectApprovalGrant>;
+  readonly rememberedStarts?: ReadonlyArray<RememberedStartView>;
   /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
   readonly trustedAddOns?: boolean;
   readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
@@ -163,6 +164,37 @@ export interface ServerFamilyStatus {
    * and grown-ups' devices; null when the engine does not know it yet. Never the code itself.
    */
   readonly codeLength?: number | null;
+}
+
+export interface RememberedStartView {
+  readonly id: string;
+  readonly projectRealPath: string;
+  readonly approvedBy: string;
+  readonly how: string;
+  readonly createdAt: number;
+}
+
+function parseRememberedStarts(value: unknown): ReadonlyArray<RememberedStartView> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null) return [];
+    const entry = item as Record<string, unknown>;
+    return typeof entry["id"] === "string" &&
+      typeof entry["projectRealPath"] === "string" &&
+      typeof entry["approvedBy"] === "string" &&
+      typeof entry["how"] === "string" &&
+      typeof entry["createdAt"] === "number"
+      ? [
+          {
+            id: entry["id"],
+            projectRealPath: entry["projectRealPath"],
+            approvedBy: entry["approvedBy"],
+            how: entry["how"],
+            createdAt: entry["createdAt"],
+          },
+        ]
+      : [];
+  });
 }
 
 /**
@@ -313,6 +345,7 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     allowedAssistants: parseAllowedAssistants(record["allowedAssistants"]),
     pageInternet: parsePageInternet(record["pageInternet"]),
     projectApprovalGrants: parseProjectApprovalGrants(record["projectApprovalGrants"]),
+    rememberedStarts: parseRememberedStarts(record["rememberedStarts"]),
     ...(typeof record["trustedAddOns"] === "boolean"
       ? { trustedAddOns: record["trustedAddOns"] }
       : {}),
@@ -422,6 +455,7 @@ export interface FamilyView {
   /** Pages a grown-up let use internet sites (Settings › Family lists them). */
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
   readonly projectApprovalGrants: ReadonlyArray<ProjectApprovalGrant>;
+  readonly rememberedStarts: ReadonlyArray<RememberedStartView>;
   /** Trusted add-ons (three.js, p5, …) download without a grown-up; the engine decides. */
   readonly trustedAddOns: boolean;
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
@@ -451,6 +485,7 @@ export const EMPTY_VIEW: FamilyView = {
   allowedAssistants: [],
   pageInternet: [],
   projectApprovalGrants: [],
+  rememberedStarts: [],
   trustedAddOns: false,
   grownUps: [],
   devices: [],
@@ -532,6 +567,7 @@ export function viewFromStatus(
     allowedAssistants: status.enabled ? (status.allowedAssistants ?? []) : [],
     pageInternet: status.enabled ? (status.pageInternet ?? []) : [],
     projectApprovalGrants: status.enabled ? (status.projectApprovalGrants ?? []) : [],
+    rememberedStarts: status.enabled ? (status.rememberedStarts ?? []) : [],
     trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],

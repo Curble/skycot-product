@@ -1,4 +1,5 @@
 // nondev-seam: skycot-ipad-grownup-recap
+// nondev-seam: skycot-iphone-q39-recap
 /**
  * "Ava's week" (or today): what they made, what they asked for, what needed a grown-up and the
  * time used, built by the Mac from what it already keeps. Open on a grown-up's phone without
@@ -12,13 +13,12 @@ import { View } from "react-native";
 import {
   askLine,
   grownUpLines,
-  madeSummary,
-  minutesPhrase,
   rangeLabel,
   recapHeadline,
   weekBars,
   type RecapRange,
 } from "../../../../nondev/src/features/recap/recap";
+import { compactMinutes, mobileMadeSummary } from "./recapCopy";
 import { childLabel } from "../../../../nondev/src/features/family/children";
 import { friendlyTitle } from "../../../../nondev/src/plain/titles";
 import type { StackRoutes } from "../../app/routes";
@@ -85,7 +85,7 @@ export function RecapScreen() {
           <Txt variant="title2">{recapHeadline(value, name)}</Txt>
           <Txt tone="label2">{rangeLabel(value)}</Txt>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <Stat value={minutesPhrase(value.minutes)} label="on SKYCOT" />
+            <Stat value={compactMinutes(value.minutes)} label="on SKYCOT" />
             <Stat
               value={String(value.made.length)}
               label={value.made.length === 1 ? "thing made" : "things made"}
@@ -139,9 +139,9 @@ export function RecapScreen() {
             {value.made.map((made) => (
               <View key={made.threadId}>
                 <Txt weight="600">{friendlyTitle(made.title)}</Txt>
-                {madeSummary(made) ? (
+                {mobileMadeSummary(made, name) ? (
                   <Txt variant="subheadline" tone="label2">
-                    {madeSummary(made)}
+                    {mobileMadeSummary(made, name)}
                   </Txt>
                 ) : null}
               </View>
@@ -225,7 +225,7 @@ function Stat(props: { readonly value: string; readonly label: string }) {
       <Txt variant="title3" center>
         {props.value}
       </Txt>
-      <Txt variant="caption" tone="label2" center>
+      <Txt variant="caption" tone="label2" center numberOfLines={2}>
         {props.label}
       </Txt>
     </Card>

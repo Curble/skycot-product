@@ -136,6 +136,7 @@ function FailureNote({
     usageLimitResetAt: context.shell?.runtime?.usageLimitResetAt ?? null,
   });
   const childView = useChildView();
+  const childRest = childView && item.failure.class === "usage_limit";
   const retry = item.retry;
   const retryLine =
     retry && retry.maxAttempts !== null
@@ -145,15 +146,20 @@ function FailureNote({
         : null;
   return (
     <Bubble author="crew" full meta={shortTime(item.updatedAt)}>
-      <p className="fm-mascot-kicker">
-        <Mascot pose="oops" size={36} decorative />
-        Oops
-      </p>
-      <div className="fm-approval fm-approval--high" data-sober="">
-        <Card label="Something went wrong">
+      {childRest ? null : (
+        <p className="fm-mascot-kicker">
+          <Mascot pose="oops" size={36} decorative />
+          Oops
+        </p>
+      )}
+      <div
+        className={`fm-approval ${childRest ? "fm-approval--rest" : "fm-approval--high"}`}
+        data-sober=""
+      >
+        <Card label={childRest ? "Sam needs a short rest" : "Something went wrong"}>
           <CardHeader
             icon={CircleAlert}
-            tone="red"
+            tone={childRest ? "grey" : "red"}
             title={
               childView
                 ? item.failure.class === "usage_limit"
