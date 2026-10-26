@@ -3,8 +3,9 @@
  * link (src/links/pairing.ts), and the Mac decides what this device becomes.
  */
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { Platform, TextInput, View } from "react-native";
+import { Linking, Platform, TextInput, useWindowDimensions, View } from "react-native";
 
 import {
   LinkError,
@@ -19,6 +20,9 @@ import { newHomeRecord, RelayHome } from "@t3tools/skycot-relay/client/home";
 import { waysToMac } from "../../transport/ways";
 import { Banner, Button, haptic, Sheet, Symbol, Txt } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
+import { scannerMessage } from "./scannerState";
+
+// nondev-seam: skycot-mobile-device-link-sheets
 
 export type LinkOutcome = { readonly kind: "linked"; readonly mac: LinkedMac };
 
@@ -89,6 +93,7 @@ export function TypeCodeSheet(props: {
   const theme = useTheme();
   const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
+  const [pastedLink, setPastedLink] = useState("");
   const action = useLinkAction(props.onLinked);
   const prefill = props.prefill ?? null;
   useEffect(() => {
@@ -115,6 +120,7 @@ export function TypeCodeSheet(props: {
       onClose={() => {
         setCode("");
         setAddress("");
+        setPastedLink("");
         action.clear();
         props.onClose();
       }}
@@ -170,7 +176,39 @@ export function TypeCodeSheet(props: {
           style={[fieldStyle(theme), { fontSize: 17 }]}
         />
       </View>
+      <View style={{ gap: 8 }}>
+        <Txt variant="footnote" tone="label2" style={{ textTransform: "uppercase", marginLeft: 4 }}>
+          Or paste the link
+        </Txt>
+        <TextInput
+          value={pastedLink}
+          onChangeText={(text) => {
+            action.clear();
+            setPastedLink(text);
+          }}
+          placeholder="Paste the link from the Mac"
+          placeholderTextColor={theme.color.label3}
+          autoCapitalize="none"
+          autoCorrect={false}
+          multiline
+          accessibilityLabel="The link from the Mac"
+          style={[fieldStyle(theme), { fontSize: 15, minHeight: 76, textAlignVertical: "top" }]}
+        />
+        <Button
+          title="Paste the link"
+          kind="plain"
+          onPress={() => void Clipboard.getStringAsync().then(setPastedLink)}
+        />
+      </View>
       {action.problem ? <Banner tone="warning" text={action.problem} /> : null}
+      {pastedLink.trim().length > 0 ? (
+        <Button
+          title={action.busy ? "Linking…" : "Link with pasted link"}
+          busy={action.busy}
+          disabled={action.busy}
+          onPress={() => void action.run({ kind: "scanned", text: pastedLink })}
+        />
+      ) : null}
       <Button
         title={action.busy ? "Linking…" : "Link"}
         busy={action.busy}
@@ -191,6 +229,14 @@ export function ScanSheet(props: {
   const [permission, requestPermission] = useCameraPermissions();
   const action = useLinkAction(props.onLinked);
   const seen = useRef<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const { width } = useWindowDimensions();
+  const previewHeight = Math.min(420, Math.max(260, Math.round(width * 0.72)));
+  useEffect(() => {
+    if (!props.visible) return;
+    setCameraReady(false);
+    seen.current = null;
+  }, [props.visible]);
   return (
     <Sheet visible={props.visible} title="Scan the code" onClose={props.onClose}>
       <Txt tone="label2">
@@ -198,7 +244,8 @@ export function ScanSheet(props: {
       </Txt>
       <View
         style={{
-          aspectRatio: 1,
+          width: "100%",
+          height: previewHeight,
           borderRadius: theme.radius.card,
           overflow: "hidden",
           backgroundColor: "#000",
@@ -210,7 +257,10 @@ export function ScanSheet(props: {
           <CameraView
             style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
             facing="back"
+            autofocus="on"
+            zoom={0}
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onCameraReady={() => setCameraReady(true)}
             onBarcodeScanned={
               action.busy
                 ? undefined
@@ -221,6 +271,10 @@ export function ScanSheet(props: {
                   }
             }
           />
+        ) : permission === null ? (
+          <Txt center style={{ color: "#FFFFFF" }}>
+            {scannerMessage({ granted: false, canAskAgain: true, cameraReady: false, busy: false })}
+          </Txt>
         ) : (
           <View style={{ alignItems: "center", gap: 12, padding: 24 }}>
             <Symbol name="qrcode.viewfinder" size={56} color="#FFFFFF" />
@@ -229,12 +283,24 @@ export function ScanSheet(props: {
                 ? "Camera access is off for SKYCOT. Turn it on in Settings, or type the code instead."
                 : "SKYCOT needs the camera to read the code."}
             </Txt>
+            {permission?.canAskAgain === false ? (
+              <Button
+                title="Open Settings"
+                onPress={() => void Linking.openSettings()}
+                size="medium"
+              />
+            ) : null}
             {permission?.canAskAgain !== false ? (
               <Button title="Allow Camera" onPress={() => void requestPermission()} size="medium" />
             ) : null}
           </View>
         )}
       </View>
+      {permission?.granted ? (
+        <Txt center tone="label2">
+          {scannerMessage({ granted: true, canAskAgain: true, cameraReady, busy: action.busy })}
+        </Txt>
+      ) : null}
       {action.busy ? (
         <Txt center tone="label2">
           Linking…

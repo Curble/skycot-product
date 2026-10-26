@@ -79,6 +79,28 @@ describe("reading the Mac's link", () => {
     });
   });
 
+  it("accepts a pasted link through the scanned input path", () => {
+    expect(
+      readLinkInput({
+        kind: "scanned",
+        text: "http://192.168.1.20:3773/simple/#token=7KQ3M9XD2HPA",
+      }),
+    ).toMatchObject({ httpBaseUrl: "http://192.168.1.20:3773", code: "7KQ3M9XD2HPA" });
+  });
+
+  it("keeps accepting QR links issued before copy and paste was added", () => {
+    expect(
+      readLinkInput({
+        kind: "scanned",
+        text: "https://family-mac.tailnet.ts.net/simple/#token=7KQ3M9XD2HPA",
+      }),
+    ).toEqual({
+      httpBaseUrl: "https://family-mac.tailnet.ts.net",
+      code: "7KQ3M9XD2HPA",
+      relay: null,
+    });
+  });
+
   it("accepts a typed code in groups, in lower case, and a bare address", () => {
     expect(
       readLinkInput({ kind: "typed", code: "7kq3 m9xd 2hpa", address: "192.168.1.20:3773" }),

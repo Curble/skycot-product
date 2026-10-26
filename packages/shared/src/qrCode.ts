@@ -31,9 +31,10 @@ type int = number;
 export class QrCode {
   public static Ecc: typeof QrCodeEcc;
 
-  public static encodeText(text: string, ecl: QrCodeEcc): QrCode {
+  // nondev-seam: skycot-family-qr-low-correction
+  public static encodeText(text: string, ecl: QrCodeEcc, boostEcl = true): QrCode {
     const segs: Array<QrSegment> = QrSegment.makeSegments(text);
-    return QrCode.encodeSegments(segs, ecl);
+    return QrCode.encodeSegments(segs, ecl, 1, 40, -1, boostEcl);
   }
 
   public static encodeBinary(data: Readonly<Array<byte>>, ecl: QrCodeEcc): QrCode {

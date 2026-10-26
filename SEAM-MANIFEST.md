@@ -572,14 +572,20 @@ variable and still carries upstream's default.
 
 ## Family device links (25 October 2026)
 
-| id                                   | file                                              | change                                                                          | marker                                                 |
-| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| skycot-family-link-addresses         | `apps/server/src/skycot/SkycotFamilyHttp.ts`      | Exposes the engine's reachable link addresses for the Family link preflight.    | `// nondev-seam: skycot-family-link-addresses`         |
-| skycot-family-link-addresses-test    | `apps/server/src/skycot/SkycotFamilyHttp.test.ts` | Checks the preflight route delegates through the optional device service.       | `// nondev-seam: skycot-family-link-addresses-test`    |
-| skycot-family-reachable-link         | `apps/nondev/src/features/family/relay.ts`        | Selects only advertised reachable routes for a phone link QR.                   | `// nondev-seam: skycot-family-reachable-link`         |
-| skycot-family-reachable-link-test    | `apps/nondev/src/features/family/relay.test.ts`   | Ensures unreachable routes are not selected for phone QR codes.                 | `// nondev-seam: skycot-family-reachable-link-test`    |
-| skycot-mobile-link-failure-copy      | `apps/skycot-mobile/src/links/pairing.ts`         | Chooses first-contact link guidance from the QR's routes and the failure phase. | `// nondev-seam: skycot-mobile-link-failure-copy`      |
-| skycot-mobile-link-failure-copy-test | `apps/skycot-mobile/src/links/pairing.test.ts`    | Covers missing routes, home-only Local Network guidance and relay failure copy. | `// nondev-seam: skycot-mobile-link-failure-copy-test` |
+| id                                    | file                                                       | change                                                                                     | marker                                                  |
+| ------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| skycot-family-link-addresses          | `apps/server/src/skycot/SkycotFamilyHttp.ts`               | Exposes the engine's reachable link addresses for the Family link preflight.               | `// nondev-seam: skycot-family-link-addresses`          |
+| skycot-family-link-addresses-test     | `apps/server/src/skycot/SkycotFamilyHttp.test.ts`          | Checks the preflight route delegates through the optional device service.                  | `// nondev-seam: skycot-family-link-addresses-test`     |
+| skycot-family-reachable-link          | `apps/nondev/src/features/family/relay.ts`                 | Selects only advertised reachable routes for a phone link QR.                              | `// nondev-seam: skycot-family-reachable-link`          |
+| skycot-family-reachable-link-test     | `apps/nondev/src/features/family/relay.test.ts`            | Ensures unreachable routes are not selected for phone QR codes.                            | `// nondev-seam: skycot-family-reachable-link-test`     |
+| skycot-mobile-link-failure-copy       | `apps/skycot-mobile/src/links/pairing.ts`                  | Chooses first-contact link guidance from the QR's routes and the failure phase.            | `// nondev-seam: skycot-mobile-link-failure-copy`       |
+| skycot-mobile-link-failure-copy-test  | `apps/skycot-mobile/src/links/pairing.test.ts`             | Covers link parsing, fallback guidance and existing QR links.                              | `// nondev-seam: skycot-mobile-link-failure-copy-test`  |
+| skycot-mobile-device-link-sheets      | `apps/skycot-mobile/src/screens/link/LinkSheets.tsx`       | Adds iPad-aware scanning states, Settings recovery and clipboard paste for complete links. | `// nondev-seam: skycot-mobile-device-link-sheets`      |
+| skycot-mobile-link-scanner-state      | `apps/skycot-mobile/src/screens/link/scannerState.ts`      | Keeps scanner progress copy in a pure, testable state helper.                              | `// nondev-seam: skycot-mobile-link-scanner-state`      |
+| skycot-mobile-link-scanner-state-test | `apps/skycot-mobile/src/screens/link/scannerState.test.ts` | Covers camera startup, scanning and linking states.                                        | `// nondev-seam: skycot-mobile-link-scanner-state-test` |
+| skycot-family-qr-sizing               | `apps/nondev/src/features/family/qrSizing.ts`              | Adds the four-module QR quiet zone to its image viewBox.                                   | `// nondev-seam: skycot-family-qr-sizing`               |
+| skycot-family-qr-sizing-test          | `apps/nondev/src/features/family/qrSizing.test.ts`         | Pins quiet-zone sizing and low error correction.                                           | `// nondev-seam: skycot-family-qr-sizing-test`          |
+| skycot-family-qr-low-correction       | `packages/shared/src/qrCode.ts`                            | Allows the family QR to select low correction without the encoder boosting it.             | `// nondev-seam: skycot-family-qr-low-correction`       |
 
 ## Page fullscreen (25 October 2026)
 

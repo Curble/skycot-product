@@ -36,10 +36,10 @@
   text-align: center;
 }
 .fm-link__qr {
-  width: min(240px, 70vw);
+  width: min(320px, 88vw);
   height: auto;
-  border-radius: 12px;
-  border: 1px solid var(--fm-sep);
+  background: #fff;
+  image-rendering: pixelated;
 }
 .fm-link__code {
   font-family: var(--fm-mono);

@@ -6,6 +6,7 @@ import { Check, Copy, Laptop, Plus, Smartphone, Tablet, Trash2, UserRound } from
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { QrCode } from "@t3tools/shared/qrCode";
+import { qrImageSize } from "./qrSizing";
 import {
   deviceKindLabel,
   deviceKindSummary,
@@ -623,14 +624,14 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
 /** The link as a QR code, drawn here: nothing leaves this Mac to make it. */
 function QrImage({ value }: { readonly value: string }) {
   const path = useMemo(() => {
-    const code = QrCode.encodeText(value, QrCode.Ecc.MEDIUM);
+    const code = QrCode.encodeText(value, QrCode.Ecc.LOW, false);
     const commands: Array<string> = [];
     for (let y = 0; y < code.size; y += 1) {
       for (let x = 0; x < code.size; x += 1) {
-        if (code.getModule(x, y)) commands.push(`M${x + 2} ${y + 2}h1v1h-1z`);
+        if (code.getModule(x, y)) commands.push(`M${x + 4} ${y + 4}h1v1h-1z`);
       }
     }
-    return { d: commands.join(""), size: code.size + 4 };
+    return { d: commands.join(""), size: qrImageSize(code.size) };
   }, [value]);
   return (
     <svg
@@ -663,6 +664,9 @@ function CopyLink({ url }: { readonly url: string }) {
       >
         {copied ? "Copied" : "Copy link"}
       </Button>
+      <p className="fm-help">
+        This link works once for five minutes. It cannot be cleared from the clipboard.
+      </p>
     </div>
   );
 }
