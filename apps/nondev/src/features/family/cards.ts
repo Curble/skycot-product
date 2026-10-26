@@ -12,7 +12,7 @@ import { filesFromPrompt } from "@t3tools/skycot-rules/files";
 import { describeMatches, readCommandAsk, type RuleRequest } from "@t3tools/skycot-rules/rules";
 
 import type { ApprovalCard, ApprovalOption } from "../../plain/approvals";
-import { familyCopy } from "./copy";
+import { approvalScopeCopy, familyCopy } from "./copy";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 
@@ -148,7 +148,7 @@ export function friendlySiteName(site: string): string {
 export function projectFetchSentence(command: string, assistantName: string): string | null {
   const description = projectFetchDescription(command);
   if (description === null) return null;
-  return `${assistantName} is asking a grown-up to let this page get ${description}. This works for the whole project once a grown-up says yes.`;
+  return `${assistantName} is asking a grown-up to let this page get ${description}. ${approvalScopeCopy}`;
 }
 
 export function projectFetchDescription(command: string): string | null {

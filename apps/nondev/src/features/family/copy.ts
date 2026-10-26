@@ -82,7 +82,7 @@ export function familySteps(askEachStep: boolean): {
 export function actionReason(action: FamilyAction, cardReason?: string | null): string {
   if (action === "aiSettings" && cardReason) return cardReason;
   if (action === "approve" && cardReason) {
-    return `${cardReason} A grown-up allows this one step with the parent code.`;
+    return `${cardReason} ${approvalScopeCopy}`;
   }
   switch (action) {
     case "publish":
@@ -102,7 +102,7 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
     case "openFolder":
       return "Opening another folder lets the assistant work there, so a parent chooses it.";
     case "approve":
-      return "This step uses the internet, installs something, deletes or reaches outside the project, so a grown-up allows it.";
+      return `This step uses the internet, installs something, deletes or reaches outside the project. ${approvalScopeCopy}`;
     case "aiSettings":
       return "The AI assistants use a parent's accounts and settings, so a parent changes them.";
     case "renameChild":
@@ -127,3 +127,6 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "";
   }
 }
+
+export const approvalScopeCopy =
+  "A grown-up can allow just this step, or choose “Allow for this project” to allow this kind of request across the project.";

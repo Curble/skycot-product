@@ -208,6 +208,9 @@ import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts
 import * as ProjectService from "./project/ProjectService.ts";
 import { threadWorkspaceRoot } from "./project/threadWorkspaceRoot.ts";
 import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
+import * as SkycotFamilyLimits from "./skycot/family-limits/SkycotFamilyLimits.ts"; // nondev-seam: skycot-child-project-folder-ws
+import * as SkycotQuestions from "./skycot/questions/SkycotQuestions.ts"; // nondev-seam: skycot-child-project-folder-ws
+import { childQuestionsFolder } from "@t3tools/skycot-rules/questions"; // nondev-seam: skycot-child-project-folder-ws
 import { projectMutationOperation } from "./project/ProjectMutation.ts";
 import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
@@ -1206,6 +1209,7 @@ export const layerWsRpc = (
       const projectStore = yield* ProjectStore.ProjectStoreV2;
       const projectService = yield* ProjectService.ProjectService;
       const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
+      const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
       const eventLoopMonitor = yield* EventLoopMonitor.EventLoopMonitor;
       const threadSearch = yield* ThreadSearch.ThreadSearch;
 
@@ -2605,13 +2609,47 @@ export const layerWsRpc = (
             ),
           ),
         [WS_METHODS.projectsCreateNew]: (input) =>
-          managedFolders
-            .createNamedProject(input)
-            .pipe(
-              Effect.mapError(
-                (cause) => new OrchestrationDispatchCommandError({ message: cause.message, cause }),
-              ),
+          Effect.gen(function* () {
+            if (Option.isNone(familyLimits)) {
+              if (SkycotPolicy.isSkycotPolicyEnabled(process.env))
+                return yield* new ManagedProjectFolders.NamedProjectFolderError({
+                  folder: "",
+                  cause: "The child's SKYCOT folder is unavailable.",
+                });
+              return yield* managedFolders.createNamedProject(input);
+            }
+            const session = yield* familyLimits.value.forSession({ sessionId: currentSessionId });
+            if (session.device === "grown-up" || session.limits === null)
+              return yield* managedFolders.createNamedProject(input);
+            if (session.childId === null) {
+              return yield* new ManagedProjectFolders.NamedProjectFolderError({
+                folder: "",
+                cause: "Choose a child before making a project.",
+              });
+            }
+            const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+            const childFolder = childQuestionsFolder(questionsRoot, session.childId);
+            if (childFolder === null) {
+              return yield* new ManagedProjectFolders.NamedProjectFolderError({
+                folder: "",
+                cause: "The child's SKYCOT folder is unavailable.",
+              });
+            }
+            const path = yield* Path.Path;
+            const created = yield* managedFolders.createNamedProject({
+              ...input,
+              parentRoot: path.join(childFolder, "projects"),
+            });
+            yield* familyLimits.value.recordStart({
+              sessionId: currentSessionId,
+              projectId: created.projectId,
+            });
+            return created;
+          }).pipe(
+            Effect.mapError(
+              (cause) => new OrchestrationDispatchCommandError({ message: cause.message, cause }),
             ),
+          ),
         [WS_METHODS.projectCloneCancel]: (input) =>
           projectCloneTracker.cancel(input.projectId).pipe(Effect.map((applied) => ({ applied }))),
         [WS_METHODS.projectCloneRetry]: (input) =>

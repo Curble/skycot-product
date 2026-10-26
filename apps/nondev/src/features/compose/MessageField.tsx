@@ -138,6 +138,7 @@ export function MessageField({
               onClick={() => fileRef.current?.click()}
             >
               <Plus size={16} strokeWidth={1.8} aria-hidden />
+              <span>Add a picture</span>
             </button>
             <input
               ref={fileRef}

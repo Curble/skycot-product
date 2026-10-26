@@ -26,7 +26,7 @@ describe("family approval cards", () => {
     const item = items.approval("command", { prompt: command });
     expect(projectApprovalFor(item, { projectRoot: ROOT })).toBe("internetFetch");
     expect(projectFetchSentence(command, "Sam")).toBe(
-      "Sam is asking a grown-up to let this page get the Lobster Regular font from GitHub's files. This works for the whole project once a grown-up says yes.",
+      "Sam is asking a grown-up to let this page get the Lobster Regular font from GitHub's files. A grown-up can allow just this step, or choose “Allow for this project” to allow this kind of request across the project.",
     );
   });
 

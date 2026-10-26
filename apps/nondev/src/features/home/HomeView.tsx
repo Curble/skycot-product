@@ -8,6 +8,8 @@ import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
 import { useFamily } from "../family/FamilyProvider";
+import { useChildView } from "../../app/useChildView";
+import { useLimits } from "../family-limits/store";
 import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
 import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
@@ -20,7 +22,7 @@ import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { homeTip } from "./tip";
-import { summarySentence } from "./summary";
+import { homeRows, summarySentence } from "./summary";
 import { greeting as greetingForHour } from "./greeting";
 
 /**
@@ -37,6 +39,8 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
+  const childView = useChildView();
+  const { today } = useLimits();
   // A grown-up who picked themselves on the shared Mac is greeted by name.
   const grownUpId = grownUpSessionFor(useGrownUpSessionId(), family.profile, Date.now());
   const grownUpName =
@@ -46,13 +50,11 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const { kids } = useStarters();
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
 
-  const active = rows.filter(
-    (row) =>
-      row.status.kind === "working" ||
-      row.status.kind === "preparing" ||
-      row.status.kind === "waiting" ||
-      row.status.kind === "ready" ||
-      row.status.kind === "failed",
+  const active = homeRows(
+    rows,
+    childView,
+    family.profile.me.kind === "child" ? family.profile.me.childId : family.profile.currentChildId,
+    today.threads,
   );
   const working = active.filter(
     (row) => row.status.kind === "working" || row.status.kind === "preparing",
@@ -64,6 +66,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
     (row) => row.status.kind === "waiting" && !row.status.headline.includes("grown-up"),
   ).length;
   const ready = active.filter((row) => row.status.kind === "ready").length;
+  const failed = active.filter((row) => row.status.kind === "failed").length;
 
   return (
     <>
@@ -99,10 +102,11 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   working,
                   waiting,
                   ready,
-                  rows.length,
+                  active.length,
                   connected,
-                  family.enabled && family.profile.me.kind !== "grown-up",
+                  childView,
                   needsGrownUp,
+                  failed,
                 )}
               </p>
             </div>

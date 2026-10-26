@@ -6,6 +6,10 @@ import { useState, type MouseEvent } from "react";
 
 import { Mascot } from "../features/brand/Mascot";
 import { useChildFirst } from "../features/family-limits/useChildFirst";
+import { useChildView } from "./useChildView";
+import { projectsForChild, rowsForChild } from "../features/family-limits/order";
+import { useLimits } from "../features/family-limits/store";
+import { useFamily } from "../features/family/FamilyProvider";
 import { filesHref, navigate, threadHref } from "../router";
 import {
   conversationRowsAtom,
@@ -51,14 +55,31 @@ export function ConversationList({
 }) {
   const shell = useShellState();
   const crew = useCrew();
+  const family = useFamily();
+  const childView = useChildView();
+  const { today } = useLimits();
+  const childId =
+    family.profile.me.kind === "child" ? family.profile.me.childId : family.profile.currentChildId;
   const { kids } = useStarters();
   const old = shell.filter === "old";
   const liveRows = useAtomValue(conversationRowsAtom);
   const oldRows = useAtomValue(old ? oldConversationRowsAtom : EMPTY_ROWS_ATOM);
   const oldLoading = useAtomValue(old ? oldConversationsLoadingAtom : NOT_LOADING_ATOM);
-  const rows = old ? oldRows : liveRows;
+  const allRows = old ? oldRows : liveRows;
+  const rows = childView
+    ? rowsForChild(allRows, (row) => row.shell.id, today.threads, childId)
+    : allRows;
   const connected = useConnected();
-  const projects = useAtomValue(environmentProjects.projectsAtom);
+  const allProjects = useAtomValue(environmentProjects.projectsAtom);
+  const projects = childView
+    ? projectsForChild(
+        allProjects,
+        (project) => project.id,
+        today.projects,
+        childId,
+        new Set(rows.map((row) => row.shell.projectId)),
+      )
+    : allProjects;
   const projectCount = projects.length;
   // A project picked in the sidebar: its files are one click away, beside New conversation.
   const selectedProject =

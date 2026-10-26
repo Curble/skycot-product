@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { summarySentence } from "./summary";
+import { homeRows, summarySentence } from "./summary";
 
 describe("summarySentence", () => {
   it("keeps the noun when only one kind of job exists", () => {
@@ -26,5 +26,47 @@ describe("summarySentence", () => {
     expect(summarySentence(0, 1, 0, 2, true, true, 1)).toBe(
       "One thing is waiting on you, one thing needs a grown-up.",
     );
+  });
+
+  it("counts failed rows that remain in Home's list", () => {
+    expect(summarySentence(0, 1, 0, 2, true, true, 0, 1)).toBe(
+      "One thing is waiting on you, one thing didn't work.",
+    );
+  });
+});
+
+describe("homeRows", () => {
+  it("keeps the waiting count aligned with current child rows and drops stale plans and sibling failures", () => {
+    const rows = [
+      {
+        shell: { id: "mine" },
+        at: "2026-10-27T12:00:00.000Z",
+        status: { kind: "waiting", headline: "Waiting for you" },
+      },
+      {
+        shell: { id: "old-plan" },
+        at: "2026-10-25T12:00:00.000Z",
+        status: { kind: "waiting", headline: "Sam made a plan. Press Build it." },
+      },
+      {
+        shell: { id: "fresh-plan" },
+        at: "2026-10-27T11:00:00.000Z",
+        status: { kind: "waiting", headline: "Sam made a plan. Press Build it." },
+      },
+      {
+        shell: { id: "sibling-error" },
+        at: "2026-10-27T11:00:00.000Z",
+        status: { kind: "failed", headline: "Something went wrong" },
+      },
+    ];
+    const visible = homeRows(
+      rows,
+      true,
+      "leo",
+      { mine: "leo", "old-plan": "leo", "fresh-plan": "leo", "sibling-error": "ava" },
+      Date.parse("2026-10-27T13:00:00.000Z"),
+    );
+    expect(visible.map((row) => row.shell.id)).toEqual(["mine", "fresh-plan"]);
+    expect(visible.filter((row) => row.status.kind === "waiting")).toHaveLength(2);
   });
 });

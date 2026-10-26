@@ -18,6 +18,32 @@ export function childFirst<R>(
   return { mine, others };
 }
 
+/** Work a child profile may list: only conversations the engine recorded for this child. */
+export function rowsForChild<R>(
+  rows: ReadonlyArray<R>,
+  threadIdOf: (row: R) => string,
+  owners: Readonly<Record<string, string>>,
+  childId: string | null,
+): ReadonlyArray<R> {
+  return childId === null ? [] : rows.filter((row) => owners[threadIdOf(row)] === childId);
+}
+
+/** Projects are shared when nobody owns them, and siblings' projects stay private. */
+export function projectsForChild<P>(
+  projects: ReadonlyArray<P>,
+  projectIdOf: (project: P) => string,
+  owners: Readonly<Record<string, string>>,
+  childId: string | null,
+  ownProjectIds: ReadonlySet<string>,
+): ReadonlyArray<P> {
+  if (childId === null) return [];
+  return projects.filter((project) => {
+    const id = projectIdOf(project);
+    const owner = owners[id];
+    return owner === undefined || owner === childId || ownProjectIds.has(id);
+  });
+}
+
 /**
  * Conversations the engine has not said who started, among `rows`. A brand-new one is the
  * usual case: the engine records its child as it starts, but this device's copy of who

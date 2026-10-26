@@ -11,7 +11,7 @@ import { WorkingCard } from "./WorkingCard";
 import { groupTimelineItems } from "./cards/grouping";
 
 describe("finished plan work in the child view", () => {
-  it("calls it a plan, even though the plan has its own separate timeline card", async () => {
+  it("leaves the proposed plan as the only card", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const host = document.createElement("div");
     document.body.append(host);
@@ -37,10 +37,7 @@ describe("finished plan work in the child view", () => {
           />,
         ),
       );
-      expect(host.textContent).toContain("Pip made a plan");
-      expect(host.textContent).toContain("Press Build it");
-      expect(host.textContent).not.toContain("All done");
-      expect(host.textContent).not.toContain("Nothing in the project was changed");
+      expect(host.textContent).toBe("");
     } finally {
       await act(async () => root.unmount());
       host.remove();

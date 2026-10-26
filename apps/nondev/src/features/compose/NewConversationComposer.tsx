@@ -13,6 +13,7 @@ import { CrewName } from "../../themes/CrewName";
 import { useCrew } from "../../themes/useCrew";
 import { navigate, threadHref } from "../../router";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
+import { conversationRowsAtom } from "../../state/conversations";
 import {
   readAutonomy,
   useLastProject,
@@ -39,7 +40,8 @@ import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
-import { noteStartedHere } from "../family-limits/store";
+import { projectsForChild, rowsForChild } from "../family-limits/order";
+import { noteStartedHere, useLimits } from "../family-limits/store";
 import { familyApi } from "../family/api"; // nondev-seam: skycot-project-memory
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
 import {
@@ -93,6 +95,7 @@ export function NewConversationComposer({
   readonly seed?: ComposerSeed | null;
 }) {
   const projects = useAtomValue(environmentProjects.projectsAtom);
+  const conversations = useAtomValue(conversationRowsAtom);
   const lastProject = useLastProject();
   const columns = useColumns();
   const connected = useConnected();
@@ -108,6 +111,9 @@ export function NewConversationComposer({
   const [chosenKey, setChosenKey] = useState<string | null>(null);
   const family = useFamily();
   const childView = useChildView();
+  const { today } = useLimits();
+  const childId =
+    family.profile.me.kind === "child" ? family.profile.me.childId : family.profile.currentChildId;
   const crew = useCrew();
   // Family: how this child's steps run (safe steps by themselves, unless a parent chose
   // "Ask before each step"), instead of "Ask me first … before every command".
@@ -142,12 +148,25 @@ export function NewConversationComposer({
   // Only an engine whose data folder is outside any Git checkout offers Questions.
   const questionsAvailable =
     Boolean(config?.scratchWorkspaceRoot) && environmentIds[0] !== undefined;
-  const ownProjects = realProjects(projects);
-  const questionsProject = projects.find((candidate) => isQuestionsProject(candidate)) ?? null;
+  const childProjects = childView
+    ? projectsForChild(
+        projects,
+        (candidate) => candidate.id,
+        today.projects,
+        childId,
+        new Set(
+          rowsForChild(conversations, (row) => row.shell.id, today.threads, childId).map(
+            (row) => row.shell.projectId,
+          ),
+        ),
+      )
+    : projects;
+  const ownProjects = realProjects(childProjects);
+  const questionsProject = childProjects.find((candidate) => isQuestionsProject(candidate)) ?? null;
   // Nothing chosen, nothing remembered and several projects: ask, rather than
   // aim the first message at whichever project happens to be listed first.
   const target = composeTargetFor({
-    projects,
+    projects: childProjects,
     questionsAvailable,
     chosen: chosenKey,
     preferredKey: preferredProjectKey,

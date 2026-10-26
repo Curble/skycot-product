@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { ADVANCED_MODE_LABEL } from "../brand";
 import { useChildView } from "./useChildView";
+import { projectsForChild, rowsForChild } from "../features/family-limits/order";
+import { useLimits } from "../features/family-limits/store";
 import {
   AUTOMATIONS_HREF,
   FRIDGE_HREF,
@@ -34,7 +36,7 @@ import {
 import { threadHref } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf, type ConversationRow } from "../state/conversations";
-import { environmentProjects } from "../state/projects";
+import { environmentProjects, projectEnvironment } from "../state/projects";
 import { oldConversationRowsAtom } from "../state/oldConversations";
 import { CrewAvatar } from "../themes/CrewAvatar";
 import { useCrew } from "../themes/useCrew";
@@ -54,7 +56,9 @@ import { grownUpSessionFor, useGrownUpSessionId } from "../features/family/grown
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
+import { showToast } from "../ui/Toast";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useAtomCommand } from "~/state/use-atom-command";
 
 const NO_CHILD_ARCHIVE_ROWS = Atom.make<ReadonlyArray<ConversationRow>>([]).pipe(
   Atom.withLabel("nondev-child-sidebar:no-archive-rows"),
@@ -76,9 +80,11 @@ export function AppSidebar({
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const projects = useAtomValue(environmentProjects.projectsAtom);
   const sheets = useSidebarSheets();
+  const createNewProject = useAtomCommand(projectEnvironment.createNew, { reportFailure: false });
   const crew = useCrew();
   const family = useFamily();
   const childView = useChildView();
+  const { today } = useLimits();
   const archivedChildRows = useAtomValue(
     childView ? oldConversationRowsAtom : NO_CHILD_ARCHIVE_ROWS,
   );
@@ -87,6 +93,7 @@ export function AppSidebar({
     readonly at: MenuPoint;
   } | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const railToggle = useRef<HTMLButtonElement>(null);
   const railPanel = useRef<HTMLElement>(null);
   const openedRail = useRef(false);
@@ -94,9 +101,21 @@ export function AppSidebar({
 
   const waiting = rows.filter((row) => row.status.attention === "waiting").length;
   const ready = rows.filter((row) => row.status.kind === "ready").length;
-  const childMakes = [...rows, ...(childView ? archivedChildRows : [])].sort(
-    (a, b) => Date.parse(b.at) - Date.parse(a.at),
-  );
+  const childId =
+    family.profile.me.kind === "child" ? family.profile.me.childId : family.profile.currentChildId;
+  const childRows = childView
+    ? rowsForChild([...rows, ...archivedChildRows], (row) => row.shell.id, today.threads, childId)
+    : [];
+  const childMakes = [...childRows].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const visibleProjects = childView
+    ? projectsForChild(
+        projects,
+        (project) => project.id,
+        today.projects,
+        childId,
+        new Set(childRows.map((row) => row.shell.projectId)),
+      )
+    : projects;
   const countsByProject = new Map<string, number>();
   const attentionByProject = new Set<string>();
   for (const row of rows) {
@@ -328,65 +347,91 @@ export function AppSidebar({
           />
         </SidebarSection>
 
-        {showSidebarProjects(childView, projects.length) ? (
-          <SidebarSection title="Projects">
-            {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
-            {[...projects]
-              .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
-              .map((project) => {
-                const key = projectKeyOf({
-                  environmentId: project.environmentId,
-                  projectId: project.id,
+        <SidebarSection title="Projects">
+          {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
+          {[...visibleProjects]
+            .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
+            .map((project) => {
+              const key = projectKeyOf({
+                environmentId: project.environmentId,
+                projectId: project.id,
+              });
+              return (
+                <SidebarItem
+                  key={key}
+                  glyph={<ProjectAvatar project={project} size="sm" />}
+                  label={project.title}
+                  count={countsByProject.get(key) ?? 0}
+                  attention={attentionByProject.has(key)}
+                  selected={conversationRoute && shell.projectKey === key}
+                  onClick={() => showList(() => shell.setProjectKey(key))}
+                  // Questions is SKYCOT's own space: nothing to rename or re-icon.
+                  {...(project.isScratch === true
+                    ? {}
+                    : {
+                        menuOpen: projectMenu?.project === project,
+                        onContextMenu: (event: MouseEvent) => {
+                          event.preventDefault();
+                          setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
+                        },
+                        trailing: (
+                          <ProjectMenuButton
+                            project={project}
+                            expanded={projectMenu?.project === project}
+                            onOpen={(at) => setProjectMenu({ project, at })}
+                          />
+                        ),
+                      })}
+                />
+              );
+            })}
+          {childView ? (
+            <SidebarItem
+              icon={FolderPlus}
+              label={creatingProject ? "Making project…" : "New project"}
+              muted={creatingProject}
+              onClick={() => {
+                if (creatingProject || !primaryEnvironmentId) return;
+                setCreatingProject(true);
+                const name = nextChildProjectName(visibleProjects.map((project) => project.title));
+                void createNewProject({
+                  environmentId: primaryEnvironmentId,
+                  input: { name },
+                }).then((outcome) => {
+                  setCreatingProject(false);
+                  if (outcome._tag === "Failure") {
+                    showToast("Couldn't make a project. Try again.");
+                    return;
+                  }
+                  showList(() =>
+                    shell.setProjectKey(
+                      projectKeyOf({
+                        environmentId: primaryEnvironmentId,
+                        projectId: outcome.value.projectId,
+                      }),
+                    ),
+                  );
                 });
-                return (
-                  <SidebarItem
-                    key={key}
-                    glyph={<ProjectAvatar project={project} size="sm" />}
-                    label={project.title}
-                    count={countsByProject.get(key) ?? 0}
-                    attention={attentionByProject.has(key)}
-                    selected={conversationRoute && shell.projectKey === key}
-                    onClick={() => showList(() => shell.setProjectKey(key))}
-                    // Questions is SKYCOT's own space: nothing to rename or re-icon.
-                    {...(project.isScratch === true
-                      ? {}
-                      : {
-                          menuOpen: projectMenu?.project === project,
-                          onContextMenu: (event: MouseEvent) => {
-                            event.preventDefault();
-                            setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
-                          },
-                          trailing: (
-                            <ProjectMenuButton
-                              project={project}
-                              expanded={projectMenu?.project === project}
-                              onOpen={(at) => setProjectMenu({ project, at })}
-                            />
-                          ),
-                        })}
-                  />
-                );
-              })}
-            {!childView ? (
-              <SidebarItem
-                icon={FolderPlus}
-                label="Open a folder…"
-                muted
-                onClick={() => {
-                  if (!primaryEnvironmentId) return;
-                  const environmentId = primaryEnvironmentId;
-                  sheets.openFolder({
-                    environmentId,
-                    onOpened: (projectId) =>
-                      showList(() =>
-                        shell.setProjectKey(projectKeyOf({ environmentId, projectId })),
-                      ),
-                  });
-                }}
-              />
-            ) : null}
-          </SidebarSection>
-        ) : null}
+              }}
+            />
+          ) : null}
+          {!childView ? (
+            <SidebarItem
+              icon={FolderPlus}
+              label="Open a folder…"
+              muted
+              onClick={() => {
+                if (!primaryEnvironmentId) return;
+                const environmentId = primaryEnvironmentId;
+                sheets.openFolder({
+                  environmentId,
+                  onOpened: (projectId) =>
+                    showList(() => shell.setProjectKey(projectKeyOf({ environmentId, projectId }))),
+                });
+              }}
+            />
+          ) : null}
+        </SidebarSection>
 
         {crew.named && !childView ? (
           <SidebarSection title="Your crew">
@@ -490,8 +535,11 @@ export function sidebarPersonLabel(familyOn: boolean): string {
   return familyOn ? "Grown-up" : "You";
 }
 
-export function showSidebarProjects(childView: boolean, projectCount: number): boolean {
-  return !childView || projectCount > 1;
+export function nextChildProjectName(titles: ReadonlyArray<string>): string {
+  const existing = new Set(titles);
+  let index = 1;
+  while (existing.has(`Project ${index}`)) index += 1;
+  return `Project ${index}`;
 }
 
 export function childMakeBadge(

@@ -353,6 +353,8 @@ export function WorkingCard({
           ? HandMetal
           : Hammer;
 
+  if (planDone) return null;
+
   return (
     <Bubble author="crew" full meta={active ? undefined : shortTime(run?.completedAt ?? null)}>
       <Card label={title}>

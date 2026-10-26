@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ChildMakesList, childMakeBadge, showSidebarProjects, SidebarIdentity } from "./Sidebar";
+import { ChildMakesList, childMakeBadge, nextChildProjectName, SidebarIdentity } from "./Sidebar";
 import type { FamilyChild } from "../features/family/children";
 import type { ConversationRow } from "../state/conversations";
 
@@ -50,10 +50,7 @@ describe("Sidebar identity in the child view", () => {
     expect(html).not.toContain("Make 7");
   });
 
-  it("keeps child Projects hidden until there is more than one project", () => {
-    expect(showSidebarProjects(true, 1)).toBe(false);
-    expect(showSidebarProjects(true, 2)).toBe(true);
-    expect(showSidebarProjects(false, 1)).toBe(true);
+  it("labels child makes by the step they are waiting on", () => {
     const now = new Date().toISOString();
     expect(childMakeBadge({ kind: "waiting", headline: "Waiting for a grown-up" }, now)).toBe(
       "Waiting for a grown-up",
@@ -64,6 +61,10 @@ describe("Sidebar identity in the child view", () => {
     expect(
       childMakeBadge({ kind: "waiting", headline: "Waiting for you · has a question" }, now),
     ).toBe("A question for you");
+  });
+
+  it("chooses the next unused child project name", () => {
+    expect(nextChildProjectName(["Questions", "Project 1", "Project 2"])).toBe("Project 3");
   });
 
   it("keeps the grown-up footer label", () => {

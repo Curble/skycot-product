@@ -1,4 +1,36 @@
 /** The one-line status under the Home greeting. */
+import { rowsForChild } from "../family-limits/order";
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/** Rows represented by Home's counts and list. An unpressed plan stops being urgent after a day. */
+export function homeRows<
+  R extends {
+    readonly shell: { readonly id: string };
+    readonly at: string;
+    readonly status: { readonly kind: string; readonly headline: string };
+  },
+>(
+  rows: ReadonlyArray<R>,
+  childView: boolean,
+  childId: string | null,
+  owners: Readonly<Record<string, string>>,
+  now = Date.now(),
+): ReadonlyArray<R> {
+  const active = rows.filter((row) =>
+    ["working", "preparing", "waiting", "ready", "failed"].includes(row.status.kind),
+  );
+  const mine = childView ? rowsForChild(active, (row) => row.shell.id, owners, childId) : active;
+  return mine.filter(
+    (row) =>
+      !(
+        row.status.kind === "waiting" &&
+        /made a plan/i.test(row.status.headline) &&
+        now - Date.parse(row.at) > DAY_MS
+      ),
+  );
+}
+
 export function summarySentence(
   working: number,
   waiting: number,
@@ -7,6 +39,7 @@ export function summarySentence(
   connected = true,
   childView = false,
   needsGrownUp = 0,
+  failed = 0,
 ): string {
   // Until the engine has answered, an empty list means "not loaded", not "nothing".
   if (total === 0 && !connected) {
@@ -29,6 +62,14 @@ export function summarySentence(
       `${count(needsGrownUp, childView ? "thing needs" : "job needs", childView ? "things need" : "jobs need")} a grown-up`,
     );
   if (ready > 0) parts.push(`${count(ready, one, many)} ready to look at`);
+  if (failed > 0)
+    parts.push(
+      count(
+        failed,
+        childView ? "thing didn't work" : "job didn't work",
+        childView ? "things didn't work" : "jobs didn't work",
+      ),
+    );
   if (parts.length === 0)
     return childView
       ? "All quiet. Sam isn't making anything right now."

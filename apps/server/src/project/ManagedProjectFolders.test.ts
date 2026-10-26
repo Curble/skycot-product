@@ -28,6 +28,7 @@ import * as ProjectService from "./ProjectService.ts";
 import * as RepositoryIdentityResolver from "./RepositoryIdentityResolver.ts";
 import * as ManagedProjectFolders from "./ManagedProjectFolders.ts";
 import * as SkycotProjectMemory from "../skycot/SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory-test
+// nondev-seam: skycot-child-project-folder-test
 
 const layerGitWorkflow = (vcsProcess?: Layer.Layer<VcsProcess.VcsProcess>) =>
   GitWorkflow.layer.pipe(
@@ -388,6 +389,27 @@ it.effect("starts a named project as a committed repository, and suffixes a take
           "main",
         );
         assert.equal(yield* gitOutput(first.workspaceRoot, ["status", "--porcelain"]), "");
+      }),
+    ),
+  ),
+);
+
+it.effect("creates a child named project under the caller's server-selected SKYCOT folder", () =>
+  withScratch(({ baseDir }) =>
+    withGitEnv(
+      TEST_IDENTITY,
+      Effect.gen(function* () {
+        const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const childProjects = path.resolve(baseDir, "scratch", "children", "child-1", "projects");
+        const created = yield* folders.createNamedProject({
+          name: "Volcano Page",
+          parentRoot: childProjects,
+        });
+        assert.equal(created.workspaceRoot, path.join(childProjects, "volcano-page"));
+        assert.isTrue(yield* fileSystem.exists(created.workspaceRoot));
+        assert.isFalse(yield* fileSystem.exists(path.resolve(baseDir, "projects", "volcano-page")));
       }),
     ),
   ),

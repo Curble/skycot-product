@@ -11,7 +11,7 @@ vi.mock("../voice/VoiceTyping", () => ({
 
 import { MessageField } from "./MessageField";
 
-async function mount(starterBlanks: boolean, onSend: (text: string) => void) {
+async function mount(starterBlanks: boolean, onSend: (text: string) => void, addPictures = false) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div");
   document.body.append(host);
@@ -26,6 +26,7 @@ async function mount(starterBlanks: boolean, onSend: (text: string) => void) {
         placeholder="Your idea"
         canSend
         starterBlanks={starterBlanks}
+        {...(addPictures ? { onAddPictures: () => {} } : {})}
       />
     );
   }
@@ -55,6 +56,13 @@ async function mount(starterBlanks: boolean, onSend: (text: string) => void) {
 }
 
 describe("starter blanks in the message box", () => {
+  it("labels the picture button in words as well as for assistive technology", async () => {
+    await using page = await mount(false, vi.fn(), true);
+    const button = page.host.querySelector(".fm-composer__attach");
+    expect(button?.textContent).toContain("Add a picture");
+    expect(button?.getAttribute("aria-label")).toBe("Add a picture");
+  });
+
   it("keeps the words, highlights a remaining blank and sends only once it is filled or removed", async () => {
     const sent = vi.fn();
     await using page = await mount(true, sent);
