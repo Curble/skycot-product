@@ -9,6 +9,7 @@ import {
   type EnvironmentId,
   type PreviewAnnotationSubmissionResult,
 } from "@t3tools/contracts";
+import { reportedPageLink } from "@t3tools/skycot-rules/page-internet";
 import { isLocalPreviewAddress, type PreviewProblem } from "@t3tools/skycot-rules/preview";
 import {
   AppWindow,
@@ -295,6 +296,18 @@ function PreviewPanelBody({
     autoStarted.current = true;
     void start(false);
   });
+
+  // A link inside the child's page: the page server's interceptor stops it and tells us, so the
+  // same "That link goes to the internet" card shows here as for the desktop frame.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const url = reportedPageLink(event.data);
+      if (url === null || !/^https?:/iu.test(url)) return;
+      setLeaving((current) => current ?? { url });
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   const originOf = (url: string) => {
     try {

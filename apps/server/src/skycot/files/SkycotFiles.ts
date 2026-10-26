@@ -11,6 +11,8 @@
 // code (the `files` grant). Everything else in a SKYCOT project is open to the child, siblings'
 // projects included, as their conversations are.
 import type { ProjectId, ThreadId } from "@t3tools/contracts";
+
+import * as SkycotFamilyVisibility from "../family-devices/SkycotFamilyVisibility.ts";
 import {
   cleanBrowsePath,
   isNoiseName,
@@ -41,7 +43,14 @@ export const PAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 export const BINARY_PREVIEW_BYTES = 10 * 1024 * 1024;
 
 export class SkycotFilesError extends Schema.TaggedError<SkycotFilesError>()("SkycotFilesError", {
-  reason: Schema.Literals(["no-project", "outside", "missing", "hidden", "not-a-folder"]),
+  reason: Schema.Literals([
+    "no-project",
+    "outside",
+    "missing",
+    "hidden",
+    "not-a-folder",
+    "not-theirs",
+  ]),
 }) {
   override get message(): string {
     switch (this.reason) {
@@ -53,6 +62,8 @@ export class SkycotFilesError extends Schema.TaggedError<SkycotFilesError>()("Sk
         return "That file isn't there any more. It may have been moved or undone.";
       case "hidden":
         return "That's one of the project's hidden files. A grown-up can show everything with the parent code.";
+      case "not-theirs":
+        return "That's not yours to open.";
       case "not-a-folder":
         return "That isn't a folder.";
     }
@@ -137,6 +148,7 @@ export const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
+  const visibility = yield* Effect.serviceOption(SkycotFamilyVisibility.SkycotFamilyVisibility);
   const projects = yield* ProjectStore.ProjectStoreV2;
   const family = yield* Effect.serviceOption(SkycotFamily.SkycotFamily);
 
@@ -157,6 +169,25 @@ export const make = Effect.gen(function* () {
       .get(input.projectId)
       .pipe(Effect.orElseSucceed(() => Option.none()));
     if (Option.isNone(project)) return yield* new SkycotFilesError({ reason: "no-project" });
+    // A child (their own device, or the shared Mac with them chosen) opens only what is theirs:
+    // a sibling's conversation and its files stay closed, exactly as the engine's other doors.
+    if (Option.isSome(visibility)) {
+      const view = yield* visibility.value.childViewFor(input.sessionId);
+      if (
+        view !== null &&
+        !(yield* visibility.value.allows(
+          view,
+          SkycotFamilyVisibility.referencedBy({
+            projectId: input.projectId,
+            ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
+          }),
+          "read",
+        ))
+      ) {
+        yield* Effect.logInfo("skycot-files.refused", { reason: "not-theirs" });
+        return yield* new SkycotFilesError({ reason: "not-theirs" });
+      }
+    }
     let folder = project.value.workspaceRoot;
     let privateCopy = false;
     if (input.threadId !== undefined) {

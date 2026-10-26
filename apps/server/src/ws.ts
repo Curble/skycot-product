@@ -1211,6 +1211,8 @@ export const layerWsRpc = (
       const projectService = yield* ProjectService.ProjectService;
       const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
       const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
+      // Resolved here, with the server config in reach; inside a handler it is not (nondev-seam: skycot-child-project-folder-ws).
+      const questionsRootAtStart = yield* SkycotQuestions.questionsRootOption;
       const eventLoopMonitor = yield* EventLoopMonitor.EventLoopMonitor;
       const threadSearch = yield* ThreadSearch.ThreadSearch;
 
@@ -2628,7 +2630,7 @@ export const layerWsRpc = (
                 cause: "Choose a child before making a project.",
               });
             }
-            const questionsRoot = yield* SkycotQuestions.questionsRootOption;
+            const questionsRoot = questionsRootAtStart;
             const childFolder = childQuestionsFolder(questionsRoot, session.childId);
             if (childFolder === null) {
               return yield* new ManagedProjectFolders.NamedProjectFolderError({

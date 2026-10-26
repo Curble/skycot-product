@@ -111,12 +111,19 @@ export function FullscreenPage({
             {childView && game ? "Play full screen" : "Full screen"}
           </Button>
         </span>
-      ) : shown ? (
-        <button className="fm-fullscreen-page__exit" onClick={exit} type="button">
+      ) : (
+        // Always there while full screen (a page that swallows keys and mouse moves must never
+        // trap a child); it only dims once the pointer rests.
+        <button
+          className="fm-fullscreen-page__exit"
+          data-dim={shown ? undefined : "true"}
+          onClick={exit}
+          type="button"
+        >
           <Minimize size={15} aria-hidden />
           Exit full screen
         </button>
-      ) : null}
+      )}
     </div>
   );
 }
