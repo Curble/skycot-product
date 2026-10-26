@@ -154,6 +154,21 @@ export function ConversationView({
   const question = isQuestionsProject(project);
   const childView = useChildView();
   const state = Option.getOrNull(AsyncResult.value(result));
+  // The engine said this conversation is another child's ("That's not yours to open"): nothing
+  // cached is shown, and the window goes Home.
+  const notTheirs =
+    state !== null &&
+    Option.isSome(state.error) &&
+    /not yours to open/iu.test(
+      String((state.error.value as { message?: unknown }).message ?? state.error.value),
+    );
+  useEffect(() => {
+    if (!notTheirs) return;
+    const timer = window.setTimeout(() => {
+      window.location.hash = HOME_HREF;
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [notTheirs]);
   const fullProjection = state ? Option.getOrNull(state.data) : null;
   // A child never sees the assistant's own housekeeping (plan-mode notes, tool look-ups).
   const projection = useMemo(
@@ -466,7 +481,11 @@ export function ConversationView({
         <HandsOffStrip environmentId={environmentId} threadId={threadId} canOperate={canOperate} />
       ) : null}
 
-      {state && Option.isSome(state.error) ? (
+      {notTheirs ? (
+        <Banner tone="warning">
+          <b>That's not yours to open.</b> Taking you home…
+        </Banner>
+      ) : state && Option.isSome(state.error) ? (
         <Banner tone="warning">
           <b>This conversation didn't load fully.</b> Trying again…
         </Banner>
@@ -476,9 +495,11 @@ export function ConversationView({
         <Banner tone="info">{startNote}</Banner>
       ) : null}
 
-      {projection === null ? (
+      {projection === null || notTheirs ? (
         <div className="fm-stream">
-          <EmptyState title="Opening the conversation…" />
+          <EmptyState
+            title={notTheirs ? "That's not yours to open" : "Opening the conversation…"}
+          />
         </div>
       ) : projection.turnItems.length === 0 ? (
         <div className="fm-stream">

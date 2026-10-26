@@ -1,0 +1,56 @@
+// A fresh start for the shared Mac when the picker moves to another child: the client keeps
+// conversations and projects in the browser's own store (T3's connection runtime cache), and
+// those belong to the child who was using SKYCOT before. The switch marks a fresh start and
+// reloads; at boot the mark is read once and the cached engine data is deleted before anything
+// renders, so nothing of the previous child's is ever shown to the next one.
+const FRESH_START_KEY = "skycot:fresh-start";
+/** T3's cache database (apps/web/src/connection/storage.ts DATABASE_NAME). */
+export const ENGINE_CACHE_DATABASE = "t3code:connection-runtime";
+
+export function markFreshStart(storage: Pick<Storage, "setItem"> = localStorage): void {
+  try {
+    storage.setItem(FRESH_START_KEY, "1");
+  } catch {
+    // Private windows may refuse; the reload still re-fetches everything live.
+  }
+}
+
+/** Pure: whether the mark says to clear, and the mark is spent by reading it. */
+export function takeFreshStart(
+  storage: Pick<Storage, "getItem" | "removeItem"> = localStorage,
+): boolean {
+  try {
+    const marked = storage.getItem(FRESH_START_KEY) === "1";
+    if (marked) storage.removeItem(FRESH_START_KEY);
+    return marked;
+  } catch {
+    return false;
+  }
+}
+
+/** Deletes the cached engine data when a fresh start was marked; never throws, never hangs. */
+export function clearCachedEngineData(
+  deleteDatabase: (name: string) => IDBOpenDBRequest | null = (name) =>
+    typeof indexedDB === "undefined" ? null : indexedDB.deleteDatabase(name),
+  storage?: Pick<Storage, "getItem" | "removeItem">,
+): Promise<void> {
+  if (!takeFreshStart(storage)) return Promise.resolve();
+  return new Promise((resolve) => {
+    let request: IDBOpenDBRequest | null = null;
+    try {
+      request = deleteDatabase(ENGINE_CACHE_DATABASE);
+    } catch {
+      request = null;
+    }
+    if (request === null) {
+      resolve();
+      return;
+    }
+    const done = () => resolve();
+    request.onsuccess = done;
+    request.onerror = done;
+    request.onblocked = done;
+    // Whatever happens, the app starts within two seconds.
+    setTimeout(done, 2000);
+  });
+}

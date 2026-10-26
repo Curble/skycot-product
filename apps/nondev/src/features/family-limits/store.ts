@@ -2,6 +2,8 @@
 // kept fresh by a heartbeat twice a minute (which is also how active minutes are counted), and
 // every child's day for Settings › Family. One timer for the heartbeat and one for the next
 // wall-clock change the engine named (bedtime starting, extra time ending); no polling beyond.
+import { HOME_HREF } from "../../router";
+import { markFreshStart } from "./freshStart";
 import { useSyncExternalStore } from "react";
 
 import { familyApi, request } from "../family/api";
@@ -180,8 +182,16 @@ export function askWhoStarted(threadIds: ReadonlyArray<string>): void {
 }
 
 export async function chooseChild(childId: string): Promise<FamilyResult<SessionLimits>> {
+  const before = readLimits().session?.childId ?? null;
   const result = await familyApi.choose({ childId });
   if (result.ok) applySessionLimits(result.value);
+  // Another child than before on the shared Mac: the window starts fresh, with the previous
+  // child's cached conversations and projects deleted before anything shows (freshStart.ts).
+  if (result.ok && before !== null && before !== childId) {
+    markFreshStart();
+    window.location.hash = HOME_HREF;
+    window.location.reload();
+  }
   return result;
 }
 

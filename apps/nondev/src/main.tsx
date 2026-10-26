@@ -11,10 +11,13 @@ import { startThemeSync } from "./app/theme";
 import { applyTextSize, readTextSize } from "./features/settings/localPrefs";
 import { PRODUCT_NAME } from "./brand";
 import { startDaylightBranding } from "./features/brand/useDaylightPhase";
+import { clearCachedEngineData } from "./features/family-limits/freshStart";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 
-export const startup = Promise.resolve().then(() => {
+export const startup = Promise.resolve().then(async () => {
   document.title = PRODUCT_NAME;
+  // The shared Mac moved to another child: the previous child's cached conversations go first.
+  await clearCachedEngineData();
   // Tab icon: day or dusk drawing, switched at local civil dusk and dawn.
   startDaylightBranding();
   applyPlatformClasses();
