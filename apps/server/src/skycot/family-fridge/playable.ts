@@ -7,6 +7,7 @@ import * as NodeCrypto from "node:crypto";
 import {
   BLOCKED_REPORTER,
   sealedPolicy,
+  siteOfUrl,
   STORAGE_SHIM,
   withHeadStart,
 } from "@t3tools/skycot-rules/page-internet";
@@ -167,7 +168,14 @@ function classicBundle(
   return `(function(){var M={${records.join(",")}},C={};function R(n){if(C[n])return C[n];var e=C[n]={};if(!M[n])throw Error('Missing local module '+n);M[n](e,R);return e}function run(){${entries.map((entry) => `R(${JSON.stringify(entry)});`).join("")}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run()})();`;
 }
 
-export type PlayableResult = { readonly html: string | null; readonly reason: "too-big" | null };
+export type PlayableResult = {
+  readonly html: string | null;
+  readonly reason: "too-big" | "unpackable-module" | "remote-script" | null;
+  readonly needs: {
+    readonly scripts: ReadonlyArray<string>;
+    readonly other: ReadonlyArray<string>;
+  };
+};
 
 /** Packs a project's runnable page and local module graph into one sealed document. */
 export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
@@ -177,14 +185,27 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
 ) {
   const pagePath = page.replace(/^\//u, "");
   if (!safeName(pagePath) || !/\.html?$/iu.test(pagePath))
-    return { html: null, reason: null } as const;
+    return { html: null, reason: null, needs: { scripts: [], other: [] } } as const;
   const source = yield* read(pagePath);
-  if (source === null) return { html: null, reason: null } as const;
+  if (source === null)
+    return { html: null, reason: null, needs: { scripts: [], other: [] } } as const;
   if (source.byteLength > MAX_PLAYABLE_PAGE_BYTES)
-    return { html: null, reason: "too-big" } as const;
+    return { html: null, reason: "too-big", needs: { scripts: [], other: [] } } as const;
   let remaining = MAX_PLAYABLE_TOTAL_BYTES - source.byteLength;
   let exceeded = false;
   let graphExceeded = false;
+  let unpackableModule = false;
+  let remoteScript = false;
+  const needsScripts = new Set<string>();
+  const needsOther = new Set<string>();
+  const noteSite = (value: string, list: Set<string>) => {
+    const host = siteOfUrl(value);
+    if (host !== null && /^https:\/\//iu.test(value.trim())) list.add(host);
+  };
+  const noteScript = (value: string) => {
+    if (/^(?:https?:)?\/\//iu.test(value.trim())) remoteScript = true;
+    noteSite(value, needsScripts);
+  };
   const cache = new Map<string, Uint8Array | null>();
   const counted = new Set<string>();
   const take = (path: string) =>
@@ -207,6 +228,10 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       return bytes;
     });
   let html = decoder.decode(source).replace(/<base\b[^>]*>/giu, "");
+  for (const imported of html.matchAll(
+    /\bimport\s+(?:[^'";]*?\s+from\s*)?(?:\(|)["']((?:https?:)?\/\/[^"']+)["']/giu,
+  ))
+    noteScript(imported[1]!);
   const modules = new Map<string, string>();
   const existingImports = new Map<string, string>();
   for (const tag of html.matchAll(
@@ -214,6 +239,12 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
   )) {
     try {
       const parsed = JSON.parse(tag[2] ?? "") as { imports?: Record<string, unknown> };
+      const visitTargets = (value: unknown) => {
+        if (typeof value === "string") noteScript(value);
+        else if (typeof value === "object" && value !== null)
+          for (const child of Object.values(value)) visitTargets(child);
+      };
+      visitTargets(parsed);
       for (const [name, target] of Object.entries(parsed.imports ?? {})) {
         if (typeof target !== "string") continue;
         const path = projectFile(pagePath, target);
@@ -241,11 +272,15 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       const subpath = pieces.slice(packageName.startsWith("@") ? 2 : 1).join("/");
       const packageRoot = `node_modules/${packageName}`;
       const manifestBytes = yield* take(`${packageRoot}/package.json`);
-      if (manifestBytes === null) return null;
+      if (manifestBytes === null) {
+        unpackableModule = true;
+        return null;
+      }
       let manifest: Record<string, unknown>;
       try {
         manifest = JSON.parse(decoder.decode(manifestBytes)) as Record<string, unknown>;
       } catch {
+        unpackableModule = true;
         return null;
       }
       const exports = manifest["exports"];
@@ -265,8 +300,12 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       const entry =
         subpath ||
         (typeof conditions === "string" ? conditions : (manifest["module"] ?? manifest["main"]));
-      if (typeof entry !== "string") return null;
+      if (typeof entry !== "string") {
+        unpackableModule = true;
+        return null;
+      }
       const path = `${packageRoot}/${entry.replace(/^\.\//u, "")}`;
+      if (!safeName(path)) unpackableModule = true;
       return safeName(path) ? path : null;
     });
   const loadModule: (
@@ -290,14 +329,19 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       let last = 0;
       for (const match of text.matchAll(specs)) {
         const spec = match[3]!;
+        if (/^(?:https?:)?\/\//iu.test(spec)) noteScript(spec);
         const target = yield* resolve(path, spec);
         if (target === null) {
+          if (!/^(?:https?:|\/\/|[a-z][\w+.-]*:)/iu.test(spec)) unpackableModule = true;
           out += `${text.slice(last, match.index)};`;
           last = match.index + match[0].length;
           continue;
         }
         const name = yield* loadModule(target, undefined, depth + 1);
-        if (name === null) continue;
+        if (name === null) {
+          unpackableModule = true;
+          continue;
+        }
         out += `${text.slice(last, match.index)}${match[1]}${match[2]}${name}${match[2]}`;
         last = match.index + match[0].length;
       }
@@ -316,6 +360,7 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     const isModule = /\btype\s*=\s*(["'])module\1/iu.test(attrs);
     let replacement = tag;
     if (src !== undefined) {
+      if (/^(?:https?:)?\/\//iu.test(src)) noteScript(src);
       const path = projectFile(pagePath, src);
       const bytes = path === null ? null : yield* take(path);
       if (bytes !== null && isModule && path !== null) {
@@ -342,10 +387,16 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     const href = /\bhref\s*=\s*(["'])(.*?)\1/iu.exec(tag)?.[2];
     let replacement = "";
     if (isStyle && href !== undefined) {
+      if (/^https:\/\//iu.test(href)) noteSite(href, needsOther);
       const cssPath = projectFile(pagePath, href);
       const bytes = cssPath === null ? null : yield* take(cssPath);
       if (cssPath !== null && bytes !== null) {
-        let css = decoder.decode(bytes).replace(/@import\s+[^;]+;?/giu, "");
+        let css = decoder.decode(bytes);
+        for (const imported of css.matchAll(
+          /@import\s+(?:url\(\s*)?["']?(https:\/\/[^\s"')]+)["']?\s*\)?[^;]*;?/giu,
+        ))
+          noteSite(imported[1]!, needsOther);
+        css = css.replace(/@import\s+[^;]+;?/giu, "");
         for (const item of css.matchAll(/url\(\s*(["']?)([^)'"\s]+)\1\s*\)/giu)) {
           const assetPath = projectFile(cssPath, item[2]!);
           const type = assetPath
@@ -362,11 +413,16 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     last = match.index + match[0].length;
   }
   html = out + html.slice(last);
+  for (const imported of html.matchAll(
+    /@import\s+(?:url\(\s*)?["']?(https:\/\/[^\s"')]+)["']?\s*\)?[^;]*;?/giu,
+  ))
+    noteSite(imported[1]!, needsOther);
   const refs = new Set<string>();
   for (const match of html.matchAll(/\b(?:src|poster|href)\s*=\s*(["'])([^"']+)\1/giu))
     refs.add(match[2]!);
   for (const match of html.matchAll(/url\(\s*(["']?)([^)'"\s]+)\1\s*\)/giu)) refs.add(match[2]!);
   for (const ref of refs) {
+    if (/^https:\/\//iu.test(ref)) noteSite(ref, needsOther);
     const path = projectFile(pagePath, ref);
     const type = path ? mime[path.split(".").at(-1)?.toLowerCase() ?? ""] : undefined;
     if (path === null || type === undefined) continue;
@@ -421,8 +477,10 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
   const { scripts, handlers } = cspHashes(provisional);
   const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites, scripts, handlers))}">`;
   const ordered = `${policy}${helpers}`;
-  if (exceeded || graphExceeded) return { html: null, reason: "too-big" } as const;
-  return { html: withHeadStart(html, ordered), reason: null } as const;
+  const needs = { scripts: [...needsScripts].sort(), other: [...needsOther].sort() };
+  if (exceeded || graphExceeded) return { html: null, reason: "too-big", needs } as const;
+  const reason = remoteScript ? "remote-script" : unpackableModule ? "unpackable-module" : null;
+  return { html: withHeadStart(html, ordered), reason, needs } as const;
 });
 
 function fileShim(assets: ReadonlyMap<string, string>): string {

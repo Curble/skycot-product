@@ -17,6 +17,8 @@ import {
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   playableCopy,
+  playNoticeCopy,
+  type PlayNoticeKind,
   pageAskWaitingCopy,
   rememberGameButtons,
   reportedSites,
@@ -27,6 +29,8 @@ export function PagePreview(props: {
   readonly mac: Mac;
   readonly threadId: string;
   readonly page: string;
+  readonly childView: boolean;
+  readonly onTellSam?: (message: string) => void;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -34,7 +38,8 @@ export function PagePreview(props: {
   const [play, setPlay] = useState<FridgePlay | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [tooBig, setTooBig] = useState(false);
+  const [notice, setNotice] = useState<PlayNoticeKind | null>(null);
+  const [noticeHosts, setNoticeHosts] = useState<ReadonlyArray<string>>([]);
   const [sites, setSites] = useState<ReadonlyArray<string>>([]);
   const [hiddenSites, setHiddenSites] = useState<ReadonlyArray<string>>([]);
   const [request, setRequest] = useState<{
@@ -52,11 +57,22 @@ export function PagePreview(props: {
     setProblem(null);
     setPlay(null);
     setHtml(null);
+    setNotice(null);
+    setNoticeHosts([]);
     setSites([]);
     setHiddenSites([]);
     const result = await familyApi.fridgePlay(props.mac.transport, props.threadId, props.page);
     const playable = playableCopy(result);
-    setTooBig(result.ok && result.value.reason === "too-big");
+    if (result.ok) {
+      if (result.value.reason === "too-big") setNotice("too-big");
+      else if (result.value.reason === "unpackable-module") setNotice("unpackable-module");
+      else if (result.value.reason === "remote-script") {
+        setNotice("remote-script");
+        setNoticeHosts(result.value.needs.scripts);
+      }
+    } else if ("routeUnavailable" in result && result.routeUnavailable) {
+      setNotice("engine-update");
+    }
     if (playable !== null) {
       setPlay(playable);
       return;
@@ -145,6 +161,7 @@ export function PagePreview(props: {
   if (play === null && html === null) return <Spinner />;
   const shownSites = sites.filter((site) => !hiddenSites.includes(site));
   const allowedPage = play?.page ?? null;
+  const noticeCopy = notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts);
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <WebView<object>
@@ -302,20 +319,32 @@ export function PagePreview(props: {
           <Banner tone={answerLabel.endsWith("said yes") ? "success" : "info"} text={answerLabel} />
         </View>
       ) : null}
-      {tooBig ? (
+      {noticeCopy !== null ? (
         <View
           style={{
             position: "absolute",
+            top: insets.top + 8,
             left: 12,
             right: 12,
-            bottom: insets.bottom + 8,
-            zIndex: 1,
+            zIndex: 4,
           }}
         >
-          <Banner
-            tone="warning"
-            text="This page is too big to play here. You can still see its no-code copy."
-          />
+          <Card style={{ padding: 16, gap: 8, backgroundColor: theme.color.card }}>
+            <Txt variant="headline">{noticeCopy.title}</Txt>
+            <Txt tone="label2">{noticeCopy.message}</Txt>
+            {noticeCopy.grownUp !== null ? <Txt tone="label2">{noticeCopy.grownUp}</Txt> : null}
+            {noticeCopy.tellSam !== null &&
+            noticeCopy.tellSamLabel !== null &&
+            props.onTellSam !== undefined ? (
+              <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+                <Button
+                  title={noticeCopy.tellSamLabel}
+                  kind="plain"
+                  onPress={() => props.onTellSam?.(noticeCopy.tellSam!)}
+                />
+              </View>
+            ) : null}
+          </Card>
         </View>
       ) : null}
     </View>

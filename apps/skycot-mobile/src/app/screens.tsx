@@ -35,7 +35,7 @@ function Gone() {
 export function ConversationRoute() {
   const route = useRoute<RouteProp<StackRoutes, "Conversation">>();
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
-  const { macId, threadId, readOnly } = route.params;
+  const { macId, threadId, readOnly, initialDraft } = route.params;
   const mac = useMac(macId);
   const { mode } = useLinks();
   const child = useOptionalChild();
@@ -54,6 +54,7 @@ export function ConversationRoute() {
       mac={mac}
       threadId={threadId}
       readOnly={readOnly === true || mode !== "child"}
+      initialDraft={initialDraft}
       childId={childId}
       onTitle={setTitle}
       voiceAllowed={child !== null && child.childOn(mac)?.voice.typing === true}
@@ -79,9 +80,29 @@ export const conversationOptions = (params: StackRoutes["Conversation"]) => ({
 
 export function PageRoute() {
   const route = useRoute<RouteProp<StackRoutes, "Page">>();
+  const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const { mode } = useLinks();
   const mac = useMac(route.params.macId);
   if (mac === null) return <Gone />;
-  return <PagePreview mac={mac} threadId={route.params.threadId} page={route.params.page} />;
+  return (
+    <PagePreview
+      mac={mac}
+      threadId={route.params.threadId}
+      page={route.params.page}
+      childView={mode === "child"}
+      onTellSam={
+        mode === "child"
+          ? (initialDraft) =>
+              navigation.navigate("Conversation", {
+                macId: mac.macId,
+                threadId: route.params.threadId,
+                title: route.params.title,
+                initialDraft,
+              })
+          : undefined
+      }
+    />
+  );
 }
 
 // nondev-seam: skycot-mobile-page-screen

@@ -68,7 +68,11 @@ export class SkycotFridge extends Context.Service<
       readonly sitesForPage: (realPath: string) => Effect.Effect<ReadonlyArray<string> | null>;
     }) => Effect.Effect<{
       readonly html: string | null;
-      readonly reason: "too-big" | null;
+      readonly reason: "too-big" | "unpackable-module" | "remote-script" | null;
+      readonly needs: {
+        readonly scripts: ReadonlyArray<string>;
+        readonly other: ReadonlyArray<string>;
+      };
       readonly page: string | null;
     }>;
     /** Canonical existing page path, only when it resolves inside this thread's project. */
@@ -193,13 +197,14 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
         thread.cwd === null ||
         !/\.html?$/iu.test(input.page)
       )
-        return { html: null, reason: null, page: null } as const;
+        return { html: null, reason: null, needs: { scripts: [], other: [] }, page: null } as const;
       if (
         !new Set(thread.checkpoints.map((checkpoint) => pageOf(checkpoint.files))).has(input.page)
       )
-        return { html: null, reason: null, page: null } as const;
+        return { html: null, reason: null, needs: { scripts: [], other: [] }, page: null } as const;
       const root = yield* fs.realPath(thread.cwd).pipe(Effect.orElseSucceed(() => null));
-      if (root === null) return { html: null, reason: null, page: null } as const;
+      if (root === null)
+        return { html: null, reason: null, needs: { scripts: [], other: [] }, page: null } as const;
       const relativePage = path.isAbsolute(input.page)
         ? path.relative(root, input.page).split(path.sep).join("/")
         : input.page;
@@ -207,12 +212,12 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
         !relativePage ||
         relativePage.split(/[\\/]/u).some((part) => !part || part === ".." || part.startsWith("."))
       )
-        return { html: null, reason: null, page: null } as const;
+        return { html: null, reason: null, needs: { scripts: [], other: [] }, page: null } as const;
       const realPage = yield* fs
         .realPath(path.join(root, relativePage))
         .pipe(Effect.orElseSucceed(() => null));
       if (realPage === null || (realPage !== root && !realPage.startsWith(`${root}${path.sep}`)))
-        return { html: null, reason: null, page: null } as const;
+        return { html: null, reason: null, needs: { scripts: [], other: [] }, page: null } as const;
       const sites = (yield* input.sitesForPage(realPage)) ?? [];
       const result = yield* playablePage(
         relativePage,

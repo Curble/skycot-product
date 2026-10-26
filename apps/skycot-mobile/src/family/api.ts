@@ -37,7 +37,11 @@ export const FAMILY_API_PATH = "/api/skycot/family";
 export type MoreTimeKind = "extra15" | "extra30" | "endBedtime";
 export interface FridgePlay {
   readonly html: string | null;
-  readonly reason: "too-big" | null;
+  readonly reason: "too-big" | "unpackable-module" | "remote-script" | null;
+  readonly needs: {
+    readonly scripts: ReadonlyArray<string>;
+    readonly other: ReadonlyArray<string>;
+  };
   readonly page: string | null;
 }
 export interface PageInternetAskResult {
@@ -125,13 +129,27 @@ export function parseFridgePlay(body: unknown): FridgePlay | null {
   const input = record(body);
   if (
     (input.html !== null && typeof input.html !== "string") ||
-    (input.reason !== null && input.reason !== "too-big") ||
+    (input.reason !== null &&
+      input.reason !== "too-big" &&
+      input.reason !== "unpackable-module" &&
+      input.reason !== "remote-script") ||
     (input.page !== null && typeof input.page !== "string")
   )
     return null;
+  const needs = record(input.needs);
+  const sites = (value: unknown) =>
+    Array.isArray(value) && value.every((site) => typeof site === "string")
+      ? (value as Array<string>)
+      : [];
   return {
     html: typeof input.html === "string" ? input.html : null,
-    reason: input.reason === "too-big" ? "too-big" : null,
+    reason:
+      input.reason === "too-big" ||
+      input.reason === "unpackable-module" ||
+      input.reason === "remote-script"
+        ? input.reason
+        : null,
+    needs: { scripts: sites(needs.scripts), other: sites(needs.other) },
     page: typeof input.page === "string" ? input.page : null,
   };
 }
@@ -246,12 +264,21 @@ export const familyApi = {
       (body) => (typeof record(body).html === "string" ? (record(body).html as string) : null),
     ),
   // nondev-seam: skycot-mobile-family-api
-  fridgePlay: (transport: MacTransport, threadId: string, page: string) =>
-    call(
-      transport,
-      { method: "GET", path: `${FAMILY_API_PATH}/fridge/play`, query: { threadId, page } },
-      parseFridgePlay,
-    ),
+  fridgePlay: async (transport: MacTransport, threadId: string, page: string) => {
+    try {
+      const answer = await transport.request({
+        method: "GET",
+        path: `${FAMILY_API_PATH}/fridge/play`,
+        query: { threadId, page },
+      });
+      return {
+        ...readFamilyAnswer(answer.status, answer.json, parseFridgePlay),
+        ...(answer.status === 404 ? { routeUnavailable: true as const } : {}),
+      };
+    } catch {
+      return readFamilyAnswer(503, null, parseFridgePlay);
+    }
+  },
   // nondev-seam: skycot-mobile-family-api
   allowPageInternet: (
     transport: MacTransport,

@@ -38,9 +38,67 @@ export const GAME_KEY_SCRIPTS = {
 
 export type PlayCopy = {
   readonly html: string | null;
-  readonly reason: "too-big" | null;
+  readonly reason: "too-big" | "unpackable-module" | "remote-script" | null;
+  readonly needs: {
+    readonly scripts: ReadonlyArray<string>;
+    readonly other: ReadonlyArray<string>;
+  };
   readonly page: string | null;
 };
+
+export type PlayNoticeKind = "engine-update" | "too-big" | "unpackable-module" | "remote-script";
+
+export function playNoticeCopy(
+  kind: PlayNoticeKind,
+  childView: boolean,
+  hosts: ReadonlyArray<string> = [],
+): {
+  readonly title: string;
+  readonly message: string;
+  readonly grownUp: string | null;
+  readonly tellSamLabel: string | null;
+  readonly tellSam: string | null;
+} {
+  if (kind === "engine-update")
+    return {
+      title: "This game can't play here yet",
+      message: childView
+        ? "This game needs a newer SKYCOT on the Mac to play here. Ask a grown-up to update it. You're seeing a picture of the game."
+        : "This game needs a newer SKYCOT on the Mac to play here. You're seeing a picture of the game.",
+      grownUp: childView ? null : "Update SKYCOT on the Mac (Settings > About).",
+      tellSamLabel: null,
+      tellSam: null,
+    };
+  if (kind === "remote-script")
+    return {
+      title: "This game can't play here yet",
+      message: `This game uses a tool from the internet (${hosts.length > 0 ? hosts.join(", ") : "a website"}), which can't run on the iPad. It works on the Mac. Ask Sam to make it work without the internet.`,
+      grownUp: null,
+      tellSamLabel: "Tell Sam",
+      tellSam:
+        "Please make my game work without loading anything from the internet, so it plays on the iPad.",
+    };
+  if (kind === "too-big")
+    return {
+      title: "This game can't play here yet",
+      message: "This game is too big to play on the iPad. You're seeing a picture of the game.",
+      grownUp: childView
+        ? null
+        : "The Mac could not pack this page within the playable size limit.",
+      tellSamLabel: null,
+      tellSam: null,
+    };
+  return {
+    title: "This game can't play here yet",
+    message:
+      "A part of this game is missing from its project, so it can't play on the iPad. You're seeing a picture of the game.",
+    grownUp: childView
+      ? null
+      : "Keep the game's modules inside the project folder, then try again.",
+    tellSamLabel: null,
+    tellSam: null,
+  };
+}
 
 export function playableCopy(result: {
   readonly ok: boolean;

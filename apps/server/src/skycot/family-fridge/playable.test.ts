@@ -47,6 +47,7 @@ describe("playablePage", () => {
       assert.notInclude(scriptPolicy, "'unsafe-inline'");
       assert.notInclude(scriptPolicy, "'unsafe-eval'");
       assert.include(result.html!, "'unsafe-hashes'");
+      assert.deepEqual(result.needs, { scripts: [], other: [] });
     }),
   );
 
@@ -77,6 +78,7 @@ describe("playablePage", () => {
         [],
       );
       assert.equal(totalTooBig.reason, "too-big");
+      assert.isNull(totalTooBig.html);
     }),
   );
 
@@ -137,6 +139,44 @@ describe("playablePage", () => {
       const result = yield* playablePage("game/index.html", project(files), []);
       assert.equal(result.reason, "too-big");
       assert.isNull(result.html);
+    }),
+  );
+
+  it.effect("reports remote scripts and styles without allowing them", () =>
+    Effect.gen(function* () {
+      const result = yield* playablePage(
+        "game.html",
+        project({
+          "game.html":
+            '<script src="https://cdn.jsdelivr.net/game.js"></script><script type="importmap">{"imports":{"remote":"https://modules.example.org/index.mjs"}}</script><script type="module">import { start } from "https://cdn.example.com/game.mjs"; import "remote"; start();</script><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Game"><style>@import url("https://styles.example.net/game.css");</style>',
+        }),
+        [],
+      );
+      assert.isNotNull(result.html);
+      assert.equal(result.reason, "remote-script");
+      assert.deepEqual(result.needs, {
+        scripts: ["example.com", "example.org", "jsdelivr.net"],
+        other: ["example.net", "fonts.googleapis.com"],
+      });
+      assert.notInclude(result.html!, "https://cdn.jsdelivr.net/game.js");
+      assert.notInclude(result.html!, "https://cdn.example.com/game.mjs");
+      assert.include(result.html!, "script-src 'sha256-");
+    }),
+  );
+
+  it.effect("reports a module that is not present in the project", () =>
+    Effect.gen(function* () {
+      const result = yield* playablePage(
+        "game.html",
+        project({
+          "game.html": '<script type="module" src="./main.mjs"></script>',
+          "main.mjs": 'import { start } from "./missing.mjs"; start();',
+        }),
+        [],
+      );
+      assert.isNotNull(result.html);
+      assert.equal(result.reason, "unpackable-module");
+      assert.deepEqual(result.needs, { scripts: [], other: [] });
     }),
   );
 });

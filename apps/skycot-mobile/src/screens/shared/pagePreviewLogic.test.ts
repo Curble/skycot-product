@@ -8,6 +8,7 @@ import {
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   playableCopy,
+  playNoticeCopy,
   pageAskWaitingCopy,
   reportedSites,
 } from "./pagePreviewLogic";
@@ -17,13 +18,44 @@ describe("the sealed page viewer", () => {
     const playable = {
       html: "<script>game()</script>",
       reason: null,
+      needs: { scripts: [], other: [] },
       page: "/a/game.html",
     } as const;
     expect(playableCopy({ ok: true, value: playable })).toBe(playable);
     expect(
-      playableCopy({ ok: true, value: { html: null, reason: "too-big", page: "/a/game.html" } }),
+      playableCopy({
+        ok: true,
+        value: {
+          html: null,
+          reason: "too-big",
+          needs: { scripts: [], other: [] },
+          page: "/a/game.html",
+        },
+      }),
     ).toBeNull();
     expect(playableCopy({ ok: false })).toBeNull();
+  });
+
+  it("explains why a game cannot play in child and grown-up words", () => {
+    const childUpdate = playNoticeCopy("engine-update", true);
+    expect(childUpdate.title).toBe("This game can't play here yet");
+    expect(childUpdate.message).toContain("You're seeing a picture of the game.");
+    expect(childUpdate.message).toContain("Ask a grown-up to update it.");
+    expect(childUpdate.grownUp).toBeNull();
+    const adultUpdate = playNoticeCopy("engine-update", false);
+    expect(adultUpdate.grownUp).toBe("Update SKYCOT on the Mac (Settings > About).");
+
+    const remote = playNoticeCopy("remote-script", true, ["example.com"]);
+    expect(remote.message).toContain("tool from the internet (example.com)");
+    expect(remote.message).toContain("It works on the Mac.");
+    expect(remote.tellSam).toBe(
+      "Please make my game work without loading anything from the internet, so it plays on the iPad.",
+    );
+    expect(remote.tellSamLabel).toBe("Tell Sam");
+    expect(playNoticeCopy("too-big", true).message).toContain("too big to play on the iPad");
+    expect(playNoticeCopy("unpackable-module", true).message).toContain(
+      "part of this game is missing",
+    );
   });
 
   it("allows navigation only to the viewer's own document", () => {

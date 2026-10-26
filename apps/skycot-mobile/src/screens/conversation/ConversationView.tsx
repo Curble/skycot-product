@@ -50,6 +50,7 @@ export function ConversationView(props: {
   readonly mac: Mac;
   readonly threadId: string;
   readonly readOnly: boolean;
+  readonly initialDraft?: string;
   /** A child's device: talking is allowed for this child (the Mac's grown-up switch). */
   readonly voiceAllowed?: boolean;
   readonly childId?: string | null;
@@ -67,7 +68,7 @@ export function ConversationView(props: {
   const projection = props.demo ?? thread.value;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(props.initialDraft ?? "");
   const [mode, setMode] = useState<"reply" | "change-plan">("reply");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -80,6 +81,10 @@ export function ConversationView(props: {
     readonly checkpointId: string;
   } | null>(null);
   const [busyCard, setBusyCard] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (props.initialDraft !== undefined) setDraft(props.initialDraft);
+  }, [props.initialDraft]);
 
   const title = projection?.thread.title ?? null;
   const onTitle = props.onTitle;
