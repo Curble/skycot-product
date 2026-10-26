@@ -343,6 +343,31 @@ describe("what the Watch may ask", () => {
     ).toMatchObject({ decision: "decline", proof: null });
   });
 
+  it("accepts a batch challenge and answer without a single-request identifier", () => {
+    expect(
+      parseWatchMessage(
+        JSON.stringify({
+          type: "challenge",
+          macId: "mac-1",
+          batchId: "batch-1",
+          fingerprint: "batch-fp",
+        }),
+      ),
+    ).toMatchObject({ type: "challenge", batchId: "batch-1", fingerprint: "batch-fp" });
+    expect(
+      parseWatchMessage(
+        JSON.stringify({
+          type: "answer",
+          macId: "mac-1",
+          batchId: "batch-1",
+          fingerprint: "batch-fp",
+          decision: "accept",
+          proof: { keyId: "k", challenge: "c", signature: "s" },
+        }),
+      ),
+    ).toMatchObject({ type: "answer", batchId: "batch-1", decision: "accept" });
+  });
+
   it("refuses anything that isn't once: no 'always', no strangers", () => {
     expect(parseWatchMessage(JSON.stringify({ ...answer, decision: "acceptAlways" }))).toBeNull();
     expect(parseWatchMessage(JSON.stringify({ type: "unlink" }))).toBeNull();

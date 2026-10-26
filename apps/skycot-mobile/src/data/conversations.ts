@@ -38,7 +38,7 @@ export function threadState(thread: ThreadShell): ConversationRow["state"] {
 export function stateLabel(state: ConversationRow["state"], builder: string): string | null {
   switch (state) {
     case "working":
-      return `${builder} is building…`;
+      return `${builder} is working`;
     case "waiting":
       return "Waiting for you";
     case "failed":
@@ -48,6 +48,16 @@ export function stateLabel(state: ConversationRow["state"], builder: string): st
     default:
       return null;
   }
+}
+
+export function childStatusLabel(
+  state: ConversationRow["state"],
+  builder: string,
+  hasPage: boolean,
+): string | null {
+  if (state === "working") return `${builder} is working`;
+  if (state === "done" && hasPage) return "Ready to play";
+  return stateLabel(state, builder);
 }
 
 /** One of the Mac's Questions spaces (Just ask): the shared one, or a child's own. */

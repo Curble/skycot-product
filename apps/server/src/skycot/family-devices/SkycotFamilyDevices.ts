@@ -14,6 +14,7 @@
 // Hashing and random challenges have no Effect counterpart; these are pure calls.
 // @effect-diagnostics nodeBuiltinImport:off
 // nondev-seam: skycot-page-internet-approver
+// nondev-seam: skycot-approval-batches
 import * as NodeCrypto from "node:crypto";
 import * as NodeOS from "node:os";
 
@@ -164,6 +165,7 @@ export interface PendingApproval {
   readonly childId: string | null;
   readonly threadTitle: string;
   readonly projectTitle: string | null;
+  readonly projectId?: string;
   readonly createdAt: number;
   /** Older than 30 minutes: it waits on the Mac now (the approval contract, rule 4). */
   readonly lapsed: boolean;
@@ -179,6 +181,55 @@ export interface PendingApproval {
   readonly projectCovers?: ReadonlyArray<ProjectApprovalCover>;
   readonly page?: string;
   readonly sites?: ReadonlyArray<string>;
+}
+
+export interface ApprovalBatch {
+  readonly id: string;
+  readonly childId: string;
+  readonly project: string;
+  readonly kind: ProjectApprovalCover;
+  readonly fingerprint: string;
+  readonly items: ReadonlyArray<
+    Pick<PendingApproval, "threadId" | "requestId" | "what" | "fingerprint" | "target">
+  >;
+}
+
+export function buildApprovalBatches(
+  requests: ReadonlyArray<PendingApproval>,
+): ReadonlyArray<ApprovalBatch> {
+  const groups = new Map<string, Array<PendingApproval & { projectId: string; childId: string }>>();
+  for (const request of requests) {
+    if (request.childId === null || request.projectId === undefined || request.lapsed) continue;
+    for (const kind of request.projectCovers ?? []) {
+      const key = JSON.stringify([request.childId, request.projectId, kind]);
+      const group = groups.get(key) ?? [];
+      group.push({ ...request, childId: request.childId, projectId: request.projectId });
+      groups.set(key, group);
+    }
+  }
+  return [...groups.entries()].flatMap(([key, group]) => {
+    if (group.length < 2) return [];
+    const [childId, project, kind] = JSON.parse(key) as [string, string, ProjectApprovalCover];
+    const items = group
+      .map(({ threadId, requestId, what, fingerprint, target }) => ({
+        threadId,
+        requestId,
+        what,
+        fingerprint,
+        ...(target === undefined ? {} : { target }),
+      }))
+      .toSorted((a, b) =>
+        `${a.threadId}\n${a.requestId}`.localeCompare(`${b.threadId}\n${b.requestId}`),
+      );
+    const id = NodeCrypto.createHash("sha256").update(key).digest("hex").slice(0, 24);
+    const fingerprint = NodeCrypto.createHash("sha256")
+      .update(
+        JSON.stringify([childId, project, kind, items.map((item) => item.fingerprint).toSorted()]),
+      )
+      .digest("hex")
+      .slice(0, 24);
+    return [{ id, childId, project, kind, fingerprint, items }];
+  });
 }
 
 /** How a grown-up's device proves it is the grown-up for a yes. */
@@ -312,8 +363,9 @@ export class SkycotFamilyDevices extends Context.Service<
     /** A challenge for one yes from this phone's Apple Watch. */
     readonly watchChallenge: (input: {
       readonly who: GrownUpIdentity;
-      readonly threadId: string;
-      readonly requestId: string;
+      readonly threadId?: string;
+      readonly requestId?: string;
+      readonly batchId?: string;
       readonly fingerprint: string;
     }) => Effect.Effect<
       {
@@ -346,8 +398,9 @@ export class SkycotFamilyDevices extends Context.Service<
     /** A challenge for one yes with this device's Face ID key, for the card it shows. */
     readonly deviceKeyChallenge: (input: {
       readonly who: GrownUpIdentity;
-      readonly threadId: string;
-      readonly requestId: string;
+      readonly threadId?: string;
+      readonly requestId?: string;
+      readonly batchId?: string;
       readonly fingerprint: string;
     }) => Effect.Effect<
       {
@@ -363,6 +416,7 @@ export class SkycotFamilyDevices extends Context.Service<
      * need a grown-up. A child's own "Ask me first" steps are theirs to answer at the Mac.
      */
     readonly approvals: Effect.Effect<ReadonlyArray<PendingApproval>>;
+    readonly approvalBatches: Effect.Effect<ReadonlyArray<ApprovalBatch>>;
     /** A passkey challenge for one action of this grown-up's device. */
     readonly challenge: (input: {
       readonly who: GrownUpIdentity;
@@ -374,6 +428,7 @@ export class SkycotFamilyDevices extends Context.Service<
             readonly requestId: string;
             readonly fingerprint: string;
           }
+        | { readonly type: "approve-batch"; readonly batchId: string; readonly fingerprint: string }
         | { readonly type: "more-time"; readonly childId: string; readonly kind: string };
     }) => Effect.Effect<unknown, DevicesError>;
     readonly answer: (input: {
@@ -392,6 +447,16 @@ export class SkycotFamilyDevices extends Context.Service<
        * this is the phone's word for where it was said). A yes from the Watch is known by its
        * proof instead.
        */
+      readonly via?: "watch" | null;
+    }) => Effect.Effect<void, DevicesError | SkycotFamily.FamilyError>;
+    readonly answerBatch: (input: {
+      readonly who: GrownUpIdentity;
+      readonly sessionId: string;
+      readonly origin: string;
+      readonly batchId: string;
+      readonly fingerprint: string;
+      readonly decision: ApproverDecision;
+      readonly proof: Proof | null;
       readonly via?: "watch" | null;
     }) => Effect.Effect<void, DevicesError | SkycotFamily.FamilyError>;
     readonly moreTime: (input: {
@@ -818,7 +883,10 @@ const make = Effect.gen(function* () {
     if (record?.watch === undefined) {
       return yield* fail("watch", "This phone's Apple Watch isn't set up to say yes.");
     }
-    const action = approveAction(input.threadId, input.requestId, input.fingerprint);
+    const action =
+      input.batchId === undefined
+        ? approveAction(input.threadId!, input.requestId!, input.fingerprint)
+        : `approve-batch:${input.batchId}:${input.fingerprint}`;
     const challenge = yield* issueSignedChallenge("watch", input.who, action);
     return { challenge, action, purpose: "approve" as const, keyId: record.watch.id };
   });
@@ -891,7 +959,10 @@ const make = Effect.gen(function* () {
     if (record?.deviceKey === undefined) {
       return yield* fail("device-key", "Face ID isn't set up on this device yet.");
     }
-    const action = approveAction(input.threadId, input.requestId, input.fingerprint);
+    const action =
+      input.batchId === undefined
+        ? approveAction(input.threadId!, input.requestId!, input.fingerprint)
+        : `approve-batch:${input.batchId}:${input.fingerprint}`;
     const challenge = yield* issueSignedChallenge("device-key", input.who, action);
     return { challenge, action, purpose: "approve" as const, keyId: record.deviceKey.id };
   });
@@ -933,6 +1004,7 @@ const make = Effect.gen(function* () {
         childId: owners[thread.id] ?? null,
         threadTitle: thread.title,
         projectTitle: projectTitles.get(String(thread.projectId)) ?? null,
+        projectId: String(thread.projectId),
         createdAt,
         lapsed: at - createdAt > APPROVAL_LAPSE_MS,
         needsGrownUp: described.needsGrownUp,
@@ -980,6 +1052,7 @@ const make = Effect.gen(function* () {
         childId: ask.childId,
         threadTitle: thread.title,
         projectTitle: projectTitles.get(String(thread.projectId)) ?? null,
+        projectId: String(thread.projectId),
         createdAt: ask.createdAt,
         lapsed: ask.expiresAt <= at || at - ask.createdAt > APPROVAL_LAPSE_MS,
         needsGrownUp: true,
@@ -1001,6 +1074,11 @@ const make = Effect.gen(function* () {
     return found.toSorted((a, b) => b.createdAt - a.createdAt);
   }).pipe(Effect.withSpan("SkycotFamilyDevices.approvals"));
 
+  const approvalBatches: SkycotFamilyDevices["Service"]["approvalBatches"] = approvals.pipe(
+    Effect.map(buildApprovalBatches),
+    Effect.withSpan("SkycotFamilyDevices.approvalBatches"),
+  );
+
   const challenge: SkycotFamilyDevices["Service"]["challenge"] = Effect.fn(
     "SkycotFamilyDevices.challenge",
   )(function* (input) {
@@ -1011,7 +1089,9 @@ const make = Effect.gen(function* () {
     const action =
       input.action.type === "approve"
         ? approveAction(input.action.threadId, input.action.requestId, input.action.fingerprint)
-        : moreTimeAction(input.action.childId, input.action.kind);
+        : input.action.type === "approve-batch"
+          ? `approve-batch:${input.action.batchId}:${input.action.fingerprint}`
+          : moreTimeAction(input.action.childId, input.action.kind);
     const issued = yield* issueChallenge(input.who, input.origin, action);
     return {
       challenge: issued.challenge,
@@ -1038,7 +1118,7 @@ const make = Effect.gen(function* () {
     }
     if (proof.type === "watch") {
       // Only a yes (approve:…) can be signed this way; more time stays on the phone.
-      if (!action.startsWith("approve:")) {
+      if (!action.startsWith("approve:") && !action.startsWith("approve-batch:")) {
         return yield* fail("watch", "Give more time on your iPhone, with the parent code.");
       }
       const record = yield* verifySigned({
@@ -1062,7 +1142,7 @@ const make = Effect.gen(function* () {
     }
     if (proof.type === "device-key") {
       // Only a yes (approve:…): more time asks for the parent code, as before.
-      if (!action.startsWith("approve:")) {
+      if (!action.startsWith("approve:") && !action.startsWith("approve-batch:")) {
         return yield* fail("device-key", "Give more time with the parent code.");
       }
       const record = yield* verifySigned({
@@ -1379,6 +1459,91 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const answerBatch: SkycotFamilyDevices["Service"]["answerBatch"] = Effect.fn(
+    "SkycotFamilyDevices.answerBatch",
+  )(function* (input) {
+    const current = buildApprovalBatches(yield* approvals);
+    const batch = current.find((entry) => entry.id === input.batchId);
+    if (batch === undefined || batch.fingerprint !== input.fingerprint) {
+      return yield* fail("changed", "That list changed, have another look.");
+    }
+    const proven =
+      input.decision === "accept"
+        ? yield* prove(
+            input.who,
+            input.origin,
+            `approve-batch:${batch.id}:${batch.fingerprint}`,
+            input.proof,
+          )
+        : null;
+    const via: AnswerVia | null =
+      proven?.via ??
+      (input.via === "watch"
+        ? yield* family
+            .device(input.who.deviceId)
+            .pipe(
+              Effect.map((record) =>
+                record?.watch === undefined
+                  ? null
+                  : ({ kind: "watch", name: record.watch.name } satisfies AnswerVia),
+              ),
+            )
+        : null);
+    for (const item of batch.items) {
+      if (item.target === "page-internet") {
+        const ask = (yield* family.pendingPageInternetAsks).find(
+          (entry) => entry.id === item.requestId && entry.threadId === item.threadId,
+        );
+        if (ask === undefined)
+          return yield* fail("changed", "That list changed, have another look.");
+        yield* family
+          .settlePageInternetAsk({
+            id: ask.id,
+            decision: input.decision === "accept" ? "allow" : "decline",
+          })
+          .pipe(
+            Effect.mapError(
+              () => new DevicesError("changed", "That list changed, have another look."),
+            ),
+          );
+      } else {
+        const requestId = item.requestId as RuntimeRequestId;
+        yield* engine
+          .dispatch({
+            type: "runtime-request.respond",
+            commandId: CommandId.make(
+              `server:skycot-approver-batch:${batch.id}:${item.threadId}:${item.requestId}:${input.who.deviceId}`,
+            ),
+            threadId: item.threadId as ThreadId,
+            requestId,
+            decision: input.decision,
+          })
+          .pipe(
+            Effect.mapError(
+              () => new DevicesError("changed", "That list changed, have another look."),
+            ),
+          );
+      }
+      const owner = (yield* limits.today).threads[item.threadId];
+      yield* limits.recordEvent({
+        sessionId: input.sessionId,
+        kind: input.decision === "accept" ? "approved" : "declined",
+        threadId: item.threadId,
+        requestId: item.requestId,
+        ...(owner === undefined ? {} : { childId: owner }),
+        by: {
+          personId: input.who.personId,
+          deviceId: input.who.deviceId,
+          deviceName: input.who.deviceName,
+          ...(via === null ? {} : { via }),
+          ...(proven?.how === "face-id" && proven.biometry
+            ? { how: "face-id" as const, biometry: proven.biometry }
+            : {}),
+        },
+      });
+    }
+  });
+
   const moreTime: SkycotFamilyDevices["Service"]["moreTime"] = Effect.fn(
     "SkycotFamilyDevices.moreTime",
   )(function* (input) {
@@ -1438,8 +1603,10 @@ const make = Effect.gen(function* () {
     deviceKeyForget,
     deviceKeyChallenge,
     approvals,
+    approvalBatches,
     challenge,
     answer,
+    answerBatch,
     moreTime,
   });
 });

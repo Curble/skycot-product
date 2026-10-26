@@ -9,24 +9,16 @@ import {
 } from "./onboarding";
 
 describe("onboardingSteps", () => {
-  it("puts the parent code and child's name before the child setup", () => {
+  it("keeps the child setup to family code and assistant before making", () => {
     expect(onboardingSteps(null)).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
     expect(onboardingSteps("me")).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
-    expect(onboardingSteps("child")).toEqual([
-      "who",
-      "family",
-      "picture",
-      "assistant",
-      "work",
-      "look",
-      "done",
-    ]);
+    expect(onboardingSteps("child")).toEqual(["who", "family", "assistant", "done"]);
   });
 
   it("skips the Family set-up when a profile is already on", () => {
     expect(onboardingSteps("child", true)).not.toContain("family");
     expect(onboardingSteps("child", true)).not.toContain("picture");
-    expect(onboardingSteps("child", true)).toEqual(["who", "assistant", "work", "look", "done"]);
+    expect(onboardingSteps("child", true)).toEqual(["who", "assistant", "done"]);
   });
 });
 
@@ -36,9 +28,9 @@ describe("onboardingProgress", () => {
     expect(me.steps).toHaveLength(5);
     expect(me.index).toBe(2);
 
-    const child = onboardingProgress(onboardingSteps("child"), "work");
-    expect(child.steps).toHaveLength(6);
-    expect(child.index).toBe(4);
+    const child = onboardingProgress(onboardingSteps("child"), "assistant");
+    expect(child.steps).toHaveLength(3);
+    expect(child.index).toBe(2);
   });
 
   it("keeps the final setup dot selected on done", () => {

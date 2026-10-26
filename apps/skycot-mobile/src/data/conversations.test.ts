@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ProjectShell } from "../engine/types";
-import { isQuestionsProject, projectTitleFor } from "./conversations";
+import { childStatusLabel, isQuestionsProject, projectTitleFor } from "./conversations";
 
 const ROOT = "/Users/family/.skycot/scratch";
 const AVA = "c0a0a0a0a0a";
@@ -35,5 +35,12 @@ describe("Questions spaces in the app", () => {
   it("a grown-up's phone shows whose they are, as the Mac titles them", () => {
     expect(projectTitleFor(AVAS, grownUpPhone, ROOT)).toBe("Ava's questions");
     expect(projectTitleFor(AVAS, grownUpPhone, null)).toBe("Ava's questions");
+  });
+});
+
+describe("a child's conversation status", () => {
+  it("uses friendly words while Sam works and when a page is ready", () => {
+    expect(childStatusLabel("working", "Sam", false)).toBe("Sam is working");
+    expect(childStatusLabel("done", "Sam", true)).toBe("Ready to play");
   });
 });

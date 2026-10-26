@@ -10,6 +10,16 @@ import { brandForDriver, modelOf, restingUntilPhrase } from "./usage";
 /** The message id of a continuation the engine sent to carry a stopped turn on. */
 export const SWITCH_MESSAGE_PREFIX = "skycot-switch:";
 
+/** A limit note is useful only until the provider refills or the assistant works again. */
+export function usageLimitNoteIsStale(input: {
+  readonly resetAt: string | null;
+  readonly workedAgain: boolean;
+  readonly now: number;
+}): boolean {
+  const reset = input.resetAt === null ? Number.NaN : Date.parse(input.resetAt);
+  return input.workedAgain || (Number.isFinite(reset) && reset <= input.now);
+}
+
 export interface SwitchEnd {
   readonly instanceId: string;
   readonly driver: string;

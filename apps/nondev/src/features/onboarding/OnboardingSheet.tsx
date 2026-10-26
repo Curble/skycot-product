@@ -146,6 +146,10 @@ export function OnboardingSheet({
   const [problem, setProblem] = useState<string | null>(null);
   const [skipWarning, setSkipWarning] = useState(false);
   const enableFamily = useEnableFamilyWithDefaults(environmentId);
+  const createProject = useAtomCommand(projectEnvironment.createNew, { reportFailure: false });
+  const availableProjects = useAtomValue(environmentProjects.projectsAtom).filter(
+    (project) => project.environmentId === environmentId,
+  );
   const steps = onboardingSteps(audience, family.enabled);
   const index = Math.max(0, steps.indexOf(step));
   const progress = onboardingProgress(steps, step);
@@ -182,7 +186,8 @@ export function OnboardingSheet({
       const opened = await tryParentCode(draft.code, "settings", undefined, { quiet: true });
       const grownUp = readFamilyView().grownUps[0];
       if (opened.ok && grownUp !== undefined) startGrownUpSession(grownUp.id);
-      setStep("picture");
+      if (!hasChosenTheme()) setActiveTheme(FAMILY_THEME_ID);
+      setStep("assistant");
       return;
     }
     setStep(steps[index + 1]!);
@@ -200,6 +205,21 @@ export function OnboardingSheet({
       if (failure !== null) {
         setProblem(failure);
         return;
+      }
+    }
+    if (childPath) {
+      const existing = availableProjects[0];
+      if (existing === undefined) {
+        const outcome = await createProject({ environmentId, input: { name: "My first project" } });
+        if (outcome._tag === "Failure") {
+          setProblem(
+            "SKYCOT couldn't make your project folder. Try again, or open a folder later from the sidebar.",
+          );
+          return;
+        }
+        writeLastProject({ environmentId, projectId: outcome.value.projectId as ProjectId });
+      } else {
+        writeLastProject({ environmentId, projectId: existing.id as ProjectId });
       }
     }
     finish("done");
@@ -309,6 +329,11 @@ export function OnboardingSheet({
             ? { familyFor: family.profile.childName ?? (draft.childName.trim() || null) }
             : {})}
         />
+      ) : null}
+      {childPath ? (
+        <p className="fm-help">
+          SKYCOT never sends your files, messages or projects. It only sends anonymous daily totals.
+        </p>
       ) : null}
     </Sheet>
   );
@@ -473,7 +498,7 @@ function AssistantStep({
       <p className="fm-help">
         {anyProviderReady(providers)
           ? "At least one assistant is ready. You can connect more later in Settings."
-          : "Green ticks appear as soon as an assistant is signed in. You can also do this later."}
+          : "To make something, choose an assistant and sign in on its website; SKYCOT notices when you return."}
       </p>
       {forChild ? <p className="fm-help">{familyAgeTermsNote()}</p> : null}
     </div>

@@ -149,7 +149,7 @@ struct RequestsPage: View {
         }
       }
     }
-    .navigationTitle("Requests")
+    .navigationTitle(waiting.isEmpty ? "Requests" : "Requests · \(waiting.count)")
   }
 }
 
@@ -426,6 +426,27 @@ struct RequestView: View {
           .font(.footnote).foregroundStyle(.orange).padding(.top, 4)
       } else {
         if request.watchCanSayYes {
+          if request.batchLead == true, let batchCount = request.batchCount, batchCount > 1,
+             request.batchId != nil, request.batchFingerprint != nil {
+            Button {
+              Task { await allowBatch(request) }
+            } label: {
+              Label("Allow all \(batchCount)", systemImage: "checkmark.circle")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+            .padding(.top, 6)
+            .accessibilityLabel("Allow all \(batchCount) requests once")
+            Button {
+              Task { await answerBatch(request, decision: "decline") }
+            } label: {
+              Label("Not now for all \(batchCount)", systemImage: "xmark")
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Not now for all \(batchCount) requests")
+          }
           Button {
             Task { await allow(request, scope: "once") }
           } label: {
@@ -435,6 +456,7 @@ struct RequestView: View {
           .buttonStyle(.borderedProminent)
           .tint(.blue)
           .padding(.top, 6)
+          .accessibilityLabel("Allow this request once")
           if request.projectFingerprint != nil && projectMatches {
             Button {
               Task { await allow(request, scope: "project") }
@@ -444,9 +466,10 @@ struct RequestView: View {
             }
             .buttonStyle(.bordered)
             .padding(.top, 4)
+            .accessibilityLabel("Allow this request for this project")
           }
         } else {
-          Text("To say yes here, set it up on your iPhone: SKYCOT, This device, Apple Watch.")
+          Text("To say yes here, set up Apple Watch in Settings on your iPhone.")
             .font(.footnote).foregroundStyle(.secondary).padding(.top, 4)
         }
         Button {
@@ -455,11 +478,52 @@ struct RequestView: View {
           Label("Decline", systemImage: "xmark").frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
+        .accessibilityLabel("Decline this request")
         if let note = WristCheck.simulatorNote {
           Text(note).font(.caption2).foregroundStyle(.tertiary)
         }
       }
     }
+  }
+
+  private func allowBatch(_ request: WatchRequest) async {
+    guard let batchId = request.batchId, let fingerprint = request.batchFingerprint,
+          let count = request.batchCount else { return }
+    switch await WristCheck.confirm(reason: "Allow all \(count) requests from \(request.childName)") {
+    case .cancelled: return
+    case .openOnIPhone(let words): stage = .openOnIPhone(words); return
+    case .confirmed: break
+    }
+    stage = .working("Asking your iPhone…")
+    do {
+      let issued = try await phone.send(.challengeBatch(request))
+      guard issued.ok, let challenge = issued.challenge, let action = issued.action,
+            let keyId = issued.keyId,
+            action == "approve-batch:\(batchId):\(fingerprint)" else {
+        stage = .problem(issued.sentence ?? "That list changed. Have another look on your iPhone.")
+        return
+      }
+      let signature = try WatchKey.sign(watchSignedMessage(purpose: "approve", challenge: challenge, action: action))
+      let answered = try await phone.send(.answerBatch(
+        request, decision: "accept", proof: Proof(keyId: keyId, challenge: challenge, signature: signature)))
+      if answered.ok { stage = .done("Allowed all \(count), once each."); tap(.success) }
+      else { stage = .problem(answered.sentence ?? "That didn't work. Try again.") }
+    } catch {
+      stage = .openOnIPhone("Your Watch can't reach your iPhone right now.")
+    }
+  }
+
+  private func answerBatch(_ request: WatchRequest, decision: String) async {
+    guard request.batchId != nil, request.batchFingerprint != nil else { return }
+    switch await WristCheck.confirm(reason: "Not now for all \(request.batchCount ?? 0) requests") {
+    case .cancelled: return
+    case .openOnIPhone(let words): stage = .openOnIPhone(words); return
+    case .confirmed: break
+    }
+    do {
+      let result = try await phone.send(.answerBatch(request, decision: decision, proof: nil))
+      stage = result.ok ? .done("Not now. They see that on their screen.") : .problem(result.sentence ?? "That list changed. Have another look.")
+    } catch { stage = .openOnIPhone("Your Watch can't reach your iPhone right now.") }
   }
 
   private func allow(_ request: WatchRequest, scope: String = "once") async {

@@ -22,6 +22,15 @@ the `brand-client-entry*` seams in the brand table below.
 
 ## SKYCOT daily totals (26 October 2026)
 
+## SKYCOT approval batches (26 October 2026)
+
+| id                                | file                                                                    | change                                                                                                                                           | marker                                              |
+| --------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| skycot-approval-batches           | `apps/server/src/skycot/family-devices/SkycotFamilyDevices.ts`          | Groups only grown-up requests sharing a child, project and closed project cover; checks the full current fingerprint before answering each item. | `// nondev-seam: skycot-approval-batches`           |
+| skycot-approval-batches-http      | `apps/server/src/skycot/SkycotFamilyHttp.ts`                            | Keeps single requests for older clients and adds grown-up-only batch read and answer routes.                                                     | `// nondev-seam: skycot-approval-batches`           |
+| skycot-approval-batches-test      | `apps/server/src/skycot/family-devices/SkycotFamilyDevices.test.ts`     | Covers sorted membership fingerprints and child/project/cover isolation.                                                                         | `// nondev-seam: skycot-approval-batches-test`      |
+| skycot-approval-batches-http-test | `apps/server/src/skycot/family-devices/SkycotFamilyDevicesHttp.test.ts` | Confirms a child device cannot call the batch answer route.                                                                                      | `// nondev-seam: skycot-approval-batches-http-test` |
+
 | id                                | file                                      | change                                                                                                         | marker                                                 |
 | --------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | skycot-update-count-worker        | `infra/skycot-counter/src/worker.ts`      | Serves the single R2 update feed and writes optional anonymous daily update totals.                            | `// nondev-seam: skycot-update-count-worker`           |

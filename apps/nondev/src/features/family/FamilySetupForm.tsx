@@ -40,6 +40,10 @@ export function FamilySetupForm({
         onChange={(event) => onDraft({ ...draft, childName: event.currentTarget.value })}
       />
       <p className="fm-help">Only used for the greeting. It stays on this Mac.</p>
+      <p className="fm-help">
+        Write your parent code down and keep it somewhere safe. A hint is optional; SKYCOT cannot
+        show the code again.
+      </p>
       <div className="fm-family-setup__codes" data-sober="">
         <div className="fm-family-setup__row">
           <TextField

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
 import {
+  approvalBatchSentence,
   grownUpRequestSentence,
   requestHeading,
 } from "../../../../nondev/src/features/family/people";
@@ -201,7 +202,7 @@ function RequestCard(props: {
   const [asking, setAsking] = useState(false);
   /** Why the code is asked for, when Face ID was tried and didn't say yes. */
   const [codeNote, setCodeNote] = useState<string | null>(null);
-  const [allowScope, setAllowScope] = useState<"once" | "project">("once");
+  const [allowScope, setAllowScope] = useState<"once" | "project" | "batch">("once");
   const [allowing, setAllowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -217,6 +218,10 @@ function RequestCard(props: {
   ]
     .filter(Boolean)
     .join(" · ");
+  const batch = request.batch;
+  const batchLead =
+    batch?.items[0]?.threadId === request.threadId &&
+    batch?.items[0]?.requestId === request.requestId;
 
   const settle = useCallback(
     (sentence: string) => {
@@ -244,7 +249,7 @@ function RequestCard(props: {
   const useFace = faceId.readyOn(mac);
   const allowingRef = useRef(false);
   /** Allow once: Face ID's fresh signature when it is set up; the parent code otherwise. */
-  const allow = async (scope: "once" | "project" = "once") => {
+  const allow = async (scope: "once" | "project" | "batch" = "once") => {
     if (allowingRef.current || done !== null || request.lapsed) return;
     if (scope === "project" && (!request.projectFingerprint || !request.projectCovers?.length))
       return;
@@ -260,20 +265,24 @@ function RequestCard(props: {
     try {
       const outcome = await faceId.allow(
         mac,
-        {
-          threadId: request.threadId,
-          requestId: request.requestId,
-          fingerprint: scope === "project" ? request.projectFingerprint! : request.fingerprint,
-        },
+        scope === "batch" && batch
+          ? { batchId: batch.id, fingerprint: batch.fingerprint }
+          : {
+              threadId: request.threadId,
+              requestId: request.requestId,
+              fingerprint: scope === "project" ? request.projectFingerprint! : request.fingerprint,
+            },
         child?.name ?? null,
-        scope,
+        scope === "batch" ? "once" : scope,
       );
       if (outcome.kind === "allowed") {
         haptic("success");
         settle(
-          scope === "project"
-            ? `Allowed for this project with ${faceId.label}.`
-            : `Allowed with ${faceId.label}, this once.`,
+          scope === "batch" && batch
+            ? `Allowed all ${batch.items.length}, once each.`
+            : scope === "project"
+              ? `Allowed for this project with ${faceId.label}.`
+              : `Allowed with ${faceId.label}, this once.`,
         );
       } else if (outcome.kind === "use-code") {
         setCodeNote(outcome.note);
@@ -317,11 +326,21 @@ function RequestCard(props: {
         </View>
       </View>
       {/* nondev-seam: skycot-grownup-request-sentence */}
-      <Txt variant="title3">{grownUpRequestSentence(request, name)}</Txt>
+      <Txt variant="title3">
+        {batchLead && batch
+          ? approvalBatchSentence(batch, name, request.projectTitle)
+          : grownUpRequestSentence(request, name)}
+      </Txt>
       {request.projectCovers?.length ? (
         <Txt tone="label2">
           For this project ({request.projectTitle ?? request.threadTitle}):{" "}
           {projectCoverSentence(request.projectCovers)}.
+        </Txt>
+      ) : null}
+      {batchLead && batch ? (
+        <Txt tone="label2">
+          {name}'s {request.projectTitle ?? request.threadTitle} has {batch.items.length} similar
+          requests.
         </Txt>
       ) : null}
       <Button
@@ -345,6 +364,38 @@ function RequestCard(props: {
         <Banner tone="success" text={done} />
       ) : request.lapsed ? null : (
         <ButtonRow minWidthEach={120}>
+          {batchLead && batch ? (
+            <>
+              <Button
+                title={`Not now for all ${batch.items.length}`}
+                accessibilityLabel={`Not now for all ${batch.items.length} requests`}
+                kind="grey"
+                busy={busy}
+                onPress={async () => {
+                  setBusy(true);
+                  const result = await familyApi.answerBatch(mac.transport, {
+                    batchId: batch.id,
+                    fingerprint: batch.fingerprint,
+                    decision: "decline",
+                    proof: null,
+                  });
+                  setBusy(false);
+                  if (result.ok) settle("Not now. They see that on their screen.");
+                  else setProblem(result.message);
+                }}
+                style={{ flex: 1 }}
+                size="medium"
+              />
+              <Button
+                title={`Allow all ${batch.items.length}`}
+                accessibilityLabel={`Allow all ${batch.items.length} requests once`}
+                busy={allowing}
+                onPress={() => void allow("batch")}
+                style={{ flex: 1 }}
+                size="medium"
+              />
+            </>
+          ) : null}
           <Button
             title="Decline"
             kind="grey"
@@ -376,15 +427,40 @@ function RequestCard(props: {
       )}
       <ParentCodeSheet
         visible={asking}
-        title={allowScope === "project" ? "Allow for this project?" : "Allow this once?"}
-        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${request.kind === "page-internet" ? `${name}'s ${request.page?.split("/").at(-1) ?? "page"} wants internet from ${request.sites?.join(", ") ?? "the listed sites"}.` : `${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}.`} ${allowScope === "project" ? `This allows ${projectCoverSentence(request.projectCovers ?? [])} for ${request.projectTitle ?? request.threadTitle} for 30 days.` : "Enter the parent code to allow it, this once."}`}
-        actionLabel={allowScope === "project" ? "Allow for this project" : "Allow once"}
+        title={
+          allowScope === "project"
+            ? "Allow for this project?"
+            : allowScope === "batch"
+              ? `Allow all ${batch?.items.length ?? 0}?`
+              : "Allow this once?"
+        }
+        description={`${codeNote === null ? "" : `${codeNote}\n\n`}${allowScope === "batch" && batch ? `${name}'s project has ${batch.items.length} similar requests. Enter the parent code to allow each one once.` : request.kind === "page-internet" ? `${name}'s ${request.page?.split("/").at(-1) ?? "page"} wants internet from ${request.sites?.join(", ") ?? "the listed sites"}.` : `${name}'s conversation wants to ${heading.charAt(0).toLowerCase()}${heading.slice(1)}.`} ${allowScope === "project" ? `This allows ${projectCoverSentence(request.projectCovers ?? [])} for ${request.projectTitle ?? request.threadTitle} for 30 days.` : allowScope === "batch" ? "This is for these requests only." : "Enter the parent code to allow it, this once."}`}
+        actionLabel={
+          allowScope === "project"
+            ? "Allow for this project"
+            : allowScope === "batch"
+              ? `Allow all ${batch?.items.length ?? 0}`
+              : "Allow once"
+        }
         length={codeLength}
         onClose={() => {
           setAsking(false);
           setCodeNote(null);
         }}
         onCode={async (code) => {
+          if (allowScope === "batch" && batch) {
+            const result = await familyApi.answerBatch(mac.transport, {
+              batchId: batch.id,
+              fingerprint: batch.fingerprint,
+              decision: "accept",
+              proof: { type: "code", code },
+            });
+            if (!result.ok) return result.message;
+            setAsking(false);
+            haptic("success");
+            settle(`Allowed all ${batch.items.length}, once each.`);
+            return null;
+          }
           const result = await familyApi.answerRequest(mac.transport, {
             threadId: request.threadId,
             requestId: request.requestId,

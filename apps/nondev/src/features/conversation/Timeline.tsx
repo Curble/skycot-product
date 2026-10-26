@@ -7,7 +7,8 @@
 // back to a quiet narrated line for anything unregistered.
 import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@t3tools/contracts";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { useEffect, useRef, type ReactNode } from "react";
+import * as DateTime from "effect/DateTime";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { readPolicyDecision } from "@t3tools/skycot-rules/decision";
 
@@ -16,6 +17,7 @@ import {
   SWITCH_MESSAGE_PREFIX,
   continuationSwitch,
   isCarriedOnLimitItem,
+  usageLimitNoteIsStale,
 } from "../../plain/switches";
 import { foldTakenBack, rolledBackRunIds } from "../rewind/rewind";
 import { TakenBackFold } from "../rewind/TakenBackFold";
@@ -102,6 +104,7 @@ export function Timeline({
   shell,
   projectName,
   trailing,
+  sendingMessage,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -110,8 +113,14 @@ export function Timeline({
   readonly projectName: string | null;
   /** Rendered after the last item (e.g. the typing indicator while a run is live). */
   readonly trailing?: ReactNode;
+  readonly sendingMessage?: { readonly id: string; readonly text: string } | null;
 }) {
   const childView = useChildView();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const items = projection.turnItems;
   const startedAt = shell?.createdAt ?? null;
   // Asks the SKYCOT rules answered were never a question for the person: they
@@ -153,6 +162,20 @@ export function Timeline({
     }
     const item = entry.item;
     if (isCarriedOnLimitItem(projection, item)) return null;
+    if (item.type === "error" && item.failure.class === "usage_limit") {
+      const failedAt = DateTime.toEpochMillis(item.updatedAt);
+      const workedAgain = projection.runs.some(
+        (run) => run.startedAt !== null && DateTime.toEpochMillis(run.startedAt) > failedAt,
+      );
+      if (
+        usageLimitNoteIsStale({
+          resetAt: item.failure.resetAt ?? null,
+          workedAgain,
+          now,
+        })
+      )
+        return null;
+    }
     const messageId = item.type === "user_message" ? String(item.messageId) : null;
     const change =
       messageId === null
@@ -192,6 +215,12 @@ export function Timeline({
   // Follow the newest message like Messages does, but only while the reader is
   // already at the bottom; scrolling up to re-read something pins the view.
   const follow = useRef(true);
+  const sendingAlreadyRecorded =
+    sendingMessage !== null &&
+    sendingMessage !== undefined &&
+    projection.turnItems.some(
+      (item) => item.type === "user_message" && String(item.messageId) === sendingMessage.id,
+    );
   useEffect(() => {
     const scroller = stream.current;
     const content = inner.current;
@@ -240,6 +269,13 @@ export function Timeline({
               renderEntry(entry)
             ),
           )}
+          {sendingMessage && !sendingAlreadyRecorded ? (
+            <div key={sendingMessage.id} className="fm-stream__item">
+              <Bubble author="me" meta="Sending…">
+                {sendingMessage.text}
+              </Bubble>
+            </div>
+          ) : null}
         </div>
         {trailing}
       </div>

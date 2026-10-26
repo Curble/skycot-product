@@ -20,10 +20,10 @@ export function AboutContent() {
         <Txt variant="title2">SKYCOT</Txt>
         <Txt tone="label2">Version {version}</Txt>
         <Txt variant="footnote" tone="label2" center>
-          The cloud is SKYCOT too.
+          A friendly place to build with Sam.
         </Txt>
       </View>
-      <Section footer="SKYCOT keeps your family's work on your own Mac. No account or advertising. SKYCOT counts update checks and relay connections as anonymous daily totals. The count resets each UTC day and has no name or account attached. Do Not Track or Global Privacy Control opts out of update counting; turning off updates or the relay stops those requests.">
+      <Section footer="Your family's work stays on your Mac. SKYCOT has no account or ads. Each day, we count app update checks and relay connections without names or account details. Totals reset daily. Update counts stop when updates are turned off or when Do Not Track or Global Privacy Control is on.">
         <Row title="Made by" detail="Curble Pty Ltd" />
         <Row title="Copyright" subtitle="© 2026 Curble Pty Ltd, trading as SKYCOT." />
       </Section>

@@ -11,13 +11,13 @@ describe("the Lock Screen's words", () => {
     expect(JSON.stringify(activity)).not.toMatch(/space game/iu);
   });
 
-  it("says who needs a grown-up on a grown-up's phone", () => {
+  it("shows the number of requests that need a grown-up", () => {
     expect(grownUpActivity({ waitingChildNames: ["Ava"] }, at)?.headline).toBe(
-      "Ava needs a grown-up",
+      "1 request needs a grown-up",
     );
-    expect(grownUpActivity({ waitingChildNames: ["Ava", "Leo", "Leo"] }, at)?.headline).toBe(
-      "Ava and 1 more need a grown-up",
-    );
+    expect(
+      grownUpActivity({ waitingChildNames: ["Ava", "Ava", "Leo"], waitingCount: 3 }, at)?.headline,
+    ).toBe("3 requests need a grown-up");
   });
 
   it("goes quiet when nothing is happening", () => {

@@ -211,6 +211,37 @@ export interface PendingRequest {
   >;
   readonly page?: string;
   readonly sites?: ReadonlyArray<string>;
+  readonly batch?: ApprovalBatch;
+}
+
+export interface ApprovalBatch {
+  readonly id: string;
+  readonly childId: string;
+  readonly project: string;
+  readonly kind: "webSearch" | "addOns" | "internetFetch" | "internetAssets";
+  readonly fingerprint: string;
+  readonly items: ReadonlyArray<{
+    readonly threadId: string;
+    readonly requestId: string;
+    readonly what: string;
+    readonly fingerprint: string;
+  }>;
+}
+
+export function approvalBatchSentence(
+  batch: ApprovalBatch,
+  childName: string,
+  projectTitle: string | null,
+): string {
+  const request =
+    batch.kind === "internetAssets"
+      ? "pictures and files from the internet"
+      : batch.kind === "internetFetch"
+        ? "downloads from the internet"
+        : batch.kind === "webSearch"
+          ? "web searches"
+          : "add-ons";
+  return `${childName}'s ${projectTitle ?? "project"} wants ${batch.items.length} ${request}.`;
 }
 
 /**
@@ -222,6 +253,38 @@ export interface PendingRequest {
 export function parsePendingRequests(body: unknown): ReadonlyArray<PendingRequest> | null {
   const requests = record(body)["requests"];
   if (!Array.isArray(requests)) return null;
+  const batches = Array.isArray(record(body)["batches"])
+    ? (record(body)["batches"] as unknown[]).flatMap((entry): ApprovalBatch[] => {
+        const input = record(entry);
+        const items = Array.isArray(input["items"])
+          ? input["items"].flatMap((row) => {
+              const item = record(row);
+              const threadId = text(item["threadId"]);
+              const requestId = text(item["requestId"]);
+              const fingerprint = text(item["fingerprint"]);
+              return threadId && requestId && fingerprint
+                ? [{ threadId, requestId, fingerprint, what: text(item["what"]) ?? "" }]
+                : [];
+            })
+          : [];
+        const kind = input["kind"];
+        const id = text(input["id"]);
+        const childId = text(input["childId"]);
+        const project = text(input["project"]);
+        const fingerprint = text(input["fingerprint"]);
+        return id &&
+          childId &&
+          project &&
+          fingerprint &&
+          items.length > 1 &&
+          (kind === "webSearch" ||
+            kind === "addOns" ||
+            kind === "internetFetch" ||
+            kind === "internetAssets")
+          ? [{ id, childId, project, kind, fingerprint, items }]
+          : [];
+      })
+    : [];
   return requests.flatMap((entry: unknown) => {
     const input = record(entry);
     const threadId = text(input["threadId"]);
@@ -229,6 +292,9 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
     const fingerprint = text(input["fingerprint"]);
     if (threadId === null || requestId === null || fingerprint === null) return [];
     if (input["needsGrownUp"] === false) return [];
+    const batch = batches.find((candidate) =>
+      candidate.items.some((item) => item.threadId === threadId && item.requestId === requestId),
+    );
     return [
       {
         threadId,
@@ -262,6 +328,7 @@ export function parsePendingRequests(body: unknown): ReadonlyArray<PendingReques
         ...(Array.isArray(input["sites"])
           ? { sites: input["sites"].filter((site): site is string => typeof site === "string") }
           : {}),
+        ...(batch === undefined ? {} : { batch }),
       },
     ];
   });

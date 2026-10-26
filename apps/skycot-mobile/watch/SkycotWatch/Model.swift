@@ -29,6 +29,10 @@ struct WatchRequest: Codable, Identifiable, Hashable {
   let createdAt: Double
   let lapsed: Bool
   let watchCanSayYes: Bool
+  let batchId: String?
+  let batchFingerprint: String?
+  let batchCount: Int?
+  let batchLead: Bool?
 }
 
 /// A family note: "Ava asked for more time" or "Ava made something". Never what they made.
@@ -95,12 +99,14 @@ enum WatchMessage: Encodable {
   case lock
   case challenge(WatchRequest, scope: String?)
   case answer(WatchRequest, decision: String, proof: Proof?, scope: String?)
+  case challengeBatch(WatchRequest)
+  case answerBatch(WatchRequest, decision: String, proof: Proof?)
   /// "Not tonight" to a note asking for more time. No proof, and no minutes: the Watch can't
   /// give more time (the Mac needs the parent code, on the iPhone).
   case noteNotTonight(WatchNote)
 
   private enum Keys: String, CodingKey {
-    case type, macId, threadId, requestId, fingerprint, decision, proof, noteId, scope
+    case type, macId, threadId, requestId, fingerprint, decision, proof, noteId, scope, batchId
   }
 
   func encode(to encoder: Encoder) throws {
@@ -126,6 +132,18 @@ enum WatchMessage: Encodable {
       try out.encode(decision, forKey: .decision)
       try out.encodeIfPresent(proof, forKey: .proof)
       try out.encodeIfPresent(scope, forKey: .scope)
+    case .challengeBatch(let request):
+      try out.encode("challenge", forKey: .type)
+      try out.encode(request.macId, forKey: .macId)
+      try out.encode(request.batchId, forKey: .batchId)
+      try out.encode(request.batchFingerprint, forKey: .fingerprint)
+    case .answerBatch(let request, let decision, let proof):
+      try out.encode("answer", forKey: .type)
+      try out.encode(request.macId, forKey: .macId)
+      try out.encode(request.batchId, forKey: .batchId)
+      try out.encode(request.batchFingerprint, forKey: .fingerprint)
+      try out.encode(decision, forKey: .decision)
+      try out.encodeIfPresent(proof, forKey: .proof)
     case .noteNotTonight(let note):
       try out.encode("noteNotTonight", forKey: .type)
       try out.encode(note.macId, forKey: .macId)

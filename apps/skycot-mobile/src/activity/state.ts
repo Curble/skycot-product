@@ -44,16 +44,15 @@ export function childActivity(
 }
 
 export function grownUpActivity(
-  input: { readonly waitingChildNames: ReadonlyArray<string> },
+  input: { readonly waitingChildNames: ReadonlyArray<string>; readonly waitingCount?: number },
   now: Date = new Date(),
 ): FamilyActivity | null {
   const names = input.waitingChildNames;
   if (names.length === 0) return null;
   const first = names[0]!;
-  const others = new Set(names).size - 1;
+  const count = input.waitingCount ?? names.length;
   return {
-    headline:
-      others > 0 ? `${first} and ${others} more need a grown-up` : `${first} needs a grown-up`,
+    headline: count === 1 ? "1 request needs a grown-up" : `${count} requests need a grown-up`,
     detail: "Open SKYCOT to say yes once, or no.",
     phase: "needs-grown-up",
     count: names.length,

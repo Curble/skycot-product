@@ -32,6 +32,7 @@ export type FaceIdApi = Pick<
   | "deviceKeyForget"
   | "deviceKeyChallenge"
   | "answerRequest"
+  | "answerBatch"
 >;
 
 /** The Secure Enclave's part, as `SkycotDeviceKey` has it. */
@@ -174,6 +175,52 @@ export async function allowWithFaceId(input: {
   return KEY_REASONS.has(answered.reason)
     ? { kind: "use-code", note: answered.message }
     : { kind: "problem", message: answered.message };
+}
+
+export async function allowBatchWithFaceId(input: {
+  readonly api: FaceIdApi;
+  readonly signer: FaceIdSigner;
+  readonly transport: MacTransport;
+  readonly batch: { readonly batchId: string; readonly fingerprint: string };
+  readonly reason: string;
+  readonly label?: string;
+}): Promise<AllowOutcome> {
+  const { api, signer, transport, batch } = input;
+  const issued = await api.deviceKeyChallenge(transport, {
+    batchId: batch.batchId,
+    fingerprint: batch.fingerprint,
+  });
+  if (!issued.ok) {
+    return KEY_REASONS.has(issued.reason)
+      ? { kind: "use-code", note: null }
+      : { kind: "problem", message: issued.message };
+  }
+  if (issued.value.keyId === null || issued.value.purpose !== "approve")
+    return { kind: "use-code", note: null };
+  try {
+    const [signature] = await signer.sign(input.reason, [
+      { purpose: "approve", challenge: issued.value.challenge, action: issued.value.action },
+    ]);
+    if (!signature)
+      return { kind: "use-code", note: fallbackNote("failed", input.label ?? "Face ID") };
+    const answered = await api.answerBatch(transport, {
+      batchId: batch.batchId,
+      fingerprint: batch.fingerprint,
+      decision: "accept",
+      proof: {
+        type: "device-key",
+        keyId: issued.value.keyId,
+        challenge: issued.value.challenge,
+        signature,
+      },
+    });
+    return answered.ok ? { kind: "allowed" } : { kind: "problem", message: answered.message };
+  } catch (error) {
+    return {
+      kind: "use-code",
+      note: fallbackNote(deviceKeyErrorCode(error), input.label ?? "Face ID"),
+    };
+  }
 }
 
 /**

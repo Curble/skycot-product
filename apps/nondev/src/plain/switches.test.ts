@@ -8,6 +8,7 @@ import {
   isCarriedOnLimitItem,
   parseAssistantSwitches,
   switchLine,
+  usageLimitNoteIsStale,
   wasCarriedOn,
 } from "./switches";
 import { restingUntilPhrase } from "./usage";
@@ -17,6 +18,26 @@ const NOW = Date.parse("2026-10-24T09:00:00.000Z");
 const TZ = "Australia/Melbourne";
 const HOUR = 60 * 60_000;
 const TUESDAY = Date.parse("2026-10-27T03:04:00.000Z");
+
+describe("stale usage limit notes", () => {
+  it("hides a note after its reset or once work resumes", () => {
+    expect(
+      usageLimitNoteIsStale({
+        resetAt: new Date(NOW + HOUR).toISOString(),
+        workedAgain: false,
+        now: NOW,
+      }),
+    ).toBe(false);
+    expect(
+      usageLimitNoteIsStale({
+        resetAt: new Date(NOW - 1).toISOString(),
+        workedAgain: false,
+        now: NOW,
+      }),
+    ).toBe(true);
+    expect(usageLimitNoteIsStale({ resetAt: null, workedAgain: true, now: NOW })).toBe(true);
+  });
+});
 
 const decodeProvider = Schema.decodeUnknownSync(ServerProvider);
 const base = {

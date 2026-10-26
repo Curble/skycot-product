@@ -2,7 +2,7 @@
 // shows when SKYCOT opens (once per window), and from Settings › Family › Switch. Choosing
 // needs no code; moving away from a child SKYCOT is asleep for does (the engine says so), and
 // then the code is asked for right here, without a second sheet on top.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "../../ui/Button";
@@ -15,7 +15,7 @@ import { grownUpLabel } from "../family/people";
 import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import { tryParentCode, useFamilyView } from "../family/store";
 import { chooseChild } from "./store";
-import { rememberChild } from "./idlePicker";
+import { bufferPickerCode, rememberChild } from "./idlePicker";
 
 export function ChildPicker({
   onDone,
@@ -27,6 +27,10 @@ export function ChildPicker({
 }) {
   const view = useFamilyView();
   const ref = useRef<HTMLDivElement>(null);
+  const earlyCode = useRef("");
+  const captureCode = useRef(false);
+  const captureKey = useRef<((event: KeyboardEvent) => void) | null>(null);
+  const captureTimer = useRef<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [needsGrownUp, setNeedsGrownUp] = useState<{ childId: string; sentence: string } | null>(
     null,
@@ -36,6 +40,56 @@ export function ChildPicker({
   const [grownUp, setGrownUp] = useState<{ readonly id: string; readonly name: string } | null>(
     null,
   );
+  useEffect(() => {
+    if (grownUp === null && needsGrownUp === null) return;
+    const field = ref.current?.querySelector<HTMLInputElement>("input[type=password]");
+    if (!field) return;
+    captureCode.current = false;
+    if (captureKey.current) window.removeEventListener("keydown", captureKey.current, true);
+    captureKey.current = null;
+    field.focus();
+    if (earlyCode.current) {
+      const value = earlyCode.current;
+      earlyCode.current = "";
+      entry.setCode(value);
+    }
+  }, [grownUp, needsGrownUp]);
+  useEffect(
+    () => () => {
+      if (captureTimer.current !== null) window.clearTimeout(captureTimer.current);
+      if (captureKey.current) window.removeEventListener("keydown", captureKey.current, true);
+    },
+    [],
+  );
+
+  const startCodeCapture = () => {
+    earlyCode.current = "";
+    captureCode.current = true;
+    const capture = (event: KeyboardEvent) => {
+      if (!captureCode.current) {
+        window.removeEventListener("keydown", capture, true);
+        return;
+      }
+      const next = bufferPickerCode(earlyCode.current, event.key);
+      if (next !== null) {
+        earlyCode.current = next;
+        event.preventDefault();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+      }
+    };
+    captureKey.current = capture;
+    window.addEventListener("keydown", capture, true);
+    if (captureTimer.current !== null) window.clearTimeout(captureTimer.current);
+    captureTimer.current = window.setTimeout(() => {
+      if (captureCode.current) {
+        captureCode.current = false;
+        window.removeEventListener("keydown", capture, true);
+        captureKey.current = null;
+      }
+      captureTimer.current = null;
+    }, 1000);
+  };
   useModal(ref, {
     open: true,
     onClose: dismissible ? onDone : () => undefined,
@@ -157,9 +211,10 @@ export function ChildPicker({
                           type="button"
                           className="fm-picker__tag fm-picker__tag--grown-up"
                           disabled={busy !== null}
-                          onClick={() =>
-                            setGrownUp({ id: person.id, name: grownUpLabel(person, index) })
-                          }
+                          onClick={() => {
+                            startCodeCapture();
+                            setGrownUp({ id: person.id, name: grownUpLabel(person, index) });
+                          }}
                         >
                           <span className="fm-picker__tag-hello" aria-hidden>
                             HELLO <small>my name is</small>

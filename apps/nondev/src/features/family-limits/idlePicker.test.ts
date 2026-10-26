@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   CHILD_PICK_MEMORY_MS,
+  bufferPickerCode,
   pickerAfterIdle,
   PICKER_IDLE_MS,
   rememberedChildIsFresh,
@@ -9,6 +10,12 @@ import {
 } from "./idlePicker";
 
 describe("the shared Mac child picker idle time", () => {
+  it("keeps a quick code burst while the grown-up field opens", () => {
+    expect(bufferPickerCode("123", "4")).toBe("1234");
+    expect(bufferPickerCode("123", "Backspace")).toBe("12");
+    expect(bufferPickerCode("123", "a")).toBeNull();
+  });
+
   it("waits an hour after the last input", () => {
     expect(pickerAfterIdle(1_000, 1_000 + PICKER_IDLE_MS - 1)).toBe(false);
     expect(pickerAfterIdle(1_000, 1_000 + PICKER_IDLE_MS)).toBe(true);

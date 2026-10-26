@@ -46,12 +46,14 @@ import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
 import * as SkycotFamilyGate from "../SkycotFamilyGate.ts";
 import * as SkycotFamilyDevices from "./SkycotFamilyDevices.ts";
+import type { PendingApproval } from "./SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
 import { filterShellSnapshot, folderOwner, referencedBy } from "./visibility.ts";
 
 // nondev-seam: skycot-page-internet-approver-test
 // nondev-seam: skycot-project-approval-fingerprint-test
+// nondev-seam: skycot-approval-batches-test
 
 describe("page ask fingerprints", () => {
   it("binds the child, conversation, page and sorted exact sites", () => {
@@ -115,6 +117,56 @@ describe("project approval fingerprints", () => {
     });
     assert.notEqual(once, project);
     assert.notEqual(project, otherCovers);
+  });
+});
+
+describe("approval batches", () => {
+  const request = (
+    threadId: string,
+    requestId: string,
+    childId: string | null,
+    projectId: string,
+    covers: PendingApproval["projectCovers"] = ["internetAssets"],
+  ): PendingApproval => ({
+    threadId,
+    requestId,
+    childId,
+    projectId,
+    projectTitle: "Soccer game",
+    threadTitle: "Pictures",
+    createdAt: 1,
+    lapsed: false,
+    needsGrownUp: true,
+    why: "Internet",
+    what: requestId,
+    kind: "command",
+    fingerprint: `${threadId}:${requestId}`,
+    projectCovers: covers,
+  });
+
+  it("binds every sorted item and refuses to make groups across children, projects or uncovered requests", () => {
+    const together = [request("t1", "r1", "leo", "p1"), request("t2", "r2", "leo", "p1")];
+    const [batch] = SkycotFamilyDevices.buildApprovalBatches(together);
+    assert.isDefined(batch);
+    assert.equal(batch.items.length, 2);
+    assert.notEqual(
+      batch.fingerprint,
+      SkycotFamilyDevices.buildApprovalBatches([...together, request("t3", "r3", "leo", "p1")])[0]
+        ?.fingerprint,
+    );
+    assert.equal(
+      SkycotFamilyDevices.buildApprovalBatches([
+        ...together,
+        request("t3", "r3", "ava", "p1"),
+        request("t4", "r4", "leo", "p2"),
+        request("t5", "r5", "leo", "p1", []),
+      ]).length,
+      1,
+    );
+    assert.deepEqual(
+      batch.items.map((item) => item.requestId),
+      ["r1", "r2"],
+    );
   });
 });
 
@@ -1538,5 +1590,46 @@ it.layer(NodeServices.layer)("linked devices", (it) => {
         assert.equal(logged?.by?.via?.name, "Mum's Apple Watch");
       }),
     ),
+  );
+
+  it.effect(
+    "one batch proof answers each matching page ask once and a changed list is refused",
+    () =>
+      withDevices((world) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-page-batch-" });
+          const firstPage = path.join(dir, "first.html");
+          const secondPage = path.join(dir, "second.html");
+          yield* fs.writeFileString(firstPage, "<p>one</p>");
+          yield* fs.writeFileString(secondPage, "<p>two</p>");
+          for (const page of [firstPage, secondPage]) {
+            yield* world.family.askPageInternet({
+              threadId: "thread-ava",
+              childId: world.avaId,
+              page,
+              sites: [page === firstPage ? "one.example" : "two.example"],
+            });
+          }
+          const batch = (yield* world.devices.approvalBatches).find(
+            (entry) => entry.kind === "internetAssets",
+          );
+          assert.isDefined(batch);
+          assert.equal(batch.items.length, 2);
+          const answer = {
+            who: mum(world),
+            sessionId: "mum-phone",
+            origin: "http://localhost:3790",
+            batchId: batch.id,
+            fingerprint: batch.fingerprint,
+            decision: "accept" as const,
+            proof: { type: "code" as const, code: CODE },
+          };
+          yield* world.devices.answerBatch(answer);
+          assert.equal((yield* world.family.pendingPageInternetAsks).length, 0);
+          assert.isTrue(yield* refused(world.devices.answerBatch(answer)));
+        }),
+      ),
   );
 });

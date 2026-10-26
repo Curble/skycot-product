@@ -271,7 +271,15 @@ export const familyApi = {
     readonly decision: "accept" | "decline";
     readonly fingerprint: string;
     readonly proof: ApproverProof | null;
+    readonly scope?: "once" | "project";
   }) => request("POST", "/approver/answer", input, okOnly),
+  answerBatch: (input: {
+    readonly batchId: string;
+    readonly fingerprint: string;
+    readonly decision: "accept" | "decline";
+    readonly proof: ApproverProof | null;
+    readonly via?: "watch";
+  }) => request("POST", "/approver/answer-batch", input, okOnly),
   approverChallenge: (input: Record<string, string>) =>
     request("POST", "/approver/challenge", input, anyObject),
   approverMoreTime: (input: {

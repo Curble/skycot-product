@@ -46,6 +46,10 @@ export interface WatchRequest {
   readonly lapsed: boolean;
   /** This phone's Watch is set up to say yes on that Mac. */
   readonly watchCanSayYes: boolean;
+  readonly batchId?: string;
+  readonly batchFingerprint?: string;
+  readonly batchCount?: number;
+  readonly batchLead?: boolean;
 }
 
 /**
@@ -121,17 +125,19 @@ export type WatchMessage =
   | {
       readonly type: "challenge";
       readonly macId: string;
-      readonly threadId: string;
-      readonly requestId: string;
+      readonly threadId?: string;
+      readonly requestId?: string;
       readonly fingerprint: string;
+      readonly batchId?: string;
       readonly scope?: "once" | "project";
     }
   | {
       readonly type: "answer";
       readonly macId: string;
-      readonly threadId: string;
-      readonly requestId: string;
+      readonly threadId?: string;
+      readonly requestId?: string;
       readonly fingerprint: string;
+      readonly batchId?: string;
       readonly decision: "accept" | "decline";
       readonly scope?: "once" | "project";
       /** A yes only: the Watch's signature over the Mac's challenge. */
@@ -202,18 +208,23 @@ export function parseWatchMessage(json: string): WatchMessage | null {
     case "challenge":
     case "answer": {
       const macId = text(input.macId);
+      const batchId = text(input.batchId);
       const threadId = text(input.threadId);
       const requestId = text(input.requestId);
       const fingerprint = text(input.fingerprint, 128);
-      if (macId === null || threadId === null || requestId === null || fingerprint === null) {
+      if (
+        macId === null ||
+        fingerprint === null ||
+        (batchId === null && (threadId === null || requestId === null))
+      ) {
         return null;
       }
       if (input.type === "challenge") {
         return {
           type: "challenge",
           macId,
-          threadId,
-          requestId,
+          ...(threadId === null || requestId === null ? {} : { threadId, requestId }),
+          ...(batchId === null ? {} : { batchId }),
           fingerprint,
           ...(input.scope === "project" ? { scope: "project" as const } : {}),
         };
@@ -233,8 +244,8 @@ export function parseWatchMessage(json: string): WatchMessage | null {
       return {
         type: "answer",
         macId,
-        threadId,
-        requestId,
+        ...(threadId === null || requestId === null ? {} : { threadId, requestId }),
+        ...(batchId === null ? {} : { batchId }),
         fingerprint,
         ...(input.scope === "project" ? { scope: "project" as const } : {}),
         decision,

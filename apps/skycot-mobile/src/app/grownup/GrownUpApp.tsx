@@ -5,6 +5,7 @@
  * send messages, start conversations, change settings or open files.
  */
 import { useGrownUp } from "./GrownUpContext";
+import { useLayout } from "../../ui/layout";
 import { useActivityMirror } from "../../activity/useActivityMirror";
 import {
   ChildConversationsScreen,
@@ -47,6 +48,7 @@ const SCREENS: ReadonlyArray<ShellScreen> = [
 
 export function GrownUpApp() {
   const grownUp = useGrownUp();
+  const { usesSplitView } = useLayout();
   useActivityMirror();
   const count = grownUp.waiting.filter((waiting) => !waiting.request.lapsed).length;
   const sections: ReadonlyArray<ShellSection> = [
@@ -64,7 +66,12 @@ export function GrownUpApp() {
       symbol: "figure.2.and.child.holdinghands",
       route: "Children",
     },
-    { id: "device", title: "This device", symbol: "iphone", route: "ThisDevice" },
+    {
+      id: "device",
+      title: usesSplitView ? "This device" : "Settings",
+      symbol: "gearshape",
+      route: "ThisDevice",
+    },
   ];
   return (
     <Shell

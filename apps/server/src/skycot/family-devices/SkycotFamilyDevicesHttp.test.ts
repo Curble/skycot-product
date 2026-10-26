@@ -1,5 +1,6 @@
 // Who is who over HTTP, through a real server: the doors of the device and approver routes, and
 // a child's own device meeting the HTTP reads that name a conversation.
+// nondev-seam: skycot-approval-batches-http-test
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -119,7 +120,12 @@ const makeServer = Effect.fn("WhoIsWhoHttpTest.makeServer")(function* () {
       answers.push(input);
       return Effect.void;
     },
+    answerBatch: (input) => {
+      answers.push(input);
+      return Effect.void;
+    },
     approvals: Effect.succeed([]),
+    approvalBatches: Effect.succeed([]),
     moreTime: (input) => {
       if (input.proof === null)
         return Effect.fail(
@@ -421,6 +427,15 @@ it.layer(
       );
       assert.equal(
         (yield* send("ava", "POST", "/api/skycot/family/approver/answer", body("accept"))).status,
+        403,
+      );
+      assert.equal(
+        (yield* send("ava", "POST", "/api/skycot/family/approver/answer-batch", {
+          batchId: "batch",
+          fingerprint: "f",
+          decision: "accept",
+          proof: { type: "code", code: CODE },
+        })).status,
         403,
       );
       assert.equal(answers.length, 1);

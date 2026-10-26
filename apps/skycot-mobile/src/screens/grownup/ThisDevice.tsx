@@ -103,7 +103,7 @@ export function ThisDeviceScreen() {
         title={faceId.label}
         footer={
           faceIdProblem ??
-          `${faceId.label} signs each yes with a key that never leaves this iPhone, and only your ${faceId.label === "Touch ID" ? "fingerprint" : "face"} can use it. The parent code always works too, and saying no never needs either.`
+          `Allow once asks you to confirm with ${faceId.label}. The parent code always works too, and saying no never needs either.`
         }
       >
         <Row
@@ -152,7 +152,7 @@ export function ThisDeviceScreen() {
           title="Apple Watch"
           footer={
             watchProblem ??
-            "Your Watch asks your iPhone, and your iPhone asks the Mac: the Watch has no sign-in of its own. A yes from the Watch is logged as from your Watch, through this iPhone."
+            "Your Watch asks this iPhone, which checks with the Mac. A yes from your Watch is recorded as yours."
           }
         >
           <Row
@@ -220,7 +220,7 @@ export function ThisDeviceScreen() {
             key={mac.macId}
             leading={<RowIcon name="iphone" color={theme.color.accent} />}
             title={mac.me.deviceName}
-            subtitle={`On ${mac.macName}: a grown-up's device. It reads and says yes or no, and can't change anything.`}
+            subtitle={`Linked to ${mac.macName}. You can answer requests here.`}
           />
         ))}
         <Row
@@ -258,7 +258,7 @@ export function ThisDeviceScreen() {
       <ParentCodeSheet
         visible={settingUpWatch}
         title="Say yes from your Watch?"
-        description="Open SKYCOT on your Apple Watch first. Then enter the parent code: your Watch makes its own key and can say yes once while it's unlocked and on your wrist."
+        description="Open SKYCOT on your Apple Watch first. Then enter the parent code once. Your Watch can confirm a request while it is unlocked and on your wrist."
         actionLabel="Set up"
         length={codeLength}
         onClose={() => setSettingUpWatch(false)}

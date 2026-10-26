@@ -3,6 +3,13 @@ export const PICKER_IDLE_MS = 60 * 60_000;
 export const CHILD_PICK_MEMORY_MS = 8 * 60 * 60_000;
 const LAST_CHILD_KEY = "skycot:family:last-child";
 
+/** Digits typed during the picker-to-code-field handoff, or null when the key is unrelated. */
+export function bufferPickerCode(current: string, key: string): string | null {
+  if (/^\d$/u.test(key)) return `${current}${key}`.slice(0, 6);
+  if (key === "Backspace") return current.slice(0, -1);
+  return null;
+}
+
 export function rememberChild(childId: string, selectedAt: number): void {
   try {
     window.localStorage.setItem(LAST_CHILD_KEY, JSON.stringify({ childId, selectedAt }));

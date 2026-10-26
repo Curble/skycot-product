@@ -1315,7 +1315,9 @@ const proofOf = (value: unknown): SkycotFamilyDevices.Proof | null => {
 
 /** The requests waiting for a grown-up, in plain words (details only after the phone is unlocked). */
 const approverRequestsRoute = approverRoute("GET", "/approver/requests", ({ service }) =>
-  service.approvals.pipe(Effect.map((requests) => json({ requests }))),
+  Effect.all([service.approvals, service.approvalBatches]).pipe(
+    Effect.map(([requests, batches]) => json({ requests, batches })),
+  ),
 );
 
 /** A child can leave only a small note for their own grown-ups; the relay gets only its kind. */
@@ -1446,14 +1448,43 @@ const approverChallengeRoute = approverRoute(
               childId: text(body["childId"]),
               kind: text(body["kind"]),
             }
-          : {
-              type: "approve" as const,
-              threadId: text(body["threadId"]),
-              requestId: text(body["requestId"]),
-              fingerprint: text(body["fingerprint"]),
-            };
+          : body["type"] === "approve-batch"
+            ? {
+                type: "approve-batch" as const,
+                batchId: text(body["batchId"]),
+                fingerprint: text(body["fingerprint"]),
+              }
+            : {
+                type: "approve" as const,
+                threadId: text(body["threadId"]),
+                requestId: text(body["requestId"]),
+                fingerprint: text(body["fingerprint"]),
+              };
       return json(yield* service.challenge({ who: grownUp, origin, action }));
     }),
+);
+
+// nondev-seam: skycot-approval-batches
+const approverBatchAnswerRoute = approverRoute(
+  "POST",
+  "/approver/answer-batch",
+  ({ service, grownUp, origin, body, sessionId }) => {
+    const decision = body["decision"];
+    if (!isApproverDecision(decision))
+      return Effect.succeed(json({ error: "invalid-request" }, 400));
+    return service
+      .answerBatch({
+        who: grownUp,
+        sessionId,
+        origin,
+        batchId: text(body["batchId"]),
+        fingerprint: text(body["fingerprint"]),
+        decision,
+        proof: proofOf(body["proof"]),
+        via: body["via"] === "watch" ? "watch" : null,
+      })
+      .pipe(Effect.as(json({ ok: true })));
+  },
 );
 
 /** Accept or decline one request, once. Never "for the session" or "always". */
@@ -1588,8 +1619,9 @@ const watchChallengeRoute = approverRoute(
     service
       .watchChallenge({
         who: grownUp,
-        threadId: text(body["threadId"]),
-        requestId: text(body["requestId"]),
+        ...(typeof body["batchId"] === "string"
+          ? { batchId: text(body["batchId"]) }
+          : { threadId: text(body["threadId"]), requestId: text(body["requestId"]) }),
         fingerprint: text(body["fingerprint"]),
       })
       .pipe(Effect.map((issued) => json(issued))),
@@ -1645,8 +1677,9 @@ const deviceKeyChallengeRoute = approverRoute(
     service
       .deviceKeyChallenge({
         who: grownUp,
-        threadId: text(body["threadId"]),
-        requestId: text(body["requestId"]),
+        ...(typeof body["batchId"] === "string"
+          ? { batchId: text(body["batchId"]) }
+          : { threadId: text(body["threadId"]), requestId: text(body["requestId"]) }),
         fingerprint: text(body["fingerprint"]),
       })
       .pipe(Effect.map((issued) => json(issued))),
@@ -1719,6 +1752,7 @@ export const layerDeviceRoutes = Layer.mergeAll(
   familyNoteAnswerRoute,
   approverChallengeRoute,
   approverAnswerRoute,
+  approverBatchAnswerRoute,
   approverMoreTimeRoute,
   approverLockAllRoute,
   passkeyOptionsRoute,

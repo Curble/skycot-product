@@ -164,25 +164,38 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
       }
       // nondev-seam: skycot-watch-project-approval-answer
       // The answer uses the same scope-bound fingerprint as the phone's Requests card.
-      const result = await familyApi.answerRequest(mac.transport, {
-        threadId: message.threadId,
-        requestId: message.requestId,
-        decision: message.decision,
-        fingerprint: message.fingerprint,
-        ...(message.scope === "project" ? { scope: "project" as const } : {}),
-        proof: message.proof === null ? null : { type: "watch", ...message.proof },
-        ...(message.decision === "decline" ? { via: "watch" as const } : {}),
-      });
+      const proof = message.proof === null ? null : { type: "watch" as const, ...message.proof };
+      const result =
+        message.batchId !== undefined
+          ? await familyApi.answerBatch(mac.transport, {
+              batchId: message.batchId,
+              fingerprint: message.fingerprint,
+              decision: message.decision,
+              proof,
+              ...(message.decision === "decline" ? { via: "watch" as const } : {}),
+            })
+          : await familyApi.answerRequest(mac.transport, {
+              threadId: message.threadId!,
+              requestId: message.requestId!,
+              decision: message.decision,
+              fingerprint: message.fingerprint,
+              ...(message.scope === "project" ? { scope: "project" as const } : {}),
+              proof,
+              ...(message.decision === "decline" ? { via: "watch" as const } : {}),
+            });
       if (!result.ok) return { ok: false, sentence: result.message };
-      SkycotWatch?.clearRequest(`${mac.macId}:${message.requestId}`);
+      if (message.requestId !== undefined)
+        SkycotWatch?.clearRequest(`${mac.macId}:${message.requestId}`);
       setTimeout(() => void refresh(mac.macId), 600);
       return {
         ok: true,
         sentence:
           message.decision === "accept"
-            ? message.scope === "project"
-              ? "Allowed for this project."
-              : "Allowed, this once."
+            ? message.batchId !== undefined
+              ? "Allowed all, once each."
+              : message.scope === "project"
+                ? "Allowed for this project."
+                : "Allowed, this once."
             : "Declined. They see that on their screen.",
       };
     },

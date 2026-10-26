@@ -388,6 +388,21 @@ export const familyApi = {
       { method: "POST", path: `${FAMILY_API_PATH}/approver/answer`, body: input },
       ok,
     ),
+  answerBatch: (
+    transport: MacTransport,
+    input: {
+      readonly batchId: string;
+      readonly fingerprint: string;
+      readonly decision: "accept" | "decline";
+      readonly proof: ApproverProof | null;
+      readonly via?: "watch";
+    },
+  ) =>
+    call(
+      transport,
+      { method: "POST", path: `${FAMILY_API_PATH}/approver/answer-batch`, body: input },
+      ok,
+    ),
   /** "Say yes from my Apple Watch": the parent code once; the Watch signs what comes back. */
   watchOptions: (transport: MacTransport, code: string) =>
     call(
@@ -418,7 +433,12 @@ export const familyApi = {
     ),
   watchChallenge: (
     transport: MacTransport,
-    input: { readonly threadId: string; readonly requestId: string; readonly fingerprint: string },
+    input: {
+      readonly threadId?: string;
+      readonly requestId?: string;
+      readonly batchId?: string;
+      readonly fingerprint: string;
+    },
   ) =>
     call(
       transport,
@@ -455,7 +475,12 @@ export const familyApi = {
   /** A one-use challenge for one yes with Face ID, for the card this phone shows. */
   deviceKeyChallenge: (
     transport: MacTransport,
-    input: { readonly threadId: string; readonly requestId: string; readonly fingerprint: string },
+    input: {
+      readonly threadId?: string;
+      readonly requestId?: string;
+      readonly batchId?: string;
+      readonly fingerprint: string;
+    },
   ) =>
     call(
       transport,

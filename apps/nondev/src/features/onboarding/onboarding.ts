@@ -53,16 +53,16 @@ export function onboardingSteps(
   audience: Audience | null,
   familyEnabled = false,
 ): ReadonlyArray<OnboardingStep> {
-  // The Family set-up, then everyone picks the picture they'll tap on "Who's using SKYCOT?".
-  const family: OnboardingStep[] =
-    audience === "child" && !familyEnabled ? ["family", "picture"] : [];
+  // A child needs the parent code and an assistant before making a first thing. Pictures,
+  // folders and looks can be changed after the child lands in the Workshop.
+  const family: OnboardingStep[] = audience === "child" && !familyEnabled ? ["family"] : [];
   return [
     "who",
     ...family,
     "assistant",
-    "work",
+    ...(audience === "child" ? [] : ["work" as const]),
     ...(audience === "child" ? [] : ["autonomy" as const]),
-    "look",
+    ...(audience === "child" ? [] : ["look" as const]),
     "done",
   ];
 }

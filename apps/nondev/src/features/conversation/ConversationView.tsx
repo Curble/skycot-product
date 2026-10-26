@@ -293,6 +293,16 @@ export function ConversationView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [makeProjectOpen, setMakeProjectOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const [sendingMessage, setSendingMessage] = useState<{ id: string; text: string } | null>(null);
+  useEffect(() => {
+    if (
+      sendingMessage !== null &&
+      projection?.turnItems.some(
+        (item) => item.type === "user_message" && String(item.messageId) === sendingMessage.id,
+      )
+    )
+      setSendingMessage(null);
+  }, [projection, sendingMessage]);
   const [journeyNote, setJourneyNote] = useState<string | null>(null);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
@@ -495,6 +505,7 @@ export function ConversationView({
           projection={projection}
           shell={shell}
           projectName={projectName}
+          sendingMessage={sendingMessage}
           trailing={
             childView &&
             (active ||
@@ -549,6 +560,7 @@ export function ConversationView({
           rewindFacts={rewindFacts}
           journeyNote={journeyNote}
           onJourneyNoteHandled={() => setJourneyNote(null)}
+          onSendingMessage={setSendingMessage}
         />
       )}
 
@@ -748,6 +760,7 @@ function ReplyComposer({
   rewindFacts,
   journeyNote,
   onJourneyNoteHandled,
+  onSendingMessage,
 }: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -759,6 +772,7 @@ function ReplyComposer({
   readonly rewindFacts: ReturnType<typeof useRewindFacts>;
   readonly journeyNote: string | null;
   readonly onJourneyNoteHandled: () => void;
+  readonly onSendingMessage: (message: { id: string; text: string } | null) => void;
 }) {
   const childView = useChildView();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
@@ -878,6 +892,7 @@ function ReplyComposer({
   ): Promise<boolean> => {
     if (shell === null) return false;
     setSending(true);
+    onSendingMessage({ id: String(message.messageId), text: message.text });
     setProblem(null);
     // A note typed while it works joins that turn; anything else is a new request.
     const interactionMode = asNote ? shell.interactionMode : requestMode(planFirst);
@@ -907,6 +922,7 @@ function ReplyComposer({
           });
     setSending(false);
     if (outcome === null || outcome._tag === "Failure") {
+      onSendingMessage(null);
       const cause = outcome === null ? modeProblem : squashAtomCommandFailure(outcome);
       setProblem(
         cause instanceof Error && /scope|permission|unauthori/i.test(cause.message)

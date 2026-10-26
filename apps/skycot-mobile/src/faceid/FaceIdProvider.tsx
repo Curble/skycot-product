@@ -21,6 +21,7 @@ import { familyApi } from "../family/api";
 import { useLinks, type Mac } from "../links/store";
 import {
   allowReason,
+  allowBatchWithFaceId,
   allowWithFaceId,
   biometryLabel,
   faceIdReadyOn,
@@ -44,8 +45,9 @@ interface FaceIdValue {
   readonly allow: (
     mac: Mac,
     request: {
-      readonly threadId: string;
-      readonly requestId: string;
+      readonly threadId?: string;
+      readonly requestId?: string;
+      readonly batchId?: string;
       readonly fingerprint: string;
     },
     childName: string | null,
@@ -121,15 +123,29 @@ export function FaceIdProvider(props: { readonly children: ReactNode }) {
         return problem;
       },
       allow: async (mac, request, childName, scope = "once") => {
-        const outcome = await allowWithFaceId({
-          api: familyApi,
-          signer,
-          transport: mac.transport,
-          request,
-          scope,
-          reason: allowReason(childName),
-          label,
-        });
+        const outcome =
+          request.batchId !== undefined
+            ? await allowBatchWithFaceId({
+                api: familyApi,
+                signer,
+                transport: mac.transport,
+                batch: { batchId: request.batchId, fingerprint: request.fingerprint },
+                reason: allowReason(childName),
+                label,
+              })
+            : await allowWithFaceId({
+                api: familyApi,
+                signer,
+                transport: mac.transport,
+                request: {
+                  threadId: request.threadId!,
+                  requestId: request.requestId!,
+                  fingerprint: request.fingerprint,
+                },
+                scope,
+                reason: allowReason(childName),
+                label,
+              });
         // A key Face ID no longer opens shows as not set up from now on.
         setNative(readNative());
         return outcome;

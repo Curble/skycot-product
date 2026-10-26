@@ -40,7 +40,7 @@ export function useActivityMirror(): FamilyActivity | null {
             state?.status?.children.find((c) => c.id === request.childId)?.name ?? "A child",
         );
     });
-    activity = grownUpActivity({ waitingChildNames: names });
+    activity = grownUpActivity({ waitingChildNames: names, waitingCount: names.length });
   }
 
   const key = activity === null ? "none" : `${activity.phase}:${activity.headline}`;

@@ -53,4 +53,34 @@ describe("page internet approvals", () => {
     expect(request).not.toHaveProperty("target");
     expect(requestHeading(request!)).toBe("Run a command");
   });
+
+  it("attaches a batch to its members while still reading older single-request responses", () => {
+    const request = (requestId: string) => ({
+      threadId: "thread-1",
+      requestId,
+      fingerprint: `fp-${requestId}`,
+      childId: "ava",
+      needsGrownUp: true,
+      kind: "command",
+      projectCovers: ["addOns"],
+    });
+    const parsed = parsePendingRequests({
+      requests: [request("r1"), request("r2")],
+      batches: [
+        {
+          id: "batch-1",
+          childId: "ava",
+          project: "project-1",
+          kind: "addOns",
+          fingerprint: "batch-fp",
+          items: [
+            { threadId: "thread-1", requestId: "r1", what: "one", fingerprint: "fp-r1" },
+            { threadId: "thread-1", requestId: "r2", what: "two", fingerprint: "fp-r2" },
+          ],
+        },
+      ],
+    });
+    expect(parsed?.map((entry) => entry.batch?.id)).toEqual(["batch-1", "batch-1"]);
+    expect(parsePendingRequests({ requests: [request("r1")] })?.[0]).not.toHaveProperty("batch");
+  });
 });

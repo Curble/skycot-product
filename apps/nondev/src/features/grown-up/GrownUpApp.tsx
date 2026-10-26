@@ -41,6 +41,7 @@ import { ParentCodeEntry, useParentCodeEntry } from "../family/ParentCodeEntry";
 import {
   grownUpLabel,
   grownUpRequestSentence,
+  approvalBatchSentence,
   requestHeading,
   type PendingRequest,
 } from "../family/people";
@@ -330,10 +331,18 @@ function RequestCard({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [askCode, setAskCode] = useState(false);
+  const [allowScope, setAllowScope] = useState<"once" | "project">("once");
   const [done, setDone] = useState<"accept" | "decline" | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const isBatchLead =
+    request.batch?.items[0]?.threadId === request.threadId &&
+    request.batch.items[0]?.requestId === request.requestId;
 
-  const send = async (decision: "accept" | "decline", proof: ApproverProof | null) => {
+  const send = async (
+    decision: "accept" | "decline",
+    proof: ApproverProof | null,
+    scope: "once" | "project" = "once",
+  ) => {
     setBusy(true);
     setProblem(null);
     const result = await settleWithCode(
@@ -341,8 +350,9 @@ function RequestCard({
         threadId: request.threadId,
         requestId: request.requestId,
         decision,
-        fingerprint: request.fingerprint,
+        fingerprint: scope === "project" ? request.projectFingerprint! : request.fingerprint,
         proof,
+        ...(scope === "project" ? { scope } : {}),
       }),
     );
     setBusy(false);
@@ -355,6 +365,10 @@ function RequestCard({
   };
 
   const allow = async () => {
+    if (request.batch !== undefined) {
+      setAskCode(true);
+      return;
+    }
     if (hasPasskey && passkeysPossible()) {
       setBusy(true);
       const proof = await passkeyProof({
@@ -370,6 +384,7 @@ function RequestCard({
       }
       setProblem(proof.message);
     }
+    setAllowScope("once");
     setAskCode(true);
   };
 
@@ -385,7 +400,11 @@ function RequestCard({
           </small>
         </div>
       </div>
-      <p className="fm-grownup__card-what">{grownUpRequestSentence(request, childName)}</p>
+      <p className="fm-grownup__card-what">
+        {isBatchLead && request.batch
+          ? approvalBatchSentence(request.batch, childName, request.projectTitle)
+          : grownUpRequestSentence(request, childName)}
+      </p>
       <Button size="sm" variant="plain" onClick={() => setShowDetails((value) => !value)}>
         {showDetails ? "Hide details" : "Show details"}
       </Button>
@@ -406,6 +425,44 @@ function RequestCard({
         <Banner tone="info">This one is waiting on the Mac now. Answer it there.</Banner>
       ) : (
         <div className="fm-grownup__card-actions">
+          {isBatchLead && request.batch ? (
+            <>
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void familyApi
+                    .answerBatch({
+                      batchId: request.batch!.id,
+                      fingerprint: request.batch!.fingerprint,
+                      decision: "decline",
+                      proof: null,
+                    })
+                    .then((result) => {
+                      if (result.ok) {
+                        setDone("decline");
+                        onDone();
+                      } else setProblem(result.message);
+                    })
+                }
+              >
+                Not now for all {request.batch.items.length}
+              </Button>
+              <Button variant="primary" disabled={busy} onClick={() => setAskCode(true)}>
+                Allow all {request.batch.items.length}
+              </Button>
+            </>
+          ) : null}
+          {request.projectFingerprint && request.projectCovers?.length ? (
+            <Button
+              disabled={busy}
+              onClick={() => {
+                setAllowScope("project");
+                setAskCode(true);
+              }}
+            >
+              Allow for this project
+            </Button>
+          ) : null}
           <Button disabled={busy} onClick={() => void send("decline", null)}>
             Decline
           </Button>
@@ -422,11 +479,38 @@ function RequestCard({
       {problem ? <Banner tone="warning">{problem}</Banner> : null}
       {askCode ? (
         <CodeSheet
-          title="Allow this once?"
-          description={`${childName}'s ${requestHeading(request).toLowerCase()}. Enter the parent code to allow it, this once.`}
+          title={
+            request.batch
+              ? `Allow all ${request.batch.items.length}?`
+              : allowScope === "project"
+                ? "Allow for this project?"
+                : "Allow this once?"
+          }
+          description={
+            request.batch
+              ? `${childName}'s ${request.projectTitle ?? request.threadTitle} wants ${request.batch.items.length} similar things. Enter the parent code to allow each one once.`
+              : allowScope === "project"
+                ? `${childName}'s ${requestHeading(request).toLowerCase()}. Enter the parent code to allow this kind of request for ${request.projectTitle ?? request.threadTitle}.`
+                : `${childName}'s ${requestHeading(request).toLowerCase()}. Enter the parent code to allow it, this once.`
+          }
           onClose={() => setAskCode(false)}
-          attempt={(code) => send("accept", { type: "code", code })}
-          confirm="Allow once"
+          attempt={(code) =>
+            request.batch
+              ? familyApi.answerBatch({
+                  batchId: request.batch.id,
+                  fingerprint: request.batch.fingerprint,
+                  decision: "accept",
+                  proof: { type: "code", code },
+                })
+              : send("accept", { type: "code", code }, allowScope)
+          }
+          confirm={
+            request.batch
+              ? `Allow all ${request.batch.items.length}`
+              : allowScope === "project"
+                ? "Allow for this project"
+                : "Allow once"
+          }
         />
       ) : null}
     </article>

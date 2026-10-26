@@ -13,6 +13,7 @@ import {
 import {
   grownUpLabel,
   grownUpRequestSentence,
+  approvalBatchSentence,
   requestHeading,
 } from "../../../nondev/src/features/family/people";
 import { durationPhrase, wallTimePhrase } from "../../../nondev/src/features/family-limits/limits";
@@ -117,6 +118,16 @@ export function buildWatchSnapshot(input: {
         threadId: request.threadId,
         requestId: request.requestId,
         fingerprint: request.fingerprint,
+        ...(request.batch === undefined ||
+        request.batch.items[0]?.threadId !== request.threadId ||
+        request.batch.items[0]?.requestId !== request.requestId
+          ? {}
+          : {
+              batchId: request.batch.id,
+              batchFingerprint: request.batch.fingerprint,
+              batchCount: request.batch.items.length,
+              batchLead: true,
+            }),
         ...(request.projectFingerprint === undefined
           ? {}
           : {
@@ -137,7 +148,12 @@ export function buildWatchSnapshot(input: {
         title: `${name} needs a grown-up`,
         heading: requestHeading(request),
         // nondev-seam: skycot-watch-request-sentence-snapshot
-        sentence: grownUpRequestSentence(request, name),
+        sentence:
+          request.batch !== undefined &&
+          request.batch.items[0]?.threadId === request.threadId &&
+          request.batch.items[0]?.requestId === request.requestId
+            ? approvalBatchSentence(request.batch, name, request.projectTitle)
+            : grownUpRequestSentence(request, name),
         what: request.what,
         why: request.why,
         macName: several ? mac.macName : null,

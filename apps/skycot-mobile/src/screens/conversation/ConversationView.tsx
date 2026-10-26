@@ -28,6 +28,7 @@ import { useCodeLength } from "../../data/MacData";
 import type { ThreadProjection } from "../../engine/types";
 import type { Mac } from "../../links/store";
 import { BUILDER_NAME } from "../../ui/brand";
+import { childStatusLabel } from "../../data/conversations";
 import {
   Banner,
   Button,
@@ -331,7 +332,7 @@ function WorkingLine() {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 4 }}>
       <Mascot pose="thinking" size={36} />
-      <Txt tone="label2">{BUILDER_NAME} is building…</Txt>
+      <Txt tone="label2">{childStatusLabel("working", BUILDER_NAME, false)}</Txt>
     </View>
   );
 }
@@ -535,7 +536,12 @@ function TimelineCard(props: {
           <CardHeader
             symbol={entry.undone ? "arrow.uturn.backward.circle.fill" : "sparkles"}
             color={entry.undone ? theme.color.label3 : theme.color.green}
-            title={entry.undone ? "Undone" : "What changed"}
+            title={
+              entry.undone
+                ? "Undone"
+                : (childStatusLabel("done", BUILDER_NAME, props.onOpenPage !== undefined) ??
+                  "What changed")
+            }
             subtitle={entry.undone ? "Back to how it was before." : entry.headline}
             trailing={
               <Pill text={`${entry.fileCount} ${entry.fileCount === 1 ? "file" : "files"}`} />
@@ -554,11 +560,11 @@ function TimelineCard(props: {
             <ButtonRow style={{ marginTop: 14 }}>
               {props.onOpenPage ? (
                 <Button
-                  title="Open it"
+                  title="Play"
                   icon="play.fill"
                   onPress={props.onOpenPage}
                   style={{ flex: 1 }}
-                  size="medium"
+                  size="large"
                 />
               ) : null}
               {entry.undo ? (
