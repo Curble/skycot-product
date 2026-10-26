@@ -4,7 +4,7 @@
  */
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo } from "react";
+import { use, useCallback, useMemo } from "react";
 import { View } from "react-native";
 
 import { friendlyTitle } from "../../../nondev/src/plain/titles";
@@ -17,6 +17,7 @@ import { AboutContent } from "../screens/shared/About";
 import { MacsScreen } from "../screens/shared/Macs";
 import { PagePreview } from "../screens/shared/PagePreview";
 import { Banner, Page } from "../ui/kit";
+import { RootHeaderContext } from "../ui/rootHeader";
 import { HeaderButton } from "./Shell";
 import type { StackRoutes } from "./routes";
 
@@ -81,6 +82,7 @@ export const conversationOptions = (params: StackRoutes["Conversation"]) => ({
 export function PageRoute() {
   const route = useRoute<RouteProp<StackRoutes, "Page">>();
   const navigation = useNavigation<NativeStackNavigationProp<StackRoutes>>();
+  const shellHeader = use(RootHeaderContext);
   const { mode } = useLinks();
   const mac = useMac(route.params.macId);
   if (mac === null) return <Gone />;
@@ -90,6 +92,11 @@ export function PageRoute() {
       threadId={route.params.threadId}
       page={route.params.page}
       childView={mode === "child"}
+      fullScreen={shellHeader?.fullScreen === true}
+      onDone={() => navigation.goBack()}
+      {...(shellHeader?.toggleFullScreen
+        ? { onToggleFullScreen: shellHeader.toggleFullScreen }
+        : {})}
       onTellSam={
         mode === "child"
           ? (initialDraft) =>
@@ -108,7 +115,9 @@ export function PageRoute() {
 // nondev-seam: skycot-mobile-page-screen
 export const pageOptions = (params: StackRoutes["Page"]) => ({
   title: params.title,
-  presentation: "fullScreenModal" as const,
+  presentation: "card" as const,
+  gestureEnabled: true,
+  headerShown: false,
   headerLargeTitle: false,
 });
 

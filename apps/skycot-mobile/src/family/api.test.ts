@@ -34,6 +34,21 @@ describe("the playable fridge response", () => {
     });
   });
 
+  it("accepts an older engine's answer that leaves newer fields out", () => {
+    expect(parseFridgePlay({ html: "<main>game</main>" })).toEqual({
+      html: "<main>game</main>",
+      reason: null,
+      needs: { scripts: [], other: [] },
+      page: null,
+    });
+    expect(parseFridgePlay({ html: "<main>game</main>", reason: null, page: "/g.html" })).toEqual({
+      html: "<main>game</main>",
+      reason: null,
+      needs: { scripts: [], other: [] },
+      page: "/g.html",
+    });
+  });
+
   it("rejects malformed response fields", () => {
     expect(parseFridgePlay({ html: 3, reason: null, page: "/game.html" })).toBeNull();
     expect(parseFridgePlay({ html: null, reason: "unavailable", page: null })).toBeNull();

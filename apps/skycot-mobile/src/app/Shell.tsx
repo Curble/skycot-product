@@ -90,6 +90,8 @@ function SectionStack(props: {
   readonly screens: ReadonlyArray<ShellScreen>;
   readonly headerRight?: () => ReactNode;
   readonly onToggleSidebar?: () => void;
+  readonly onToggleFullScreen?: () => void;
+  readonly fullScreen?: boolean;
   readonly initial?: {
     readonly name: StackRouteName;
     readonly params?: object;
@@ -116,6 +118,8 @@ function SectionStack(props: {
               ),
             }
           : {}),
+        ...(props.onToggleFullScreen ? { toggleFullScreen: props.onToggleFullScreen } : {}),
+        ...(props.fullScreen !== undefined ? { fullScreen: props.fullScreen } : {}),
       }}
     >
       <NavigationIndependentTree>
@@ -204,6 +208,7 @@ export function Shell(props: {
   const visibleSections = layout.usesSplitView ? sidebarSections : props.sections;
   const [selected, setSelected] = useState(props.sections[0]!.id);
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [fullScreen, setFullScreen] = useState(false);
   const [opened, setOpened] = useState<SidebarItem | null>(null);
   const [provenance, setProvenance] = useState(0);
   // Like iOS's hidesBottomBarWhenPushed: a conversation pushed in a tab gets the whole screen.
@@ -359,9 +364,13 @@ export function Shell(props: {
     visibleSections.find((candidate) => candidate.id === selected) ?? visibleSections[0]!;
   const contentKey = opened ? `item:${opened.key}` : `section:${section.id}`;
   const toggleSidebar = () => setSidebarVisible((visible) => !visible);
+  const toggleFullScreen = () => {
+    setFullScreen((current) => !current);
+    setSidebarVisible((visible) => !visible);
+  };
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.color.background }}>
-      {sidebarVisible ? (
+      {sidebarVisible && !fullScreen ? (
         <SafeAreaView
           edges={["top", "bottom", "left"]}
           style={{
@@ -430,6 +439,8 @@ export function Shell(props: {
           screens={props.screens}
           {...(props.headerRight ? { headerRight: props.headerRight } : {})}
           onToggleSidebar={toggleSidebar}
+          onToggleFullScreen={toggleFullScreen}
+          fullScreen={fullScreen}
           {...(opened ? { initial: opened.open } : {})}
         />
       </View>

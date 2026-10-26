@@ -20,6 +20,8 @@ import {
   playNoticeCopy,
   type PlayNoticeKind,
   pageAskWaitingCopy,
+  pageHasOwnGameControls,
+  pageToolbarCopy,
   rememberGameButtons,
   reportedSites,
 } from "./pagePreviewLogic";
@@ -30,6 +32,9 @@ export function PagePreview(props: {
   readonly threadId: string;
   readonly page: string;
   readonly childView: boolean;
+  readonly fullScreen?: boolean;
+  readonly onDone: () => void;
+  readonly onToggleFullScreen?: () => void;
   readonly onTellSam?: (message: string) => void;
 }) {
   const theme = useTheme();
@@ -51,6 +56,7 @@ export function PagePreview(props: {
   const [busy, setBusy] = useState(false);
   const pageKey = `${props.mac.macId}:${props.threadId}:${props.page}`;
   const [gameButtons, setGameButtons] = useState(() => gameButtonsForPage(pageKey));
+  const toolbarCopy = pageToolbarCopy(props.childView, props.fullScreen === true);
   const currentSitesKey = [...sites].sort().join(",");
 
   const loadPage = useCallback(async () => {
@@ -85,6 +91,12 @@ export function PagePreview(props: {
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  useEffect(() => {
+    if (play?.html !== null && play?.html !== undefined) {
+      setGameButtons(gameButtonsForPage(pageKey, pageHasOwnGameControls(play.html)));
+    }
+  }, [pageKey, play]);
 
   useEffect(() => {
     if (request === null) return;
@@ -151,74 +163,97 @@ export function PagePreview(props: {
     rememberGameButtons(pageKey, next);
   };
 
-  if (problem !== null) {
-    return (
-      <View style={{ flex: 1, padding: 20, backgroundColor: theme.color.background }}>
-        <Banner tone="warning" text={problem} />
-      </View>
-    );
-  }
-  if (play === null && html === null) return <Spinner />;
   const shownSites = sites.filter((site) => !hiddenSites.includes(site));
   const allowedPage = play?.page ?? null;
   const noticeCopy = notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts);
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      <WebView<object>
-        ref={webView}
-        source={{ html: play?.html ?? html!, baseUrl: "about:blank" }}
-        javaScriptEnabled={play !== null}
-        originWhitelist={["about:*"]}
-        onShouldStartLoadWithRequest={(request) => allowsPlayNavigation(request.url)}
-        onMessage={play === null ? undefined : onMessage}
-        setSupportMultipleWindows={false}
-        javaScriptCanOpenWindowsAutomatically={false}
-        allowFileAccess={false}
-        allowFileAccessFromFileURLs={false}
-        allowUniversalAccessFromFileURLs={false}
-        incognito
-        allowsLinkPreview={false}
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction
-        sharedCookiesEnabled={false}
-        cacheEnabled={false}
-        style={{ flex: 1, backgroundColor: "#FFFFFF" }}
-      />
-      {play !== null ? (
-        <>
-          <View
-            style={{
-              position: "absolute",
-              top: insets.top + 8,
-              right: 12,
-              zIndex: 2,
-            }}
-          >
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF", paddingTop: insets.top }}>
+      <View
+        style={{
+          minHeight: 48,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.color.separator,
+          backgroundColor: theme.color.background,
+        }}
+      >
+        <ToolbarButton
+          label={toolbarCopy.done}
+          symbol="chevron.left"
+          onPress={props.onDone}
+          leading
+        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {props.onToggleFullScreen ? (
+            <ToolbarButton
+              label={toolbarCopy.fullScreen}
+              symbol={
+                props.fullScreen
+                  ? "arrow.down.right.and.arrow.up.left"
+                  : "arrow.up.left.and.arrow.down.right"
+              }
+              onPress={props.onToggleFullScreen}
+            />
+          ) : null}
+          {play !== null ? (
             <Pressable
               accessibilityRole="switch"
-              accessibilityLabel="Game buttons"
+              accessibilityLabel={toolbarCopy.extraButtons}
               accessibilityState={{ checked: gameButtons }}
               onPress={toggleGameButtons}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 7,
-                paddingHorizontal: 13,
-                paddingVertical: 10,
-                borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.88)",
+                gap: 6,
+                paddingHorizontal: 9,
+                paddingVertical: 8,
+                borderRadius: 18,
+                backgroundColor: theme.color.fill,
               }}
             >
               <Txt variant="footnote" weight="600">
-                Game buttons
+                {toolbarCopy.extraButtons}
               </Txt>
-              <Symbol name={gameButtons ? "checkmark.circle.fill" : "circle"} size={19} />
+              <Symbol name={gameButtons ? "checkmark.circle.fill" : "circle"} size={18} />
             </Pressable>
-          </View>
+          ) : null}
+        </View>
+      </View>
+      {problem !== null ? (
+        <View style={{ flex: 1, padding: 20, backgroundColor: theme.color.background }}>
+          <Banner tone="warning" text={problem} />
+        </View>
+      ) : play === null && html === null ? (
+        <Spinner />
+      ) : (
+        <WebView<object>
+          ref={webView}
+          source={{ html: play?.html ?? html!, baseUrl: "about:blank" }}
+          javaScriptEnabled={play !== null}
+          originWhitelist={["about:*"]}
+          onShouldStartLoadWithRequest={(request) => allowsPlayNavigation(request.url)}
+          onMessage={play === null ? undefined : onMessage}
+          setSupportMultipleWindows={false}
+          javaScriptCanOpenWindowsAutomatically={false}
+          allowFileAccess={false}
+          allowFileAccessFromFileURLs={false}
+          allowUniversalAccessFromFileURLs={false}
+          incognito
+          allowsLinkPreview={false}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction
+          sharedCookiesEnabled={false}
+          cacheEnabled={false}
+          style={{ flex: 1, backgroundColor: "#FFFFFF" }}
+        />
+      )}
+      {play !== null ? (
+        <>
           {shownSites.length > 0 ? (
-            <View
-              style={{ position: "absolute", top: insets.top + 58, left: 12, right: 12, zIndex: 3 }}
-            >
+            <View style={{ position: "absolute", top: 58, left: 12, right: 12, zIndex: 3 }}>
               <Card style={{ padding: 16, gap: 8, backgroundColor: theme.color.card }}>
                 <Txt variant="headline">This page wants to use the internet</Txt>
                 <Txt tone="label2">
@@ -348,6 +383,38 @@ export function PagePreview(props: {
         </View>
       ) : null}
     </View>
+  );
+}
+
+function ToolbarButton(props: {
+  readonly label: string;
+  readonly symbol:
+    | "chevron.left"
+    | "arrow.up.left.and.arrow.down.right"
+    | "arrow.down.right.and.arrow.up.left";
+  readonly onPress: () => void;
+  readonly leading?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      onPress={props.onPress}
+      hitSlop={8}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+      }}
+    >
+      {props.leading ? <Symbol name={props.symbol} size={18} /> : null}
+      <Txt variant="footnote" weight="600" tone="accent">
+        {props.label}
+      </Txt>
+      {!props.leading ? <Symbol name={props.symbol} size={18} /> : null}
+    </Pressable>
   );
 }
 

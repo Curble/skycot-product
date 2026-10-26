@@ -11,6 +11,8 @@ export interface RootHeader {
   readonly title: string;
   readonly right?: (() => ReactNode) | undefined;
   readonly leading?: ReactNode;
+  readonly toggleFullScreen?: (() => void) | undefined;
+  readonly fullScreen?: boolean | undefined;
 }
 
 export const RootHeaderContext = createContext<RootHeader | null>(null);

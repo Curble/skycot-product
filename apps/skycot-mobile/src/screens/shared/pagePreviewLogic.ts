@@ -2,6 +2,31 @@
 import { MAX_PAGE_SITES, reportedSite } from "@t3tools/skycot-rules/page-internet";
 
 export const GAME_BUTTONS_DEFAULT = false;
+const buttonsByPage = new Map<string, boolean>();
+
+export function pageHasOwnGameControls(html: string): boolean {
+  const buttons =
+    html.match(
+      /<button\b[^>]*>[\s\S]*?<\/button\s*>|<input\b[^>]*>|<\w+\b[^>]*\brole\s*=\s*["']button["'][^>]*>[\s\S]*?<\/\w+\s*>/giu,
+    ) ?? [];
+  return buttons.some((button) =>
+    /(?:\barrow\s*(?:up|down|left|right)\b|\b(?:up|down|left|right|kick|jump|move|shoot|fire)\b|↑|↓|←|→)/iu.test(
+      button.replace(/<([\w-]+)\b([^>]*)>/gu, "$2 ").replace(/<\/?[^>]+>/gu, " "),
+    ),
+  );
+}
+
+export function gameButtonsForPage(key: string, hasOwnControls = false): boolean {
+  return buttonsByPage.get(key) ?? (!hasOwnControls && GAME_BUTTONS_DEFAULT);
+}
+
+export function pageToolbarCopy(childView: boolean, fullScreen: boolean) {
+  return {
+    done: childView ? "Done" : "Back",
+    fullScreen: fullScreen ? "Exit full screen" : "Full screen",
+    extraButtons: "Extra buttons",
+  } as const;
+}
 
 export const GAME_KEY_SCRIPTS = {
   ArrowUp: {
@@ -131,10 +156,6 @@ export function pageAskWaitingCopy(): string {
   return "We've let your grown-ups know. The parent code stays on this device while they decide.";
 }
 
-const buttonsByPage = new Map<string, boolean>();
-export function gameButtonsForPage(key: string): boolean {
-  return buttonsByPage.get(key) ?? GAME_BUTTONS_DEFAULT;
-}
 export function rememberGameButtons(key: string, enabled: boolean): void {
   buttonsByPage.set(key, enabled);
 }

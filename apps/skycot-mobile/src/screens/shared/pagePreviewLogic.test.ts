@@ -7,6 +7,8 @@ import {
   GAME_BUTTONS_DEFAULT,
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
+  pageHasOwnGameControls,
+  pageToolbarCopy,
   playableCopy,
   playNoticeCopy,
   pageAskWaitingCopy,
@@ -125,5 +127,23 @@ describe("the sealed page viewer", () => {
   it("starts game buttons off for each page", () => {
     expect(GAME_BUTTONS_DEFAULT).toBe(false);
     expect(gameButtonsForPage("test:page-preview:default-off")).toBe(false);
+    expect(gameButtonsForPage("test:page-preview:own-controls", true)).toBe(false);
+  });
+
+  it("recognizes labelled game controls and keeps viewer actions clear", () => {
+    expect(
+      pageHasOwnGameControls('<button aria-label="Move left">←</button><button>KICK</button>'),
+    ).toBe(true);
+    expect(pageHasOwnGameControls("<button>Open settings</button>")).toBe(false);
+    expect(pageToolbarCopy(true, false)).toEqual({
+      done: "Done",
+      fullScreen: "Full screen",
+      extraButtons: "Extra buttons",
+    });
+    expect(pageToolbarCopy(false, true)).toEqual({
+      done: "Back",
+      fullScreen: "Exit full screen",
+      extraButtons: "Extra buttons",
+    });
   });
 });

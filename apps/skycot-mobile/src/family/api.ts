@@ -127,13 +127,15 @@ const ok = () => true as const;
 
 export function parseFridgePlay(body: unknown): FridgePlay | null {
   const input = record(body);
+  // An engine from before a field existed leaves it out: missing counts as empty, never as an
+  // answer "this app doesn't understand" (a newer app talking to an older Mac).
   if (
-    (input.html !== null && typeof input.html !== "string") ||
-    (input.reason !== null &&
+    (input.html != null && typeof input.html !== "string") ||
+    (input.reason != null &&
       input.reason !== "too-big" &&
       input.reason !== "unpackable-module" &&
       input.reason !== "remote-script") ||
-    (input.page !== null && typeof input.page !== "string")
+    (input.page != null && typeof input.page !== "string")
   )
     return null;
   const needs = record(input.needs);
