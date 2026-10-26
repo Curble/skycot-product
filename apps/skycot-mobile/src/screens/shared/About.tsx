@@ -23,7 +23,7 @@ export function AboutContent() {
           The cloud is SKYCOT too.
         </Txt>
       </View>
-      <Section footer="SKYCOT keeps your family's work on your own Mac. This app has no account, no advertising and no tracking.">
+      <Section footer="SKYCOT keeps your family's work on your own Mac. No account or advertising. SKYCOT counts update checks and relay connections as anonymous daily totals. The count resets each UTC day and has no name or account attached. Do Not Track or Global Privacy Control opts out of update counting; turning off updates or the relay stops those requests.">
         <Row title="Made by" detail="Curble Pty Ltd" />
         <Row title="Copyright" subtitle="© 2026 Curble Pty Ltd, trading as SKYCOT." />
       </Section>

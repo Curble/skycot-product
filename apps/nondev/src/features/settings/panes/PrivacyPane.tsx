@@ -40,19 +40,19 @@ export function PrivacyPane({ environmentId }: { readonly environmentId: Environ
     <>
       <SettingsGroup
         title="Usage reporting"
-        footer={`${PRODUCT_NAME} is built so that nothing about how you use it is sent to anyone. There is no switch because there is nothing to switch on.`}
+        footer={`${PRODUCT_NAME} never sends your files, messages or projects. It only sends anonymous daily totals, so there is no switch to flip.`}
       >
         <ListRow
           leading={<StepBadge state="ok" icon={EyeOff} />}
-          title="Off"
+          title="Daily totals"
           subtitle={
             relayTelemetry
-              ? "The desktop app's relay diagnostics are on; the simple interface still sends nothing."
-              : "No analytics, no crash reports, no usage statistics leave this Mac."
+              ? "The desktop app's relay diagnostics are on; the simple interface sends only the daily totals described here."
+              : "SKYCOT sends anonymous daily totals for successful update checks and relay connections. The count changes each UTC day and has no name or account attached. It contains no project or message content. Do Not Track or Global Privacy Control opts out of update counting; turn off updates or the relay to stop those requests."
           }
           trailing={
             <Pill tone="ok" size="sm">
-              Off
+              Limited
             </Pill>
           }
         />
