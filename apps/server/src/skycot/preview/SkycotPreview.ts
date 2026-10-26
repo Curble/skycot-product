@@ -400,8 +400,14 @@ export const make = Effect.gen(function* () {
       if (entry.url === null && entry.failure === null) yield* findAddress(entry);
       const described = describe(entry);
       if (described.state !== "running") return described;
+      const version =
+        entry.site === null ? undefined : yield* Effect.promise(() => entry.site!.version());
       const internetAsks = yield* internetAsksFor(entry);
-      return internetAsks.length === 0 ? described : { ...described, internetAsks };
+      return {
+        ...described,
+        ...(version === undefined ? {} : { version }),
+        ...(internetAsks.length === 0 ? {} : { internetAsks }),
+      };
     }
     const command = findPreviewCommand(yield* readStartFiles(context.folder));
     if (command === null) return { state: "no-site" } satisfies PreviewStatus;

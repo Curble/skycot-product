@@ -141,12 +141,51 @@ export interface StaticSite {
     readonly page: string;
     readonly sites: ReadonlyArray<string>;
   }>;
+  /** A bounded fingerprint of files the page server can expose, sampled on status polls. */
+  readonly version: () => Promise<string>;
 }
 
 const MAX_BLOCKED_PAGES = 20;
 const MAX_BLOCKED_SITES = 8;
 const MAX_REPORT_BYTES = 16 * 1024;
 const MAX_POLICY_PAGE_BYTES = 2 * 1024 * 1024;
+const VERSION_FILE_LIMIT = 2000;
+const VERSION_DEPTH_LIMIT = 6;
+const VERSION_ENTRY_LIMIT = 4000;
+
+/** Maximum modification time plus count changes when a served file is edited or added. */
+export async function staticSiteVersion(root: string): Promise<string> {
+  let newest = 0;
+  let count = 0;
+  let entriesSeen = 0;
+  const visit = async (folder: string, depth: number): Promise<void> => {
+    if (
+      depth > VERSION_DEPTH_LIMIT ||
+      count >= VERSION_FILE_LIMIT ||
+      entriesSeen >= VERSION_ENTRY_LIMIT
+    ) {
+      return;
+    }
+    const directory = await NodeFSP.opendir(folder).catch(() => null);
+    if (directory === null) return;
+    for await (const entry of directory) {
+      entriesSeen += 1;
+      if (count >= VERSION_FILE_LIMIT || entriesSeen >= VERSION_ENTRY_LIMIT) return;
+      if (isPrivateName(entry.name) || entry.name === "node_modules") continue;
+      const path = NodePath.join(folder, entry.name);
+      if (entry.isDirectory()) await visit(path, depth + 1);
+      else if (entry.isFile()) {
+        const stat = await NodeFSP.stat(path).catch(() => null);
+        if (stat) {
+          count += 1;
+          newest = Math.max(newest, stat.mtimeMs);
+        }
+      }
+    }
+  };
+  await visit(root, 0);
+  return `${Math.trunc(newest)}:${count}`;
+}
 
 const inlineHashes = (html: string) => ({
   scripts: [
@@ -365,6 +404,7 @@ export async function serveStaticSite(
     port,
     url: `http://127.0.0.1:${port}/`,
     blocked: () => [...blocked].map(([page, sites]) => ({ page, sites: [...sites].sort() })),
+    version: () => staticSiteVersion(realRoot),
     close: () =>
       new Promise<void>((resolve) => {
         server.close(() => resolve());

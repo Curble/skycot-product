@@ -35,6 +35,8 @@ export type PreviewStatusView =
       readonly command: PreviewCommandView;
       readonly url: string;
       readonly frameable: boolean;
+      /** Static page fingerprint; absent on older engines and dev-server previews. */
+      readonly version?: string;
       /** Family profile: pages that tried internet sites no grown-up allowed yet. */
       readonly internetAsks: ReadonlyArray<InternetAsk>;
     }
@@ -127,6 +129,7 @@ export function parsePreviewStatus(body: unknown): PreviewStatusView | null {
             command,
             url,
             frameable: status["frameable"] !== false,
+            ...(text(status["version"]) === null ? {} : { version: text(status["version"])! }),
             internetAsks: parseInternetAsks(status["internetAsks"]),
           }
         : null;
@@ -143,6 +146,20 @@ export function parsePreviewStatus(body: unknown): PreviewStatusView | null {
     default:
       return null;
   }
+}
+
+/** Reload only when two answers from a version-aware engine disagree. */
+export function shouldReload(
+  previous: PreviewStatusView | null,
+  next: PreviewStatusView | null,
+): boolean {
+  return (
+    previous?.state === "running" &&
+    next?.state === "running" &&
+    previous.version !== undefined &&
+    next.version !== undefined &&
+    previous.version !== next.version
+  );
 }
 
 /**

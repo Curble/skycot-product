@@ -4,7 +4,11 @@
 // in "Ask me first" (in a Family profile, the parent code when the start script installs
 // something or uses the internet). Plain controls only: Reload, Open in browser, Close, and
 // "Point at something", which turns a click in the page into a chip in the message box.
-import type { EnvironmentId, PreviewAnnotationSubmissionResult } from "@t3tools/contracts";
+import {
+  ThreadId,
+  type EnvironmentId,
+  type PreviewAnnotationSubmissionResult,
+} from "@t3tools/contracts";
 import { isLocalPreviewAddress, type PreviewProblem } from "@t3tools/skycot-rules/preview";
 import {
   AppWindow,
@@ -23,6 +27,7 @@ import { randomUUID } from "~/lib/utils";
 
 import { useCrew } from "../../themes/useCrew";
 import { useChildView } from "../../app/useChildView";
+import { useConversationShell } from "../../state/oldConversations";
 import { previewPageUrl } from "../starters/preview";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
@@ -54,6 +59,7 @@ import {
   SET_UP_MESSAGE,
   shortAddress,
   startApproval,
+  shouldReload,
   type PreviewStatusView,
 } from "./model";
 import {
@@ -64,7 +70,7 @@ import {
   type PointerDraft,
 } from "./store";
 
-/** Polls while the panel is open: quickly while starting, slowly otherwise (it also keeps the site alive). */
+/** Polls while the panel is open; running pages need fresh fingerprints. */
 function usePreviewAnswer(threadId: string, familyOn: boolean) {
   const [answer, setAnswer] = useState<PreviewAnswer | null>(null);
   const askNow = useRef<(() => void) | null>(null);
@@ -83,8 +89,8 @@ function usePreviewAnswer(threadId: string, familyOn: boolean) {
       const every =
         next.ok && next.status.state === "starting"
           ? 1000
-          : next.ok && next.status.state === "running" && familyOn
-            ? 3000
+          : next.ok && next.status.state === "running"
+            ? 2000
             : 8000;
       timer = setTimeout(run, every);
     };
@@ -163,6 +169,7 @@ function PreviewPanelBody({
   const builder = crew.builder.name;
   const family = useFamily();
   const childView = useChildView();
+  const { shell } = useConversationShell(environmentId, ThreadId.make(threadId));
   const { answer, setAnswer, refresh } = usePreviewAnswer(threadId, family.enabled);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -172,6 +179,11 @@ function PreviewPanelBody({
   /** Internet addresses a grown-up said yes to while this panel is open. */
   const allowedOrigins = useRef(new Set<string>());
   const status = answer?.ok ? answer.status : null;
+  const previousStatus = useRef<PreviewStatusView | null>(null);
+  const pendingVersionReload = useRef(false);
+  const pendingFinishedReload = useRef(false);
+  const latestRunFinishedAt = shell?.latestRun?.completedAt ?? null;
+  const previousRunFinishedAt = useRef(latestRunFinishedAt);
   const bridge = desktopPreviewBridge();
   const surface =
     status?.state === "running"
@@ -187,6 +199,47 @@ function PreviewPanelBody({
   const pageRequest = usePreviewPage(threadId);
   const frameUrl =
     runningUrl === null ? null : previewPageUrl(runningUrl, pageRequest?.path ?? null);
+  useEffect(() => {
+    const previous = previousStatus.current;
+    previousStatus.current = status;
+    if (shouldReload(previous, status)) pendingVersionReload.current = true;
+  }, [status]);
+  useEffect(() => {
+    if (
+      pendingVersionReload.current &&
+      controls !== null &&
+      leaving === null &&
+      !(status?.state === "running" && status.internetAsks.length > 0)
+    ) {
+      pendingVersionReload.current = false;
+      controls.reload();
+    }
+  }, [status, controls, leaving]);
+  useEffect(() => {
+    const previous = previousRunFinishedAt.current;
+    previousRunFinishedAt.current = latestRunFinishedAt;
+    if (
+      previous !== latestRunFinishedAt &&
+      latestRunFinishedAt !== null &&
+      status?.state === "running" &&
+      status.version === undefined &&
+      status.internetAsks.length === 0
+    ) {
+      pendingFinishedReload.current = true;
+    }
+  }, [latestRunFinishedAt, status, controls]);
+  useEffect(() => {
+    if (
+      pendingFinishedReload.current &&
+      controls !== null &&
+      leaving === null &&
+      status?.state === "running" &&
+      status.internetAsks.length === 0
+    ) {
+      pendingFinishedReload.current = false;
+      controls.reload();
+    }
+  }, [status, controls, leaving]);
   // A new "Open it" while the site is already showing: go to that page. (A new address reaches
   // the frame by itself; this is for the same address asked for again after clicking around.)
   const askedNonce = useRef(pageRequest?.nonce ?? null);

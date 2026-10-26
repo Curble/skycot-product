@@ -15,6 +15,7 @@ import {
   mimeTypeFor,
   readRequestPath,
   serveStaticSite,
+  staticSiteVersion,
   type StaticSite,
 } from "./staticSite.ts";
 
@@ -165,6 +166,45 @@ describe("serveStaticSite", () => {
 
   it("listens on 127.0.0.1 only", () => {
     expect(site.url).toBe(`http://127.0.0.1:${site.port}/`);
+  });
+
+  it("tracks served file edits and ignores private and dependency files", async () => {
+    const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "skycot-version-"));
+    try {
+      await NodeFSP.mkdir(NodePath.join(root, "node_modules"), { recursive: true });
+      await NodeFSP.writeFile(NodePath.join(root, "index.html"), "old");
+      await NodeFSP.writeFile(NodePath.join(root, ".env"), "SECRET=1");
+      await NodeFSP.writeFile(NodePath.join(root, "node_modules", "library.js"), "old");
+      const before = await staticSiteVersion(root);
+      await NodeFSP.writeFile(NodePath.join(root, ".env"), "changed secret");
+      await NodeFSP.writeFile(
+        NodePath.join(root, "node_modules", "library.js"),
+        "changed dependency",
+      );
+      expect(await staticSiteVersion(root)).toBe(before);
+      await NodeFSP.writeFile(NodePath.join(root, "index.html"), "new page");
+      await NodeFSP.utimes(NodePath.join(root, "index.html"), 1_893_456_000, 1_893_456_000);
+      expect(await staticSiteVersion(root)).not.toBe(before);
+    } finally {
+      await NodeFSP.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("bounds fingerprint work to 2000 files and six directory levels", async () => {
+    const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "skycot-version-"));
+    try {
+      await NodeFSP.mkdir(NodePath.join(root, "a/b/c/d/e/f/g"), { recursive: true });
+      const beforeDeepFile = await staticSiteVersion(root);
+      await NodeFSP.writeFile(NodePath.join(root, "a/b/c/d/e/f/g/deep.txt"), "x");
+      expect(await staticSiteVersion(root)).toBe(beforeDeepFile);
+      for (let index = 0; index < 2002; index += 1) {
+        await NodeFSP.writeFile(NodePath.join(root, `file-${index}.txt`), "x");
+      }
+      expect(await staticSiteVersion(root)).toMatch(/:\d+$/u);
+      expect(Number((await staticSiteVersion(root)).split(":")[1])).toBeLessThanOrEqual(2000);
+    } finally {
+      await NodeFSP.rm(root, { recursive: true, force: true });
+    }
   });
 
   it("serves index.html for the folder and for a subfolder, never a listing", async () => {

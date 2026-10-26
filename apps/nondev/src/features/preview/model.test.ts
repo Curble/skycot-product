@@ -12,6 +12,7 @@ import {
   previewAddressWorksHere,
   previewSurface,
   shortAddress,
+  shouldReload,
   startApproval,
   type PickedElement,
 } from "./model";
@@ -64,6 +65,27 @@ describe("parsePreviewStatus", () => {
     ).toBeNull();
     expect(parsePreviewStatus({ error: "needs-approval" })).toBeNull();
     expect(parsePreviewStatus("<html>")).toBeNull();
+  });
+});
+
+describe("shouldReload", () => {
+  const running = (version?: string) => ({
+    state: "running" as const,
+    command,
+    url: SITE,
+    frameable: true,
+    internetAsks: [],
+    ...(version === undefined ? {} : { version }),
+  });
+
+  it("reloads when two running answers have different versions", () => {
+    expect(shouldReload(running("1:2"), running("2:2"))).toBe(true);
+    expect(shouldReload(running("1:2"), running("1:2"))).toBe(false);
+  });
+
+  it("keeps older engines and non-running answers quiet", () => {
+    expect(shouldReload(running(), running("1:2"))).toBe(false);
+    expect(shouldReload(null, running("1:2"))).toBe(false);
   });
 });
 
