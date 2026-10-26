@@ -9,5 +9,6 @@ export function kidSafeText(text: string): string {
       /\b(?:files?|folders?|directories|repos?|commits?|branches|builds?|deploys?|servers?|terminals?|npm|packages?|scripts?|tokens?|apis?|json|urls?|paths?|sandboxes?|worktrees?|runtimes?|processes)\b/giu,
       "things",
     )
-    .replace(/letting SKYCOT pause for approval/giu, "asking a grown-up for help");
+    .replace(/letting SKYCOT pause for approval/giu, "asking a grown-up for help")
+    .replace(/\*\*|__|~~|[*_]/gu, "");
 }

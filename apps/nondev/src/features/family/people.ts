@@ -364,7 +364,7 @@ export function grownUpRequestSentence(
     return `${childName}'s game wants to download a free 3D tool (three.js) from the internet.`;
   }
   if (request.kind === "command" && /\b(download|install)\b/.test(what)) {
-    return `${childName}'s game wants to download a tool from the internet.`;
+    return `${childName}'s project wants to download a tool from the internet.`;
   }
-  return `${childName}'s game needs help with one step.`;
+  return `${childName} needs a grown-up's help with one step.`;
 }

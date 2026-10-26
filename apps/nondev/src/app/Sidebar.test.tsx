@@ -23,7 +23,7 @@ describe("Sidebar identity in the child view", () => {
       <SidebarIdentity familyOn childView child={child} onSwitch={vi.fn()} />,
     );
     expect(html).toContain("Ava");
-    expect(html).toContain("I&#x27;m the grown-up");
+    expect(html).toContain("Switch who&#x27;s using SKYCOT");
     expect(html).not.toContain("Grown-up mode");
   });
 

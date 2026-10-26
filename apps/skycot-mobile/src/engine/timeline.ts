@@ -22,6 +22,8 @@ import {
 } from "../../../nondev/src/features/family/cards";
 import type { Checkpoint, ThreadProjection, TurnItem } from "./types";
 import { visibleMessageText } from "./displayText";
+import { kidSafeText } from "../../../nondev/src/features/conversation/kidSafeText";
+import { childApprovalSentence } from "../../../nondev/src/plain/approvals";
 
 export type TimelineEntry =
   | { readonly kind: "me"; readonly id: string; readonly text: string; readonly at: string }
@@ -56,6 +58,7 @@ export type TimelineEntry =
       /** Where Undo goes back to; null when there's no restore point before it. */
       readonly undo: { readonly scopeId: string; readonly checkpointId: string } | null;
       readonly undone: boolean;
+      readonly kidSummary: boolean;
     }
   | {
       readonly kind: "oops";
@@ -88,6 +91,7 @@ function findBefore(projection: ThreadProjection, checkpoint: Checkpoint): Check
 export interface TimelineContext {
   readonly projectRoot: string | null;
   readonly assistantName: string;
+  readonly childView?: boolean;
 }
 
 export function buildTimeline(
@@ -121,7 +125,9 @@ export function buildTimeline(
           out.push({
             kind: "crew",
             id: item.id,
-            text: visibleMessageText(item.text),
+            text: context.childView
+              ? kidSafeText(visibleMessageText(item.text))
+              : visibleMessageText(item.text),
             streaming: item.streaming,
             at: String(item.updatedAt),
           });
@@ -148,11 +154,11 @@ export function buildTimeline(
         break;
       }
       case "approval_request": {
+        const request = projection.runtimeRequests.find((r) => r.id === item.requestId);
         const decoded = item as unknown as Extract<
           OrchestrationV2TurnItem,
           { type: "approval_request" }
         >;
-        const request = projection.runtimeRequests.find((r) => r.id === item.requestId);
         const toolCallInput = toolCallInputFor(decoded, decodedItems);
         const base = describeRuntimeRequest(decoded, {
           assistantName: context.assistantName,
@@ -177,7 +183,23 @@ export function buildTimeline(
               : request?.status === "resolved"
                 ? "allowed"
                 : "ended";
-        out.push({ kind: "ask", id: item.id, requestId: item.requestId, card, state });
+        if (
+          context.childView &&
+          card.grownUp === null &&
+          request?.status === "resolved" &&
+          request.decision === "accept"
+        )
+          break;
+        out.push({
+          kind: "ask",
+          id: item.id,
+          requestId: item.requestId,
+          card:
+            context.childView && card.grownUp !== null
+              ? { ...card, whatItWants: childApprovalSentence(card, "Sam") }
+              : card,
+          state,
+        });
         break;
       }
       case "checkpoint": {
@@ -185,19 +207,21 @@ export function buildTimeline(
         const checkpoint = projection.checkpoints.find((c) => c.id === item.checkpointId);
         const before = checkpoint ? findBefore(projection, checkpoint) : null;
         const summary = describeChanges(fromCheckpointFiles(item.files as never));
+        const kidSummary = context.childView === true;
         out.push({
           kind: "changed",
           id: item.id,
-          headline: summary.summary,
-          lines: summary.groups
-            .flatMap((group) => group.files.map((file) => file.line))
-            .slice(0, 6),
+          headline: kidSummary ? "Sam made your page." : summary.summary,
+          lines: kidSummary
+            ? ["Your page is ready to play."]
+            : summary.groups.flatMap((group) => group.files.map((file) => file.line)).slice(0, 6),
           fileCount: item.files.length,
           undo:
             before !== null && before.status === "ready"
               ? { scopeId: before.scopeId, checkpointId: before.id }
               : null,
           undone: checkpoint?.runId != null && rolledBack.has(checkpoint.runId),
+          kidSummary,
         });
         break;
       }

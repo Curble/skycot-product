@@ -6,6 +6,7 @@ import * as NodeCrypto from "node:crypto";
 
 import {
   BLOCKED_REPORTER,
+  PAGE_LINK_INTERCEPTOR,
   sealedPolicy,
   siteOfUrl,
   pageDiagnosticsScript,
@@ -259,7 +260,10 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
       }
       return bytes;
     });
-  let html = decoder.decode(source).replace(/<base\b[^>]*>/giu, "");
+  let html = decoder
+    .decode(source)
+    .replace(/<base\b[^>]*>/giu, "")
+    .replace(/\btarget\s*=\s*(?:(["'])_blank\1|_blank\b)/giu, 'target="_self"');
   for (const imported of html.matchAll(
     /\bimport\s+(?:[^'";]*?\s+from\s*)?(?:\(|)["']((?:https?:)?\/\/[^"']+)["']/giu,
   ))
@@ -505,7 +509,7 @@ export const playablePage = Effect.fn("SkycotFridge.playablePage")(function* (
     html = html.replace(/<!--SKYCOT_MODULE_ENTRY:[^>]+-->/gu, "");
   }
   const pack = (packedBytes: number) => {
-    const helpers = `${STORAGE_SHIM}${BLOCKED_REPORTER}${pageDiagnosticsScript(packedBytes)}<script>${fileShim(assets)}</script>`;
+    const helpers = `<base target="_self">${STORAGE_SHIM}${BLOCKED_REPORTER}${PAGE_LINK_INTERCEPTOR}${pageDiagnosticsScript(packedBytes)}<script>${fileShim(assets)}</script>`;
     const provisional = withHeadStart(html, helpers);
     const { scripts, handlers } = cspHashes(provisional);
     const policy = `<meta http-equiv="Content-Security-Policy" content="${quote(sealedPolicy(sites, scripts, handlers))}">`;

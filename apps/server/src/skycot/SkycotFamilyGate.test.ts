@@ -1106,14 +1106,14 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
                 type: "message.dispatch",
                 threadId: THREAD_ID,
                 messageId,
-                text: "Make it green instead",
+                text: "Make it a quiz instead",
                 ...extra,
               });
             const modeFor = (messageId: string) =>
               SkycotFamilyInstructions.familyTurnInput(family, {
                 message: {
                   messageId: MessageId.make(messageId),
-                  text: "Make it green instead",
+                  text: "Make it a quiz instead",
                   attachments: [],
                   createdBy: "user",
                   creationSource: "web",

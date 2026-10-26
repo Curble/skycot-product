@@ -16,7 +16,7 @@ import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
 import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
 import { PreviewPanel } from "../features/preview/PreviewPanel";
-import { usePreviewElsewhere, usePreviewOpen } from "../features/preview/store";
+import { closePreview, usePreviewElsewhere, usePreviewOpen } from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { ReadyNotifier } from "../features/updates/ReadyNotifier";
 import { UpdatePill } from "../features/updates/UpdatePill";
@@ -73,6 +73,17 @@ export function AppShell({
 }
 
 function ShellFrame({ route, children }: { readonly route: Route; readonly children: ReactNode }) {
+  const previousRoute = useRef(route);
+  useEffect(() => {
+    const previous = previousRoute.current;
+    previousRoute.current = route;
+    if (
+      previous.name === "thread" &&
+      (route.name !== "thread" || route.threadId !== previous.threadId)
+    ) {
+      closePreview();
+    }
+  }, [route]);
   const columns = useColumns();
   const shell = useShellState();
   const childView = useChildView();
@@ -145,7 +156,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <UsageBanner />
         {childView && columns < 3 ? (
           <Button size="sm" variant="quiet" onClick={openChildPicker}>
-            I'm the grown-up
+            Switch who's using SKYCOT
           </Button>
         ) : null}
       </div>

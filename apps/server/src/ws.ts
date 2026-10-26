@@ -1197,6 +1197,7 @@ export const layerWsRpc = (
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
+      const fileSystem = yield* FileSystem.FileSystem;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
         | ThreadManagementService.ThreadManagementService
@@ -2636,6 +2637,9 @@ export const layerWsRpc = (
               });
             }
             const path = yield* Path.Path;
+            yield* fileSystem.makeDirectory(path.join(childFolder, "projects"), {
+              recursive: true,
+            });
             const created = yield* managedFolders.createNamedProject({
               ...input,
               parentRoot: path.join(childFolder, "projects"),

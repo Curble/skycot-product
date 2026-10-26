@@ -44,6 +44,7 @@ import { FRIDGE_FILE_NAME } from "../family-fridge/SkycotFridge.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
 import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
+import * as SkycotFamily from "../SkycotFamily.ts";
 import {
   archivedItemVisible,
   folderOwner,
@@ -102,6 +103,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const identity = yield* SkycotFamilyIdentity.SkycotFamilyIdentity;
+  const family = yield* SkycotFamily.SkycotFamily;
   const limits = yield* SkycotFamilyLimits.SkycotFamilyLimits;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const projects = yield* ProjectStore.ProjectStoreV2;
@@ -125,12 +127,23 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
     "SkycotFamilyVisibility.childViewFor",
   )(function* (sessionId) {
     const who = yield* identity.identify(sessionId);
-    if (who.kind !== "child") return null;
+    // A grown-up in grown-up mode on the Mac (code entered: settings, advanced or the session) sees everything.
+    if (who.kind === "shared" && (yield* family.allows({ sessionId, purpose: "settings" }))) {
+      return null;
+    }
+    const childId =
+      who.kind === "child"
+        ? who.childId
+        : who.kind === "shared"
+          ? (yield* limits.forSession({ sessionId })).childId
+          : null;
+    if (childId === null) return null;
     const today = yield* limits.today;
     return {
-      childId: who.childId,
+      childId,
       owners: { threads: today.threads, projects: yield* projectOwners(today.projects) },
       pinned: yield* readPins(fs, pinsFile),
+      ...(who.kind === "shared" ? { sharedSession: true } : {}),
     } satisfies ChildView;
   });
 
@@ -149,7 +162,9 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   ) {
     const owner = view.owners.threads[threadId];
     if (owner === view.childId) return true;
+    // A page pinned to the family fridge is readable by every child, on the Mac too; never writable.
     if (mode === "read" && view.pinned.has(threadId)) return true;
+    if (view.sharedSession && owner === undefined) return true;
     if (owner !== undefined) return false;
     return !(yield* threadExists(threadId));
   });
@@ -170,6 +185,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   });
 
   const projectAllowed = Effect.fnUntraced(function* (view: ChildView, projectId: string) {
+    if (view.sharedSession) return childSeesProject(view.childId, projectId, view.owners);
     if (childSeesProject(view.childId, projectId, view.owners)) return true;
     return childSeesProject(view.childId, projectId, view.owners, yield* ownThreadProjects(view));
   });

@@ -12,6 +12,7 @@ import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { formatVersionTime, restoreSentence } from "./timeline";
+import { useChildView } from "../../app/useChildView";
 
 export type RestoreIntent = "undo" | "restore";
 
@@ -43,16 +44,27 @@ export function RestoreSheet({
   const revert = useAtomCommand(threadEnvironment.revertCheckpoint, { reportFailure: false });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const childView = useChildView();
 
   if (!entry) return null;
   const explainer = entry.restoreExplainer;
-  const title =
-    intent === "undo"
+  const does = childView
+    ? [
+        "Puts the page back how it was before this change.",
+        "Sam will forget messages after that point.",
+      ]
+    : explainer.does;
+  const doesNot = childView
+    ? ["Things already shared stay shared.", "This can't be undone."]
+    : explainer.doesNot;
+  const title = childView
+    ? "Go back?"
+    : intent === "undo"
       ? "Undo all of it?"
       : versionNumber
         ? `Restore Version ${versionNumber}?`
         : "Restore this version?";
-  const verb = intent === "undo" ? "Undo all of it" : "Restore";
+  const verb = childView ? "Go back" : intent === "undo" ? "Undo all of it" : "Restore";
 
   const confirm = async () => {
     if (!entry.restore) return;
@@ -87,7 +99,11 @@ export function RestoreSheet({
       icon={RotateCcw}
       iconTone="red"
       sober
-      description={restoreSentence(intent, versionNumber, formatVersionTime(entry.timestamp))}
+      description={
+        childView
+          ? "Put the page back to how it was before this change? You can't undo this."
+          : restoreSentence(intent, versionNumber, formatVersionTime(entry.timestamp))
+      }
       // A stray click outside must not cancel (or confirm) a destructive step.
       dismissOnBackdrop={false}
       actions={
@@ -105,13 +121,17 @@ export function RestoreSheet({
           </Button>
         </>
       }
-      note={`Back to: ${versionNumber ? `Version ${versionNumber} · ` : ""}${entry.label}`}
+      note={
+        childView
+          ? undefined
+          : `Back to: ${versionNumber ? `Version ${versionNumber} · ` : ""}${entry.label}`
+      }
     >
       {problem ? <Banner tone="danger">{problem}</Banner> : null}
       {explainer.blockedBecause ? <Banner tone="warning">{explainer.blockedBecause}</Banner> : null}
       <div className="fm-restore-explainer">
         <ul className="fm-restore-explainer__list" aria-label="Restore does">
-          {explainer.does.map((line) => (
+          {does.map((line) => (
             <li key={line}>
               <Check
                 size={13}
@@ -124,7 +144,7 @@ export function RestoreSheet({
           ))}
         </ul>
         <ul className="fm-restore-explainer__list" aria-label="Restore does not">
-          {explainer.doesNot.map((line) => (
+          {doesNot.map((line) => (
             <li key={line}>
               <X size={13} strokeWidth={2.4} aria-hidden className="fm-restore-explainer__no" />
               <span>{line}</span>

@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { useCrew } from "../../themes/useCrew";
+import { useChildView } from "../../app/useChildView";
 import { Button } from "../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
 import { Mascot } from "../brand/Mascot";
@@ -46,6 +47,7 @@ export function ShieldCard({
   readonly onAskGrownUp: () => Promise<boolean>;
 }) {
   const crew = useCrew();
+  const childView = useChildView();
   // Words first; pictures get their own question once the words are settled.
   const [nicknamed, setNicknamed] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
@@ -62,7 +64,11 @@ export function ShieldCard({
     <div className="fm-shield" role="group" aria-label="Before this is sent">
       <p className="fm-crew-kicker">
         {crew.named ? <CrewAvatar role="checker" size="sm" /> : null}
-        {crew.named ? `${crew.checker.name} spotted something private` : "Something private"}
+        {childView
+          ? "Sam spotted something private"
+          : crew.named
+            ? `${crew.checker.name} spotted something private`
+            : "Something private"}
       </p>
       <Card label={wordsStep ? shieldCopy.title : shieldCopy.photoTitle}>
         <CardHeader

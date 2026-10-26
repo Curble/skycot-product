@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { Atom } from "effect/reactivity";
 import {
   Archive,
@@ -400,7 +401,8 @@ export function AppSidebar({
                 }).then((outcome) => {
                   setCreatingProject(false);
                   if (outcome._tag === "Failure") {
-                    showToast("Couldn't make a project. Try again.");
+                    const reason = squashAtomCommandFailure(outcome);
+                    showToast(`Couldn't make a project: ${reason}`);
                     return;
                   }
                   showList(() =>
@@ -624,7 +626,7 @@ export function SidebarIdentity({
       </span>
       {childView ? (
         <Button size="sm" variant="quiet" onClick={onSwitch}>
-          I'm the grown-up
+          Switch who's using SKYCOT
         </Button>
       ) : null}
     </>

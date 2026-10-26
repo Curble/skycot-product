@@ -184,10 +184,9 @@ const route = (
             );
           }
           const url = HttpServerRequest.toURL(request);
-          const childView =
-            who.kind === "child" && Option.isSome(visibility)
-              ? yield* visibility.value.childViewFor(session.sessionId)
-              : null;
+          const childView = Option.isSome(visibility)
+            ? yield* visibility.value.childViewFor(session.sessionId)
+            : null;
           return yield* handler({
             sessionId: session.sessionId,
             body,
@@ -915,7 +914,14 @@ export const layerApiGate = HttpRouter.middleware(
             sessionId: session.value.sessionId,
             visibility: Option.getOrNull(visibility),
           });
-          if (decision.type === "refuse") return decision.response;
+          if (decision.type === "refuse") {
+            yield* Effect.logInfo("skycot-family.device-refused", {
+              method: request.method,
+              pathname,
+              why: "not-theirs",
+            });
+            return decision.response;
+          }
           transform = decision.transform;
         }
         if (gated) {
@@ -1029,7 +1035,7 @@ const fridgeRoute = madeRoute("GET", "/fridge", ({ fridge, childView }) =>
   fridge.list.pipe(
     Effect.map((items) =>
       json({
-        // A child's own device: their own magnets, and whatever the family pinned.
+        // A child (own device or the shared Mac): their own magnets, and whatever the family pinned.
         items:
           childView === null
             ? items

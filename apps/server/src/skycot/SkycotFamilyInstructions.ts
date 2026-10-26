@@ -235,12 +235,12 @@ export const carryPlanPass = (fromMessageId: string, toMessageId: string): Effec
  */
 // nondev-seam: skycot-q42-small-follow-up
 const TWEAK_WORDS =
-  /\b(colou?r|bigger|smaller|larger|faster|slower|speed|size|font|bold|bright|dark|light|rename|spell|typo|wording|text|title|heading|move|left|right|centre|center|top|bottom|round|rounder|space|margin|padding|border|shadow|louder|quieter)\b/i;
+  /\b(colou?r|red|blue|green|yellow|purple|pink|orange|circle|bigger|smaller|larger|faster|slower|speed|size|font|bold|bright|dark|light|rename|spell|typo|wording|text|title|heading|move|left|right|centre|center|top|bottom|round|rounder|space|margin|padding|border|shadow|louder|quieter)\b/i;
 const BIG_WORDS =
   /\b(internet|website|web ?site|online|download|install|login|log in|password|account|delete|remove|everything|database|server|api|game|level|menu|score system|multiple pages|a whole|redo|rebuild|turn it into|new (game|project|app|page|site)|from scratch|start over|publish|share|send|email|buy|pay|camera|microphone|location|http|www)\b/i;
 export function isSmallTweak(text: string): boolean {
   const trimmed = text.trim();
-  if (trimmed.length === 0 || trimmed.length > 140) return false;
+  if (trimmed.length === 0 || trimmed.length > 80) return false;
   if (trimmed.split(/\n/).length > 2 || (trimmed.match(/[.!?]\s/g) ?? []).length > 1) return false;
   if (/\b(and|then|also|plus)\b/i.test(trimmed)) return false;
   return TWEAK_WORDS.test(trimmed) && !BIG_WORDS.test(trimmed);

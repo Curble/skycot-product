@@ -79,8 +79,10 @@ function schemeOf(value: string): string {
 
 /** The tag without code: every `on…` handler, and any address that is code (`javascript:`). */
 function tagWithoutCode(tag: string): string {
-  return tag.replace(ATTRIBUTE, (whole, name: string, value: string | undefined) => {
-    if (/^on/iu.test(name)) return "";
+  const tagName = /^<([\w:-]+)/u.exec(tag)?.[1]?.toLowerCase();
+  return tag.replace(ATTRIBUTE, (whole, attributeName: string, value: string | undefined) => {
+    if ((tagName === "a" || tagName === "area") && /^href$/iu.test(attributeName)) return "";
+    if (/^on/iu.test(attributeName)) return "";
     if (value !== undefined && /^(?:javascript|vbscript):/u.test(schemeOf(value))) return "";
     return whole;
   });

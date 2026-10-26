@@ -2,13 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
-import { Platform, Pressable, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { familyApi, type FridgePlay } from "../../family/api";
 import type { Mac } from "../../links/store";
-import { Banner, Button, Card, Spinner, Symbol, Txt } from "../../ui/kit";
+import { Banner, Button, Card, Sheet, Spinner, Symbol, Txt } from "../../ui/kit";
 import {
   grownUpAnswerLabel,
   type GrownUpAnswer,
@@ -16,6 +16,7 @@ import {
 import { useTheme } from "../../ui/theme";
 import {
   allowsPlayNavigation,
+  isPageLinkMessage,
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   playableCopy,
@@ -69,9 +70,14 @@ export function PagePreview(props: {
   const [diagnosticsElapsed, setDiagnosticsElapsed] = useState(0);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
+  const [linkNotice, setLinkNotice] = useState(false);
+  const [localFullScreen, setLocalFullScreen] = useState(false);
+  const fullScreen = props.fullScreen ?? localFullScreen;
+  const toggleFullScreen =
+    props.onToggleFullScreen ?? (() => setLocalFullScreen((current) => !current));
   const pageKey = `${props.mac.macId}:${props.threadId}:${props.page}`;
   const [gameButtons, setGameButtons] = useState(() => gameButtonsForPage(pageKey));
-  const toolbarCopy = pageToolbarCopy(props.childView, props.fullScreen === true);
+  const toolbarCopy = pageToolbarCopy(props.childView, fullScreen);
   const currentSitesKey = [...sites].sort().join(",");
 
   const loadPage = useCallback(async () => {
@@ -83,6 +89,7 @@ export function PagePreview(props: {
     setDiagnosticsElapsed(0);
     setDiagnosticsOpen(false);
     setReportCopied(false);
+    setLinkNotice(false);
     setNotice(null);
     setNoticeHosts([]);
     setSites([]);
@@ -175,6 +182,10 @@ export function PagePreview(props: {
     } catch {
       return;
     }
+    if (isPageLinkMessage(data)) {
+      setLinkNotice(true);
+      return;
+    }
     setSites((current) => reportedSites(data, current));
     setDiagnostics((current) => parsePageDiagnostic(data, current));
   };
@@ -215,7 +226,14 @@ export function PagePreview(props: {
   const noticeCopy =
     notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts, device);
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF", paddingTop: insets.top }}>
+    <View
+      style={{
+        flex: 1,
+        position: "relative",
+        backgroundColor: "#FFFFFF",
+        paddingTop: fullScreen ? 0 : insets.top,
+      }}
+    >
       <View
         style={{
           minHeight: 48,
@@ -226,6 +244,9 @@ export function PagePreview(props: {
           borderBottomWidth: 1,
           borderBottomColor: theme.color.separator,
           backgroundColor: theme.color.background,
+          ...(fullScreen
+            ? { position: "absolute", top: 0, left: 0, right: 0, zIndex: 4, paddingTop: insets.top }
+            : {}),
         }}
       >
         <ToolbarButton
@@ -234,18 +255,21 @@ export function PagePreview(props: {
           onPress={props.onDone}
           leading
         />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {props.onToggleFullScreen ? (
-            <ToolbarButton
-              label={toolbarCopy.fullScreen}
-              symbol={
-                props.fullScreen
-                  ? "arrow.down.right.and.arrow.up.left"
-                  : "arrow.up.left.and.arrow.down.right"
-              }
-              onPress={props.onToggleFullScreen}
-            />
-          ) : null}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+          style={{ flexShrink: 1, marginLeft: 8 }}
+        >
+          <ToolbarButton
+            label={toolbarCopy.fullScreen}
+            symbol={
+              fullScreen
+                ? "arrow.down.right.and.arrow.up.left"
+                : "arrow.up.left.and.arrow.down.right"
+            }
+            onPress={toggleFullScreen}
+          />
           {play !== null ? (
             <Pressable
               accessibilityRole="switch"
@@ -268,20 +292,25 @@ export function PagePreview(props: {
               <Symbol name={gameButtons ? "checkmark.circle.fill" : "circle"} size={18} />
             </Pressable>
           ) : null}
-          {wrong || (engineResponse?.reason !== null && engineResponse?.reason !== undefined) ? (
+          {play !== null ||
+          wrong ||
+          (engineResponse?.reason !== null && engineResponse?.reason !== undefined) ? (
             <ToolbarButton
               label={props.childView ? "Not working?" : "Why isn't it working?"}
               onPress={() => setDiagnosticsOpen(true)}
             />
           ) : null}
-        </View>
+        </ScrollView>
       </View>
       {problem !== null ? (
         <View style={{ flex: 1, padding: 20, backgroundColor: theme.color.background }}>
           <Banner tone="warning" text={problem} />
         </View>
       ) : play === null && html === null ? (
-        <Spinner />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <Spinner />
+          <Txt tone="label2">Getting your page ready…</Txt>
+        </View>
       ) : (
         <WebView<object>
           ref={webView}
@@ -295,6 +324,7 @@ export function PagePreview(props: {
             setTimeout(() => setDiagnosticsElapsed(3000), 3000);
           }}
           setSupportMultipleWindows={false}
+          onOpenWindow={() => undefined}
           javaScriptCanOpenWindowsAutomatically={false}
           allowFileAccess={false}
           allowFileAccessFromFileURLs={false}
@@ -477,6 +507,16 @@ export function PagePreview(props: {
           </Card>
         </View>
       ) : null}
+      <Sheet
+        visible={linkNotice}
+        title="Links stay closed here"
+        onClose={() => setLinkNotice(false)}
+        closeLabel="Done"
+      >
+        <Txt center>
+          That link goes to the internet. Links open only on the Mac with a grown-up.
+        </Txt>
+      </Sheet>
     </View>
   );
 }

@@ -305,6 +305,8 @@ export function RequestCard({
   const grownUpAnswer =
     childView && item.type === "approval_request" ? answers.get(item.requestId) : undefined;
   const decided = decidedLine(item, request, runEnded, grownUpAnswer);
+  const questionTitle =
+    childView && item.type === "user_input_request" ? "Sam has a question" : null;
   const decision = request ? describeDecision(request) : null;
   const checking = waitsForEngineCheck({
     familyOn: familyApplies,
@@ -333,6 +335,10 @@ export function RequestCard({
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+
+  if (childView && item.type === "user_input_request" && request?.answers !== undefined) {
+    return null;
+  }
 
   // A new ask lands keyboard focus on the card itself (not a button, so
   // nothing is pre-selected) unless the person is typing somewhere; from the
@@ -418,11 +424,13 @@ export function RequestCard({
         {crew.named && !decided && !(childView && grownUp !== null) ? (
           <p className="fm-crew-kicker">
             <CrewAvatar role="builder" size="sm" />
-            {item.type === "approval_request"
-              ? `${crew.builder.name} needs your OK`
-              : item.type === "secret_request"
-                ? `${crew.builder.name} needs a key from you`
-                : `${crew.builder.name} has a question`}
+            {childView && item.type === "user_input_request"
+              ? "Sam has a question"
+              : item.type === "approval_request"
+                ? `${crew.builder.name} needs your OK`
+                : item.type === "secret_request"
+                  ? `${crew.builder.name} needs a key from you`
+                  : `${crew.builder.name} has a question`}
           </p>
         ) : null}
         <Card
@@ -431,7 +439,7 @@ export function RequestCard({
               ? decided
               : childView && grownUp !== null
                 ? "A grown-up is needed"
-                : card.title
+                : (questionTitle ?? card.title)
           }
         >
           <CardHeader
@@ -444,7 +452,7 @@ export function RequestCard({
                   ? "A grown-up is needed"
                   : grownUp !== null
                     ? "Allow this step?"
-                    : card.title
+                    : (questionTitle ?? card.title)
             }
             subtitle={
               childView && decided

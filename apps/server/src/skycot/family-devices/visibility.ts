@@ -20,6 +20,8 @@ export interface ChildView {
   readonly owners: Owners;
   /** Conversations pinned to the fridge: their pages stay readable on every child's device. */
   readonly pinned: ReadonlySet<string>;
+  /** The family's Mac uses the selected child without the linked-device legacy filters. */
+  readonly sharedSession?: boolean;
 }
 
 type ThreadLike = Pick<OrchestrationV2ThreadShell, "id" | "projectId">;

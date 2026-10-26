@@ -2,7 +2,11 @@
 // may use (the engine's list for that page, Family profile only) and which ones it tried that
 // still need a yes. The frame's reporter (BLOCKED_REPORTER) names a stopped address; only a
 // message from this frame counts, and only an https site can ever be allowed.
-import { reportedSite, MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
+import {
+  reportedPageLink,
+  reportedSite,
+  MAX_PAGE_SITES,
+} from "@t3tools/skycot-rules/page-internet";
 import { useEffect, useState, type RefObject } from "react";
 
 import { useFamily } from "../family/FamilyProvider";
@@ -14,6 +18,8 @@ export function useSealedInternet(
   readonly enabled: boolean;
   readonly allowed: ReadonlyArray<string>;
   readonly asks: ReadonlyArray<string>;
+  readonly link: string | null;
+  readonly clearLink: () => void;
 } {
   const family = useFamily();
   const on = family.enabled && page !== null;
@@ -21,10 +27,18 @@ export function useSealedInternet(
     ? (family.profile.pageInternet.find((entry) => entry.page === page)?.sites ?? [])
     : [];
   const [tried, setTried] = useState<ReadonlyArray<string>>([]);
+  const [link, setLink] = useState<string | null>(null);
   useEffect(() => {
-    if (!on) return;
+    if (page === null) return;
+    setLink(null);
     const onMessage = (event: MessageEvent) => {
       if (frame.current === null || event.source !== frame.current.contentWindow) return;
+      const tapped = reportedPageLink(event.data);
+      if (tapped !== null) {
+        setLink(tapped);
+        return;
+      }
+      if (!on) return;
       const site = reportedSite(event.data);
       if (site === null) return;
       setTried((current) =>
@@ -33,10 +47,12 @@ export function useSealedInternet(
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [on, frame]);
+  }, [on, page, frame]);
   return {
     enabled: family.enabled,
     allowed,
     asks: tried.filter((site) => !allowed.includes(site)),
+    link,
+    clearLink: () => setLink(null),
   };
 }

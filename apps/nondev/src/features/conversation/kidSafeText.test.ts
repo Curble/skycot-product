@@ -18,4 +18,8 @@ describe("kidSafeText", () => {
       "The things changed a things in the project things.",
     );
   });
+
+  it("removes markdown markers that the phone cannot render", () => {
+    expect(kidSafeText("**How I did it:** I drew a box.")).toBe("How I did it: I drew a box.");
+  });
 });

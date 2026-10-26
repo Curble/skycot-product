@@ -43,6 +43,17 @@ describe("a conversation as SKYCOT's cards", () => {
     expect(JSON.stringify(changed)).not.toMatch(/space-game\.html|rocket\.css/u);
   });
 
+  it("hides safe step cards and developer change details from a child", () => {
+    const asks = buildTimeline(demoConversation("ask"), { ...context, childView: true });
+    expect(asks.some((entry) => entry.kind === "ask" && entry.state === "allowed")).toBe(false);
+    const entries = buildTimeline(demoConversation("made"), { ...context, childView: true });
+    expect(entries.find((entry) => entry.kind === "changed")).toMatchObject({
+      headline: "Sam made your page.",
+      lines: ["Your page is ready to play."],
+      kidSummary: true,
+    });
+  });
+
   it("shows one plain, retryable failure until the child sends another message", () => {
     const projection = demoConversation("plan");
     const visible = projection.visibleTurnItems as unknown as Array<{

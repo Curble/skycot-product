@@ -3,5 +3,5 @@ export function shouldShowDestinationPicker(
   projectCount: number,
   questionSpaceCount: number,
 ): boolean {
-  return projectCount + questionSpaceCount > 1;
+  return projectCount > 1 || questionSpaceCount > 1;
 }

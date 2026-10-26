@@ -5,6 +5,7 @@ import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 
 import {
   allowsPlayNavigation,
+  isPageLinkMessage,
   diagnosticReport,
   diagnosticSheetCopy,
   EMPTY_PAGE_DIAGNOSTICS,
@@ -85,6 +86,14 @@ describe("the sealed page viewer", () => {
     ]) {
       expect(allowsPlayNavigation(url)).toBe(false);
     }
+  });
+
+  it("recognizes only the link message used to show the closed-link sheet", () => {
+    expect(isPageLinkMessage('{"skycot":"link","url":"https://example.com"}')).toBe(true);
+    expect(isPageLinkMessage({ skycot: "link", url: "mailto:grownup@example.com" })).toBe(true);
+    expect(isPageLinkMessage({ skycot: "page-internet", url: "https://example.com" })).toBe(false);
+    expect(isPageLinkMessage({ skycot: "link", url: "x".repeat(2049) })).toBe(false);
+    expect(isPageLinkMessage("not json")).toBe(false);
   });
 
   it("collects only unique public https reporter sites", () => {

@@ -95,7 +95,7 @@ describe("the copy a phone or iPad shows", () => {
         "index.html": `<!doctype html><html><head><title>Dogs</title><meta http-equiv="refresh" content="0;url=https://example.com"></head><body onload="fetch('https://dog.ceo/api')">
 <h1 title="1 > 0" onclick="go()">Dogs</h1><script>fetch("https://dog.ceo/a")</script>
 <img src="missing.png" onerror="fetch('https://dog.ceo/b')"><img/onerror=fetch(1) alt="x">
-<a href="javascript:fetch('https://dog.ceo/c')">one</a><a href=" &#106;avascript:alert(1)">two</a>
+<a href="javascript:fetch('https://dog.ceo/c')">one</a><a href=" &#106;avascript:alert(1)">two</a><a href="https://example.com" target="_blank">outside</a>
 <a href="&#x6A;ava&#x09;script&colon;x">three</a><a href="pets.html">pets</a><svg onLoad="x()"></svg>
 <form action="javascript:void(0)"><button formaction="javascript:x()">Go</button></form></body></html>`,
       });
@@ -103,6 +103,7 @@ describe("the copy a phone or iPad shows", () => {
       assert.notMatch(html, /\son[a-z]+\s*=/iu);
       assert.notMatch(html, /\/on[a-z]+\s*=/iu);
       assert.notMatch(html, /javascript|&#106;|&#x6a;/iu);
+      assert.notMatch(html, /<a\b[^>]*\bhref\s*=/iu);
       assert.notMatch(html, /<script|http-equiv="refresh"/iu);
       assert.include(
         html,
@@ -111,7 +112,7 @@ describe("the copy a phone or iPad shows", () => {
       assert.isBelow(html.indexOf("Content-Security-Policy"), html.indexOf("<title>"));
       // Ordinary content and attributes stay as they were.
       assert.include(html, '<h1 title="1 > 0">Dogs</h1>');
-      assert.include(html, '<a href="pets.html">pets</a>');
+      assert.include(html, ">pets</a>");
       assert.include(html, 'alt="x"');
     }),
   );

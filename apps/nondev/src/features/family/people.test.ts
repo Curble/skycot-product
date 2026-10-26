@@ -52,6 +52,27 @@ describe("page internet approvals", () => {
     const [request] = requests;
     expect(request).not.toHaveProperty("target");
     expect(requestHeading(request!)).toBe("Run a command");
+    expect(grownUpRequestSentence(request!, "Ava")).toBe(
+      "Ava's game wants to download a free 3D tool (three.js) from the internet.",
+    );
+  });
+
+  it("does not call every grown-up request a game", () => {
+    const request = parsePendingRequests({
+      requests: [
+        {
+          threadId: "thread-1",
+          requestId: "request-1",
+          fingerprint: "fingerprint",
+          kind: "file-change",
+          what: "change a file",
+          needsGrownUp: true,
+        },
+      ],
+    })?.[0];
+    expect(request && grownUpRequestSentence(request, "Ava")).toBe(
+      "Ava needs a grown-up's help with one step.",
+    );
   });
 
   it("attaches a batch to its members while still reading older single-request responses", () => {

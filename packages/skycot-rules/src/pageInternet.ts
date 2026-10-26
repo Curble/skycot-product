@@ -168,6 +168,30 @@ export function readBlockedReport(
 export const BLOCKED_REPORTER =
   "<script>(function(){document.addEventListener('securitypolicyviolation',function(e){try{var u=new URL(e.blockedURI);if(u.protocol!=='https:'&&u.protocol!=='http:')return;var m={skycot:'page-internet',url:u.origin,directive:String(e.effectiveDirective||'')};if(window.ReactNativeWebView&&typeof window.ReactNativeWebView.postMessage==='function')window.ReactNativeWebView.postMessage(JSON.stringify(m));else window.parent.postMessage(m,'*')}catch(_){}})})()</script>";
 
+/** A link the sealed page stopped before it could leave the viewer. */
+export function reportedPageLink(data: unknown): string | null {
+  let value = data;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value !== "object" || value === null) return null;
+  const message = value as Record<string, unknown>;
+  return message["skycot"] === "link" &&
+    typeof message["url"] === "string" &&
+    message["url"].length <= 2048 &&
+    Object.keys(message).length === 2
+    ? message["url"]
+    : null;
+}
+
+// A child can see the link, but the sealed page never hands it to the phone or the Mac browser.
+export const PAGE_LINK_INTERCEPTOR =
+  "<script>(function(){var send=function(u){try{var m={skycot:'link',url:String(u||'').slice(0,2048)};if(window.ReactNativeWebView&&typeof window.ReactNativeWebView.postMessage==='function')window.ReactNativeWebView.postMessage(JSON.stringify(m));else window.parent.postMessage(m,'*')}catch(_){}};var stop=function(e){var n=e.target&&e.target.closest?e.target.closest('[href]'):null;if(!n)return;var u=n.getAttribute('href');if(!u)return;e.preventDefault();e.stopImmediatePropagation();send(u)};document.addEventListener('click',stop,true);document.addEventListener('auxclick',stop,true);document.addEventListener('keydown',function(e){if(e.key!=='Enter'&&e.key!==' ')return;stop(e)},true);window.open=function(u){send(u);return null};try{var d=Object.getOwnPropertyDescriptor(Location.prototype,'href');if(d&&d.configurable)Object.defineProperty(Location.prototype,'href',{get:d.get,set:function(u){send(u)}});['assign','replace'].forEach(function(k){var f=Location.prototype[k];if(typeof f==='function')Location.prototype[k]=function(u){send(u)}})}catch(_){} })()</script>";
+
 // nondev-seam: skycot-page-play-policy
 /** Small, local-only signals for the phone's in-memory game diagnostics. */
 export function pageDiagnosticsScript(packedBytes: number): string {

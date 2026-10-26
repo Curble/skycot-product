@@ -327,7 +327,16 @@ const make = Effect.gen(function* () {
   }) {
     const project = yield* projects.get(thread.projectId);
     const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
-    return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
+    const roots = workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
+    if (Option.isNone(fsOption)) return roots;
+    const real = (value: string | null) =>
+      value === null
+        ? Effect.succeed(null)
+        : fsOption.value.realPath(value).pipe(Effect.orElseSucceed(() => value));
+    return {
+      projectRoot: yield* real(roots.projectRoot),
+      projectFolder: yield* real(roots.projectFolder),
+    };
   });
 
   /**

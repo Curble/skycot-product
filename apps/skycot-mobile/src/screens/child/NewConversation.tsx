@@ -14,7 +14,7 @@ import {
   rewriteWithNicknames,
 } from "@t3tools/skycot-rules/personal";
 import type { ModelSelection } from "@t3tools/contracts";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ComponentRef } from "react";
 import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from "react-native";
 
 import {
@@ -25,7 +25,7 @@ import {
 import { JUST_ASK_COPY } from "../../../../nondev/src/features/questions/questions";
 import type { StackRoutes } from "../../app/routes";
 import { useChild } from "../../app/child/ChildContext";
-import { isQuestionsProject } from "../../data/conversations";
+import { childProjectTitle, isQuestionsProject } from "../../data/conversations";
 import { useMacData } from "../../data/MacData";
 import { defaultModelSelection, openQuestions, startConversation } from "../../engine/engine";
 import { BUILDER_NAME } from "../../ui/brand";
@@ -51,10 +51,7 @@ export function NewConversationScreen() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [shieldShown, setShieldShown] = useState(false);
-  const [selection, setSelection] = useState<{
-    readonly start: number;
-    readonly end: number;
-  } | null>(null);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
 
   const projects = useMemo(
     () =>
@@ -157,7 +154,7 @@ export function NewConversationScreen() {
               {projects.map(({ mac: owner, project }) => (
                 <Row
                   key={`${owner.macId}:${project.id}`}
-                  title={project.title}
+                  title={childProjectTitle(project.title, owner.macName)}
                   leading={<Symbol name="folder.fill" size={22} />}
                   trailing={
                     target?.projectId === project.id && target.macId === owner.macId ? (
@@ -194,11 +191,10 @@ export function NewConversationScreen() {
             </Txt>
             <Card padded={false}>
               <TextInput
+                ref={input}
                 value={text}
-                selection={selection ?? undefined}
                 onChangeText={(value) => {
                   setText(value);
-                  setSelection(null);
                   setShieldShown(false);
                 }}
                 multiline
@@ -249,7 +245,12 @@ export function NewConversationScreen() {
                     key={`${placeholder.start}:${placeholder.end}`}
                     accessibilityRole="button"
                     accessibilityLabel={`Replace ${placeholder.text}`}
-                    onPress={() => setSelection({ start: placeholder.start, end: placeholder.end })}
+                    onPress={() => {
+                      input.current?.focus();
+                      input.current?.setNativeProps({
+                        selection: { start: placeholder.start, end: placeholder.end },
+                      });
+                    }}
                   >
                     <Txt tone="accent">{placeholder.text}</Txt>
                   </Pressable>

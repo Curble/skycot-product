@@ -133,12 +133,19 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
       identify: () => Effect.succeed({ kind: "shared" } as never),
     }),
     Layer.mock(SkycotFamilyVisibility.SkycotFamilyVisibility)({
-      childViewFor: () =>
-        Effect.succeed({
-          childId: "ava",
-          owners: { threads: { "own-thread": "ava", "other-thread": "bea" }, projects: {} },
-          pinned: new Set(),
-        } as never),
+      childViewFor: (sessionId) =>
+        Effect.succeed(
+          sessionId === "session-child"
+            ? ({
+                childId: "ava",
+                owners: {
+                  threads: { "own-thread": "ava", "other-thread": "bea" },
+                  projects: {},
+                },
+                pinned: new Set(),
+              } as never)
+            : null,
+        ),
       allows: () => Effect.succeed(true),
       filterShellStream: (_sessionId, stream) => stream,
       filterArchivedStream: (_sessionId, stream) => stream,
@@ -196,6 +203,7 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
                   } as never)) as never,
               }),
               Layer.mock(ProjectStore.ProjectStoreV2)({
+                list: () => Effect.succeed([]),
                 get: () =>
                   Effect.succeed(
                     Option.some({
@@ -895,6 +903,7 @@ const makeEngine = Effect.fn("SkycotFamilyHttpTest.makeEngine")(function* () {
             Effect.succeed(heldItems.find((item) => item.id === itemId) ?? null),
         }),
         Layer.mock(ProjectStore.ProjectStoreV2)({
+          list: () => Effect.succeed([]),
           get: () => Effect.succeed(Option.none()),
           findActiveByWorkspaceRoot: () => Effect.succeed(Option.none()),
         }),

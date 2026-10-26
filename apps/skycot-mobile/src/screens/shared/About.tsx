@@ -6,7 +6,7 @@
  */
 import Constants from "expo-constants";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { useOptionalChild } from "../../app/child/ChildContext";
 import { CHILD_ABOUT_COPY } from "./aboutCopy";
@@ -26,14 +26,6 @@ export function AboutContent() {
         <Txt tone="label2" center>
           {CHILD_ABOUT_COPY.privacy}
         </Txt>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Ask a grown-up about SKYCOT"
-          onPress={() => Alert.alert("Ask a grown-up", "A grown-up can help you with SKYCOT.")}
-          hitSlop={10}
-        >
-          <Txt tone="accent">{CHILD_ABOUT_COPY.ask}</Txt>
-        </Pressable>
       </View>
     );
   }

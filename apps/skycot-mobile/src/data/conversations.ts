@@ -57,6 +57,7 @@ export function childStatusLabel(
   hasPage: boolean,
 ): string | null {
   if (state === "working") return `${builder} is working`;
+  if (state === "waiting") return "Waiting for a grown-up";
   if (state === "done" && hasPage) return "Ready to play";
   return stateLabel(state, builder);
 }
@@ -74,11 +75,14 @@ export function isQuestionsProject(project: ProjectShell | null, questionsRoot: 
  */
 export function projectTitleFor(
   project: ProjectShell | null,
-  mac: Pick<Mac, "me">,
+  mac: Pick<Mac, "me" | "macName">,
   questionsRoot: string | null,
 ): string {
   const space = project === null ? null : questionsSpaceOf(project.workspaceRoot, questionsRoot);
-  if (space === null) return project?.title ?? "A project";
+  if (space === null)
+    return mac.me.kind === "child"
+      ? childProjectTitle(project?.title, mac.macName)
+      : (project?.title ?? "A project");
   return questionsSpaceLabel(space, {
     childDevice: mac.me.kind === "child",
     // A linked device exists only while the Family profile is on.
@@ -86,6 +90,18 @@ export function projectTitleFor(
     nameOf: () => null,
     title: project?.title,
   });
+}
+
+/** Folder and computer labels are for grown-ups; children see names made for their projects. */
+export function childProjectTitle(title: string | null | undefined, computerName?: string): string {
+  const clean = title?.trim();
+  if (
+    !clean ||
+    clean === computerName ||
+    /^(?:[a-z0-9]+[-_])*(?:device|mac|computer)(?:[-_][a-z0-9]+)*$/iu.test(clean)
+  )
+    return "My project";
+  return clean;
 }
 
 export function conversationRows(

@@ -1,6 +1,10 @@
 // nondev-seam: skycot-mobile-page-logic
 // nondev-seam: skycot-iphone-q39-page-copy
-import { MAX_PAGE_SITES, reportedSite } from "@t3tools/skycot-rules/page-internet";
+import {
+  MAX_PAGE_SITES,
+  reportedPageLink,
+  reportedSite,
+} from "@t3tools/skycot-rules/page-internet";
 
 export const GAME_BUTTONS_DEFAULT = false;
 const buttonsByPage = new Map<string, boolean>();
@@ -141,6 +145,10 @@ export function playableCopy(result: {
  */
 export function allowsPlayNavigation(url: string): boolean {
   return /^about:(?:blank|srcdoc)(?:[?#].*)?$/iu.test(url);
+}
+
+export function isPageLinkMessage(value: unknown): boolean {
+  return reportedPageLink(value) !== null;
 }
 
 export function reportedSites(

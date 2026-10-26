@@ -4,7 +4,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ProjectShell } from "../engine/types";
-import { childStatusLabel, isQuestionsProject, projectTitleFor, rowLabel } from "./conversations";
+import {
+  childProjectTitle,
+  childStatusLabel,
+  isQuestionsProject,
+  projectTitleFor,
+  rowLabel,
+} from "./conversations";
 
 const ROOT = "/Users/family/.skycot/scratch";
 const AVA = "c0a0a0a0a0a";
@@ -30,7 +36,14 @@ describe("Questions spaces in the app", () => {
     expect(projectTitleFor(AVAS, childDevice, ROOT)).toBe("Questions");
     expect(projectTitleFor(SHARED, childDevice, ROOT)).toBe("Earlier questions");
     expect(projectTitleFor(SITE, childDevice, ROOT)).toBe("Our site");
-    expect(projectTitleFor(null, childDevice, ROOT)).toBe("A project");
+    expect(
+      projectTitleFor(
+        project("/Users/family/skycot-wt-device", "skycot-wt-device"),
+        childDevice,
+        ROOT,
+      ),
+    ).toBe("My project");
+    expect(projectTitleFor(null, childDevice, ROOT)).toBe("My project");
   });
 
   it("a grown-up's phone shows whose they are, as the Mac titles them", () => {
@@ -48,5 +61,13 @@ describe("a child's conversation status", () => {
   it("uses friendly words while Sam works and when a page is ready", () => {
     expect(childStatusLabel("working", "Sam", false)).toBe("Sam is working");
     expect(childStatusLabel("done", "Sam", true)).toBe("Ready to play");
+    expect(childStatusLabel("waiting", "Sam", false)).toBe("Waiting for a grown-up");
+  });
+
+  it("keeps folder and computer names out of child project labels", () => {
+    expect(childProjectTitle("Hello Ava Page", "Mark's Mac")).toBe("Hello Ava Page");
+    expect(childProjectTitle("Mark's Mac", "Mark's Mac")).toBe("My project");
+    expect(childProjectTitle("skycot-wt-device")).toBe("My project");
+    expect(childProjectTitle(" ")).toBe("My project");
   });
 });

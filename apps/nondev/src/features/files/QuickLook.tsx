@@ -244,7 +244,9 @@ function Body({
         icon={KIND_ICON[kindOfEntry({ name: file.name, kind: "file" })]}
         title="Too big to show here"
       >
-        {`This file is ${formatSize(file.size)}. SKYCOT shows pictures, documents and sounds up to 10 MB, and pages up to 2 MB. ${elsewhere}`}
+        {childView
+          ? `This file is too big to show here. SKYCOT shows pictures, documents and sounds up to 10 MB, and pages up to 2 MB. ${elsewhere}`
+          : `This file is ${formatSize(file.size)}. SKYCOT shows pictures, documents and sounds up to 10 MB, and pages up to 2 MB. ${elsewhere}`}
       </EmptyState>
     );
   }

@@ -19,7 +19,12 @@ import { JUST_ASK_COPY } from "../../../../nondev/src/features/questions/questio
 import { headsUpSentence } from "../../../../nondev/src/features/family-limits/limits";
 import type { StackRoutes } from "../../app/routes";
 import { useChild } from "../../app/child/ChildContext";
-import { conversationRows, relativeTime, rowLabel, stateLabel } from "../../data/conversations";
+import {
+  childStatusLabel,
+  conversationRows,
+  relativeTime,
+  rowLabel,
+} from "../../data/conversations";
 import { useMacData } from "../../data/MacData";
 import { BUILDER_NAME } from "../../ui/brand";
 import { Banner, Card, Mascot, Row, Section, Symbol, Txt, haptic, Page } from "../../ui/kit";
@@ -210,7 +215,7 @@ export function ChildHome() {
             title={row.thread.title}
             subtitle={[
               rowLabel(row),
-              stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt),
+              childStatusLabel(row.state, BUILDER_NAME, false) ?? relativeTime(row.updatedAt),
             ].join(" · ")}
             leading={
               <Symbol
@@ -259,7 +264,7 @@ export function MyMakesScreen() {
             title={row.thread.title}
             subtitle={[
               rowLabel(row),
-              stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt),
+              childStatusLabel(row.state, BUILDER_NAME, false) ?? relativeTime(row.updatedAt),
             ].join(" · ")}
             leading={<Symbol name="bubble.left.fill" size={22} />}
             chevron

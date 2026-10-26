@@ -392,8 +392,8 @@ it.layer(NodeServices.layer)("who is who", (it) => {
           ]) {
             yield* gate.check(call("ava-ipad", method, own));
             assert.isTrue(yield* refused(gate.check(call("ava-ipad", method, sibling))), method);
-            // The Mac keeps today's behaviour: siblings' work stays open there.
-            yield* gate.check(call("mac-ava", method, sibling));
+            // The shared Mac with Ava chosen is a child session too: a sibling's work is closed.
+            assert.isTrue(yield* refused(gate.check(call("mac-ava", method, sibling))), method);
           }
           const reply = {
             type: "message.dispatch",
@@ -524,12 +524,15 @@ it.layer(NodeServices.layer)("who is who", (it) => {
           );
         }
         assert.equal(list[1]!.kind === "thread.updated" ? list[1]!.thread.id : "", "thread-ava");
-        // The Mac and Mum's phone see everything.
-        for (const sessionId of ["mac-ava", "mum-phone"]) {
+        // Mum's phone sees everything; the Mac with Ava chosen sees Ava's, like her iPad.
+        for (const [sessionId, count] of [
+          ["mum-phone", 3],
+          ["mac-ava", 2],
+        ] as const) {
           const all = yield* Stream.runCollect(
             visibility.filterShellStream(sessionId, Stream.fromIterable(items)),
           );
-          assert.equal(Array.from(all).length, 3);
+          assert.equal(Array.from(all).length, count, sessionId);
         }
       }),
     ),

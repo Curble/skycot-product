@@ -1,6 +1,9 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // nondev-seam: skycot-playable-copy-test
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as NodeCrypto from "node:crypto";
+import { PAGE_LINK_INTERCEPTOR } from "@t3tools/skycot-rules/page-internet";
 
 import { playablePage } from "./playable.ts";
 
@@ -52,6 +55,34 @@ describe("playablePage", () => {
       assert.notInclude(scriptPolicy, "'unsafe-eval'");
       assert.include(result.html!, "'unsafe-hashes'");
       assert.deepEqual(result.needs, { scripts: [], other: [] });
+    }),
+  );
+
+  it.effect("seals an in-page link interceptor and keeps every link in the same document", () =>
+    Effect.gen(function* () {
+      const result = yield* playablePage(
+        "game.html",
+        project({
+          "game.html":
+            '<html><head><base href="https://outside.test/"></head><body><a href="https://commons.wikimedia.org/a" target="_blank">credit</a><button formaction="mailto:parent@example.test">open</button></body></html>',
+        }),
+        [],
+      );
+      assert.isNotNull(result.html);
+      assert.include(result.html!, "skycot:'link'");
+      assert.include(result.html!, "document.addEventListener('click',stop,true)");
+      assert.include(result.html!, "window.open=function(u)");
+      assert.include(result.html!, "Object.defineProperty(Location.prototype,'href'");
+      assert.include(result.html!, PAGE_LINK_INTERCEPTOR);
+      assert.include(result.html!, '<base target="_self">');
+      assert.include(result.html!, 'target="_self"');
+      const scriptPolicy = result.html!.match(/script-src [^;]*/u)?.[0] ?? "";
+      const interceptor = PAGE_LINK_INTERCEPTOR.match(/<script>([\s\S]*?)<\/script>/u)?.[1];
+      assert.isString(interceptor);
+      const hash = NodeCrypto.createHash("sha256")
+        .update(interceptor!.replace(/\r\n?/gu, "\n"))
+        .digest("base64");
+      assert.include(scriptPolicy, `'sha256-${hash}'`);
     }),
   );
 

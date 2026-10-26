@@ -7,6 +7,7 @@
  */
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Linking } from "react-native";
 import { useState } from "react";
 
 import type { StackRoutes } from "../../app/routes";
@@ -29,6 +30,7 @@ import {
 } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 import { useWatch } from "../../watch/WatchBridge";
+import { faceIdRowAction } from "./faceIdRow";
 
 /** What the Apple Watch row says, from what WatchConnectivity knows. */
 export function watchRowSubtitle(input: {
@@ -84,6 +86,7 @@ export function ThisDeviceScreen() {
   const [settingUpWatch, setSettingUpWatch] = useState(false);
   const [watchProblem, setWatchProblem] = useState<string | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
+  const faceIdAction = faceIdRowAction(faceId.native?.available === true, faceId.everywhere);
 
   const lockAll = async () => {
     setLocking(true);
@@ -100,7 +103,7 @@ export function ThisDeviceScreen() {
 
   return (
     <Page>
-      {faceId.native?.available || faceId.native?.hasKey ? (
+      {faceId.native?.biometry !== undefined && faceId.native.biometry !== "none" ? (
         <Section
           title={faceId.label}
           footer={
@@ -108,35 +111,40 @@ export function ThisDeviceScreen() {
             `Allow once asks you to confirm with ${faceId.label}. The parent code always works too, and saying no never needs either.`
           }
         >
-          {faceId.native?.available || faceId.everywhere ? (
-            <Row
-              leading={
-                <RowIcon
-                  name={faceId.label === "Touch ID" ? "touchid" : "faceid"}
-                  color={faceId.everywhere ? theme.color.green : "#8E8E93"}
+          <Row
+            leading={
+              <RowIcon
+                name={faceId.label === "Touch ID" ? "touchid" : "faceid"}
+                color={faceId.everywhere ? theme.color.green : "#8E8E93"}
+              />
+            }
+            title={faceIdRowTitle(faceId.label, faceId.everywhere)}
+            subtitle={faceIdRowSubtitle({
+              label: faceId.label,
+              available: faceId.native?.available ?? false,
+              everywhere: faceId.everywhere,
+            })}
+            trailing={
+              faceIdAction === "settings" ? (
+                <Button
+                  title="Open Settings"
+                  kind="tinted"
+                  size="small"
+                  onPress={() => void Linking.openSettings()}
                 />
-              }
-              title={faceIdRowTitle(faceId.label, faceId.everywhere)}
-              subtitle={faceIdRowSubtitle({
-                label: faceId.label,
-                available: faceId.native?.available ?? false,
-                everywhere: faceId.everywhere,
-              })}
-              trailing={
-                faceId.native?.available && !faceId.everywhere ? (
-                  <Button
-                    title="Set up"
-                    kind="tinted"
-                    size="small"
-                    onPress={() => {
-                      setFaceIdProblem(null);
-                      setSettingUpFaceId(true);
-                    }}
-                  />
-                ) : null
-              }
-            />
-          ) : null}
+              ) : faceIdAction === "set-up" ? (
+                <Button
+                  title="Set up"
+                  kind="tinted"
+                  size="small"
+                  onPress={() => {
+                    setFaceIdProblem(null);
+                    setSettingUpFaceId(true);
+                  }}
+                />
+              ) : null
+            }
+          />
           {faceId.native?.hasKey ? (
             <Row
               title={`Stop using ${faceId.label}`}
@@ -233,6 +241,12 @@ export function ThisDeviceScreen() {
           title="Linked Macs"
           chevron
           onPress={() => navigation.navigate("Macs")}
+        />
+        <Row
+          leading={<RowIcon name="info.circle" color={theme.color.accent} />}
+          title="About & privacy"
+          chevron
+          onPress={() => navigation.navigate("About")}
         />
         {grownUp.macs.map((mac) => (
           <Row

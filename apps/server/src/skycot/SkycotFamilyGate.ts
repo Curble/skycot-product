@@ -120,7 +120,7 @@ export const REMOVED_DEVICE_MESSAGE =
   "This device was removed from the Family profile. Link it again from the family's Mac.";
 export const GROWN_UP_DEVICE_MESSAGE =
   "A grown-up's device can read and say yes or no, but not change anything.";
-export const CHILD_DEVICE_MESSAGE = "That belongs to someone else in the family.";
+export const CHILD_DEVICE_MESSAGE = "That's not yours to open.";
 
 /**
  * Calls a child's own device may not make at all: searches across every conversation (they would
@@ -770,7 +770,15 @@ const make = Effect.gen(function* () {
   }) {
     const project = yield* projects.get(thread.projectId);
     const projectFolder = Option.isSome(project) ? project.value.workspaceRoot : null;
-    return workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
+    const roots = workRootsFor({ projectFolder, worktreePath: thread.worktreePath, questionsRoot });
+    const real = (value: string | null) =>
+      value === null
+        ? Effect.succeed(null)
+        : fs.realPath(value).pipe(Effect.orElseSucceed(() => value));
+    return {
+      projectRoot: yield* real(roots.projectRoot),
+      projectFolder: yield* real(roots.projectFolder),
+    };
   });
 
   const toolCallFor = Effect.fnUntraced(function* (
@@ -1158,7 +1166,8 @@ const make = Effect.gen(function* () {
       // A small change to something this conversation already built: no plan card for it.
       const builtBefore = yield* projections.getThreadProjection(message.threadId as ThreadId).pipe(
         Effect.map((projection) => projection.plans.some((plan) => plan.runId !== null)),
-        Effect.orElseSucceed(() => false),
+        // Anything that cannot be read plans (the safe side), a missing store included.
+        Effect.catchCause(() => Effect.succeed(false)),
       );
       if (builtBefore) {
         yield* SkycotFamilyInstructions.letRunWithoutPlan(message.messageId, "small-follow-up");
@@ -1181,7 +1190,6 @@ const make = Effect.gen(function* () {
             sessionId: input.sessionId,
             subject: input.subject,
           });
-    if (who.kind === "shared") return;
     if (who.kind === "removed") {
       yield* Effect.logInfo("skycot-family.device-refused", {
         method: input.method,
@@ -1197,13 +1205,14 @@ const make = Effect.gen(function* () {
       });
       return yield* deviceRefusal(GROWN_UP_DEVICE_MESSAGE);
     }
-    if (CHILD_DEVICE_CLOSED_METHODS.has(input.method)) {
+    if (who.kind === "child" && CHILD_DEVICE_CLOSED_METHODS.has(input.method)) {
       yield* Effect.logInfo("skycot-family.device-refused", { method: input.method, why: "child" });
       return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
     }
     if (Option.isNone(visibility)) {
       // No way to filter what a child's device would receive: the lists stay closed to it.
-      return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+      if (who.kind === "child") return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+      return;
     }
     const view = yield* visibility.value.childViewFor(input.sessionId);
     if (view === null) return;

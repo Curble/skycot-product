@@ -211,6 +211,21 @@ export function PreviewSheet({
             </Banner>
           ) : null}
           <FullscreenPage game={/game/i.test(name)} className="fm-sealed-fullscreen">
+            {internet.link !== null ? (
+              <div className="fm-preview-notice">
+                <Banner
+                  tone="info"
+                  action={
+                    <Button size="sm" onClick={internet.clearLink}>
+                      Stay here
+                    </Button>
+                  }
+                >
+                  That link goes to the internet. With the Family profile on, a grown-up says yes
+                  first.
+                </Banner>
+              </div>
+            ) : null}
             {load.state === "ready" && threadId !== null && internet.asks.length > 0 ? (
               <PageInternetAsk
                 key={internet.asks.join(",")}

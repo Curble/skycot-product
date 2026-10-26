@@ -23,7 +23,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { avatarLetter } from "../../../nondev/src/features/family/children";
 import { codeComplete } from "../family/codeLength";
@@ -96,6 +96,7 @@ export function Page(
   props: ScrollViewProps & { readonly children: ReactNode; readonly maxWidth?: number },
 ) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const route = useRoute();
   const header = use(RootHeaderContext);
   const large = header !== null && header.route === route.name ? header : null;
@@ -107,7 +108,7 @@ export function Page(
       {...rest}
       style={[{ flex: 1, backgroundColor: theme.color.background }, style]}
       contentContainerStyle={[
-        { paddingBottom: 40, ...(large ? { paddingTop: 8 } : {}) },
+        { paddingBottom: Math.max(40, insets.bottom + 32), ...(large ? { paddingTop: 8 } : {}) },
         contentContainerStyle,
       ]}
     >
@@ -618,7 +619,7 @@ export function Segmented<T extends string>(props: {
               shadowOffset: { width: 0, height: 1 },
             }}
           >
-            <Txt variant="footnote" weight={selected ? "600" : "500"} numberOfLines={1}>
+            <Txt variant="footnote" weight={selected ? "600" : "500"} numberOfLines={2} center>
               {option.label}
             </Txt>
           </Pressable>
@@ -741,7 +742,7 @@ export function ParentCodeField(props: {
       />
       <Txt variant="footnote" tone={props.problem ? "red" : "label2"} style={{ marginLeft: 4 }}>
         {props.problem ??
-          `${length === null ? "4 to 6 digits" : `${length} digits`}. Five wrong tries mean a five-minute wait.`}
+          `${length === null ? "6 digits" : `${length} digits`}. Five wrong tries mean a five-minute wait.`}
       </Txt>
     </View>
   );

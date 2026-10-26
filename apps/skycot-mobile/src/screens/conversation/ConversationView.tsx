@@ -102,6 +102,7 @@ export function ConversationView(props: {
         : buildTimeline(projection, {
             projectRoot: projection.thread.worktreePath ?? null,
             assistantName: BUILDER_NAME,
+            childView: props.childId !== null && props.childId !== undefined,
           }),
     [projection],
   );
@@ -576,15 +577,25 @@ function TimelineCard(props: {
             title={
               entry.undone
                 ? "Undone"
-                : (childStatusLabel("done", BUILDER_NAME, props.onOpenPage !== undefined) ??
-                  "What changed")
+                : entry.kidSummary
+                  ? entry.headline
+                  : (childStatusLabel("done", BUILDER_NAME, props.onOpenPage !== undefined) ??
+                    "What changed")
             }
-            subtitle={entry.undone ? "Back to how it was before." : entry.headline}
+            subtitle={
+              entry.undone
+                ? "Back to how it was before."
+                : entry.kidSummary
+                  ? (entry.lines[0] ?? "")
+                  : entry.headline
+            }
             trailing={
-              <Pill text={`${entry.fileCount} ${entry.fileCount === 1 ? "file" : "files"}`} />
+              entry.kidSummary ? null : (
+                <Pill text={`${entry.fileCount} ${entry.fileCount === 1 ? "file" : "files"}`} />
+              )
             }
           />
-          {!entry.undone ? (
+          {!entry.undone && !entry.kidSummary ? (
             <View style={{ gap: 4, marginTop: 10 }}>
               {entry.lines.map((line, index) => (
                 <Txt key={index} variant="subheadline" tone="label2">
@@ -606,7 +617,7 @@ function TimelineCard(props: {
               ) : null}
               {entry.undo ? (
                 <Button
-                  title="Undo all of it"
+                  title={entry.kidSummary ? "Undo" : "Undo all of it"}
                   kind="tinted"
                   icon="arrow.uturn.backward"
                   onPress={() => props.onUndo(entry.undo!)}

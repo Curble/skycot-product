@@ -239,6 +239,7 @@ describe("plan first in the Family profile", () => {
   it("lets a small tweak build without a plan, and keeps bigger asks planned", () => {
     assert.equal(Instructions.familyInteractionMode("plan", "small-follow-up"), "default");
     for (const text of [
+      "make the circle blue",
       "make the ball bigger",
       "change the colour to blue",
       "fix the typo in the title",
@@ -246,6 +247,7 @@ describe("plan first in the Family profile", () => {
       assert.equal(Instructions.isSmallTweak(text), true, text);
     }
     for (const text of [
+      "turn it into a game with a score and levels",
       "make a new game about dogs",
       "turn it into a game where Hello bounces",
       "make a game with a menu and a score system",

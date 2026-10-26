@@ -17,6 +17,7 @@ import {
   readBlockedReport,
   withHeadStart,
   pageDiagnosticsScript,
+  reportedPageLink,
 } from "./pageInternet.ts";
 
 describe("siteOf", () => {
@@ -115,6 +116,20 @@ describe("reportedSite", () => {
       }),
     ).toBeNull();
     expect(reportedSite("not json")).toBeNull();
+  });
+});
+
+describe("reportedPageLink", () => {
+  it("accepts only the sealed viewer's bounded link message", () => {
+    expect(reportedPageLink('{"skycot":"link","url":"https://example.com"}')).toBe(
+      "https://example.com",
+    );
+    expect(reportedPageLink({ skycot: "link", url: "mailto:grownup@example.test" })).toBe(
+      "mailto:grownup@example.test",
+    );
+    expect(reportedPageLink({ skycot: "page-internet", url: "https://example.com" })).toBeNull();
+    expect(reportedPageLink({ skycot: "link", url: "x".repeat(2049) })).toBeNull();
+    expect(reportedPageLink("not json")).toBeNull();
   });
 });
 
