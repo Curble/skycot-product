@@ -10,7 +10,7 @@ export function childProgressSentence(kind: string): string {
     case "edit":
       return "Saving a change";
     case "read":
-      return "Checking a project file";
+      return "Checking something in your project";
     case "subagent":
       return "Sam is getting help";
     case "install":

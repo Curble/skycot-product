@@ -63,8 +63,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
     (row) => row.status.kind === "waiting" && row.status.headline.includes("grown-up"),
   ).length;
   const waiting = active.filter(
-    (row) => row.status.kind === "waiting" && !row.status.headline.includes("grown-up"),
+    (row) =>
+      (row.status.kind === "waiting" || (!childView && row.status.kind === "plan")) &&
+      !row.status.headline.includes("grown-up") &&
+      !(childView && row.shell.hasActionableProposedPlan),
   ).length;
+  const plansReady = childView ? active.filter((row) => row.status.kind === "plan").length : 0;
   const ready = active.filter((row) => row.status.kind === "ready").length;
   const failed = active.filter((row) => row.status.kind === "failed").length;
 
@@ -107,6 +111,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   childView,
                   needsGrownUp,
                   failed,
+                  plansReady,
                 )}
               </p>
             </div>
@@ -196,7 +201,9 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
   const lead =
     row.status.kind === "waiting" && row.status.headline.includes("grown-up") ? (
       <StepBadge state="warn" label="Needs a grown-up" />
-    ) : row.status.kind === "waiting" ? (
+    ) : row.status.kind === "plan" && childView ? (
+      <StepBadge state="now" label="Plan ready" />
+    ) : row.status.kind === "waiting" || row.status.kind === "plan" ? (
       <StepBadge state="warn" label="Waiting for you" />
     ) : row.status.kind === "ready" ? (
       <StepBadge state="done" label="Done" />

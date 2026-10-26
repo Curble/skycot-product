@@ -242,12 +242,16 @@ const statusRoute = route(
       const grants = yield* family.openGrants({ sessionId });
       const session = yield* limits.forSession({ sessionId });
       const length = yield* codeLengthFor(family, who);
+      const grownUpSession = grants.some((grant) => grant.purpose === "grownUpSession");
       const rememberedStarts =
-        who.kind !== "child" && Option.isSome(projectMemory)
+        (who.kind === "grown-up" || (who.kind === "shared" && grownUpSession)) &&
+        Option.isSome(projectMemory)
           ? (yield* projectMemory.value.rememberedStarts).map(
-              ({ id, projectRealPath, approvedBy, how, createdAt }) => ({
+              // nondev-seam: skycot-q42-remembered-command
+              ({ id, projectRealPath, exactCommand, approvedBy, how, createdAt }) => ({
                 id,
                 projectRealPath,
+                exactCommand,
                 approvedBy,
                 how,
                 createdAt,

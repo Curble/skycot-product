@@ -19,6 +19,7 @@ describe("actionReason", () => {
     expect(reason).toContain("It touches a secrets file or key.");
     expect(reason).toContain(approvalScopeCopy);
     expect(actionReason("approve")).toContain(approvalScopeCopy);
+    expect(reason.match(/Allow for this project/g)).toHaveLength(1);
   });
 
   it("explains the new grown-up actions", () => {

@@ -5,7 +5,7 @@
  */
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import * as Haptics from "expo-haptics";
-import { Children, Fragment, use, useRef, useState, type ReactNode } from "react";
+import { Children, Fragment, use, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -32,6 +32,7 @@ import type { ChildAvatar } from "../../../nondev/src/features/family/children";
 import { AVATAR_COLORS, mascotSource, skyPhaseNow, type MascotPose } from "./brand";
 import { RootHeaderContext } from "./rootHeader";
 import { TEXT, useTheme, type Theme } from "./theme";
+import { childLoadingCopy } from "./childCopy";
 
 type TextVariant = keyof typeof TEXT;
 type Tone = "label" | "label2" | "label3" | "accent" | "red" | "green" | "orange" | "onAccent";
@@ -822,6 +823,27 @@ export function Spinner() {
   return (
     <View style={{ padding: 40, alignItems: "center" }}>
       <ActivityIndicator color={theme.color.label2} />
+    </View>
+  );
+}
+
+export function ChildLoading(props: { readonly onRetry: () => void }) {
+  const [takingAwhile, setTakingAwhile] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setTakingAwhile(true), 12_000);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <View style={{ alignItems: "center", gap: 12, padding: 24 }}>
+      <Spinner />
+      {childLoadingCopy(takingAwhile ? 12_000 : 0) ? (
+        <>
+          <Txt tone="label2" center>
+            This is taking a little while.
+          </Txt>
+          <Button title="Try again" kind="tinted" onPress={props.onRetry} />
+        </>
+      ) : null}
     </View>
   );
 }

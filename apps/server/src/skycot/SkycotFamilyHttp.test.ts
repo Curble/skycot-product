@@ -432,6 +432,34 @@ it.layer(
     }),
   );
 
+  // nondev-seam: skycot-q42-remembered-command-test
+  it.effect("shows remembered start commands to grown-ups only", () =>
+    Effect.gen(function* () {
+      const { send, projectMemory, dir } = yield* makeClient();
+      const path = yield* Path.Path;
+      yield* send("POST", "/api/skycot/family/enable", {
+        body: { code: CODE, childName: "Ava" },
+      });
+      yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "settings" },
+      });
+      yield* projectMemory.rememberStart({
+        projectRealPath: path.join(dir, "game-project"),
+        exactCommand: "npm run dev -- --host 127.0.0.1",
+        approvedBy: "parent",
+        how: "parent-code",
+      });
+      const parent = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        rememberedStarts: ReadonlyArray<{ exactCommand: string }>;
+      };
+      assert.equal(parent.rememberedStarts[0]?.exactCommand, "npm run dev -- --host 127.0.0.1");
+      const child = (yield* (yield* send("GET", "/api/skycot/family", {
+        headers: { authorization: CHILD_BEARER },
+      })).json) as { rememberedStarts: ReadonlyArray<unknown> };
+      assert.deepEqual(child.rememberedStarts, []);
+    }),
+  );
+
   it.effect("shows a child's recap only after the parent code; the fridge stays open", () =>
     Effect.gen(function* () {
       const { send } = yield* makeClient();

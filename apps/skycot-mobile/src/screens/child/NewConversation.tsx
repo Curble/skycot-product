@@ -29,6 +29,7 @@ import { isQuestionsProject } from "../../data/conversations";
 import { useMacData } from "../../data/MacData";
 import { defaultModelSelection, openQuestions, startConversation } from "../../engine/engine";
 import { BUILDER_NAME } from "../../ui/brand";
+import { childErrorCopy } from "../../ui/childCopy";
 import { Banner, Button, Card, Row, Section, Symbol, Txt, haptic } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 import { VoiceButton } from "./VoiceButton";
@@ -121,8 +122,8 @@ export function NewConversationScreen() {
       });
       haptic("success");
       navigation.replace("Conversation", { macId: mac.macId, threadId, title: titleFrom(words) });
-    } catch {
-      setProblem("SKYCOT couldn't reach the Mac just now. Check it's awake, then try again.");
+    } catch (cause) {
+      setProblem(childErrorCopy(cause));
     } finally {
       setBusy(false);
     }
@@ -286,7 +287,13 @@ export function NewConversationScreen() {
                 text="SKYCOT is asleep right now. Your message can wait until it wakes."
               />
             ) : null}
-            {problem ? <Banner tone="warning" text={problem} /> : null}
+            {problem ? (
+              <Banner
+                tone="warning"
+                text={problem}
+                action={{ title: "Try again", onPress: onSend }}
+              />
+            ) : null}
             <Button
               title={busy ? "Sending…" : "Send"}
               icon="paperplane.fill"

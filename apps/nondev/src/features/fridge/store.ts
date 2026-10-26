@@ -34,11 +34,11 @@ export function useFridge(): FridgeSnapshot {
 }
 
 export async function refreshFridge(): Promise<void> {
-  const result = await request("GET", "/fridge", undefined, parseFridge);
+  const result = await request("GET", "/fridge", undefined, parseFridge).catch(() => null);
   set(
-    result.ok
+    result?.ok
       ? { items: result.value, loaded: true, problem: null }
-      : { ...snapshot, loaded: true, problem: result.message },
+      : { ...snapshot, loaded: true, problem: "The fridge didn't open just now." },
   );
 }
 
@@ -51,11 +51,13 @@ export async function pinMagnet(threadId: string, pinned: boolean): Promise<stri
       item.threadId === threadId ? { ...item, pinnedAt: pinned ? Date.now() : null } : item,
     ),
   });
-  const result = await request("POST", "/fridge/pin", { threadId, pinned }, parseFridge);
-  if (result.ok) {
+  const result = await request("POST", "/fridge/pin", { threadId, pinned }, parseFridge).catch(
+    () => null,
+  );
+  if (result?.ok) {
     set({ items: result.value, loaded: true, problem: null });
     return null;
   }
   await refreshFridge();
-  return result.message;
+  return "That didn't work just now.";
 }

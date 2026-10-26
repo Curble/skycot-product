@@ -9,5 +9,6 @@ describe("childProgressSentence", () => {
     expect(childProgressSentence("command")).toBe("Working on your project");
     expect(childProgressSentence("edit")).toBe("Saving a change");
     expect(childProgressSentence("subagent")).toBe("Sam is getting help");
+    expect(childProgressSentence("read")).toBe("Checking something in your project");
   });
 });

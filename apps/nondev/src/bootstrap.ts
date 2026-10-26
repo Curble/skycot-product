@@ -9,9 +9,15 @@ startRelayIfLinked();
 
 void import("./main")
   .then(({ startup }) => startup)
-  .catch((error: unknown) => {
+  .catch(() => {
     const root = document.getElementById("root");
     if (root) {
-      root.textContent = `${PRODUCT_NAME} could not start: ${error instanceof Error ? error.message : String(error)}`;
+      const message = document.createElement("p");
+      message.textContent = `${PRODUCT_NAME} couldn't open just now.`;
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Try again";
+      retry.addEventListener("click", () => window.location.reload());
+      root.replaceChildren(message, retry);
     }
   });

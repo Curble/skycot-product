@@ -21,10 +21,10 @@ import type { Mac } from "../../links/store";
 import {
   Button,
   Card,
+  ChildLoading,
   EmptyState,
   Page,
   Section,
-  Spinner,
   Symbol,
   Txt,
   haptic,
@@ -115,7 +115,16 @@ function MacFridge(props: { readonly mac: Mac; readonly showName: boolean }) {
   const open = useOpenPage();
   const [, setTick] = useState(0);
   const items = fridge.value === null ? [] : fridgeOrder(fridge.value);
-  if (fridge.loading) return <Spinner />;
+  if (fridge.loading) return <ChildLoading onRetry={() => void fridge.refresh()} />;
+  if (fridge.problem && fridge.value === null) {
+    return (
+      <Page>
+        <EmptyState title="That didn't work just now.">
+          <Button title="Try again" onPress={() => void fridge.refresh()} />
+        </EmptyState>
+      </Page>
+    );
+  }
   if (items.length === 0) {
     return props.showName ? null : (
       <EmptyState

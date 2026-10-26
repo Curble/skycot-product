@@ -16,6 +16,7 @@ function label(sentence: string): string {
 }
 
 export type ConversationStatusKind =
+  | "plan"
   | "waiting"
   | "preparing"
   | "working"
@@ -140,9 +141,9 @@ export function describeThreadStatus(
   }
   if (shell.hasActionableProposedPlan) {
     return {
-      kind: "waiting",
+      kind: "plan",
       headline: options.childView
-        ? "Sam made a plan. Press Build it."
+        ? "Your plan is ready"
         : "Waiting for you · the plan is ready to approve",
       presence: options.childView ? "Plan ready · press Build it" : "Waiting for you · plan ready",
       tone: "waiting",

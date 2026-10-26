@@ -106,8 +106,12 @@ describe("child waiting words", () => {
       "Waiting for you · needs your OK before it carries on",
     );
     const plan = { ...shell({}), hasActionableProposedPlan: true } as EnvironmentThreadShell;
-    expect(describeThreadStatus(plan, { childView: true }).headline).toBe(
-      "Sam made a plan. Press Build it.",
-    );
+    expect(describeThreadStatus(plan, { childView: true })).toMatchObject({
+      kind: "plan",
+      headline: "Your plan is ready",
+    });
+    expect(
+      describeThreadStatus(shell({ runStatus: "completed" }), { childView: true }).kind,
+    ).not.toBe("plan");
   });
 });

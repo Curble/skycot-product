@@ -24,7 +24,7 @@ describe("summarySentence", () => {
 
   it("keeps a grown-up request separate from something waiting on the child", () => {
     expect(summarySentence(0, 1, 0, 2, true, true, 1)).toBe(
-      "One thing is waiting on you, one thing needs a grown-up.",
+      "One thing is waiting on you, a grown-up needs to say yes.",
     );
   });
 
@@ -36,7 +36,7 @@ describe("summarySentence", () => {
 });
 
 describe("homeRows", () => {
-  it("keeps the waiting count aligned with current child rows and drops stale plans and sibling failures", () => {
+  it("keeps the Home counts aligned with live child rows and excludes sibling failures", () => {
     const rows = [
       {
         shell: { id: "mine" },
@@ -46,12 +46,12 @@ describe("homeRows", () => {
       {
         shell: { id: "old-plan" },
         at: "2026-10-25T12:00:00.000Z",
-        status: { kind: "waiting", headline: "Sam made a plan. Press Build it." },
+        status: { kind: "done", headline: "All done" },
       },
       {
         shell: { id: "fresh-plan" },
         at: "2026-10-27T11:00:00.000Z",
-        status: { kind: "waiting", headline: "Sam made a plan. Press Build it." },
+        status: { kind: "plan", headline: "Your plan is ready" },
       },
       {
         shell: { id: "sibling-error" },
@@ -59,14 +59,21 @@ describe("homeRows", () => {
         status: { kind: "failed", headline: "Something went wrong" },
       },
     ];
-    const visible = homeRows(
-      rows,
-      true,
-      "leo",
-      { mine: "leo", "old-plan": "leo", "fresh-plan": "leo", "sibling-error": "ava" },
-      Date.parse("2026-10-27T13:00:00.000Z"),
-    );
+    const visible = homeRows(rows, true, "leo", {
+      mine: "leo",
+      "old-plan": "leo",
+      "fresh-plan": "leo",
+      "sibling-error": "ava",
+    });
     expect(visible.map((row) => row.shell.id)).toEqual(["mine", "fresh-plan"]);
-    expect(visible.filter((row) => row.status.kind === "waiting")).toHaveLength(2);
+    expect(
+      visible.filter((row) => row.status.kind === "waiting" || row.status.kind === "plan"),
+    ).toHaveLength(2);
+  });
+
+  it("counts a live plan separately from a grown-up ask", () => {
+    expect(summarySentence(0, 0, 0, 2, true, true, 1, 0, 1)).toBe(
+      "A grown-up needs to say yes, Your plan is ready.",
+    );
   });
 });

@@ -100,7 +100,28 @@ describe("the asleep screen's words", () => {
     );
     expect(copy.title).toBe("SKYCOT is having a rest");
     expect(copy.body).toBe(
-      "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
+      "SKYCOT is resting for now. Your work is saved. You can play a game you made while you wait.",
+    );
+  });
+
+  it("shows when the allowance comes back and suggests something to do", () => {
+    const copy = asleepCopy(
+      {
+        reason: "allowance",
+        wakesAt: null,
+        allowance: {
+          brand: "ChatGPT",
+          leftPercent: 0,
+          resetsAt: at("2026-10-22T20:40:00+11:00"),
+        },
+      },
+      NO_LIMITS,
+      null,
+      now,
+      ZONE,
+    );
+    expect(copy.body).toBe(
+      "SKYCOT is resting for now and can come back at 8:40 pm. Your work is saved. You can play a game you made while you wait.",
     );
   });
 });

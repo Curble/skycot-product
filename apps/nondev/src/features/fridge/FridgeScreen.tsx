@@ -8,6 +8,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { useColumns } from "../../app/useColumns";
 import { Banner } from "../../ui/Banner";
+import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { SegmentedControl } from "../../ui/SegmentedControl";
 import { Mascot } from "../brand/Mascot";
@@ -98,12 +99,40 @@ export function FridgeScreen() {
             />
           </div>
         ) : null}
-        {problem ? <Banner tone="warning">{problem}</Banner> : null}
-        {fridge.problem && fridge.items.length === 0 ? (
-          <Banner tone="warning">{fridge.problem}</Banner>
+        {problem ? (
+          <Banner
+            tone="warning"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  setProblem(null);
+                  void refreshFridge();
+                }}
+              >
+                Try again
+              </Button>
+            }
+          >
+            That didn't work just now. Try again.
+          </Banner>
+        ) : null}
+        {fridge.problem ? (
+          <Banner
+            tone="warning"
+            action={
+              <Button size="sm" onClick={() => void refreshFridge()}>
+                Try again
+              </Button>
+            }
+          >
+            The fridge didn't open just now. Try again.
+          </Banner>
         ) : null}
         {!fridge.loaded ? (
-          <p className="fm-help">Opening the fridge…</p>
+          <p className="fm-help" role="status">
+            Getting the fridge ready…
+          </p>
         ) : fridge.items.length === 0 && !fridge.problem ? (
           <EmptyState
             art={<Mascot pose="hello" size={88} decorative />}

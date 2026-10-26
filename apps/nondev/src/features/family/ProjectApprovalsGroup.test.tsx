@@ -18,13 +18,17 @@ const state = vi.hoisted(() => ({
     rememberedStarts: [] as Array<{
       id: string;
       projectRealPath: string;
+      exactCommand: string;
       approvedBy: string;
       how: string;
       createdAt: number;
     }>,
   },
+  projects: [] as Array<{ workspaceRoot: string; title: string }>,
 }));
 
+vi.mock("@effect/atom-react", () => ({ useAtomValue: () => state.projects }));
+vi.mock("../../state/projects", () => ({ environmentProjects: { projectsAtom: {} } }));
 vi.mock("./FamilyProvider", () => ({ useFamily: () => ({ profile: state.profile }) }));
 vi.mock("./store", () => ({
   stopProjectApproval: vi.fn(async () => ({ ok: true })),
@@ -37,6 +41,7 @@ import { stopRememberedStart } from "./store";
 afterEach(() => {
   state.profile.projectApprovalGrants = [];
   state.profile.rememberedStarts = [];
+  state.projects = [];
 });
 
 describe("project permissions in Family settings", () => {
@@ -54,8 +59,11 @@ describe("project permissions in Family settings", () => {
         expiresAt: 1_800_000_000_000,
       },
     ];
+    state.projects = [
+      { workspaceRoot: "/Users/ava/Projects/lobster-page", title: "Lobster Island" },
+    ];
     await act(async () => root.render(<ProjectApprovalsGroup />));
-    expect(host.textContent).toContain("What Ava may do in lobster-page");
+    expect(host.textContent).toContain("What Ava may do in Lobster Island");
     expect(host.textContent).toContain("fetch plain pages and data");
     expect(host.querySelector("button")?.textContent).toBe("Stop");
     await act(async () => root.unmount());
@@ -67,18 +75,23 @@ describe("project permissions in Family settings", () => {
     const host = document.createElement("div");
     document.body.append(host);
     const root = createRoot(host);
+    state.projects = [
+      { workspaceRoot: "/Users/ava/Projects/lobster-page", title: "Lobster Island" },
+    ];
     state.profile.rememberedStarts = [
       {
         id: "start-1",
         projectRealPath: "/Users/ava/Projects/lobster-page",
+        exactCommand: "npm run dev -- --host 127.0.0.1",
         approvedBy: "parent-code",
         how: "parent-code",
         createdAt: 1,
       },
     ];
     await act(async () => root.render(<ProjectApprovalsGroup />));
-    expect(host.textContent).toContain("Open the website in lobster-page");
+    expect(host.textContent).toContain("Open the website in Lobster Island");
     expect(host.textContent).toContain("A different command will ask again");
+    expect(host.textContent).toContain("npm run dev -- --host 127.0.0.1");
     await act(async () => host.querySelector("button")?.click());
     expect(stopRememberedStart).toHaveBeenCalledWith("start-1");
     await act(async () => root.unmount());

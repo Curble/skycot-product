@@ -7,7 +7,7 @@ import { View } from "react-native";
 import { BADGE_COPY, earnedDate } from "../../../../nondev/src/features/badges/catalog";
 import { useChild } from "../../app/child/ChildContext";
 import { readStickers, useFamilyRead } from "../../data/hooks";
-import { Card, EmptyState, Page, Spinner, Symbol, Txt } from "../../ui/kit";
+import { Button, Card, ChildLoading, EmptyState, Page, Symbol, Txt } from "../../ui/kit";
 import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
 
@@ -17,16 +17,22 @@ export function StickersScreen() {
   const mac = child.macs[0] ?? null;
   const book = useFamilyRead(mac, readStickers, 60_000, "stickers");
   const grid = useGridBasis();
-  if (book.loading) return <Spinner />;
+  if (book.loading) return <ChildLoading onRetry={() => void book.refresh()} />;
   const view = book.value?.book ?? null;
   if (view === null) {
     return (
       <Page>
-        <EmptyState
-          pose="yay"
-          title="No stickers yet"
-          body="Make something and see what you find!"
-        />
+        {book.problem ? (
+          <EmptyState title="That didn't work just now.">
+            <Button title="Try again" onPress={() => void book.refresh()} />
+          </EmptyState>
+        ) : (
+          <EmptyState
+            pose="yay"
+            title="No stickers yet"
+            body="Make something and see what you find!"
+          />
+        )}
       </Page>
     );
   }

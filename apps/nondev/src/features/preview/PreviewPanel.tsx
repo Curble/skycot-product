@@ -382,7 +382,7 @@ function PreviewPanelBody({
             </Button>
           }
         >
-          {answer.message}
+          {childView ? "The preview didn't open just now." : answer.message}
         </Banner>
       </div>
     );
@@ -470,7 +470,23 @@ function PreviewPanelBody({
         ) : null}
         {problem ? (
           <div className="fm-preview__notice">
-            <Banner tone="info">{problem}</Banner>
+            <Banner
+              tone="info"
+              action={
+                childView ? (
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      suggestMessage(threadId, "Sam, please try opening my page again.", "replace")
+                    }
+                  >
+                    Ask Sam
+                  </Button>
+                ) : undefined
+              }
+            >
+              {childView ? "The preview didn't open just now." : problem}
+            </Banner>
           </div>
         ) : null}
         {status?.state === "running" && status.internetAsks[0] !== undefined ? (
@@ -578,22 +594,31 @@ function StatusBody({
           <Mascot pose="oops" size={72} decorative />
           <p className="fm-preview__state-title">The preview didn't start.</p>
           <p className="fm-preview__state-text">
-            Ask {builder} to fix it — the message is written for you.
+            {childView
+              ? "Sam can take another look."
+              : `Ask ${builder} to fix it — the message is written for you.`}
           </p>
           <span className="fm-preview__actions">
-            <Button disabled={busy} onClick={onTryAgain}>
-              Try again
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() =>
-                onAsk(fixItMessage(status, childView), childView ? fixItDetails(status) : undefined)
-              }
-            >
-              {childView ? "Ask Sam to fix it" : `Ask ${builder} to fix it`}
-            </Button>
+            {childView ? (
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => onAsk(fixItMessage(status, true), fixItDetails(status))}
+              >
+                Ask Sam to fix it
+              </Button>
+            ) : (
+              <>
+                <Button disabled={busy} onClick={onTryAgain}>
+                  Try again
+                </Button>
+                <Button variant="primary" onClick={() => onAsk(fixItMessage(status, false))}>
+                  Ask {builder} to fix it
+                </Button>
+              </>
+            )}
           </span>
-          {status.output.trim().length > 0 ? (
+          {!childView && status.output.trim().length > 0 ? (
             <div className="fm-preview__said">
               <Disclosure summary="What it said">
                 <pre className="fm-preview__output">{status.output}</pre>

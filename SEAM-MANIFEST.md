@@ -22,6 +22,13 @@ the `brand-client-entry*` seams in the brand table below.
 
 ## SKYCOT daily totals (26 October 2026)
 
+| id                                 | file                                                      | change                                                                                                                  | marker                                               |
+| ---------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| skycot-q42-small-follow-up         | `apps/server/src/skycot/SkycotFamilyInstructions.ts`      | Limits plan-free follow-ups to short, single-purpose visual or wording tweaks; broader feature requests stay planned.   | `// nondev-seam: skycot-q42-small-follow-up`         |
+| skycot-q42-small-follow-up-tests   | `apps/server/src/skycot/SkycotFamilyInstructions.test.ts` | Covers the report's bigger game and multi-part requests alongside the existing small-tweak examples.                    | `// nondev-seam: skycot-q42-small-follow-up-tests`   |
+| skycot-q42-remembered-command      | `apps/server/src/skycot/SkycotFamilyHttp.ts`              | Includes the exact remembered preview command in Family status only for a grown-up device or verified grown-up session. | `// nondev-seam: skycot-q42-remembered-command`      |
+| skycot-q42-remembered-command-test | `apps/server/src/skycot/SkycotFamilyHttp.test.ts`         | Checks verified grown-ups can see a remembered command while child devices receive no remembered starts.                | `// nondev-seam: skycot-q42-remembered-command-test` |
+
 ## SKYCOT approval batches (26 October 2026)
 
 | id                                | file                                                                    | change                                                                                                                                           | marker                                              |

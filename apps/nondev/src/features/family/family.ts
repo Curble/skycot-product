@@ -169,6 +169,7 @@ export interface ServerFamilyStatus {
 export interface RememberedStartView {
   readonly id: string;
   readonly projectRealPath: string;
+  readonly exactCommand: string;
   readonly approvedBy: string;
   readonly how: string;
   readonly createdAt: number;
@@ -181,6 +182,7 @@ function parseRememberedStarts(value: unknown): ReadonlyArray<RememberedStartVie
     const entry = item as Record<string, unknown>;
     return typeof entry["id"] === "string" &&
       typeof entry["projectRealPath"] === "string" &&
+      typeof entry["exactCommand"] === "string" &&
       typeof entry["approvedBy"] === "string" &&
       typeof entry["how"] === "string" &&
       typeof entry["createdAt"] === "number"
@@ -188,6 +190,7 @@ function parseRememberedStarts(value: unknown): ReadonlyArray<RememberedStartVie
           {
             id: entry["id"],
             projectRealPath: entry["projectRealPath"],
+            exactCommand: entry["exactCommand"],
             approvedBy: entry["approvedBy"],
             how: entry["how"],
             createdAt: entry["createdAt"],

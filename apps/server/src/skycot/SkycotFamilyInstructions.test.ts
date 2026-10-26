@@ -235,6 +235,7 @@ describe("plan first in the Family profile", () => {
     assert.equal(Instructions.familyInteractionMode("plan", "grown-up"), "plan");
   });
 
+  // nondev-seam: skycot-q42-small-follow-up-tests
   it("lets a small tweak build without a plan, and keeps bigger asks planned", () => {
     assert.equal(Instructions.familyInteractionMode("plan", "small-follow-up"), "default");
     for (const text of [
@@ -251,6 +252,15 @@ describe("plan first in the Family profile", () => {
       "add levels and multiple pages",
       "redo this and rebuild the whole thing",
       "make it faster but turn it into a game",
+      "turn it into a game where Hello bounces",
+      "make Hello bounce around the screen",
+      "add a score counter and a restart button",
+      "make a game where Hello catches stars",
+      "make the page into a game with a timer",
+      "add a bouncing Hello and a score",
+      "change the button so it starts a new level",
+      "make the text bigger and add a game menu",
+      "change the colour to blue and make Hello bounce",
       "add a leaderboard from the internet and make the colour red",
       "make the ball bigger. then add sounds. then add a menu.",
       "install a package to make it faster",

@@ -29,17 +29,18 @@ import { useCodeLength } from "../../data/MacData";
 import type { ThreadProjection } from "../../engine/types";
 import type { Mac } from "../../links/store";
 import { BUILDER_NAME } from "../../ui/brand";
+import { childErrorCopy } from "../../ui/childCopy";
 import { childStatusLabel } from "../../data/conversations";
 import {
   Banner,
   Button,
+  ChildLoading,
   ButtonRow,
   Card,
   Mascot,
   ParentCodeSheet,
   Pill,
   Sheet,
-  Spinner,
   Symbol,
   Txt,
   haptic,
@@ -182,11 +183,12 @@ export function ConversationView(props: {
           <View style={{ padding: 24 }}>
             <Banner
               tone="warning"
-              text="This conversation didn't load. Check the Mac is awake, then try again."
+              text="This conversation didn't load. Check your Mac is awake, then try again."
+              action={{ title: "Try again", onPress: () => void thread.refresh() }}
             />
           </View>
         ) : (
-          <Spinner />
+          <ChildLoading onRetry={() => void thread.refresh()} />
         )}
       </View>
     );
@@ -251,7 +253,13 @@ export function ConversationView(props: {
               {`${BUILDER_NAME} finished without saying anything. Try asking again.`}
             </Txt>
           ) : null}
-          {problem ? <Banner tone="warning" text={problem} /> : null}
+          {problem ? (
+            <Banner
+              tone="warning"
+              text={problem}
+              action={{ title: "Got it", onPress: () => setProblem(null) }}
+            />
+          ) : null}
         </View>
       </ScrollView>
       {props.readOnly ? (
@@ -343,7 +351,7 @@ function plainFailure(cause: unknown): string {
   if (/parent code/iu.test(text))
     return "That step needs a grown-up. Ask one to enter the parent code.";
   if (/asleep/iu.test(text)) return "SKYCOT is asleep right now. Your work is saved.";
-  return "SKYCOT couldn't reach the Mac just now. Check it's awake, then try again.";
+  return childErrorCopy(cause);
 }
 
 function WorkingLine() {

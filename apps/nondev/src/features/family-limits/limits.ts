@@ -167,6 +167,7 @@ export function asleepCopy(
   timeZone: string,
 ): AsleepCopy {
   const wakes = wakePhrase(state.wakesAt, now, timeZone);
+  const allowanceReset = state.allowance?.resetsAt;
   const who = childName ? `, ${childName}` : "";
   switch (state.reason) {
     case "bedtime":
@@ -187,7 +188,7 @@ export function asleepCopy(
     case "allowance":
       return {
         title: "SKYCOT is having a rest",
-        body: "SKYCOT is resting for now. Your work is saved. Grown-ups need some time on it too.",
+        body: `SKYCOT is resting for now${allowanceReset == null ? "" : ` and can come back ${wakePhrase(allowanceReset, now, timeZone) ?? "soon"}`}. Your work is saved. You can play a game you made while you wait.`,
       };
     case null:
       return { title: "SKYCOT is awake", body: "" };

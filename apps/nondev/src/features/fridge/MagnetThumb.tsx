@@ -64,7 +64,7 @@ export function MagnetThumb({
         />
       ) : (
         <span className="fm-magnet__placeholder">
-          {current?.kind === "gone" ? "Not there any more" : ""}
+          {current?.kind === "gone" ? "This one isn't here now" : "Getting it ready…"}
         </span>
       )}
     </div>
