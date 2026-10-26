@@ -84,9 +84,9 @@ export function linkFailureCopy(target: LinkTarget, failure: LinkFailureKind): s
     return "This Mac isn't set up for phones yet. On the Mac: Settings › Family › Away from home › turn on Reach this Mac from anywhere, then make a new QR code.";
   }
   if (failure === "first-connection" && homeAddress !== null && target.relay === null) {
-    return `${LINK_COPY.unreachable} Check that SKYCOT has Local Network permission in iPhone Settings.`;
+    return "Turn on Local Network access for SKYCOT in iPhone Settings, then scan the Mac's code again.";
   }
-  return LINK_COPY.unreachable;
+  return "Wake the Mac and try again while your iPhone and Mac are on the same Wi-Fi.";
 }
 
 /** "192.168.1.20:3773" or a full address → "http://192.168.1.20:3773". */

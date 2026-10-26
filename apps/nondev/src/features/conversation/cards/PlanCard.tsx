@@ -19,6 +19,9 @@ import { InlineReply } from "./InlineReply";
 import { Markdown, parseMarkdown } from "./Markdown";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
+import { replacedByNewerPlan } from "../plans";
+import { useChildView } from "../../../app/useChildView";
+import { kidSafeText } from "../kidSafeText";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -38,7 +41,9 @@ export function PlanCard({
   readonly context: TimelineRenderContext;
 }) {
   const { projection, environmentId, threadId, shell, projectName } = context;
+  const childView = useChildView();
   const plan = projection.plans.find((p) => p.id === item.planId);
+  const newerPlan = replacedByNewerPlan(item, projection.turnItems, projection.plans);
   const acceptedRun = projection.runs.find((run) => run.sourcePlanRef?.planId === item.planId);
   const busyThread = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const card = describeRuntimeRequest(item, projectName === null ? {} : { projectName });
@@ -54,17 +59,19 @@ export function PlanCard({
   );
   const state = item.streaming
     ? "writing"
-    : takenBack
-      ? "taken-back"
-      : acceptedRun
-        ? "accepted"
-        : plan?.status === "superseded"
-          ? "superseded"
-          : plan?.status === "completed"
-            ? "completed"
-            : busyThread
-              ? "busy"
-              : "actionable";
+    : newerPlan
+      ? "superseded"
+      : takenBack
+        ? "taken-back"
+        : acceptedRun
+          ? "accepted"
+          : plan?.status === "superseded"
+            ? "superseded"
+            : plan?.status === "completed"
+              ? "completed"
+              : busyThread
+                ? "busy"
+                : "actionable";
 
   const steps = countSteps(item.markdown);
   const subtitle =
@@ -102,10 +109,13 @@ export function PlanCard({
 
   return (
     <Bubble author="crew" full meta={shortTime(item.completedAt ?? item.updatedAt)}>
-      <Card label="Plan">
+      <Card label="Plan" muted={state === "superseded"}>
         <CardHeader icon={ListChecks} tone="blue" title="Here's my plan" subtitle={subtitle} />
         <CardBody>
-          <Markdown text={item.markdown} className="fm-md--plan" />
+          <Markdown
+            text={childView ? kidSafeText(item.markdown) : item.markdown}
+            className="fm-md--plan"
+          />
           {state === "actionable" ? <p className="fm-plan__note">{card.ifYouSayNo}</p> : null}
         </CardBody>
         {state === "actionable" && approve ? (

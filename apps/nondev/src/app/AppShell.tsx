@@ -38,6 +38,7 @@ import { useDefaultAssistantPreference } from "../state/defaultAssistant";
 import { resolveDefaultModelSelection, providerForSelection } from "../state/providers";
 import { serverEnvironment } from "../state/server";
 import { environmentThreadShells } from "../state/threads";
+import { Button } from "../ui/Button";
 import { Pill } from "../ui/Pill";
 import { ToastHost } from "../ui/Toast";
 import { useModal } from "../ui/useModal";
@@ -48,6 +49,7 @@ import { ShellStateProvider, useShellState } from "./ShellState";
 import { TitleBar } from "./TitleBar";
 import { useColumns, type Columns } from "./useColumns";
 import { useChildView } from "./useChildView";
+import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
 
 /**
  * The Messages window. Decides which columns exist at this width and which
@@ -80,7 +82,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
 
   const conversationRoute =
     route.name === "home" || route.name === "new" || route.name === "thread";
-  const showContent = !(columns === 1 && route.name === "home");
+  const showContent = !(columns === 1 && route.name === "home" && !childView);
   // The live preview sits beside the conversation where there is room (the list steps aside
   // so the two share the window), and fills the window on a phone.
   const previewOpen = usePreviewOpen(route.name === "thread" ? route.threadId : null);
@@ -93,6 +95,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
     conversationRoute &&
     !childView &&
     !(columns === 1 && route.name !== "home") &&
+    !(columns === 1 && childView && route.name === "home") &&
     previewMode !== "panel";
 
   // One place owns the window title, derived from the route, so no screen can
@@ -140,6 +143,11 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <ConnectionBanner />
         <FamilyHeadsUp />
         <UsageBanner />
+        {childView && columns < 3 ? (
+          <Button size="sm" variant="quiet" onClick={openChildPicker}>
+            I'm the grown-up
+          </Button>
+        ) : null}
       </div>
       <NotificationCoordinator />
       <ReadyNotifier />

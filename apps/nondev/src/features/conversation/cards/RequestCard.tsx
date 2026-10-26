@@ -429,7 +429,9 @@ export function RequestCard({
                 ? decided
                 : childView && grownUp !== null
                   ? "A grown-up is needed"
-                  : card.title
+                  : grownUp !== null
+                    ? "Allow this step?"
+                    : card.title
             }
             subtitle={
               childView && decided
@@ -438,7 +440,7 @@ export function RequestCard({
                   (childView && grownUp !== null
                     ? "Waiting for a grown-up"
                     : grownUp !== null
-                      ? `${familyCopy.needsGrownUp} · waiting for a parent`
+                      ? "Choose Allow or Not now"
                       : card.ruleTitle
                         ? `${card.ruleTitle} · waiting for you`
                         : "Waiting for you · nothing is pre-selected"))
@@ -545,7 +547,15 @@ export function RequestCard({
                     title={option.warning}
                     onClick={() => void choose(option)}
                   >
-                    {busyId === option.id ? "Sending…" : option.label}
+                    {busyId === option.id
+                      ? "Sending…"
+                      : familyApplies && family.profile.me.kind === "grown-up"
+                        ? option.id === "accept" || option.id === "acceptForSession"
+                          ? "Allow"
+                          : option.id === "decline"
+                            ? "Not now"
+                            : option.label
+                        : option.label}
                   </Button>
                 ))}
                 {projectCover !== null && grownUp !== null && !childView ? (

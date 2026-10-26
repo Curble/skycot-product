@@ -22,6 +22,8 @@ import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { mayHaveChanges, rootCheckpoints, reviewTargetFor } from "../review/turnReview";
 import { peekAtCode } from "./peek";
 import { PeekAtCode } from "./PeekAtCode";
+import { useChildView } from "../../app/useChildView";
+import { kidSafeText } from "../conversation/kidSafeText";
 import "./explain.css";
 
 /** The anchor the What-changed card's "How did you do that?" button scrolls to. */
@@ -53,6 +55,7 @@ export function ExplainCard({
   readonly threadId: ThreadId;
 }) {
   const crew = useCrew();
+  const childView = useChildView();
   const [peeking, setPeeking] = useState(false);
   const checkpoint = streaming ? null : changedCheckpointFor(projection, runId);
   const diffInput =
@@ -70,18 +73,30 @@ export function ExplainCard({
       <div className="fm-explain" data-explain-run={runId ?? undefined} tabIndex={-1}>
         <p className="fm-crew-kicker">
           {crew.named ? <CrewAvatar role="builder" size="sm" /> : null}
-          {crew.named ? `${crew.builder.name} explains` : "How it was done"}
+          {childView
+            ? "Sam explains"
+            : crew.named
+              ? `${crew.builder.name} explains`
+              : "How it was done"}
         </p>
         <Card label="How I did it">
           <CardHeader icon={Lightbulb} tone="blue" title="How I did it" />
           <CardBody>
-            <p className="fm-explain__how">{explanation.how}</p>
+            <p className="fm-explain__how">
+              {childView ? kidSafeText(explanation.how) : explanation.how}
+            </p>
             {explanation.check ? (
               <p className="fm-explain__check">
                 {crew.named ? <CrewAvatar role="checker" size="sm" /> : null}
                 <span>
-                  <b>{crew.named ? `${crew.checker.name} double-checked:` : "Double-checked:"}</b>{" "}
-                  {explanation.check}
+                  <b>
+                    {childView
+                      ? "Sam checked this too:"
+                      : crew.named
+                        ? `${crew.checker.name} double-checked:`
+                        : "Double-checked:"}
+                  </b>{" "}
+                  {childView ? kidSafeText(explanation.check) : explanation.check}
                 </span>
               </p>
             ) : null}

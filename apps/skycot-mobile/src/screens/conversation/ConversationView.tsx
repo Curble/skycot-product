@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { familyApi } from "../../family/api";
+import { childRequestWaitingCopy } from "./childRequestCopy";
 import { respondToRequest, sendMessage, stopConversation, undoTo } from "../../engine/engine";
 import { buildTimeline, isWorking, type TimelineEntry } from "../../engine/timeline";
 import { useThread } from "../../data/hooks";
@@ -457,7 +458,10 @@ function TimelineCard(props: {
     }
     case "ask": {
       const waiting = entry.state === "waiting";
-      const grownUp = entry.card.grownUp !== null;
+      const grownUpReason = entry.card.grownUp;
+      const grownUp = grownUpReason !== null;
+      const waitingCopy =
+        grownUpReason === null ? null : childRequestWaitingCopy(grownUpReason, waiting);
       const decided =
         entry.state === "allowed"
           ? "Allowed, this once."
@@ -482,20 +486,14 @@ function TimelineCard(props: {
               }
               title={entry.card.title}
               subtitle={
-                decided ??
-                (grownUp
-                  ? "Needs a grown-up · waiting for a parent"
-                  : `${BUILDER_NAME} needs your OK`)
+                decided ?? (grownUp ? "Waiting for a grown-up" : `${BUILDER_NAME} needs your OK`)
               }
             />
             {waiting ? (
               <View style={{ gap: 10, marginTop: 12 }}>
                 <Txt>{entry.card.whatItWants}</Txt>
-                {grownUp ? (
-                  <Banner
-                    tone="warning"
-                    text={`${entry.card.grownUp} A grown-up enters the parent code to allow it.`}
-                  />
+                {waitingCopy !== null ? (
+                  <Banner tone="warning" text={waitingCopy} />
                 ) : (
                   <Txt variant="subheadline" tone="label2">
                     {entry.card.whyItMatters}

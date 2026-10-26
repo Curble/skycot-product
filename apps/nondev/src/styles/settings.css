@@ -112,7 +112,7 @@
   flex-direction: column;
   gap: 22px;
   width: 100%;
-  max-width: 720px;
+  max-width: 900px;
   padding: 10px 24px 28px;
 }
 /* Settings sections in the stacked (phone) list are separated by their <li> wrappers. */

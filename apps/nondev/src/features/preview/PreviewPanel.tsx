@@ -443,7 +443,7 @@ function PreviewPanelBody({
               disabled={!canOpenOutside}
               onClick={() => frameUrl && openOutside(frameUrl)}
             />
-            <IconButton icon={X} label="Close preview" size="sm" onClick={closePreview} />
+            <IconButton icon={X} label="Close preview" size="md" onClick={closePreview} />
           </span>
         </header>
         {leaving ? (

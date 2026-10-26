@@ -15,8 +15,6 @@ import {
 } from "react";
 
 import { Button } from "../../ui/Button";
-import { HOME_HREF, navigate } from "../../router";
-import { openChildPicker } from "../family-limits/FamilyLimitsHost";
 import {
   endGrownUpSession,
   grownUpSessionFor,
@@ -222,10 +220,8 @@ function GrownUpModeBar({ view }: { readonly view: FamilyView }) {
         size="sm"
         onClick={() => {
           void lockFamilyGrants();
-          // A grown-up who picked themselves on the shared Mac hands it back to the picker.
+          // Keep the child's current screen in place while returning control.
           endGrownUpSession();
-          openChildPicker();
-          navigate(HOME_HREF);
         }}
       >
         Done

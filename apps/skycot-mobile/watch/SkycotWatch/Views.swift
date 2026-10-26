@@ -73,7 +73,7 @@ struct RootView: View {
       switch snapshot.state {
       case "ready":
         TabView(selection: $page) {
-          RequestsPage(snapshot: snapshot).tag(0)
+          RequestsPage(snapshot: snapshot) { path.append($0) }.tag(0)
           TodayPage(snapshot: snapshot).tag(1)
           LockPage(snapshot: snapshot).tag(2)
         }
@@ -100,6 +100,7 @@ struct RootView: View {
 
 struct RequestsPage: View {
   let snapshot: WatchSnapshot
+  let open: (RequestRoute) -> Void
   @EnvironmentObject private var phone: PhoneLink
 
   var body: some View {
@@ -125,6 +126,16 @@ struct RequestsPage: View {
           ForEach(waiting) { request in
             NavigationLink(value: RequestRoute(key: request.id, decline: false)) {
               RequestRow(request: request)
+            }
+            .swipeActions(edge: .trailing) {
+              if !request.lapsed && request.watchCanSayYes {
+                Button {
+                  open(RequestRoute(key: request.id, decline: false, allow: true))
+                } label: {
+                  Label("Allow once", systemImage: "checkmark")
+                }
+                .tint(.green)
+              }
             }
           }
           ForEach(notes) { note in
@@ -348,7 +359,9 @@ struct RequestView: View {
       } else if allowNow, !startedDecline, let request {
         // The Simulator check's tap on Allow once (SimulatorTest), after the card has shown.
         startedDecline = true
-        try? await Task.sleep(for: .seconds(3))
+        if SimulatorTest.step == "allow-first" {
+          try? await Task.sleep(for: .seconds(3))
+        }
         await allow(request)
       }
     }

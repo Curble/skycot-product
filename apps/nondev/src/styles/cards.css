@@ -2,6 +2,10 @@
    secret field, developer disclosure and the light Markdown inside bubbles.
    Tokens only from styles/apple.css; no continuously repainting animation. */
 
+.fm-card--muted {
+  opacity: 0.64;
+}
+
 /* ---------------------------------------------------------------------------
    Markdown inside a bubble or card
    --------------------------------------------------------------------------- */

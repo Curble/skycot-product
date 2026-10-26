@@ -346,13 +346,24 @@ export function ConversationView({
           {project && !archived ? <PreviewButton threadId={threadId} /> : null}
           {shell && family.profile.me.kind !== "grown-up" ? (
             <FilesButton
-              onClick={() => navigate(filesHref(environmentId, shell.projectId, threadId))}
+              onClick={() => {
+                closePreview();
+                navigate(filesHref(environmentId, shell.projectId, threadId));
+              }}
             />
           ) : null}
           {/* A question has nowhere to go live; making it a project comes first. */}
           {/* nondev-seam: skycot-show-grown-up-button */}
           {childView && shell && !archived ? (
-            <ShowGrownUpButton threadId={threadId} title={shell.title} />
+            <ShowGrownUpButton
+              threadId={threadId}
+              title={shell.title}
+              includesPictures={
+                projection?.turnItems.some(
+                  (item) => item.type === "user_message" && item.attachments.length > 0,
+                ) ?? false
+              }
+            />
           ) : archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}

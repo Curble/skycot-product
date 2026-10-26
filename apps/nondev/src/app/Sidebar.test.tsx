@@ -23,8 +23,8 @@ describe("Sidebar identity in the child view", () => {
       <SidebarIdentity familyOn childView child={child} onSwitch={vi.fn()} />,
     );
     expect(html).toContain("Ava");
-    expect(html).toContain("Switch");
-    expect(html).not.toContain("Grown-up");
+    expect(html).toContain("I&#x27;m the grown-up");
+    expect(html).not.toContain("Grown-up mode");
   });
 
   it("renders one merged makes list with status badges and an expand action", () => {

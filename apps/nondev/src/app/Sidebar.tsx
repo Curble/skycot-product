@@ -576,7 +576,7 @@ export function SidebarIdentity({
       </span>
       {childView ? (
         <Button size="sm" variant="quiet" onClick={onSwitch}>
-          Switch
+          I'm the grown-up
         </Button>
       ) : null}
     </>

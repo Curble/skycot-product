@@ -9,6 +9,7 @@ import { Share, Upload } from "lucide-react";
 import { useId, useState } from "react";
 
 import { Button } from "../../ui/Button";
+import { Sheet } from "../../ui/Sheet";
 import { Pill } from "../../ui/Pill";
 import {
   describePublishStatus,
@@ -102,29 +103,55 @@ export function PublishButton({
 export function ShowGrownUpButton({
   threadId,
   title,
+  includesPictures,
 }: {
   readonly threadId: string;
   readonly title: string;
+  readonly includesPictures: boolean;
 }) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const send = () => {
+    if (busy || sent) return;
+    setBusy(true);
+    void familyApi.createNote({ kind: "shown", threadId, title }).then((result) => {
+      setBusy(false);
+      if (result.ok) {
+        setSent(true);
+        setConfirming(false);
+      }
+    });
+  };
   return (
-    <Button
-      variant="primary"
-      size="sm"
-      icon={Share}
-      disabled={sent || busy}
-      onClick={() => {
-        if (busy || sent) return;
-        setBusy(true);
-        void familyApi.createNote({ kind: "shown", threadId, title }).then((result) => {
-          setBusy(false);
-          if (result.ok) setSent(true);
-        });
-      }}
-    >
-      {sent ? "Sent to a grown-up! ✓" : busy ? "Sending…" : "Show a grown-up"}
-    </Button>
+    <>
+      <Button
+        variant="primary"
+        size="sm"
+        icon={Share}
+        disabled={sent || busy}
+        onClick={() => setConfirming(true)}
+      >
+        {sent ? "Sent to a grown-up! ✓" : "Show a grown-up"}
+      </Button>
+      <Sheet
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        icon={Share}
+        title="Show this to a grown-up?"
+        description={`Your conversation “${title}” will be shared with a grown-up.${includesPictures ? " It includes pictures you sent." : ""}`}
+        actions={
+          <>
+            <Button disabled={busy} onClick={() => setConfirming(false)}>
+              Not now
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={send}>
+              {busy ? "Sending…" : "Send"}
+            </Button>
+          </>
+        }
+      />
+    </>
   );
 }
 

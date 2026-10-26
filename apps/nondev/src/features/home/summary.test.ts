@@ -21,4 +21,10 @@ describe("summarySentence", () => {
   it("uses child words for their things", () => {
     expect(summarySentence(1, 0, 0, 1, true, true)).toBe("One thing is being made.");
   });
+
+  it("keeps a grown-up request separate from something waiting on the child", () => {
+    expect(summarySentence(0, 1, 0, 2, true, true, 1)).toBe(
+      "One thing is waiting on you, one thing needs a grown-up.",
+    );
+  });
 });

@@ -110,7 +110,7 @@ export function FamilyLimitsHost() {
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const engineKnown = view.source === "engine" && view.enabled;
   const restoreAttempted = useRef(false);
-  // A grown-up's time on the shared Mac ended (their code's grant lapsed): back to the picker.
+  // A grown-up's time on the shared Mac ended; the current child screen stays in place.
   const grownUpId = useGrownUpSessionId();
   const grownUpActive = grownUpSessionFor(grownUpId, view, now) !== null;
   useEffect(() => {
@@ -152,7 +152,6 @@ export function FamilyLimitsHost() {
     if (grownUpId === null || !wasActive.current) return;
     wasActive.current = false;
     endGrownUpSession();
-    openChildPicker();
   }, [grownUpId, grownUpActive]);
 
   useEffect(() => {

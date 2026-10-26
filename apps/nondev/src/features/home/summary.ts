@@ -6,6 +6,7 @@ export function summarySentence(
   total: number,
   connected = true,
   childView = false,
+  needsGrownUp = 0,
 ): string {
   // Until the engine has answered, an empty list means "not loaded", not "nothing".
   if (total === 0 && !connected) {
@@ -23,6 +24,10 @@ export function summarySentence(
   if (working > 0)
     parts.push(`${count(working, one, many)} ${childView ? "being made" : "running"}`);
   if (waiting > 0) parts.push(`${count(waiting, one, many)} waiting on you`);
+  if (needsGrownUp > 0)
+    parts.push(
+      `${count(needsGrownUp, childView ? "thing needs" : "job needs", childView ? "things need" : "jobs need")} a grown-up`,
+    );
   if (ready > 0) parts.push(`${count(ready, one, many)} ready to look at`);
   if (parts.length === 0)
     return childView

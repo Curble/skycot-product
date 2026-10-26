@@ -13,6 +13,17 @@
   overflow: hidden;
   max-width: 100vw;
 }
+.fm-shell__notices {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.fm-shell__notices > .fm-btn {
+  flex: none;
+  margin-left: auto;
+}
 
 .fm-titlebar {
   display: flex;
@@ -660,6 +671,23 @@
   }
 }
 
+@media (min-width: 1600px) {
+  .fm-stream__inner {
+    max-width: 1040px;
+  }
+  .fm-home__inner {
+    max-width: 1120px;
+  }
+  .fm-bubble,
+  .fm-work__hint,
+  .fm-rows__text {
+    font-size: calc(16px * var(--fm-text-scale));
+  }
+  .fm-stream__inner {
+    gap: 12px;
+  }
+}
+
 /* Centered standalone page (pairing, gate, errors) */
 .fm-standalone {
   display: grid;
@@ -869,6 +897,29 @@ html.dark .fm-standalone__foot {
 /* Phones: a greeting that fits on one or two short lines leaves room for the cards. */
 .fm-shell[data-columns="1"] .fm-home__greeting {
   font-size: calc(24px * var(--fm-text-scale));
+}
+
+@media (max-width: 520px) {
+  .fm-shell[data-columns="1"] .fm-body.fm-body--child-make {
+    --fm-sidebar-width: 56px;
+  }
+  .fm-shell[data-columns="1"] .fm-conv-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .fm-shell[data-columns="1"] .fm-conv-header__who {
+    flex-basis: calc(100% - 8px);
+  }
+  .fm-shell[data-columns="1"] .fm-conv-header__tools {
+    margin-left: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  .fm-shell[data-columns="1"] .fm-conv-header__name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* Sidebar as an overlay drawer when it no longer fits */

@@ -75,7 +75,9 @@ describe("how a child's steps are described (Family)", () => {
   it("tells a parent risky steps still wait and the plan still comes first", () => {
     const does = familyCopy.does.join(" ");
     expect(does).toMatch(/run by themselves/);
-    expect(does).toMatch(/waits for a grown-up/);
+    expect(does).toMatch(/wait for a grown-up/);
+    expect(does).toMatch(/Web searches run without a stop/);
+    expect(does).toMatch(/familiar add-ons download without another stop/);
     expect(does).toMatch(/Build it/);
     expect(does).toMatch(/asked before each step/);
   });

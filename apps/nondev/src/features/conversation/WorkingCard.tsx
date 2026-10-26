@@ -31,6 +31,7 @@ import {
   type NarrationContext,
 } from "../../plain/narration";
 import { asksForGame } from "../badges/facts";
+import { childProgressSentence } from "./childProgress";
 import { isAssistantRefusal } from "../family/assistantAllowance";
 import { Bubble } from "../../ui/Bubble";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
@@ -181,7 +182,22 @@ export function WorkingCard({
   });
   // Asks the SKYCOT rules answered sit in this card's details only; they are not steps.
   const toolItems = group.items.filter((item) => item.type !== "approval_request");
-  const { checklist } = summarizeRun(toolItems, ctx);
+  const { checklist: rawChecklist } = summarizeRun(toolItems, ctx);
+  const kidLine = (text: string) => {
+    if (!kid) return text;
+    const item = [...toolItems].reverse().find((candidate) => {
+      const narration = describeTurnItem(candidate, ctx);
+      return narration.headline === text;
+    });
+    return childProgressSentence(item ? describeTurnItem(item, ctx).kind : "other");
+  };
+  const checklist = kid
+    ? {
+        done: rawChecklist.done.map(kidLine),
+        now: rawChecklist.now.map(kidLine),
+        next: rawChecklist.next.map(kidLine),
+      }
+    : rawChecklist;
   // "Step N of M" is only honest when the agent published a to-do list; a
   // checklist inferred from tool calls has no known end.
   const planned = group.items.some((item) => item.type === "todo_list" && item.steps.length > 0);
@@ -220,7 +236,19 @@ export function WorkingCard({
     toIso(run?.completedAt ?? null),
     active && !childView,
   );
-  const hint = progressHint(toolItems, run?.status ?? "running", ctx);
+  const rawHint = progressHint(toolItems, run?.status ?? "running", ctx);
+  const latestRunning = [...toolItems].reverse().find((item) => {
+    const narration = describeTurnItem(item, ctx);
+    return (
+      narration.status === "running" &&
+      narration.kind !== "message" &&
+      narration.kind !== "reasoning"
+    );
+  });
+  const hint =
+    kid && latestRunning
+      ? childProgressSentence(describeTurnItem(latestRunning, ctx).kind)
+      : rawHint;
   // "Working on it" is already the title; saying it three times tells nothing.
   const genericHint = hint.replace(/[.…]+$/, "") === progress.working.replace(/[.…]+$/, "");
 

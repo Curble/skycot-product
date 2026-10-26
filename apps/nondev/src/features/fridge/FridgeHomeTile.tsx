@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { FRIDGE_HREF } from "../../router";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
+import { conversationRowsAtom } from "../../state/conversations";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
 import { useOpenIt } from "../starters/PreviewSheet";
 import { homeMagnets } from "./fridge";
@@ -16,12 +17,13 @@ import "./fridge.css";
 export function FridgeHomeTile() {
   const fridge = useFridge();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
+  const rows = useAtomValue(conversationRowsAtom);
   const environmentId = environmentIds[0] ?? null;
   const now = useHourClock();
   const openIt = useOpenIt(environmentId);
   useEffect(() => {
     void refreshFridge();
-  }, []);
+  }, [rows[0]?.at]);
   const magnets = homeMagnets(fridge.items);
   if (magnets.length === 0) return null;
   return (

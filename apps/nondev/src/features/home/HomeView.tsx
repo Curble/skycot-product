@@ -57,7 +57,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const working = active.filter(
     (row) => row.status.kind === "working" || row.status.kind === "preparing",
   ).length;
-  const waiting = active.filter((row) => row.status.kind === "waiting").length;
+  const needsGrownUp = active.filter(
+    (row) => row.status.kind === "waiting" && row.status.headline.includes("grown-up"),
+  ).length;
+  const waiting = active.filter(
+    (row) => row.status.kind === "waiting" && !row.status.headline.includes("grown-up"),
+  ).length;
   const ready = active.filter((row) => row.status.kind === "ready").length;
 
   return (
@@ -97,6 +102,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   rows.length,
                   connected,
                   family.enabled && family.profile.me.kind !== "grown-up",
+                  needsGrownUp,
                 )}
               </p>
             </div>
@@ -184,7 +190,9 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
     ? row.status.headline.replaceAll("Sam", crew.builder.name)
     : lowerFirst(row.status.headline);
   const lead =
-    row.status.kind === "waiting" ? (
+    row.status.kind === "waiting" && row.status.headline.includes("grown-up") ? (
+      <StepBadge state="warn" label="Needs a grown-up" />
+    ) : row.status.kind === "waiting" ? (
       <StepBadge state="warn" label="Waiting for you" />
     ) : row.status.kind === "ready" ? (
       <StepBadge state="done" label="Done" />

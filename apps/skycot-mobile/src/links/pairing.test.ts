@@ -34,18 +34,20 @@ describe("reading the Mac's link", () => {
     ).toMatch(/isn't set up for phones yet/);
   });
 
-  it("keeps the asleep message and adds Local Network permission for a home-only link", () => {
+  it("gives one clear fix for a first home connection and a later connection", () => {
     const target = {
       httpBaseUrl: "http://192.168.1.20:3773",
       code: "7KQ3M9XD2HPA",
       relay: null,
     };
-    expect(linkFailureCopy(target, "first-connection")).toMatch(/same Wi-Fi.*Mac is awake/);
-    expect(linkFailureCopy(target, "first-connection")).toMatch(/Local Network permission/);
+    expect(linkFailureCopy(target, "first-connection")).toMatch(
+      /Turn on Local Network access.*scan the Mac's code again/,
+    );
     expect(linkFailureCopy(target, "later-connection")).not.toMatch(/Local Network permission/);
+    expect(linkFailureCopy(target, "later-connection")).toMatch(/Wake the Mac.*same Wi-Fi/);
   });
 
-  it("keeps the asleep message when a relay was offered", () => {
+  it("gives a plain fix when a relay connection fails", () => {
     expect(
       linkFailureCopy(
         {
@@ -63,7 +65,7 @@ describe("reading the Mac's link", () => {
         },
         "first-connection",
       ),
-    ).toMatch(/same Wi-Fi.*Mac is awake/);
+    ).toBe("Wake the Mac and try again while your iPhone and Mac are on the same Wi-Fi.");
   });
 
   it("takes the address and the code from the QR code's link", () => {
