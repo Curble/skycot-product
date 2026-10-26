@@ -277,7 +277,10 @@ describe("serveStaticSite", () => {
       expect(policy).not.toContain("https://");
       expect(policy).toContain("report-uri /.skycot/blocked");
       // The page itself is served untouched.
-      expect(home.body).toBe("<h1>My game</h1>");
+      // The child's page is served with the link interceptor first (a link never leaves the viewer).
+      expect(home.body.endsWith("<h1>My game</h1>")).toBe(true);
+      expect(home.body.startsWith('<base target="_self"><script>')).toBe(true);
+      expect(home.headers["content-length"]).toBe(String(Buffer.byteLength(home.body)));
       const levels = await rawGet(family.port, "/levels/");
       const allowed = String(levels.headers["content-security-policy"]);
       const scriptPolicy = allowed.match(/script-src [^;]*/u)?.[0] ?? "";

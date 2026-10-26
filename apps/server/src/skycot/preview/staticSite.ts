@@ -15,9 +15,11 @@ import * as NodeProcess from "node:process";
 
 import {
   BLOCKED_REPORT_PATH,
+  PAGE_LINK_INTERCEPTOR,
   pageServerFallbackPolicy,
   pageServerPolicy,
   readBlockedReport,
+  withHeadStart,
 } from "@t3tools/skycot-rules/page-internet";
 
 /** Folders (inside the project) whose index.html is shown, best first. "" is the folder itself. */
@@ -351,13 +353,21 @@ export async function serveStaticSite(
       ? await options.pageSites(found.path).catch(() => [] as ReadonlyArray<string>)
       : null;
     let policy: Record<string, string> = {};
+    let servedBody: string | null = null;
     if (sites !== null) {
       if (/\.html?$/iu.test(found.path) && found.size <= MAX_POLICY_PAGE_BYTES) {
-        const page = await NodeFSP.readFile(found.path, "utf8");
+        // A child's page gets the link interceptor first in its head (a link never leaves the
+        // viewer; the client shows "that link goes to the internet"), hash-allowed like its own
+        // inline scripts; the served body is that page, not the file.
+        const page = withHeadStart(
+          await NodeFSP.readFile(found.path, "utf8"),
+          `<base target="_self">${PAGE_LINK_INTERCEPTOR}`,
+        );
         const hashes = inlineHashes(page);
         policy = {
           "content-security-policy": pageServerPolicy(sites, hashes.scripts, hashes.handlers),
         };
+        servedBody = page;
       } else {
         if (/\.html?$/iu.test(found.path))
           NodeProcess.stderr.write(
@@ -366,9 +376,10 @@ export async function serveStaticSite(
         policy = { "content-security-policy": pageServerFallbackPolicy(sites) };
       }
     }
+    const bodyBytes = servedBody === null ? null : Buffer.from(servedBody, "utf8");
     response.writeHead(200, {
       "content-type": mimeTypeFor(found.path),
-      "content-length": String(found.size),
+      "content-length": String(bodyBytes === null ? found.size : bodyBytes.length),
       // The child edits and presses Reload: always the newest file.
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
@@ -376,6 +387,10 @@ export async function serveStaticSite(
     });
     if (request.method === "HEAD") {
       response.end();
+      return;
+    }
+    if (bodyBytes !== null) {
+      response.end(bodyBytes);
       return;
     }
     const stream = NodeFS.createReadStream(found.path);

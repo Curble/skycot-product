@@ -70,7 +70,14 @@ export class NamedProjectFolderError extends Schema.TaggedError<NamedProjectFold
   },
 ) {
   override get message(): string {
-    return "Failed to create the project folder.";
+    // nondev-seam: skycot-child-project-folder
+    // The reason travels with it: the client's toast can then say why ("no such folder").
+    const cause = this.cause;
+    const detail =
+      cause instanceof Error ? cause.message : typeof cause === "string" ? cause : null;
+    return detail === null || detail.length === 0
+      ? "Failed to create the project folder."
+      : `Failed to create the project folder (${detail.slice(0, 160)}).`;
   }
 }
 
