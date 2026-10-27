@@ -6,8 +6,9 @@
 // nondev-seam: skycot-q51-fridge-svg-mobile
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
+import { SvgXml } from "react-native-svg";
 import { WebView } from "react-native-webview";
 
 import {
@@ -37,6 +38,37 @@ import {
 } from "../../ui/kit";
 import { useGridBasis } from "../../ui/layout";
 import { useTheme } from "../../ui/theme";
+import { createCardCache } from "./fridgeCards";
+
+// Cards already fetched, kept by hash for this run of the app (bounded).
+const cardCache = createCardCache();
+
+/**
+ * The engine's drawn card for a page, or null while loading, on failure, or when the Mac is
+ * older and sends no card (the caller then shows the per-kind icon). A changed hash refetches.
+ */
+function useCardSvg(mac: Mac, hash: string | undefined): string | null {
+  const [svg, setSvg] = useState<string | null>(hash === undefined ? null : cardCache.peek(hash));
+  useEffect(() => {
+    if (hash === undefined) {
+      setSvg(null);
+      return;
+    }
+    const kept = cardCache.peek(hash);
+    setSvg(kept);
+    if (kept !== null) return;
+    let live = true;
+    void cardCache
+      .load(hash, (name) => familyApi.fridgeCard(mac.transport, name))
+      .then((text) => {
+        if (live) setSvg(text);
+      });
+    return () => {
+      live = false;
+    };
+  }, [mac.transport, hash]);
+  return svg;
+}
 
 const MAGNET_COLORS = ["#F26B4E", "#3A9DF6", "#3FA66F", "#8E5AA8", "#E8A50C", "#E0603F"];
 
@@ -51,6 +83,7 @@ function Magnet(props: {
 }) {
   const color = MAGNET_COLORS[props.index % MAGNET_COLORS.length]!;
   const grid = useGridBasis();
+  const card = useCardSvg(props.mac, props.item.cardHash);
   return (
     <Pressable
       accessibilityRole="button"
@@ -67,7 +100,10 @@ function Magnet(props: {
     >
       <Card padded={false} style={{ overflow: "hidden" }}>
         <View style={{ height: props.compact ? 70 : 110, backgroundColor: color }}>
-          {props.item.thumbnailSvg ? (
+          {card !== null ? (
+            // The engine's static card, drawn as a picture (never through a web view).
+            <SvgXml xml={card} width="100%" height="100%" pointerEvents="none" />
+          ) : props.item.thumbnailSvg ? (
             <WebView
               source={{ html: props.item.thumbnailSvg }}
               javaScriptEnabled={false}
