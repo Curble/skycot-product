@@ -13,6 +13,7 @@ import { currentChild } from "../family/family";
 import { readFamilyView, saveOwnLook } from "../family/store";
 import { SessionRecapHost } from "../recap/SessionRecap";
 import { AsleepScreen } from "./AsleepScreen";
+import { asleepLimitsFor } from "./asleepGate";
 import { ChildPicker } from "./ChildPicker";
 import {
   endGrownUpSession,
@@ -30,7 +31,7 @@ import {
   rememberChild,
   shouldShowChildPicker,
 } from "./idlePicker";
-import { chooseChild, startLimitsClock, useLimits } from "./store";
+import { chooseChild, heartbeat, startLimitsClock, useLimits } from "./store";
 
 const PICKED_KEY = "skycot:family:picked";
 
@@ -214,6 +215,16 @@ export function FamilyLimitsHost() {
     };
   }, [engineKnown, view.children.length, view.me.kind]);
 
+  // The engine's word about the child here can be one beat old: ask again as soon as a grown-up's
+  // turn opens or closes, or the child here changes, instead of waiting for the next heartbeat.
+  const recheckKey = `${grownUpActive}|${view.currentChildId ?? ""}`;
+  const lastRecheck = useRef(recheckKey);
+  useEffect(() => {
+    if (lastRecheck.current === recheckKey) return;
+    lastRecheck.current = recheckKey;
+    if (engineKnown) void heartbeat();
+  }, [engineKnown, recheckKey]);
+
   useEffect(() => {
     if (!engineKnown) return;
     return startLimitsClock();
@@ -278,8 +289,8 @@ function LimitsCover({
       />
     );
   }
-  const limits = session?.childId === child?.id ? session?.limits : null;
-  if (child !== null && limits?.asleep) {
+  const limits = asleepLimitsFor({ childId: child?.id ?? null, session, grownUpActive });
+  if (child !== null && limits !== null) {
     return (
       <AsleepScreen
         child={child}

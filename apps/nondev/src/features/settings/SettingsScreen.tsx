@@ -64,7 +64,7 @@ export function SettingsScreen({
   // The only way out of Settings used to be the browser's Back button.
   const done = (
     <Button variant="primary" size="sm" onClick={() => navigate(HOME_HREF)}>
-      Done
+      Close
     </Button>
   );
 

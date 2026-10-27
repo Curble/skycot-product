@@ -52,7 +52,7 @@ export const BADGE_COPY: Readonly<Record<BadgeId, BadgeCopy>> = {
   voice: {
     title: "Said it out loud",
     cheer: "SKYCOT heard you through the microphone.",
-    hint: "Use the microphone to say what you want.",
+    hint: "Say what you want with voice typing, once a grown-up turns it on.",
   },
   together: {
     title: "Built together",

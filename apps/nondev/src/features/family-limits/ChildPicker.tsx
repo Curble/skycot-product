@@ -173,8 +173,8 @@ export function ChildPicker({
           <>
             <p className="fm-picker__lead fm-sr-only">Tap your name tag.</p>
             <div className="fm-picker__groups">
-              <section className="fm-picker__group fm-picker__group--makers" aria-label="Makers">
-                <h2 className="fm-picker__group-title">Makers</h2>
+              <section className="fm-picker__group fm-picker__group--makers" aria-label="Kids">
+                <h2 className="fm-picker__group-title">Kids</h2>
                 <ul className="fm-picker__tags">
                   {view.children.map((child, index) => (
                     <li key={child.id}>
