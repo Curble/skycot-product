@@ -13,8 +13,8 @@ describe("About SKYCOT for a child", () => {
   });
 
   it("explains Do Not Track in plain phone words", () => {
-    expect(GROWN_UP_PRIVACY_COPY).toContain("If your phone asks sites not to track you");
-    expect(GROWN_UP_PRIVACY_COPY).toContain("we don't count it");
+    expect(GROWN_UP_PRIVACY_COPY).toContain("If your Mac asks sites not to track it");
+    expect(GROWN_UP_PRIVACY_COPY).toContain("are not counted");
     expect(GROWN_UP_PRIVACY_COPY).not.toMatch(/Do Not Track|Global Privacy Control/iu);
   });
 });

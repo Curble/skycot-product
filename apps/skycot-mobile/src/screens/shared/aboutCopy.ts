@@ -6,4 +6,4 @@ export const CHILD_ABOUT_COPY = {
 } as const;
 
 export const GROWN_UP_PRIVACY_COPY =
-  "Your family's work stays on your Mac. SKYCOT has no account or ads. Each day, we count app update checks and relay connections without names or account details. Totals reset daily. If your phone asks sites not to track you, we don't count it.";
+  "Your family's work stays on your Mac. SKYCOT has no account or ads. Each day, we count app update checks and relay connections without names or account details. Totals reset daily. If your Mac asks sites not to track it, its update checks are not counted.";
