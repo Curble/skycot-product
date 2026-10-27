@@ -23,17 +23,27 @@ export function resetCaptureMemory(): void {
   taken.clear();
 }
 
+/** The file name a path points at; a folder (or "/") means its `index.html`. */
+export function pageFileName(path: string): string {
+  let plain = path;
+  try {
+    plain = decodeURIComponent(path);
+  } catch {
+    // Keep the raw path.
+  }
+  return plain.split("/").at(-1) || "index.html";
+}
+
 function pickItem(
   items: ReadonlyArray<FridgeItem>,
   threadId: string,
   page: string,
 ): FridgeItem | null {
   const own = items.filter((item) => item.threadId === threadId);
-  const base = (path: string) => path.split("/").at(-1);
   return (
     own.find((item) => item.page === page) ??
-    own.find((item) => base(item.page) === base(page)) ??
-    null
+    own.find((item) => pageFileName(item.page) === pageFileName(page)) ??
+    (own.length === 1 ? own[0]! : null)
   );
 }
 
@@ -110,8 +120,5 @@ export function loadedPageMatches(url: string, asked: string): boolean {
   } catch {
     return false;
   }
-  const base = (path: string) => path.split("/").at(-1) ?? "";
-  const loaded = base(loadedPath) || "index.html";
-  const wanted = base(asked) || "index.html";
-  return loaded === wanted;
+  return pageFileName(loadedPath) === pageFileName(asked);
 }

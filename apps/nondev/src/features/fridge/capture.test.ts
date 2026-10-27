@@ -188,3 +188,13 @@ describe("loadedPageMatches", () => {
     expect(loadedPageMatches("not a url", "index.html")).toBe(false);
   });
 });
+
+describe("pageFileName", () => {
+  it("treats a folder or root as index.html and decodes names", async () => {
+    const { pageFileName } = await import("./capture");
+    expect(pageFileName("/")).toBe("index.html");
+    expect(pageFileName("")).toBe("index.html");
+    expect(pageFileName("index.html")).toBe("index.html");
+    expect(pageFileName("/pages/my%20game.html")).toBe("my game.html");
+  });
+});
