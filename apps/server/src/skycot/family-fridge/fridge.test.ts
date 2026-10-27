@@ -1,6 +1,15 @@
+// nondev-seam: skycot-iphone-q50-fridge-title-test
 import { describe, expect, it } from "@effect/vitest";
 
-import { fridgeItems, type FridgeThread } from "./fridge.ts";
+import { fridgeItems, fridgePageTitle, type FridgeThread } from "./fridge.ts";
+
+describe("fridge page titles", () => {
+  it("uses a page title or first heading and cleans up its text", () => {
+    expect(fridgePageTitle("<title> A &amp; B </title><h1>Later</h1>")).toBe("A & B");
+    expect(fridgePageTitle("<h1>Hello <em>there</em></h1>")).toBe("Hello there");
+    expect(fridgePageTitle("<p>No heading</p>")).toBeNull();
+  });
+});
 
 const file = (path: string, kind = "modified") => ({ path, kind, additions: 1, deletions: 0 });
 
@@ -59,5 +68,20 @@ describe("fridgeItems", () => {
       ["leo", 900],
       ["ava", null],
     ]);
+  });
+
+  it("follows a later checkpoint when the conversation replaces its page", () => {
+    const replaced = thread({
+      threadId: "replaced",
+      checkpoints: [
+        { runId: "r1", capturedAt: 100, files: [file("bounce.html")] },
+        { runId: "r2", capturedAt: 200, files: [file("birthday-card.html")] },
+      ],
+      runs: [
+        { id: "r1", status: "completed" },
+        { id: "r2", status: "completed" },
+      ],
+    });
+    expect(fridgeItems([replaced], {}, {})[0]?.page).toBe("birthday-card.html");
   });
 });

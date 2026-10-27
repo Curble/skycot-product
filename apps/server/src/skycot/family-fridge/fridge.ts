@@ -2,6 +2,7 @@
 // What is "made" is read from the checkpoints (the newest kept change that touched a page);
 // the only thing the fridge stores is which magnets are pinned. Taking one down never deletes
 // a file: the page stays in its project and the conversation stays in the list.
+// nondev-seam: skycot-iphone-q50-fridge-title
 import { pageOf, type RecapFile } from "../family-recap/recap.ts";
 
 export interface FridgeThread {
@@ -26,8 +27,28 @@ export interface FridgeItem {
   readonly childId: string | null;
   readonly madeAt: number;
   readonly page: string;
+  readonly contentHash?: string;
   readonly cwd: string;
   readonly pinnedAt: number | null;
+}
+
+/** A page's own name wins over the conversation's first request. */
+export function fridgePageTitle(html: string): string | null {
+  const text = (
+    html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/iu)?.[1] ??
+    html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ??
+    ""
+  )
+    .replace(/<[^>]*>/gu, " ")
+    .replace(/&nbsp;|&#160;/giu, " ")
+    .replace(/&amp;/giu, "&")
+    .replace(/&quot;|&#34;/giu, '"')
+    .replace(/&#39;|&apos;/giu, "'")
+    .replace(/&lt;/giu, "<")
+    .replace(/&gt;/giu, ">")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return text.length > 0 ? text.slice(0, 80) : null;
 }
 
 /** One magnet per conversation that made a page, newest first. */

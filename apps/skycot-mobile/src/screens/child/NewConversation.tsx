@@ -1,4 +1,5 @@
 // nondev-seam: skycot-iphone-q39-new-conversation
+// nondev-seam: skycot-iphone-q50-new-conversation-place
 /**
  * A new conversation: where it goes (a project, or Just ask), the words (a starter card's, or
  * the child's own), voice typing when a grown-up allowed it, and the personal-details shield
@@ -25,7 +26,7 @@ import {
 import { JUST_ASK_COPY } from "../../../../nondev/src/features/questions/questions";
 import type { StackRoutes } from "../../app/routes";
 import { useChild } from "../../app/child/ChildContext";
-import { childProjectTitle, isQuestionsProject } from "../../data/conversations";
+import { childPlaceName, isQuestionsProject } from "../../data/conversations";
 import { useMacData } from "../../data/MacData";
 import { defaultModelSelection, openQuestions, startConversation } from "../../engine/engine";
 import { BUILDER_NAME } from "../../ui/brand";
@@ -163,7 +164,7 @@ export function NewConversationScreen() {
               {projects.map(({ mac: owner, project }) => (
                 <Row
                   key={`${owner.macId}:${project.id}`}
-                  title={childProjectTitle(project.title, owner.macName)}
+                  title={childPlaceName(project.title, owner.macName)}
                   leading={<Symbol name="folder.fill" size={22} />}
                   trailing={
                     target?.projectId === project.id && target.macId === owner.macId ? (

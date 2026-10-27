@@ -1,4 +1,5 @@
 // nondev-seam: skycot-iphone-q39-timeline
+// nondev-seam: skycot-iphone-q50-timeline
 /**
  * A conversation as SKYCOT's plain cards: what the child said, what Sam said, the plan (Build
  * it / Change the plan), Ask a grown-up, What changed (Undo), and a working line. The words
@@ -80,6 +81,23 @@ export type TimelineEntry =
 
 const LIVE_RUN = new Set(["preparing", "starting", "running", "waiting"]);
 
+export function planDisplayState(
+  status: "draft" | "active" | "completed" | "superseded" | undefined,
+  working: boolean,
+  waitingForAnswer: boolean,
+): "writing" | "ready" | "building" | "done" | "replaced" {
+  if (status === "superseded") return "replaced";
+  if (working && !waitingForAnswer) return "building";
+  if (status === "completed") return "done";
+  return "ready";
+}
+
+export function claimQuestionAnswer(answered: Set<string>, questionId: string): boolean {
+  if (answered.has(questionId)) return false;
+  answered.add(questionId);
+  return true;
+}
+
 export function isWorking(projection: ThreadProjection): boolean {
   return projection.runs.some((run) => LIVE_RUN.has(run.status));
 }
@@ -117,6 +135,11 @@ export function buildTimeline(
     projection.runs.filter((run) => run.status === "rolled_back").map((run) => run.id),
   );
   const working = isWorking(projection);
+  const waitingForAnswer = projection.runtimeRequests.some(
+    (request) =>
+      request.status === "pending" &&
+      items.some((item) => item.type === "user_input_request" && item.requestId === request.id),
+  );
   const out: Array<TimelineEntry> = [];
 
   for (const [index, item] of items.entries()) {
@@ -148,13 +171,7 @@ export function buildTimeline(
         const plan = projection.plans.find((candidate) => candidate.id === item.planId);
         const state = item.streaming
           ? "writing"
-          : plan?.status === "superseded"
-            ? "replaced"
-            : plan?.status === "completed"
-              ? "done"
-              : plan?.status === "active" && working
-                ? "building"
-                : "ready";
+          : planDisplayState(plan?.status, working, waitingForAnswer);
         out.push({
           kind: "plan",
           id: item.id,

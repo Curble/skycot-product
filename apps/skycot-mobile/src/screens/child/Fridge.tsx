@@ -2,12 +2,15 @@
  * The family fridge on a child's device: their own magnets and anything pinned by anyone
  * (the engine decides which). Pin to the fridge and Take it down never delete anything.
  */
+// nondev-seam: skycot-iphone-q50-fridge-mobile
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 
 import {
+  childFridgeTitle,
+  fridgeIcon,
   fridgeOrder,
   madeLabel,
   type FridgeItem,
@@ -38,6 +41,7 @@ function Magnet(props: {
   readonly item: FridgeItem;
   readonly mac: Mac;
   readonly index: number;
+  readonly childName: string | null;
   readonly onOpen: () => void;
   readonly onPin?: (pinned: boolean) => void;
   readonly compact?: boolean;
@@ -47,7 +51,7 @@ function Magnet(props: {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open ${friendlyTitle(props.item.title)}`}
+      accessibilityLabel={`Open ${friendlyTitle(childFridgeTitle(props.item, props.childName))}`}
       onPress={() => {
         haptic();
         props.onOpen();
@@ -67,7 +71,11 @@ function Magnet(props: {
             justifyContent: "center",
           }}
         >
-          <Symbol name="doc.richtext.fill" size={props.compact ? 28 : 40} color="#FFFFFF" />
+          <Symbol
+            name={fridgeIcon(props.item.title, props.item.page)}
+            size={props.compact ? 28 : 40}
+            color="#FFFFFF"
+          />
           {props.item.pinnedAt !== null ? (
             <View style={{ position: "absolute", top: 8, right: 8 }}>
               <Symbol name="pin.fill" size={16} color="#FFFFFF" />
@@ -76,7 +84,7 @@ function Magnet(props: {
         </View>
         <View style={{ padding: 10, gap: 2 }}>
           <Txt variant="subheadline" weight="600" numberOfLines={2}>
-            {friendlyTitle(props.item.title)}
+            {friendlyTitle(childFridgeTitle(props.item, props.childName))}
           </Txt>
           <Txt variant="caption" tone="label2">
             {madeLabel(props.item.madeAt, Date.now())}
@@ -110,7 +118,11 @@ function useOpenPage() {
     });
 }
 
-function MacFridge(props: { readonly mac: Mac; readonly showName: boolean }) {
+function MacFridge(props: {
+  readonly mac: Mac;
+  readonly showName: boolean;
+  readonly childName: string | null;
+}) {
   const fridge = useFamilyRead(props.mac, readFridge, 30_000, "fridge");
   const open = useOpenPage();
   const [, setTick] = useState(0);
@@ -148,10 +160,11 @@ function MacFridge(props: { readonly mac: Mac; readonly showName: boolean }) {
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, marginHorizontal: 16 }}>
         {items.map((item, index) => (
           <Magnet
-            key={item.threadId}
+            key={`${item.threadId}:${item.contentHash ?? ""}`}
             item={item}
             mac={props.mac}
             index={index}
+            childName={props.childName}
             onOpen={() => open(props.mac, item)}
             onPin={async (pinned) => {
               await familyApi.pin(props.mac.transport, item.threadId, pinned);
@@ -173,7 +186,12 @@ export function FridgeScreen() {
         Everything you made, and the best ones anyone pinned up. Taking one down never deletes it.
       </Txt>
       {child.macs.map((mac) => (
-        <MacFridge key={mac.macId} mac={mac} showName={child.macs.length > 1} />
+        <MacFridge
+          key={mac.macId}
+          mac={mac}
+          showName={child.macs.length > 1}
+          childName={child.name}
+        />
       ))}
     </Page>
   );
@@ -193,10 +211,11 @@ export function FridgeTile(props: { readonly onSeeAll: () => void }) {
         <View style={{ flexDirection: "row", gap: 10 }}>
           {items.map((item, index) => (
             <Magnet
-              key={item.threadId}
+              key={`${item.threadId}:${item.contentHash ?? ""}`}
               item={item}
               mac={mac}
               index={index}
+              childName={child.name}
               compact
               onOpen={() => open(mac, item)}
             />

@@ -1,7 +1,10 @@
+// nondev-seam: skycot-iphone-q50-fridge-client-test
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   fridgeOrder,
+  childFridgeTitle,
+  fridgeIcon,
   fridgeShelves,
   homeMagnets,
   madeLabel,
@@ -72,6 +75,29 @@ describe("the family fridge", () => {
       parseFridge({ items: [item("ok"), { threadId: "broken" }] })?.map((entry) => entry.threadId),
     ).toEqual(["ok"]);
     expect(parseFridge({ error: "x" })).toBeNull();
+  });
+
+  it("keeps the live page hash when an engine sends one", () => {
+    expect(
+      parseFridge({ items: [item("changed", { contentHash: "sha256-a" })] })?.[0]?.contentHash,
+    ).toBe("sha256-a");
+    expect(parseFridge({ items: [item("older-engine")] })?.[0]?.contentHash).toBeUndefined();
+  });
+
+  it("repairs generic and cut magnet names and chooses a kind icon", () => {
+    const madeAt = Date.parse("2026-10-27T09:00:00Z");
+    expect(childFridgeTitle({ title: "Page", madeAt }, "Ava")).toBe("Ava's page · 27 Oct");
+    expect(childFridgeTitle({ title: "A birthday card page for", madeAt }, "Ava")).toBe(
+      "Ava's page · 27 Oct",
+    );
+    expect(childFridgeTitle({ title: "Birthday card for m", madeAt }, "Ava")).toBe(
+      "Ava's page · 27 Oct",
+    );
+    expect(childFridgeTitle({ title: "Bounce game", madeAt }, "Ava")).toBe("Bounce game");
+    expect(fridgeIcon("Quiz time", "index.html")).toBe("questionmark.square.fill");
+    expect(fridgeIcon("Birthday card", "card.html")).toBe("gift.fill");
+    expect(fridgeIcon("Bounce", "bounce.html")).toBe("gamecontroller.fill");
+    expect(fridgeIcon("Poster", "index.html")).toBe("doc.richtext.fill");
   });
 });
 

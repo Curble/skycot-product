@@ -9,8 +9,33 @@ export interface FridgeItem {
   readonly childId: string | null;
   readonly madeAt: number;
   readonly page: string;
+  readonly contentHash?: string;
   readonly cwd: string;
   readonly pinnedAt: number | null;
+}
+
+export function childFridgeTitle(
+  item: Pick<FridgeItem, "title" | "madeAt">,
+  childName: string | null,
+): string {
+  const title = item.title.trim();
+  if (!/^(?:page|a birthday card page for|birthday card for .{0,3})$/iu.test(title)) return title;
+  const date = new Date(item.madeAt).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+  });
+  return `${childName ? `${childName}'s` : "Your"} page · ${date}`;
+}
+
+export function fridgeIcon(
+  title: string,
+  page: string,
+): "gamecontroller.fill" | "gift.fill" | "questionmark.square.fill" | "doc.richtext.fill" {
+  const value = `${title} ${page}`;
+  if (/quiz|trivia|question/iu.test(value)) return "questionmark.square.fill";
+  if (/card|birthday/iu.test(value)) return "gift.fill";
+  if (/game|play|bounce/iu.test(value)) return "gamecontroller.fill";
+  return "doc.richtext.fill";
 }
 
 export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
@@ -24,7 +49,9 @@ export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
       typeof (item as FridgeItem).threadId === "string" &&
       typeof (item as FridgeItem).page === "string" &&
       typeof (item as FridgeItem).cwd === "string" &&
-      typeof (item as FridgeItem).madeAt === "number",
+      typeof (item as FridgeItem).madeAt === "number" &&
+      ((item as FridgeItem).contentHash === undefined ||
+        typeof (item as FridgeItem).contentHash === "string"),
   );
 }
 

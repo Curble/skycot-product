@@ -1,5 +1,6 @@
 // nondev-seam: skycot-playable-copy-test
 // nondev-seam: skycot-fridge-thumbnail-cache-test
+// nondev-seam: skycot-iphone-q50-fridge-title-engine-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
@@ -45,6 +46,42 @@ const records = (id: string, title: string, archived: boolean) => ({
 // Putting a conversation away is the engine's archive, not a delete: its page stays on the
 // fridge (and in the recap and the sticker counts, which read the same records by id).
 it.layer(NodeServices.layer)("SkycotFridge", (it) => {
+  it.effect("refreshes a magnet from its current page title and content", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fridge-title-" });
+      const root = path.join(dir, "games");
+      yield* fs.makeDirectory(root, { recursive: true });
+      const record = records("live", "Hello bounce game", false);
+      yield* fs.writeFileString(path.join(root, "index.html"), "<title>Bounce</title>");
+      const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getShellSnapshot: () =>
+          Effect.succeed({ threads: [record.thread], archivedThreads: [] } as never),
+        getThreadRecords: (() => Effect.succeed(record as never)) as never,
+      });
+      const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
+        get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
+      });
+      const [first, second] = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        const first = (yield* fridge.list)[0]!;
+        yield* fs.writeFileString(path.join(root, "index.html"), "<h1>Nana's birthday card</h1>");
+        const second = (yield* fridge.list)[0]!;
+        return [first, second] as const;
+      }).pipe(
+        Effect.provide(
+          SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+            Layer.provide(Layer.merge(projections, projects)),
+          ),
+        ),
+      );
+      assert.equal(first.title, "Bounce");
+      assert.equal(second.title, "Nana's birthday card");
+      assert.notEqual(second.contentHash, first.contentHash);
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("keeps a put-away conversation's magnet, under its new name", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

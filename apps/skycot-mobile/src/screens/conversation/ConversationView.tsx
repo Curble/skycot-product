@@ -1,5 +1,6 @@
 // nondev-seam: skycot-ipad-conversation-width
 // nondev-seam: skycot-iphone-q39-conversation-retry
+// nondev-seam: skycot-iphone-q50-question-answer
 /**
  * One conversation, as SKYCOT's plain cards: what you said, what Sam said, the plan (Build it /
  * Change the plan), Ask a grown-up, What changed (Open it / Undo all of it). On a grown-up's
@@ -29,7 +30,12 @@ import {
   stopConversation,
   undoTo,
 } from "../../engine/engine";
-import { buildTimeline, isWorking, type TimelineEntry } from "../../engine/timeline";
+import {
+  buildTimeline,
+  claimQuestionAnswer,
+  isWorking,
+  type TimelineEntry,
+} from "../../engine/timeline";
 import { useThread } from "../../data/hooks";
 import { useCodeLength } from "../../data/MacData";
 import type { ThreadProjection } from "../../engine/types";
@@ -91,6 +97,7 @@ export function ConversationView(props: {
     readonly checkpointId: string;
   } | null>(null);
   const [busyCard, setBusyCard] = useState<string | null>(null);
+  const answeredQuestions = useRef(new Set<string>());
 
   useEffect(() => {
     if (props.initialDraft !== undefined) setDraft(props.initialDraft);
@@ -118,6 +125,10 @@ export function ConversationView(props: {
       ((entry.kind === "ask" || entry.kind === "question") && entry.state === "waiting") ||
       (entry.kind === "oops" && entry.isRest),
   );
+  const waitingQuestion = timeline.findLast(
+    (entry): entry is Extract<TimelineEntry, { kind: "question" }> =>
+      entry.kind === "question" && entry.state === "waiting",
+  );
   const lastPlan = timeline.findLast((entry) => entry.kind === "plan");
 
   useEffect(() => {
@@ -125,15 +136,17 @@ export function ConversationView(props: {
     return () => clearTimeout(timer);
   }, [timeline.length, working]);
 
-  const run = async (key: string, job: () => Promise<unknown>) => {
-    if (props.demo) return;
+  const run = async (key: string, job: () => Promise<unknown>): Promise<boolean> => {
+    if (props.demo) return false;
     setBusyCard(key);
     setProblem(null);
     try {
       await job();
       await thread.refresh();
+      return true;
     } catch (cause) {
       setProblem(plainFailure(cause));
+      return false;
     } finally {
       setBusyCard(null);
     }
@@ -188,14 +201,26 @@ export function ConversationView(props: {
   };
 
   const answer = async (entry: Extract<TimelineEntry, { kind: "question" }>, value: string) => {
-    if (props.readOnly) return;
-    await run(entry.id, () =>
+    if (props.readOnly) return false;
+    const key = `${entry.requestId}:${entry.questionId}`;
+    if (!claimQuestionAnswer(answeredQuestions.current, key)) return false;
+    const saved = await run(entry.id, () =>
       answerQuestion(props.mac.transport, {
         threadId: props.threadId,
         requestId: entry.requestId,
         answers: { [entry.questionId]: value },
       }),
     );
+    if (!saved) answeredQuestions.current.delete(key);
+    return saved;
+  };
+
+  const sendAnswer = () => {
+    if (waitingQuestion !== undefined && draft.trim().length > 0)
+      void answer(waitingQuestion, draft.trim()).then((saved) => {
+        if (saved) setDraft("");
+      });
+    else void send();
   };
 
   if (projection === null) {
@@ -304,9 +329,10 @@ export function ConversationView(props: {
           inputRef={input}
           value={draft}
           onChange={setDraft}
-          onSend={send}
+          onSend={sendAnswer}
           sending={sending}
           working={working}
+          waitingForAnswer={waitingQuestion !== undefined}
           mode={mode}
           voiceAllowed={props.voiceAllowed === true}
           onStop={() => run("stop", () => stopConversation(props.mac.transport, props.threadId))}
@@ -461,7 +487,13 @@ function TimelineCard(props: {
             symbol="questionmark.bubble.fill"
             color={theme.color.accent}
             title="Sam has a question"
-            subtitle={entry.state === "waiting" ? "Pick an answer" : "Answered"}
+            subtitle={
+              entry.state === "waiting"
+                ? "Pick an answer"
+                : entry.state === "answered"
+                  ? "Answered"
+                  : "This one ended"
+            }
           />
           <Txt>{entry.question}</Txt>
           {entry.state === "waiting" && !props.readOnly ? (
@@ -476,10 +508,6 @@ function TimelineCard(props: {
                 />
               ))}
             </View>
-          ) : entry.state === "answered" ? (
-            <Txt variant="footnote" tone="label2">
-              Answered
-            </Txt>
           ) : null}
         </Card>
       );
@@ -737,14 +765,16 @@ function Composer(props: {
   readonly onSend: () => void;
   readonly sending: boolean;
   readonly working: boolean;
+  readonly waitingForAnswer: boolean;
   readonly mode: "reply" | "change-plan";
   readonly voiceAllowed: boolean;
   readonly onStop: () => void;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const placeholder =
-    props.mode === "change-plan"
+  const placeholder = props.waitingForAnswer
+    ? "Type an answer for Sam…"
+    : props.mode === "change-plan"
       ? "What should be different? (“skip step 3”)"
       : props.working
         ? "Add a note while it works…"
@@ -764,7 +794,11 @@ function Composer(props: {
         backgroundColor: theme.color.cardRaised,
       }}
     >
-      {props.working ? (
+      {props.waitingForAnswer ? (
+        <Txt variant="footnote" tone="label2" style={{ maxWidth: 140, paddingBottom: 8 }}>
+          Sam is waiting for your answer
+        </Txt>
+      ) : props.working ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Stop"

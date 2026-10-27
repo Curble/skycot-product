@@ -1,5 +1,6 @@
 // nondev-seam: skycot-ipad-child-makes
 // nondev-seam: skycot-iphone-q39-child-home
+// nondev-seam: skycot-iphone-q50-home-copy
 /**
  * A child's Home: the greeting, "What shall we make?" starter cards, Just ask, their own
  * conversations (from every linked Mac, each labelled by its Mac when there are several), and
@@ -165,7 +166,7 @@ export function ChildHome() {
         <Txt variant="title3">What shall we make?</Txt>
         <Txt variant="subheadline" tone="label2">
           Tap a card, change the words if you like, then press Send. {BUILDER_NAME} shows you a plan
-          first.
+          for big things.
         </Txt>
       </View>
       <View

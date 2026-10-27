@@ -1,11 +1,12 @@
 // nondev-seam: skycot-iphone-q39-conversation-labels-test
+// nondev-seam: skycot-iphone-q50-place-name-test
 // Just ask, one space per child, in the app: a child's own space counts as Questions (so it is
 // never listed as a project to pick), and each space is named for whoever holds the device.
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ProjectShell } from "../engine/types";
 import {
-  childProjectTitle,
+  childPlaceName,
   childStatusLabel,
   isQuestionsProject,
   projectTitleFor,
@@ -33,7 +34,7 @@ describe("Questions spaces in the app", () => {
   });
 
   it("a child's device says Questions for theirs, Earlier questions for the shared one", () => {
-    expect(projectTitleFor(AVAS, childDevice, ROOT)).toBe("Questions");
+    expect(projectTitleFor(AVAS, childDevice, ROOT)).toBe("My project");
     expect(projectTitleFor(SHARED, childDevice, ROOT)).toBe("Earlier questions");
     expect(projectTitleFor(SITE, childDevice, ROOT)).toBe("Our site");
     expect(
@@ -65,9 +66,10 @@ describe("a child's conversation status", () => {
   });
 
   it("keeps folder and computer names out of child project labels", () => {
-    expect(childProjectTitle("Hello Ava Page", "Mark's Mac")).toBe("Hello Ava Page");
-    expect(childProjectTitle("Mark's Mac", "Mark's Mac")).toBe("My project");
-    expect(childProjectTitle("skycot-wt-device")).toBe("My project");
-    expect(childProjectTitle(" ")).toBe("My project");
+    expect(childPlaceName("Hello Ava Page", "Mark's Mac")).toBe("Hello Ava Page");
+    expect(childPlaceName("Mark's Mac", "Mark's Mac")).toBe("My project");
+    expect(childPlaceName("skycot-wt-device")).toBe("My project");
+    expect(childPlaceName("Questions")).toBe("Questions");
+    expect(childPlaceName(" ")).toBe("My project");
   });
 });

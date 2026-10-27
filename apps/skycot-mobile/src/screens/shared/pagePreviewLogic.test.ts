@@ -1,5 +1,6 @@
 // nondev-seam: skycot-mobile-page-logic-test
 // nondev-seam: skycot-iphone-q39-page-copy-test
+// nondev-seam: skycot-iphone-q50-page-logic-test
 import { describe, expect, it } from "vite-plus/test";
 import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 
@@ -16,6 +17,7 @@ import {
   pageThing,
   pageLooksWrong,
   pageToolbarCopy,
+  pageFullScreenState,
   playableCopy,
   parsePageDiagnostic,
   playNoticeCopy,
@@ -253,5 +255,24 @@ describe("the sealed page viewer", () => {
       extraButtons: "More",
       help: "Help",
     });
+  });
+
+  it("lets the viewer own full screen when the shell has no controls", () => {
+    expect(pageFullScreenState(false, false, false)).toBe(false);
+    expect(pageFullScreenState(true, false, false)).toBe(true);
+    expect(pageFullScreenState(false, true, true)).toBe(true);
+  });
+
+  it("explains a blocked internet attempt in the help sheet", () => {
+    const copy = diagnosticSheetCopy(
+      parsePageDiagnostic(
+        { skycot: "diag", entries: [{ kind: "policy", text: "img-src blocked images.example" }] },
+        EMPTY_PAGE_DIAGNOSTICS,
+      ),
+      true,
+    );
+    expect(copy.lines.join(" ")).toContain(
+      "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
+    );
   });
 });

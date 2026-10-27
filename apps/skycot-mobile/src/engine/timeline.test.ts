@@ -1,12 +1,28 @@
 // nondev-seam: skycot-iphone-q39-timeline-test
+// nondev-seam: skycot-iphone-q50-timeline-test
 import { describe, expect, it } from "vite-plus/test";
 
 import { demoConversation } from "../dev/demoConversation";
-import { buildTimeline, isWorking } from "./timeline";
+import { buildTimeline, claimQuestionAnswer, isWorking, planDisplayState } from "./timeline";
 
 const context = { projectRoot: "/Users/family/SKYCOT/Space game", assistantName: "Sam" };
 
 describe("a conversation as SKYCOT's cards", () => {
+  it("keeps a plan ready for a question, building during work, then done or changed", () => {
+    expect(planDisplayState("active", false, false)).toBe("ready");
+    expect(planDisplayState("completed", true, false)).toBe("building");
+    expect(planDisplayState("completed", false, false)).toBe("done");
+    expect(planDisplayState("active", true, true)).toBe("ready");
+    expect(planDisplayState("superseded", false, false)).toBe("replaced");
+  });
+
+  it("claims each question answer once while allowing a different question", () => {
+    const answered = new Set<string>();
+    expect(claimQuestionAnswer(answered, "request-1:q1")).toBe(true);
+    expect(claimQuestionAnswer(answered, "request-1:q1")).toBe(false);
+    expect(claimQuestionAnswer(answered, "request-1:q2")).toBe(true);
+  });
+
   it("shows a plan waiting for Build it", () => {
     const entries = buildTimeline(demoConversation("plan"), context);
     expect(entries.map((entry) => entry.kind)).toEqual(["me", "plan"]);

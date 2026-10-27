@@ -23,10 +23,11 @@ import * as CheckpointDiffQuery from "../../checkpointing/CheckpointDiffQuery.ts
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
+// nondev-seam: skycot-iphone-q50-fridge-title-engine
 import { pageOf } from "../family-recap/recap.ts";
 import { loadThread } from "../family-recap/threads.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
-import { fridgeItems, type FridgeItem } from "./fridge.ts";
+import { fridgeItems, fridgePageTitle, type FridgeItem } from "./fridge.ts";
 import { MAX_ASSET_BYTES, MAX_PAGE_BYTES, selfContainedPage } from "./thumbnail.ts";
 import {
   cachedThumbnail,
@@ -184,7 +185,29 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
       });
       if (loaded !== null) threads.push(loaded);
     }
-    return fridgeItems(threads, yield* owners, pins);
+    const items = fridgeItems(threads, yield* owners, pins);
+    return yield* Effect.forEach(items, (item) =>
+      Effect.gen(function* () {
+        const root = yield* fs.realPath(item.cwd).pipe(Effect.orElseSucceed(() => null));
+        if (root === null) return item;
+        const relativePage = path.isAbsolute(item.page)
+          ? path.relative(root, item.page)
+          : item.page;
+        const pagePath = path.join(root, relativePage);
+        const realPage = yield* fs.realPath(pagePath).pipe(Effect.orElseSucceed(() => null));
+        if (realPage === null || (realPage !== root && !realPage.startsWith(`${root}${path.sep}`)))
+          return item;
+        const info = yield* fs.stat(realPage).pipe(Effect.orElseSucceed(() => null));
+        if (info?.type !== "File" || Number(info.size) > MAX_PAGE_BYTES) return item;
+        const source = yield* fs.readFile(realPage).pipe(Effect.orElseSucceed(() => null));
+        if (source === null) return item;
+        return {
+          ...item,
+          title: fridgePageTitle(new TextDecoder().decode(source)) ?? item.title,
+          contentHash: NodeCrypto.createHash("sha256").update(source).digest("hex"),
+        };
+      }),
+    );
   });
 
   const list: SkycotFridge["Service"]["list"] = Effect.suspend(() =>

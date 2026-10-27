@@ -17,7 +17,7 @@ export function MagnetThumb({
   readonly threadId: string;
   readonly page: string;
   /** When the page last changed, so a newer version is fetched again. */
-  readonly version: number;
+  readonly version: number | string;
   readonly title: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);

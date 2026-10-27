@@ -1,5 +1,6 @@
 // nondev-seam: skycot-mobile-page-logic
 // nondev-seam: skycot-iphone-q39-page-copy
+// nondev-seam: skycot-iphone-q50-page-logic
 import {
   MAX_PAGE_SITES,
   reportedPageLink,
@@ -32,6 +33,20 @@ export function pageToolbarCopy(childView: boolean, fullScreen: boolean) {
     extraButtons: "More",
     help: "Help",
   } as const;
+}
+
+export function pageFullScreenState(
+  local: boolean,
+  seeded: boolean | undefined,
+  shellControls: boolean,
+): boolean {
+  return shellControls ? (seeded ?? local) : local;
+}
+
+export function claimQuestionAnswer(answered: Set<string>, questionId: string): boolean {
+  if (answered.has(questionId)) return false;
+  answered.add(questionId);
+  return true;
 }
 
 export function pageThing(page: string): "game" | "card" | "page" {
@@ -311,6 +326,9 @@ export function diagnosticSheetCopy(
     else if (entry.kind === "policy") {
       const host = /\bblocked ([\w.-]+)/iu.exec(entry.text)?.[1];
       lines.push(`The ${device} stopped the ${thing} from using ${host ?? "something it needed"}.`);
+      lines.push(
+        "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
+      );
     } else if (entry.kind === "error" || entry.kind === "rejection")
       lines.push(`Something in the ${thing}'s code went wrong.`);
     else lines.push(`The ${thing} showed a warning: ${entry.text}`);
@@ -321,11 +339,11 @@ export function diagnosticSheetCopy(
     lines.splice(
       0,
       lines.length,
-      `Your ${thing} is running on this ${device}. Tell Sam what you'd like changed.`,
+      `Your ${thing} is running on this ${device}. You can keep using it.`,
     );
   while (lines.length < 3) {
     const fallback = running
-      ? [`You can keep using your ${thing}.`, "Tell Sam what you'd like to be different."][
+      ? [`You can keep using your ${thing}.`, "A grown-up can help if something is wrong."][
           lines.length - 1
         ]!
       : [

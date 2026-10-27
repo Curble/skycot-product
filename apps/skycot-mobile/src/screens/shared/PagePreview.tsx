@@ -29,6 +29,7 @@ import {
   type PlayNoticeKind,
   pageAskWaitingCopy,
   pageHasOwnGameControls,
+  pageFullScreenState,
   pageThing,
   pageToolbarCopy,
   rememberGameButtons,
@@ -38,6 +39,7 @@ import {
 
 // nondev-seam: skycot-mobile-page-preview
 // nondev-seam: skycot-iphone-q39-page-preview
+// nondev-seam: skycot-iphone-q50-page-preview
 export function PagePreview(props: {
   readonly mac: Mac;
   readonly threadId: string;
@@ -72,10 +74,15 @@ export function PagePreview(props: {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
   const [linkNotice, setLinkNotice] = useState(false);
+  const [internetNotice, setInternetNotice] = useState(false);
+  const [internetNoticeSeen, setInternetNoticeSeen] = useState(false);
   const [localFullScreen, setLocalFullScreen] = useState(false);
-  const fullScreen = props.fullScreen ?? localFullScreen;
-  const toggleFullScreen =
-    props.onToggleFullScreen ?? (() => setLocalFullScreen((current) => !current));
+  const shellControls = props.onToggleFullScreen !== undefined;
+  const fullScreen = pageFullScreenState(localFullScreen, props.fullScreen, shellControls);
+  const toggleFullScreen = () => {
+    if (shellControls) props.onToggleFullScreen?.();
+    else setLocalFullScreen((current) => !current);
+  };
   const pageKey = `${props.mac.macId}:${props.threadId}:${props.page}`;
   const [gameButtons, setGameButtons] = useState(() => gameButtonsForPage(pageKey));
   const toolbarCopy = pageToolbarCopy(props.childView, fullScreen);
@@ -92,6 +99,7 @@ export function PagePreview(props: {
     setDiagnosticsOpen(false);
     setReportCopied(false);
     setLinkNotice(false);
+    setInternetNotice(false);
     setNotice(null);
     setNoticeHosts([]);
     setSites([]);
@@ -188,7 +196,12 @@ export function PagePreview(props: {
       setLinkNotice(true);
       return;
     }
-    setSites((current) => reportedSites(data, current));
+    const nextSites = reportedSites(data, sites);
+    if (!internetNoticeSeen && nextSites.length > sites.length) {
+      setInternetNotice(true);
+      setInternetNoticeSeen(true);
+    }
+    setSites(nextSites);
     setDiagnostics((current) => parsePageDiagnostic(data, current));
   };
 
@@ -275,7 +288,7 @@ export function PagePreview(props: {
             }
             onPress={toggleFullScreen}
           />
-          {play !== null ? (
+          {play !== null && (thing === "game" || pageHasOwnGameControls(play.html ?? "")) ? (
             <Pressable
               accessibilityRole="switch"
               accessibilityLabel={toolbarCopy.extraButtons}
@@ -457,7 +470,7 @@ export function PagePreview(props: {
             ))}
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10 }}>
               <Button
-                title={reportCopied ? "Copied" : "Copy details"}
+                title={reportCopied ? "Copied" : "Copy for a grown-up"}
                 kind="plain"
                 onPress={() => {
                   void Clipboard.setStringAsync(report).then(() => setReportCopied(true));
@@ -483,6 +496,15 @@ export function PagePreview(props: {
           style={{ position: "absolute", top: insets.top + 58, left: 12, right: 12, zIndex: 3 }}
         >
           <Banner tone={answerLabel.endsWith("said yes") ? "success" : "info"} text={answerLabel} />
+        </View>
+      ) : null}
+      {internetNotice ? (
+        <View style={{ position: "absolute", top: insets.top + 8, left: 12, right: 12, zIndex: 4 }}>
+          <Banner
+            tone="info"
+            text="This page tried to get something from the internet. A grown-up can allow it on the Mac."
+            action={{ title: "Got it", onPress: () => setInternetNotice(false) }}
+          />
         </View>
       ) : null}
       {noticeCopy !== null ? (

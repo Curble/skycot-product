@@ -1,4 +1,5 @@
 // nondev-seam: skycot-iphone-q39-conversation-labels
+// nondev-seam: skycot-iphone-q50-place-name
 /**
  * Every conversation this device may see, from every linked Mac, in one list. Each row says
  * which Mac it lives on: conversations are never copied between Macs, they are shown side by
@@ -81,19 +82,20 @@ export function projectTitleFor(
   const space = project === null ? null : questionsSpaceOf(project.workspaceRoot, questionsRoot);
   if (space === null)
     return mac.me.kind === "child"
-      ? childProjectTitle(project?.title, mac.macName)
+      ? childPlaceName(project?.title, mac.macName)
       : (project?.title ?? "A project");
-  return questionsSpaceLabel(space, {
+  const label = questionsSpaceLabel(space, {
     childDevice: mac.me.kind === "child",
     // A linked device exists only while the Family profile is on.
     familyOn: true,
     nameOf: () => null,
     title: project?.title,
   });
+  return label === "Questions" && mac.me.kind === "child" ? childPlaceName(null) : label;
 }
 
 /** Folder and computer labels are for grown-ups; children see names made for their projects. */
-export function childProjectTitle(title: string | null | undefined, computerName?: string): string {
+export function childPlaceName(title: string | null | undefined, computerName?: string): string {
   const clean = title?.trim();
   if (
     !clean ||
@@ -103,6 +105,8 @@ export function childProjectTitle(title: string | null | undefined, computerName
     return "My project";
   return clean;
 }
+
+export const childProjectTitle = childPlaceName;
 
 export function conversationRows(
   macs: ReadonlyArray<Mac>,

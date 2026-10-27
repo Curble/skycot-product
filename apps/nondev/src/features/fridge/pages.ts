@@ -22,7 +22,7 @@ export function parseMagnetPage(body: unknown): { readonly html: string | null }
 export function readMagnetPage(input: {
   readonly threadId: string;
   readonly page: string;
-  readonly version: number;
+  readonly version: number | string;
 }): Promise<MagnetPage> {
   const key = `${input.threadId}\n${input.page}\n${input.version}`;
   const known = cache.get(key);

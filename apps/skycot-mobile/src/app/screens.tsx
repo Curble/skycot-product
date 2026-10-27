@@ -2,6 +2,7 @@
  * Route wrappers shared by both modes: they read the route's params, find the Mac, and render
  * the screen. Kept apart from the screens so a screen never knows about navigation params.
  */
+// nondev-seam: skycot-iphone-q50-page-fullscreen
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { use, useCallback, useMemo } from "react";
@@ -92,10 +93,12 @@ export function PageRoute() {
       threadId={route.params.threadId}
       page={route.params.page}
       childView={mode === "child"}
-      fullScreen={shellHeader?.fullScreen === true}
       onDone={() => navigation.goBack()}
       {...(shellHeader?.toggleFullScreen
-        ? { onToggleFullScreen: shellHeader.toggleFullScreen }
+        ? {
+            fullScreen: shellHeader.fullScreen === true,
+            onToggleFullScreen: shellHeader.toggleFullScreen,
+          }
         : {})}
       onTellSam={
         mode === "child"

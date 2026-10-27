@@ -56,7 +56,7 @@ export function FridgeMagnet({
         <MagnetThumb
           threadId={item.threadId}
           page={item.page}
-          version={item.madeAt}
+          version={item.contentHash ?? String(item.madeAt)}
           title={title}
         />
       </button>
