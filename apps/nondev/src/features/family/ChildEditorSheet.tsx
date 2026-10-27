@@ -11,6 +11,7 @@ import { Sheet } from "../../ui/Sheet";
 import { Switch } from "../../ui/Switch";
 import { TextField } from "../../ui/TextField";
 import { useThemes } from "../../themes/store";
+import { READING_BANDS } from "./children";
 import { speechService } from "../voice/browser";
 import { whereChildVoiceGoes } from "../voice/copy";
 import {
@@ -29,7 +30,6 @@ import {
   DEFAULT_VOICE,
   NO_LIMITS,
   DEFAULT_READING_LEVEL,
-  READING_LEVELS,
   POSE_NAMES,
   type ChildAvatar as Avatar,
   type FamilyChild,
@@ -347,9 +347,9 @@ export function ChildEditorSheet({
                 change({ readingLevel: event.currentTarget.value as ReadingLevel })
               }
             >
-              {READING_LEVELS.map((level, index) => (
-                <option key={level} value={level}>
-                  {["Little makers (5–7)", "Makers (8–10)", "Big makers (11–13)"][index]}
+              {READING_BANDS.map((band) => (
+                <option key={band.value} value={band.value}>
+                  {band.label}
                 </option>
               ))}
             </select>

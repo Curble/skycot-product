@@ -9,6 +9,7 @@ import { useSyncExternalStore } from "react";
 import { familyApi, request } from "../family/api";
 import { grownUpSessionFor, readGrownUpSessionId } from "../family/grownUpSession";
 
+import { isSetupOpen } from "../onboarding/onboarding";
 import { applySession, readFamilyView } from "../family/store";
 import type { FamilyResult } from "../family/family";
 import { parseLimitState, type LimitState, type SessionLimits } from "./limits";
@@ -147,7 +148,10 @@ export async function heartbeat(): Promise<void> {
   if (!readFamilyView().enabled) return;
   // A grown-up using the shared Mac: their minutes are not the child's.
   const grownUp = grownUpSessionFor(readGrownUpSessionId(), readFamilyView(), Date.now()) !== null;
-  const result = await familyApi.heartbeat({ active: !grownUp && active(Date.now()) });
+  // Nor are the minutes while the welcome steps are open: the grown-up is setting up, not the child.
+  const result = await familyApi.heartbeat({
+    active: !grownUp && !isSetupOpen() && active(Date.now()),
+  });
   if (result.ok) applySessionLimits(result.value);
 }
 

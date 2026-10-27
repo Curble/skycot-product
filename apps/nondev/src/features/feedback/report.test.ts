@@ -40,13 +40,13 @@ describe("buildReport", () => {
     expect(report).toContain("line-10");
     expect(report).toContain("line-29");
   });
-  it("says so when there are no engine messages", () => {
+  it("says so when there are no recent messages", () => {
     const report = buildReport({
       type: "idea",
       message: "x",
       details: { ...details, logLines: [] },
     });
-    expect(report).toContain("Recent engine messages: none");
+    expect(report).toContain("Recent messages from SKYCOT on this Mac: none");
   });
 });
 

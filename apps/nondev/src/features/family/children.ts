@@ -35,6 +35,19 @@ export interface ChildVoice {
 
 export const READING_LEVELS = ["little-makers", "makers", "big-makers"] as const;
 export type ReadingLevel = (typeof READING_LEVELS)[number];
+
+/**
+ * The one tap on "Who is this for?": how simply Sam explains. Only the band is kept (the
+ * engine's existing reading level); no age number is asked for, stored or sent to the AI.
+ */
+export const READING_BANDS: ReadonlyArray<{
+  readonly value: ReadingLevel;
+  readonly label: string;
+}> = [
+  { value: "little-makers", label: "Little makers (5–7)" },
+  { value: "makers", label: "Makers (8–10)" },
+  { value: "big-makers", label: "Big makers (11+)" },
+];
 export const DEFAULT_READING_LEVEL: ReadingLevel = "makers";
 
 export interface FamilyChild {

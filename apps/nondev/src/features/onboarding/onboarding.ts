@@ -96,18 +96,7 @@ export function canContinue(
   return true;
 }
 
-/**
- * The one tap on "Who is this for?": how simply Sam explains. Only the band is kept (the
- * engine's existing reading level); no age number is asked for, stored or sent to the AI.
- */
-export const READING_BANDS: ReadonlyArray<{
-  readonly value: ReadingLevel;
-  readonly label: string;
-}> = [
-  { value: "little-makers", label: "Little makers (5–7)" },
-  { value: "makers", label: "Makers (8–10)" },
-  { value: "big-makers", label: "Big makers (11+)" },
-];
+export { READING_BANDS } from "../family/children";
 
 export const GROWN_UP_UNTIL_DONE = "You're in grown-up mode until you press Done.";
 

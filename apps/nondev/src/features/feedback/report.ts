@@ -16,7 +16,7 @@ export type FeedbackType = (typeof FEEDBACK_TYPES)[number]["id"];
 export const READING_LEVEL_NAMES: Readonly<Record<ReadingLevel, string>> = {
   "little-makers": "Little makers (5–7)",
   makers: "Makers (8–10)",
-  "big-makers": "Big makers (11–13)",
+  "big-makers": "Big makers (11+)",
 };
 
 export interface FeedbackDetails {
@@ -49,8 +49,8 @@ export function detailLines(
     .map((line) => removeNames(redactForFeedback(line), childNames).trim())
     .filter((line) => line.length > 0);
   return log.length === 0
-    ? [...lines, "Recent engine messages: none"]
-    : [...lines, "Recent engine messages:", ...log.map((line) => `  ${line}`)];
+    ? [...lines, "Recent messages from SKYCOT on this Mac: none"]
+    : [...lines, "Recent messages from SKYCOT on this Mac:", ...log.map((line) => `  ${line}`)];
 }
 
 export function feedbackSubject(type: FeedbackType): string {

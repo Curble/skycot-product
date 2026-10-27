@@ -5,7 +5,7 @@
 /* ---- Set-up form ------------------------------------------------------- */
 .fm-grown-up-bar {
   position: fixed;
-  z-index: 50;
+  z-index: 49; /* one below .fm-sheet-backdrop (50) so setup and other sheets cover the pill */
   top: 10px;
   left: 50%;
   display: flex;
