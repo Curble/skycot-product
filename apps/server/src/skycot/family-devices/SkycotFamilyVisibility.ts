@@ -246,7 +246,21 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
         return stream.pipe(
           Stream.mapEffect((item) =>
             childViewFor(sessionId).pipe(
-              Effect.map((view) => (view === null ? item : filter(view, item))),
+              Effect.flatMap((view) => {
+                const kept = view === null ? item : filter(view, item);
+                if (item.kind !== "snapshot") return Effect.succeed(kept);
+                // One line per list sent, so a child seeing too much can be traced to its cause.
+                return Effect.logInfo("skycot-family.shell-filtered", {
+                  sessionId,
+                  child: view?.childId ?? null,
+                  shared: view?.sharedSession ?? false,
+                  threads: item.snapshot.threads.length,
+                  projects: item.snapshot.projects.length,
+                  keptThreads: kept?.kind === "snapshot" ? kept.snapshot.threads.length : null,
+                  keptProjects: kept?.kind === "snapshot" ? kept.snapshot.projects.length : null,
+                  ownedProjects: view === null ? null : Object.keys(view.owners.projects).length,
+                }).pipe(Effect.as(kept));
+              }),
             ),
           ),
           Stream.filter((item): item is OrchestrationV2ShellStreamItem => item !== null),
