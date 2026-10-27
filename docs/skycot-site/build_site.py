@@ -333,7 +333,7 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 '''
 
 SITE = "https://skycot.com"
-LAST_UPDATED = "26 October 2026"
+LAST_UPDATED = "28 October 2026"
 H1 = "The family-friendly AI developer."
 LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
         "Plain English, on your own Mac, with the AI you already pay for.")
@@ -470,7 +470,7 @@ IC_PAW = ic('<circle cx="7" cy="10" r="1.8"/><circle cx="11" cy="6.5" r="1.8"/><
 IC_KEY = ic('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>')
 
 # One alt text for the hero (light: Home by day, Family profile on for a sample child; dark: Home at dusk).
-HERO_ALT = ("An early build of SKYCOT's Home in the Workshop look: SKYCOT the cloud waves beside \"SKYCOT says hello\" "
+HERO_ALT = ("SKYCOT's Home in the Workshop look: SKYCOT the cloud waves beside \"SKYCOT says hello\" "
             "and a good-afternoon greeting, a sticky-note tip sits on the right, and the crew Sam, who builds things, "
             "and Mo, who checks before anything goes live, sit in the sidebar under a sample café website project.")
 
@@ -590,7 +590,7 @@ def new_for_families():
   <div class="fgrid">
     {feature_cards(FEATURES_GROWNUPS)}
   </div></div>
-  <p class="fine center" style="margin:28px auto 0">Screens from SKYCOT’s early-access build, with sample children called Ava and Leo. The free Mac beta is ready to download.</p>
+  <p class="fine center" style="margin:28px auto 0">Screens from SKYCOT’s beta build, with sample children called Ava and Leo. The free Mac beta is ready to download.</p>
 </div></section>
 '''
 
@@ -609,7 +609,7 @@ def home_body():
   <div class="hero-tail">
   <div class="frame"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.jpg" width="1200" height="707"><img src="assets/hero.jpg" width="1200" height="707" alt="{html.escape(HERO_ALT)}"></picture></div>
   </div>
-  <p class="caption">Early build: Home in the Workshop look, SKYCOT's default. Light mode shows it by day with the Family profile on for a sample child called Ava; dark mode shows it at dusk.</p>
+  <p class="caption">Beta build: Home in the Workshop look, SKYCOT's default. Light mode shows it by day with the Family profile on for a sample child called Ava; dark mode shows it at dusk.</p>
 </div></section>
 '''
     body = f'''
@@ -859,8 +859,8 @@ PRIVACY = f'''{nav(True)}
   <h2>3. The website, skycot.com</h2>
   <p>The site is a set of plain pages served by Cloudflare. The cloud on the site switches between day and dusk using your device's own clock and time zone, worked out in your browser; nothing about that is sent anywhere. We set no cookies and run no advertising. To see how many people visit and which pages help, we use Cloudflare Web Analytics: a small script from Cloudflare that counts page views and records the page, the site that linked you here, your browser and device type, your country and how fast the page loaded. It sets no cookies, doesn't build a profile of you and doesn't follow you to other sites; we only see totals, never who you are. Cloudflare, like any host, processes the technical details of each request (such as IP address and browser type) to deliver the page and protect the site, and it may ask your browser to report failed connections so that network problems can be fixed; see Cloudflare's privacy policy for how they handle that. We do not combine it with anything else.</p>
 
-  <h2>4. Email, Discord and early access</h2>
-  <p>If you email us to be notified when SKYCOT is ready, we keep your email address for that purpose only, email you when it is, and delete the list afterwards unless you ask to stay in touch. Other emails are kept for as long as we need them to help you and to keep ordinary business records, and are then deleted. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
+  <h2>4. Email and Discord</h2>
+  <p>If you email us (for example beta feedback sent from Settings → Help &amp; feedback, which only ever leaves your Mac when you press Send in your own email app), we keep the email for as long as we need it to help you and to keep ordinary business records, and then delete it. Emails are kept for as long as we need them to help you and to keep ordinary business records, and are then deleted. Our email runs on Google Workspace. Our community runs on Discord, a separate company with its own privacy policy; what you post there is governed by it.</p>
 
   <h2>5. Companies that handle information for us</h2>
   <ul>
@@ -893,11 +893,11 @@ write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your informa
 TERMS = f'''{nav(True)}
 <main class="doc"><div class="narrow">
   <h1>Terms of use</h1>
-  <p class="meta">Last updated {LAST_UPDATED} · early access</p>
+  <p class="meta">Last updated {LAST_UPDATED} · beta</p>
   <p>These terms cover the SKYCOT app and the skycot.com website, made by Curble Pty Ltd ("we", "us"), Melbourne, Australia. By installing or using SKYCOT you agree to them. If you use SKYCOT for a business, you agree to them on its behalf and confirm you are allowed to. Plain-English summaries appear in italics and are not part of the terms.</p>
 
   <h2>1. What SKYCOT is</h2>
-  <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It has no account of its own: you do not sign up with us to use it. It is in early access: features may change, be incomplete, contain mistakes, lose work or stop working between versions, so do not rely on SKYCOT as the only copy of anything important. <em>Summary: it is new, and we say so.</em></p>
+  <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It has no account of its own: you do not sign up with us to use it. It is a beta: features may change, be incomplete, contain mistakes, lose work or stop working between versions, so do not rely on SKYCOT as the only copy of anything important. <em>Summary: it is new, and we say so.</em></p>
 
   <h2>2. Who can use SKYCOT</h2>
   <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer, signed in to that adult's own AI account, and under that adult's supervision; we recommend turning on the Family profile first. The adult accepts these terms for the child and is responsible for that use, including what the child asks the assistant to do and anything put online. A child does not need, and should not create, an account with us or with an AI service in order to use SKYCOT.</p>
@@ -913,10 +913,10 @@ TERMS = f'''{nav(True)}
   <p>Do not use SKYCOT to break the law or anyone's rights; to access systems or data you are not entitled to; to spread malicious software or attack other systems; to harass, deceive or defraud anyone; to get around the terms, limits or safeguards of the assistants you connect; or to claim that an assistant's output was made or endorsed by us. Do not remove or alter the open-source and copyright notices in the app.</p>
 
   <h2>6. Licence to use SKYCOT</h2>
-  <p>SKYCOT is based on T3 Code, © T3 Tools Inc., licensed under the MIT licence; that licence continues to apply to that code and is reproduced in the app and on our <a href="/open-source">open source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. Our own additions are licensed to you for your use of SKYCOT under these terms during early access. The SKYCOT name and marks are ours and are not covered by the MIT licence. <em>Summary: the engine is open source; the SKYCOT name is ours.</em></p>
+  <p>SKYCOT is based on T3 Code, © T3 Tools Inc., licensed under the MIT licence; that licence continues to apply to that code and is reproduced in the app and on our <a href="/open-source">open source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. Our own additions are licensed to you for your use of SKYCOT under these terms during the beta. The SKYCOT name and marks are ours and are not covered by the MIT licence. <em>Summary: the engine is open source; the SKYCOT name is ours.</em></p>
 
   <h2>7. Price</h2>
-  <p>SKYCOT is free during early access. You pay your AI provider, and anyone else whose service you use with SKYCOT, under their own terms. If we introduce a price, we will show it before it applies, and you will not be charged unless you agree to it.</p>
+  <p>SKYCOT is free during the beta. You pay your AI provider, and anyone else whose service you use with SKYCOT, under their own terms. If we introduce a price, we will show it before it applies, and you will not be charged unless you agree to it.</p>
 
   <h2>8. Privacy</h2>
   <p>How we handle information is explained on our <a href="/privacy">privacy page</a>, which forms part of these terms.</p>
@@ -928,10 +928,10 @@ TERMS = f'''{nav(True)}
   <p>The app checks for updates and may offer or install them. We may change or withdraw features, and we may change these terms; the new version will be posted here with its date, and continued use after that date means you accept it. If a change materially affects you, we will also say so in the app where we reasonably can.</p>
 
   <h2>11. Australian Consumer Law and warranties</h2>
-  <p>Nothing in these terms excludes, restricts or modifies any guarantee, right or remedy you have under the Australian Consumer Law or other law that cannot be excluded. Subject to that, SKYCOT is provided "as is" and "as available" during early access, without warranties of any kind, express or implied, including fitness for a particular purpose, and we do not warrant that it, or anything an AI assistant produces through it, will be uninterrupted, secure, accurate or error-free. This includes the optional SKYCOT Relay: its encryption follows the open Noise protocol standard but has not been independently audited, and we do not guarantee that it is secure. <em>Summary: your legal consumer rights stay; beyond those, early-access software comes with no promises.</em></p>
+  <p>Nothing in these terms excludes, restricts or modifies any guarantee, right or remedy you have under the Australian Consumer Law or other law that cannot be excluded. Subject to that, SKYCOT is provided "as is" and "as available" during the beta, without warranties of any kind, express or implied, including fitness for a particular purpose, and we do not warrant that it, or anything an AI assistant produces through it, will be uninterrupted, secure, accurate or error-free. This includes the optional SKYCOT Relay: its encryption follows the open Noise protocol standard but has not been independently audited, and we do not guarantee that it is secure. <em>Summary: your legal consumer rights stay; beyond those, early-access software comes with no promises.</em></p>
 
   <h2>12. Limitation of liability</h2>
-  <p>To the extent permitted by law, we are not liable for any loss of data, loss of profit, business interruption, or indirect or consequential loss arising from your use of SKYCOT or of any AI assistant used with it, and our total liability for any claim is limited to the amount you paid us for SKYCOT in the twelve months before the claim (which during free early access is nil) or, where the law requires a remedy, to re-supplying the software.</p>
+  <p>To the extent permitted by law, we are not liable for any loss of data, loss of profit, business interruption, or indirect or consequential loss arising from your use of SKYCOT or of any AI assistant used with it, and our total liability for any claim is limited to the amount you paid us for SKYCOT in the twelve months before the claim (which during the free beta is nil) or, where the law requires a remedy, to re-supplying the software.</p>
 
   <h2>13. Ending</h2>
   <p>You can stop using SKYCOT at any time by deleting it; your files remain yours and on your Mac. We may end your right to use SKYCOT if you breach these terms. The parts of these terms that by their nature should continue after that (including the licence notices, sections 11 and 12, and governing law) continue.</p>
@@ -968,12 +968,12 @@ OSS = f'''{nav()}
   </ul>
 
   <h2 id="themes">Themes are open</h2>
-  <p>Every SKYCOT theme is a plain data file: a short list of colours, a few "flavour" choices (borders, headings, tip cards, button shape, motion) and optional crew names. A theme contains no code, and you can read one in any text editor. The four themes that ship with SKYCOT (Workshop, the default, plus Classic, Paper and Night Ops) are published with the app, and the format will be documented alongside the first download.</p>
-  <p>Community themes are welcome. Duplicate a theme in Settings → Appearance, edit it, export it, and contribute it through the SKYCOT repository (the address will be published here with the first download) or by email to <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. Themes we include are credited to their author. A theme changes how SKYCOT looks, never what it does: the permission, undo and publish moments stay plain in every theme.</p>
+  <p>Every SKYCOT theme is a plain data file: a short list of colours, a few "flavour" choices (borders, headings, tip cards, button shape, motion) and optional crew names. A theme contains no code, and you can read one in any text editor. The four themes that ship with SKYCOT (Workshop, the default, plus Classic, Paper and Night Ops) are published with the app, and the format will be documented here.</p>
+  <p>Community themes are welcome. Duplicate a theme in Settings → Appearance, edit it, export it, and contribute it through the SKYCOT repository (the address will be published here) or by email to <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. Themes we include are credited to their author. A theme changes how SKYCOT looks, never what it does: the permission, undo and publish moments stay plain in every theme.</p>
 
   <h2>Third-party licences</h2>
-  <p>SKYCOT bundles many other open-source packages (for example React, Electron and the libraries T3 Code depends on), each under its own licence, mostly MIT, Apache 2.0, BSD and ISC. The complete list, with each licence text and copyright holder, is generated at build time and included in every download; in the app it is under Settings → About → Open-source licences. A copy for the current public version will be published at this address when the first download is released.</p>
-  <p>The AI assistants SKYCOT works with (Claude Code, Codex, Cursor, Gemini and Antigravity) are separate products that you install and sign in to under their owners' terms. They are not part of SKYCOT and are not open source unless their owners say so.</p>
+  <p>SKYCOT bundles many other open-source packages (for example React, Electron and the libraries T3 Code depends on), each under its own licence, mostly MIT, Apache 2.0, BSD and ISC. The complete list, with each licence text and copyright holder, is generated at build time and included in every download; in the app it is under Settings → About → Open-source licences. A copy for the current public version will be published at this address.</p>
+  <p>The AI assistants SKYCOT works with (Codex from ChatGPT, Antigravity from Google, Claude Code, Cursor and others) are separate products that you install and sign in to under their owners' terms. They are not part of SKYCOT and are not open source unless their owners say so.</p>
 
   <h2>Reporting a problem</h2>
   <p>If you believe an attribution is missing or wrong, email <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a> and we will fix it.</p>
