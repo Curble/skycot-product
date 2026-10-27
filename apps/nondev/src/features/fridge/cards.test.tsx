@@ -7,7 +7,7 @@ vi.mock("../family/api", () => ({ callEngine, FAMILY_API_PATH: "/api/skycot/fami
 vi.mock("../starters/preview", () => ({ useOfflinePreviewDocument: () => "" }));
 vi.mock("./pages", () => ({ readMagnetPage: () => new Promise(() => {}) }));
 
-import { cardImageSource, parseMagnetCard } from "./cardText";
+import { cardImageSource, cardMatColor, parseMagnetCard } from "./cardText";
 import { readMagnetCard } from "./cards";
 import { MagnetThumb, READY_TIMEOUT_MS } from "./MagnetThumb";
 
@@ -53,6 +53,14 @@ describe("fridge picture cards", () => {
     // Shown only as an image address: an image never runs the script inside it.
     expect(cardImageSource(SVG).startsWith("data:image/svg+xml;")).toBe(true);
     expect(document.querySelector("script")).toBeNull();
+  });
+
+  it("mats the tile in the card's own colour, and only a plain colour", () => {
+    expect(cardMatColor('<svg><rect width="320" height="180" rx="20" fill="#5b7cfa"/></svg>')).toBe(
+      "#5b7cfa",
+    );
+    expect(cardMatColor('<svg><rect fill="url(#x)"/></svg>')).toBeNull();
+    expect(cardMatColor("<svg></svg>")).toBeNull();
   });
 
   it("refuses an answer that is not an SVG picture", () => {

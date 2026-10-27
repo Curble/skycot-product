@@ -10,7 +10,7 @@ import { CircleHelp, FileText, Gamepad2, Gift, type LucideIcon } from "lucide-re
 import { useEffect, useRef, useState } from "react";
 
 import { useOfflinePreviewDocument } from "../starters/preview";
-import { cardImageSource } from "./cardText";
+import { cardImageSource, cardMatColor } from "./cardText";
 import { readMagnetCard, type MagnetCard } from "./cards";
 import { fridgeIcon } from "./fridge";
 import { readMagnetPage, type MagnetPage } from "./pages";
@@ -107,6 +107,7 @@ export function MagnetThumb({
           alt=""
           loading="lazy"
           src={cardImageSource(cardAnswer.svg)}
+          style={{ background: cardMatColor(cardAnswer.svg) ?? undefined }}
         />
       ) : thumbnailSvg ? (
         <img

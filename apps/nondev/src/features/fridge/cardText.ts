@@ -9,3 +9,13 @@ export function parseMagnetCard(text: string): string | null {
 export function cardImageSource(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
+
+/**
+ * The card's own background colour (its first filled rectangle), so the tile around a 16:9 card
+ * is matted in the same colour instead of dark bars. Only a plain hex colour is accepted; anything
+ * else (a url(), a gradient, nothing at all) means "no mat". The phone does the same with its tile.
+ */
+export function cardMatColor(svg: string): string | null {
+  const fill = svg.match(/<rect\b[^>]*\bfill="(#[\da-f]{3}(?:[\da-f]{3})?)"/iu)?.[1];
+  return fill ?? null;
+}
