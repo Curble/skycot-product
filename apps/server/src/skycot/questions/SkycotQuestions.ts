@@ -46,10 +46,17 @@ export const questionsRootOption = Effect.gen(function* () {
   const override = yield* Effect.serviceOption(SkycotQuestions);
   if (Option.isSome(override)) return override.value.questionsRoot;
   const config = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+  if (Option.isNone(config)) {
+    // Said once per place it is read from, so a layer built without the config shows itself.
+    yield* Effect.logWarning("skycot-questions.no-root", { missing: "server-config" });
+    return null;
+  }
+  // Where T3 keeps its Scratch project (ManagedProjectFolders: `<baseDir>/scratch`). The base
+  // dir is absolute, so a plain join does; Path is not in every layer's reach.
   const path = yield* Effect.serviceOption(Path.Path);
-  if (Option.isNone(config) || Option.isNone(path)) return null;
-  // Where T3 keeps its Scratch project (ManagedProjectFolders: `<baseDir>/scratch`).
-  return path.value.resolve(config.value.baseDir, "scratch");
+  return Option.isSome(path)
+    ? path.value.resolve(config.value.baseDir, "scratch")
+    : `${config.value.baseDir.replace(/\/+$/u, "")}/scratch`;
 });
 
 /**
