@@ -32,11 +32,18 @@ import type { MacTransport } from "../transport/MacTransport";
 import { withMacRpc } from "../transport/rpc";
 import { newId } from "./ids";
 import { SAMPLE_NEW_CONVERSATION, SAMPLE_PROVIDER } from "../sample/fixtures";
+import { SAMPLE_COMMAND_PATH } from "../sample/sampleTransport";
 import type { ShellSnapshot, ThreadProjection } from "./types";
 
 // The sample family (src/sample) has no command channel: its reads are plain requests, answered
 // from fixtures, and every command below ends in a harmless local acknowledgement.
 const inSample = (transport: MacTransport): boolean => transport.kind === "sample";
+
+/** A command in the sample: handed to the sample's own memory, never to a channel. */
+const sampleCommand = async (transport: MacTransport, body: unknown): Promise<null> => {
+  await transport.request({ method: "POST", path: SAMPLE_COMMAND_PATH, body });
+  return null;
+};
 
 export class EngineError extends Error {
   override readonly name = "EngineError";
@@ -191,7 +198,12 @@ export function sendMessage(
     readonly plan?: { readonly planId: string };
   },
 ): Promise<unknown> {
-  if (inSample(transport)) return Promise.resolve(null);
+  if (inSample(transport))
+    return sampleCommand(transport, {
+      type: "message",
+      threadId: input.threadId,
+      text: input.text,
+    });
   const threadId = ThreadId.make(input.threadId);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
@@ -220,7 +232,13 @@ export function respondToRequest(
     readonly decision: Extract<ProviderApprovalDecision, "accept" | "decline" | "cancel">;
   },
 ): Promise<unknown> {
-  if (inSample(transport)) return Promise.resolve(null);
+  if (inSample(transport))
+    return sampleCommand(transport, {
+      type: "respond",
+      threadId: input.threadId,
+      requestId: input.requestId,
+      decision: input.decision,
+    });
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
       type: "runtime-request.respond",

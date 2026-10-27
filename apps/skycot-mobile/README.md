@@ -48,18 +48,18 @@ part of SKYCOT on the Mac that runs everything. **Relay** is SKYCOT Relay (Phase
 
 ## Where things are
 
-| Folder                                      | What                                                                                                                                            |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/transport/`                            | `MacTransport`: every way to a Mac. `direct` (home Wi-Fi, Tailscale), `relay` (sealed tunnel), `failover` (relay first, then the Mac's address) |
-| `src/links/`                                | linking (Phase 1's one-use code swapped at `/oauth/token`), the keychain store, deep links                                                      |
-| `src/engine/`, `src/family/`                | the engine's reads and commands (T3's own RPC protocol), the Family routes; parsing is the plain client's own code                              |
-| `src/screens/child`, `grownup`, `shared`    | the screens; `src/app/` the shells for each mode                                                                                                |
-| `src/widgets/`, `src/activity/`             | the Live Activity (forked from T3's `AgentActivity`) and widget, and the words they show                                                        |
-| `watch/SkycotWatch/`                        | the Apple Watch app (Swift); `plugins/withSkycotWatch.cjs` adds its target at prebuild                                                          |
-| `modules/skycot-watch/`, `src/watch/`       | the iPhone side of the Watch: WatchConnectivity, the notification with Allow once / Decline, the snapshot and the Watch's messages              |
-| `modules/skycot-speech/`                    | on-device voice typing (Apple Speech, `requiresOnDeviceRecognition`)                                                                            |
-| `modules/skycot-device-key/`, `src/faceid/` | Face ID to say yes: the Secure Enclave key (Swift) and the set up / Allow once / stop steps                                                     |
-| `src/dev/`                                  | development-build demo conversations (screenshots); not reachable in the App Store build                                                        |
+| Folder                                      | What                                                                                                                                                                        |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/transport/`                            | `MacTransport`: every way to a Mac. `direct` (home Wi-Fi, Tailscale), `relay` (sealed tunnel), `failover` (relay first, then the Mac's address)                             |
+| `src/links/`                                | linking (Phase 1's one-use code swapped at `/oauth/token`), the keychain store, deep links                                                                                  |
+| `src/engine/`, `src/family/`                | the engine's reads and commands (T3's own RPC protocol), the Family routes; parsing is the plain client's own code                                                          |
+| `src/screens/child`, `grownup`, `shared`    | the screens; `src/app/` the shells for each mode                                                                                                                            |
+| `src/widgets/`, `src/activity/`             | the Live Activity (forked from T3's `AgentActivity`) and widget, and the words they show                                                                                    |
+| `watch/SkycotWatch/`                        | the Apple Watch app (Swift); `plugins/withSkycotWatch.cjs` adds its target at prebuild                                                                                      |
+| `modules/skycot-watch/`, `src/watch/`       | the iPhone side of the Watch: WatchConnectivity, the notification with Allow once / Decline, the snapshot and the Watch's messages                                          |
+| `modules/skycot-speech/`                    | on-device voice typing (Apple Speech, `requiresOnDeviceRecognition`)                                                                                                        |
+| `modules/skycot-device-key/`, `src/faceid/` | Face ID to say yes: the Secure Enclave key (Swift) and the set up / Allow once / stop steps                                                                                 |
+| `src/dev/`                                  | the recorded demo conversations (the sample family ships them in the app as sample content); the `skycot-dev://demo/…` links that open them are for development builds only |
 
 Logic is reused, not rewritten: `apps/nondev/src/plain` (approvals, changes, titles),
 `apps/nondev/src/features/{family,family-limits,fridge,recap,starters,questions,badges}` (pure

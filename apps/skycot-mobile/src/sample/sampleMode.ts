@@ -11,12 +11,19 @@ import {
   sampleMacId,
   type SampleWho,
 } from "./fixtures";
+import { activeSampleSession, endSampleSession, type SampleSession } from "./sampleSession";
 import { createSampleTransport } from "./sampleTransport";
+
+export { endSampleSession };
 
 /** The sample is offered only to a device with no real Mac: it never hides a real link. */
 export const canEnterSample = (realMacCount: number): boolean => realMacCount === 0;
 
-export function createSampleMac(who: SampleWho, clock: () => number = Date.now): Mac {
+export function createSampleMac(
+  who: SampleWho,
+  clock: () => number = Date.now,
+  session: SampleSession = activeSampleSession(),
+): Mac {
   const now = clock();
   return {
     macId: sampleMacId(who),
@@ -35,7 +42,7 @@ export function createSampleMac(who: SampleWho, clock: () => number = Date.now):
     bearerToken: "",
     relayRecord: null,
     relay: null,
-    transport: createSampleTransport(who, () => now),
+    transport: createSampleTransport(who, () => now, session),
     sample: true,
   };
 }

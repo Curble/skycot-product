@@ -18,7 +18,12 @@ import type { HomeRecord, RelayHome } from "@t3tools/skycot-relay/client/home";
 
 import type { MacTransport } from "../transport/MacTransport";
 import { closeRelayHome, relayHomeFor, waysToMac } from "../transport/ways";
-import { canEnterSample, createSampleMac, macsToShow } from "../sample/sampleMode";
+import {
+  canEnterSample,
+  createSampleMac,
+  endSampleSession,
+  macsToShow,
+} from "../sample/sampleMode";
 import type { SampleWho } from "../sample/fixtures";
 import { acceptsLink, modeOf, type DeviceMode, type LinkedMac, type MacLink } from "./pairing";
 
@@ -145,6 +150,7 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
       await save(next);
       setMacs(next);
       // Linking a real Mac ends the sample.
+      endSampleSession();
       setSampleMac(null);
       return true;
     },
@@ -170,7 +176,10 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
     },
     [realMacs.length],
   );
-  const leaveSample = useCallback(() => setSampleMac(null), []);
+  const leaveSample = useCallback(() => {
+    endSampleSession();
+    setSampleMac(null);
+  }, []);
   const sample: SampleWho | null =
     sampleMac === null ? null : sampleMac.me.kind === "child" ? "child" : "grown-up";
 

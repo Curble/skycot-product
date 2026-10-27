@@ -19,7 +19,8 @@ import {
 import { buildTimeline } from "../engine/timeline";
 import { familyApi } from "../family/api";
 import { AVA, LEO, SAMPLE_CODE_LENGTH, THREAD, isSampleMacId } from "./fixtures";
-import { createSampleMac } from "./sampleMode";
+import { createSampleMac, endSampleSession } from "./sampleMode";
+import { SAMPLE_SAM_REPLY, createSampleSession } from "./sampleSession";
 import { createSampleTransport, type SampleTransport } from "./sampleTransport";
 
 const NOW = Date.parse("2026-10-27T01:00:00Z");
@@ -27,6 +28,7 @@ const fetchSpy = vi.fn();
 const socketSpy = vi.fn();
 
 beforeEach(() => {
+  endSampleSession();
   fetchSpy.mockReset();
   socketSpy.mockReset();
   vi.stubGlobal("fetch", fetchSpy);
@@ -139,7 +141,7 @@ describe("the sample family answers reads, through the real parsers", () => {
 });
 
 describe("every write is a harmless acknowledgement", () => {
-  it("approving and declining change nothing and are only counted", async () => {
+  it("approving and declining are acknowledged and counted", async () => {
     const transport = grownUp();
     const [request] = value(await familyApi.pendingRequests(transport));
     const input = {
@@ -163,8 +165,8 @@ describe("every write is a harmless acknowledgement", () => {
       "/api/skycot/family/approver/answer",
       "/api/skycot/family/approver/answer",
     ]);
-    // Nothing actually changed: the request is still there to try again.
-    expect(value(await familyApi.pendingRequests(transport))).toHaveLength(1);
+    // The first answer settled it; the second finds nothing left to answer.
+    expect(value(await familyApi.pendingRequests(transport))).toHaveLength(0);
   });
 
   it("more time, lock everything, notes, pins and the parent code all just say yes", async () => {
@@ -251,5 +253,127 @@ describe("nothing reaches the network", () => {
     expect(mac.bearerToken).toBe("");
     expect(mac.transport.kind).toBe("sample");
     expect(isSampleMacId(mac.macId)).toBe(true);
+  });
+});
+
+describe("the sample remembers what you do, for the life of the sample", () => {
+  const answer = (transport: SampleTransport, decision: "accept" | "decline") =>
+    familyApi.pendingRequests(transport).then(async (waiting) => {
+      const [request] = value(waiting);
+      return familyApi.answerRequest(transport, {
+        threadId: request!.threadId,
+        requestId: request!.requestId,
+        fingerprint: request!.fingerprint,
+        decision,
+        proof: { type: "code", code: "1234" },
+      });
+    });
+  const soundRow = async (transport: SampleTransport) => {
+    const mac = { macId: "m", macName: "Sample", me: { kind: "grown-up" }, transport } as never;
+    const rows = conversationRows([mac], { m: { shell: await readShell(transport) } as never });
+    return rows.find((row) => row.thread.id === THREAD.sound);
+  };
+
+  it("approving settles the request, the badge and the conversation", async () => {
+    const transport = grownUp();
+    expect(value(await familyApi.pendingRequests(transport))).toHaveLength(1);
+    expect((await soundRow(transport))?.state).toBe("waiting");
+    await answer(transport, "accept");
+    expect(value(await familyApi.pendingRequests(transport))).toHaveLength(0);
+    expect((await soundRow(transport))?.state).toBe("done");
+    const projection = await readThread(transport, THREAD.sound);
+    const entries = buildTimeline(projection, { projectRoot: "/sample", assistantName: "Sam" });
+    expect(entries).not.toContainEqual(expect.objectContaining({ kind: "ask", state: "waiting" }));
+    expect(entries).toContainEqual(expect.objectContaining({ kind: "ask", state: "allowed" }));
+  });
+
+  it("declining shows as declined", async () => {
+    const transport = grownUp();
+    await answer(transport, "decline");
+    const projection = await readThread(transport, THREAD.sound);
+    const entries = buildTimeline(projection, { projectRoot: "/sample", assistantName: "Sam" });
+    expect(entries).toContainEqual(expect.objectContaining({ kind: "ask", state: "declined" }));
+  });
+
+  it("an engine yes from the conversation settles it too", async () => {
+    const transport = child();
+    const projection = await readThread(transport, THREAD.sound);
+    const pending = projection.runtimeRequests.find((r) => r.status === "pending")!;
+    await respondToRequest(transport, {
+      threadId: THREAD.sound,
+      requestId: pending.id,
+      decision: "accept",
+    });
+    expect((await soundRow(transport))?.state).toBe("done");
+    expect(value(await familyApi.pendingRequests(grownUp()))).toHaveLength(1);
+  });
+
+  it("keeps everything when the view is switched, and drops it on leaving", async () => {
+    const mac = createSampleMac("grown-up", () => NOW);
+    await answer(mac.transport as SampleTransport, "accept");
+    await familyApi.pin(mac.transport, THREAD.quiz, true);
+    const other = createSampleMac("child", () => NOW);
+    expect(value(await familyApi.pendingRequests(other.transport))).toHaveLength(0);
+    expect((await soundRow(other.transport as SampleTransport))?.state).toBe("done");
+    const back = createSampleMac("grown-up", () => NOW);
+    expect(value(await familyApi.pendingRequests(back.transport))).toHaveLength(0);
+    expect(value(await familyApi.fridge(back.transport)).every((i) => i.pinnedAt !== null)).toBe(
+      true,
+    );
+    endSampleSession();
+    const fresh = createSampleMac("grown-up", () => NOW);
+    expect(value(await familyApi.pendingRequests(fresh.transport))).toHaveLength(1);
+    expect(
+      value(await familyApi.fridge(fresh.transport)).find((i) => i.threadId === THREAD.quiz)
+        ?.pinnedAt,
+    ).toBeNull();
+  });
+
+  it("pinning adds to the fridge and taking it down removes it", async () => {
+    const transport = grownUp();
+    const quiz = async () =>
+      value(await familyApi.fridge(transport)).find((i) => i.threadId === THREAD.quiz)!;
+    expect((await quiz()).pinnedAt).toBeNull();
+    await familyApi.pin(transport, THREAD.quiz, true);
+    expect((await quiz()).pinnedAt).toBe(NOW);
+    await familyApi.pin(transport, THREAD.quiz, false);
+    expect((await quiz()).pinnedAt).toBeNull();
+  });
+
+  it("answering the family note marks it done", async () => {
+    const transport = grownUp();
+    await familyApi.answerFamilyNote(transport, { id: "sample-note-1", minutes: 15 });
+    expect(value(await familyApi.familyNotes(transport))[0]).toMatchObject({
+      status: "done",
+      answer: { minutes: 15 },
+    });
+    const other = createSampleTransport("grown-up", () => NOW);
+    expect(value(await familyApi.familyNotes(other))[0]!.status).toBe("open");
+  });
+
+  it("a message in a conversation shows the child's bubble and Sam's fixed reply", async () => {
+    const transport = child();
+    await sendMessage(transport, { threadId: THREAD.space, text: "Make it faster please" });
+    const entries = buildTimeline(await readThread(transport, THREAD.space), {
+      projectRoot: "/sample",
+      assistantName: "Sam",
+    });
+    const texts = JSON.stringify(entries);
+    expect(texts).toContain("Make it faster please");
+    expect(texts).toContain(SAMPLE_SAM_REPLY);
+    expect(entries.at(-1)).toMatchObject({ kind: "crew" });
+    expect(entries.at(-2)).toMatchObject({ kind: "me" });
+    // Another session's transport has none of it.
+    const fresh = createSampleTransport("child", () => NOW, createSampleSession());
+    expect(JSON.stringify(await readThread(fresh, THREAD.space))).not.toContain("faster please");
+  });
+
+  it("never touches the network while remembering", async () => {
+    const transport = grownUp();
+    await answer(transport, "accept");
+    await familyApi.pin(transport, THREAD.quiz, true);
+    await sendMessage(transport, { threadId: THREAD.space, text: "hi" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(socketSpy).not.toHaveBeenCalled();
   });
 });

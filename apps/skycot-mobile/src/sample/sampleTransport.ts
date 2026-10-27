@@ -1,12 +1,29 @@
 /**
  * The sample family's way "to the Mac": a `MacTransport` that answers from fixed data and
  * nothing else. It has no address, opens no socket and never calls `fetch`; every read is
- * answered from `sampleBank`, and every write is turned into a harmless local acknowledgement
- * that changes nothing and is only counted, so the screens can say what would have happened.
- * Dropping the transport (leaving the sample) drops everything it held.
+ * answered from `sampleBank` plus what the sample session remembers (an answered request, a pin,
+ * a message typed), and every write is a local acknowledgement that is only counted. The few
+ * writes that matter to what the screens show (answering a request or a note, pinning, sending a
+ * message) update the in-memory `SampleSession`; leaving the sample drops it.
  */
 import type { MacRequest, MacResponse, MacTransport } from "../transport/MacTransport";
+import type { ThreadProjection } from "../engine/types";
 import { sampleBank, type SampleWho } from "./fixtures";
+import {
+  SAMPLE_SAM_REPLY,
+  createSampleSession,
+  type SampleChatTurn,
+  type SampleDecision,
+  type SampleSession,
+} from "./sampleSession";
+
+/** The engine's commands, in the sample, arrive here (there is no channel to send them down). */
+export const SAMPLE_COMMAND_PATH = "/api/skycot/sample/command";
+
+type Loose = Record<string, any>;
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const asRecord = (value: unknown): Loose =>
+  typeof value === "object" && value !== null ? (value as Loose) : {};
 
 const FAMILY = "/api/skycot/family";
 
@@ -30,9 +47,136 @@ const notInSample = (): MacResponse => ({
 export function createSampleTransport(
   who: SampleWho,
   clock: () => number = Date.now,
+  session: SampleSession = createSampleSession(),
 ): SampleTransport {
   const bank = sampleBank(who, clock());
   const writes: Array<string> = [];
+
+  const requestsNow = () => {
+    const body = asRecord(bank.requests);
+    return {
+      ...body,
+      requests: (body.requests as Array<Loose>).filter((r) => !session.requests.has(r.requestId)),
+    };
+  };
+  const notesNow = () => ({
+    notes: (asRecord(bank.notes).notes as Array<Loose>).map((note) => {
+      const done = session.notes.get(note.id);
+      return done === undefined
+        ? note
+        : {
+            ...note,
+            status: "done",
+            answer: {
+              minutes: done.minutes,
+              by: asRecord(bank.status).grownUps?.[0]?.name ?? "A grown-up",
+              at: new Date(done.at).toISOString(),
+            },
+          };
+    }),
+  });
+  const fridgeNow = () => ({
+    ...asRecord(bank.fridge),
+    items: (asRecord(bank.fridge).items as Array<Loose>).map((item) => {
+      const pinned = session.pins.get(item.threadId);
+      if (pinned === undefined) return item;
+      return {
+        ...item,
+        pinnedAt: pinned ? (session.pinnedAt.get(item.threadId) ?? clock()) : null,
+      };
+    }),
+  });
+  const answersNow = () => ({
+    answers: [
+      ...[...session.requests].map(([requestId, decision]) => ({
+        requestId,
+        decision,
+        by: asRecord(bank.status).grownUps?.[0]?.name ?? "A grown-up",
+        at: clock(),
+      })),
+      ...(asRecord(bank.answers).answers as Array<unknown>),
+    ],
+  });
+  const threadNow = (id: string): ThreadProjection | undefined => {
+    const base = bank.threads[id];
+    if (base === undefined) return undefined;
+    const projection = clone(base) as unknown as Loose;
+    for (const request of projection.runtimeRequests as Array<Loose>) {
+      const decision = session.requests.get(request.id);
+      if (decision !== undefined && request.status === "pending") {
+        request.status = "resolved";
+        request.decision = decision;
+        request.resolvedAt = new Date(clock()).toISOString();
+      }
+    }
+    const turns = session.chats.get(id) ?? [];
+    if (turns.length > 0) {
+      const items = projection.visibleTurnItems as Array<{ position: number; item: Loose }>;
+      const userTemplate = items.find((entry) => entry.item.type === "user_message")?.item;
+      const replyTemplate = items.find((entry) => entry.item.type === "assistant_message")?.item;
+      const messageTemplate = (role: string) =>
+        (projection.messages as Array<Loose>).find((m) => m.role === role);
+      let position = Math.max(0, ...items.map((entry) => entry.position));
+      const add = (role: "user" | "assistant", turn: SampleChatTurn, text: string) => {
+        const at = new Date(turn.at).toISOString();
+        const messageId = `${turn.id}:${role}`;
+        const template = role === "user" ? userTemplate : replyTemplate;
+        const message = messageTemplate(role);
+        if (message !== undefined)
+          projection.messages.push({
+            ...clone(message),
+            id: messageId,
+            text,
+            createdAt: at,
+            updatedAt: at,
+          });
+        if (template !== undefined) {
+          const item = {
+            ...clone(template),
+            id: `${turn.id}:${role}:item`,
+            messageId,
+            text,
+            streaming: false,
+            startedAt: at,
+            completedAt: at,
+            updatedAt: at,
+          };
+          position += 1;
+          items.push({ position, item });
+          projection.turnItems.push(item);
+        }
+      };
+      for (const turn of turns) {
+        add("user", turn, turn.text);
+        add("assistant", turn, turn.reply);
+      }
+      projection.thread.updatedAt = new Date(turns.at(-1)!.at).toISOString();
+    }
+    return projection as unknown as ThreadProjection;
+  };
+  const shellNow = () => {
+    const shell = clone(bank.shell) as unknown as Loose;
+    for (const thread of shell.threads as Array<Loose>) {
+      const pending = thread.pendingRuntimeRequest as Loose | null;
+      if (pending !== null && session.requests.has(pending.id)) {
+        thread.pendingRuntimeRequest = null;
+        if (thread.status === "waiting") thread.status = "completed";
+      }
+      const last = session.chats.get(thread.id)?.at(-1);
+      if (last !== undefined) {
+        const updatedAt = new Date(last.at).toISOString();
+        thread.latestVisibleMessage = {
+          id: `${last.id}:assistant`,
+          role: "assistant",
+          text: last.reply,
+          updatedAt,
+        };
+        thread.latestUserMessageAt = updatedAt;
+        thread.updatedAt = updatedAt;
+      }
+    }
+    return shell;
+  };
 
   const read = (input: MacRequest): MacResponse => {
     const query = input.query ?? {};
@@ -42,15 +186,15 @@ export function createSampleTransport(
       case `${FAMILY}/today`:
         return found(bank.today);
       case "/api/orchestration/shell":
-        return found(bank.shell);
+        return found(shellNow());
       case `${FAMILY}/approver/requests`:
-        return found(bank.requests);
+        return found(requestsNow());
       case `${FAMILY}/approver/notes`:
-        return found(bank.notes);
+        return found(notesNow());
       case `${FAMILY}/fridge`:
-        return found(bank.fridge);
+        return found(fridgeNow());
       case `${FAMILY}/grown-up-answers`:
-        return found(bank.answers);
+        return found(answersNow());
       case "/api/skycot/badges":
         return found(who === "child" ? bank.book : { book: null });
       case `${FAMILY}/recap`:
@@ -86,8 +230,7 @@ export function createSampleTransport(
       }
       default: {
         const thread = /^\/api\/orchestration\/threads\/(.+)$/u.exec(input.path);
-        const projection =
-          thread === null ? undefined : bank.threads[decodeURIComponent(thread[1]!)];
+        const projection = thread === null ? undefined : threadNow(decodeURIComponent(thread[1]!));
         if (projection !== undefined) return found({ projection });
         return {
           status: 404,
@@ -104,8 +247,48 @@ export function createSampleTransport(
       case `${FAMILY}/more-time`:
       case `${FAMILY}/approver/more-time`:
         return found((bank.status as { session: unknown }).session);
-      case `${FAMILY}/fridge/pin`:
-        return found(bank.fridge);
+      case `${FAMILY}/fridge/pin`: {
+        const body = asRecord(input.body);
+        if (typeof body.threadId === "string" && typeof body.pinned === "boolean") {
+          session.pins.set(body.threadId, body.pinned);
+          if (body.pinned) session.pinnedAt.set(body.threadId, clock());
+        }
+        return found(fridgeNow());
+      }
+      case `${FAMILY}/approver/answer`: {
+        const body = asRecord(input.body);
+        if (typeof body.requestId === "string")
+          session.requests.set(body.requestId, body.decision === "accept" ? "accept" : "decline");
+        return found({ ok: true, sample: true });
+      }
+      case `${FAMILY}/approver/notes/answer`:
+      case `${FAMILY}/approver/notes/seen`: {
+        const body = asRecord(input.body);
+        if (typeof body.id === "string")
+          session.notes.set(body.id, {
+            minutes: typeof body.minutes === "number" ? body.minutes : 0,
+            at: clock(),
+          });
+        return found({ ok: true, sample: true });
+      }
+      case SAMPLE_COMMAND_PATH: {
+        const body = asRecord(input.body);
+        if (body.type === "respond" && typeof body.requestId === "string") {
+          const decision: SampleDecision = body.decision === "accept" ? "accept" : "decline";
+          session.requests.set(body.requestId, decision);
+        }
+        if (body.type === "message" && typeof body.threadId === "string") {
+          const turns = session.chats.get(body.threadId) ?? [];
+          turns.push({
+            id: `sample-chat-${body.threadId}-${turns.length + 1}`,
+            text: String(body.text ?? ""),
+            reply: SAMPLE_SAM_REPLY,
+            at: clock() + turns.length,
+          });
+          session.chats.set(body.threadId, turns);
+        }
+        return found({ ok: true, sample: true });
+      }
       case `${FAMILY}/page-internet/ask`:
         return found({ ask: { id: "page-internet:sample", expiresAt: clock() + 5 * 60_000 } });
       // Face ID, the Watch and passkeys need the family's real Mac and this phone's own keys.
