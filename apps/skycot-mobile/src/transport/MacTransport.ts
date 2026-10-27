@@ -10,7 +10,8 @@
  * bytes travel (docs/nondev/WHO-IS-WHO.md, "What Phases 2 to 4 must keep").
  */
 
-export type TransportKind = "direct" | "relay";
+// "sample" is the built-in sample family (src/sample): no network at all.
+export type TransportKind = "direct" | "relay" | "sample";
 
 export interface MacRequest {
   readonly method: "GET" | "POST";

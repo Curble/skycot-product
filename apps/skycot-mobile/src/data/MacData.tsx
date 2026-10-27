@@ -152,6 +152,16 @@ export function MacDataProvider(props: { readonly children: ReactNode }) {
     [macs, mode, readStatus, readShellFor, readRequests, readToday],
   );
 
+  // A Mac that is no longer shown (the sample family left, a Mac forgotten) keeps nothing here.
+  useEffect(() => {
+    setByMac((current) => {
+      const keep = Object.keys(current).filter((macId) => macs.some((mac) => mac.macId === macId));
+      return keep.length === Object.keys(current).length
+        ? current
+        : Object.fromEntries(keep.map((macId) => [macId, current[macId]!]));
+    });
+  }, [macs]);
+
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       setForeground(state === "active");

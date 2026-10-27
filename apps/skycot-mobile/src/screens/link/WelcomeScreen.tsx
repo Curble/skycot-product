@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 
 import { useDeepLink } from "../../links/deepLinks";
+import { useLinks } from "../../links/store";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,6 +16,7 @@ import { ScanSheet, TypeCodeSheet, type LinkOutcome } from "./LinkSheets";
 
 export function WelcomeScreen(props: { readonly onLinked?: (outcome: LinkOutcome) => void }) {
   const theme = useTheme();
+  const links = useLinks();
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<"scan" | "type" | "about" | null>(null);
   const deep = useDeepLink("link");
@@ -65,6 +67,16 @@ export function WelcomeScreen(props: { readonly onLinked?: (outcome: LinkOutcome
           </View>
           <Button title="Scan the code" icon="qrcode.viewfinder" onPress={() => setSheet("scan")} />
           <Button title="Type the code instead" kind="tinted" onPress={() => setSheet("type")} />
+          <Button
+            title="Look around first"
+            kind="grey"
+            icon="eye"
+            onPress={() => links.enterSample("grown-up")}
+            accessibilityLabel="Look around first, with a sample family"
+          />
+          <Txt variant="footnote" tone="label3" center>
+            A sample family shows how SKYCOT works. Nothing in it is real.
+          </Txt>
           <Txt variant="footnote" tone="label3" center>
             No accounts and no sign-up. Your family's work stays on your Mac.
           </Txt>

@@ -62,7 +62,8 @@ export function PushRegistration(): null {
   const homes = useMemo<ReadonlyArray<Home>>(
     () =>
       macs.flatMap((mac) =>
-        mac.relay === null || mac.relayRecord === null
+        // The sample family never registers for push: nothing in it is real.
+        mac.sample === true || mac.relay === null || mac.relayRecord === null
           ? []
           : [
               {

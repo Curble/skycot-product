@@ -18,6 +18,8 @@ import type { HomeRecord, RelayHome } from "@t3tools/skycot-relay/client/home";
 
 import type { MacTransport } from "../transport/MacTransport";
 import { closeRelayHome, relayHomeFor, waysToMac } from "../transport/ways";
+import { canEnterSample, createSampleMac, macsToShow } from "../sample/sampleMode";
+import type { SampleWho } from "../sample/fixtures";
 import { acceptsLink, modeOf, type DeviceMode, type LinkedMac, type MacLink } from "./pairing";
 
 const LIST_KEY = "skycot.links.v1";
@@ -46,6 +48,8 @@ export interface Mac extends LinkedMac {
   readonly transport: MacTransport;
   /** The Mac's SKYCOT Relay tunnel, when its link carried one (notifications need it). */
   readonly relay: RelayHome | null;
+  /** True only for the built-in sample family (src/sample): in memory, never linked. */
+  readonly sample?: boolean;
 }
 
 interface LinksState {
@@ -55,6 +59,12 @@ interface LinksState {
   /** False when the new Mac disagrees with the others about what this device is. */
   readonly add: (linked: LinkedMac) => Promise<boolean>;
   readonly forget: (macId: string) => Promise<void>;
+  /** The sample family is showing: nothing in it is real, and nothing in it is saved. */
+  readonly sample: SampleWho | null;
+  /** "Look around first": opens the sample (only on a device with no real Mac). */
+  readonly enterSample: (who: SampleWho) => void;
+  /** Leaves the sample and drops everything it held. */
+  readonly leaveSample: () => void;
 }
 
 const LinksContext = createContext<LinksState | null>(null);
@@ -83,7 +93,10 @@ function withTransport(link: LinkedMac): Mac {
 
 export function LinksProvider(props: { readonly children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [macs, setMacs] = useState<ReadonlyArray<Mac>>([]);
+  const [realMacs, setMacs] = useState<ReadonlyArray<Mac>>([]);
+  // The sample is memory only: not in the keychain, gone when the app closes or the person leaves.
+  const [sampleMac, setSampleMac] = useState<Mac | null>(null);
+  const macs = useMemo(() => macsToShow(realMacs, sampleMac), [realMacs, sampleMac]);
 
   useEffect(() => {
     let live = true;
@@ -123,35 +136,56 @@ export function LinksProvider(props: { readonly children: ReactNode }) {
 
   const add = useCallback(
     async (linked: LinkedMac) => {
-      if (!acceptsLink(macs, linked)) return false;
+      if (!acceptsLink(realMacs, linked)) return false;
       await SecureStore.setItemAsync(tokenKey(linked.macId), linked.bearerToken, KEYCHAIN);
       if (linked.relayRecord !== null) saveRelayRecord(linked.macId, linked.relayRecord);
       else
         await SecureStore.deleteItemAsync(relayKey(linked.macId), KEYCHAIN).catch(() => undefined);
-      const next = [...macs.filter((mac) => mac.macId !== linked.macId), withTransport(linked)];
+      const next = [...realMacs.filter((mac) => mac.macId !== linked.macId), withTransport(linked)];
       await save(next);
       setMacs(next);
+      // Linking a real Mac ends the sample.
+      setSampleMac(null);
       return true;
     },
-    [macs, save],
+    [realMacs, save],
   );
 
   const forget = useCallback(
     async (macId: string) => {
       await SecureStore.deleteItemAsync(tokenKey(macId), KEYCHAIN).catch(() => undefined);
       await SecureStore.deleteItemAsync(relayKey(macId), KEYCHAIN).catch(() => undefined);
-      const gone = macs.find((mac) => mac.macId === macId);
+      const gone = realMacs.find((mac) => mac.macId === macId);
       if (gone?.relayRecord) closeRelayHome(gone.relayRecord.homeId);
-      const next = macs.filter((mac) => mac.macId !== macId);
+      const next = realMacs.filter((mac) => mac.macId !== macId);
       await save(next);
       setMacs(next);
     },
-    [macs, save],
+    [realMacs, save],
   );
 
+  const enterSample = useCallback(
+    (who: SampleWho) => {
+      if (canEnterSample(realMacs.length)) setSampleMac(createSampleMac(who));
+    },
+    [realMacs.length],
+  );
+  const leaveSample = useCallback(() => setSampleMac(null), []);
+  const sample: SampleWho | null =
+    sampleMac === null ? null : sampleMac.me.kind === "child" ? "child" : "grown-up";
+
   const value = useMemo<LinksState>(
-    () => ({ ready, macs, mode: modeOf(macs), add, forget }),
-    [ready, macs, add, forget],
+    () => ({
+      ready,
+      macs,
+      mode: modeOf(macs),
+      add,
+      forget,
+      sample,
+      enterSample,
+      leaveSample,
+    }),
+    [ready, macs, add, forget, sample, enterSample, leaveSample],
   );
   return <LinksContext value={value}>{props.children}</LinksContext>;
 }

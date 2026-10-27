@@ -96,6 +96,8 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
   const { byMac, refresh } = useMacData();
   const [link, setLink] = useState<WatchLinkState>(() => SkycotWatch?.state() ?? NO_WATCH);
   const [lockedAt, setLockedAt] = useState<number | null>(null);
+  // The sample family never reaches a real Apple Watch: nothing in it is real.
+  const inSample = macs.some((mac) => mac.sample === true);
   const macsRef = useRef(macs);
   macsRef.current = macs;
   const readyRef = useRef(ready);
@@ -114,13 +116,19 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
   // The snapshot, whenever what the Watch shows changes.
   const key = snapshotKey(snapshot);
   useEffect(() => {
-    if (SkycotWatch === null || !link.paired || !link.installed) return;
+    if (SkycotWatch === null || inSample || !link.paired || !link.installed) return;
     try {
       SkycotWatch.updateContext(JSON.stringify(snapshotRef.current));
     } catch (cause) {
       if (__DEV__) console.warn("[skycot] Watch snapshot:", cause);
     }
-  }, [key, link.paired, link.installed]);
+  }, [key, link.paired, link.installed, inSample]);
+
+  // Leaving the sample forgets the sample's "locked" state with everything else it held.
+  useEffect(() => {
+    if (inSample) return () => setLockedAt(null);
+    return undefined;
+  }, [inSample]);
 
   const lockEverything = useCallback(async (): Promise<WatchReply> => {
     const results = await Promise.all(
@@ -313,7 +321,7 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
   // "Ava needs a grown-up": once for each new request, while SKYCOT runs on the phone.
   const told = useRef<Set<string> | null>(null);
   useEffect(() => {
-    if (SkycotWatch === null || mode !== "grown-up") return;
+    if (SkycotWatch === null || inSample || mode !== "grown-up") return;
     const live = snapshot.requests.filter((request) => !request.lapsed);
     if (told.current === null) {
       // What was already waiting when SKYCOT opened is on the screen: no notification for it.
@@ -335,7 +343,7 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
     for (const id of told.current) {
       if (!live.some((request) => request.id === id)) SkycotWatch.clearRequest(id);
     }
-  }, [snapshot.requests, mode, macs, byMac]);
+  }, [snapshot.requests, mode, macs, byMac, inSample]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {

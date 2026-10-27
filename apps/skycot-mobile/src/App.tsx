@@ -16,6 +16,7 @@ import { LinksProvider, useLinks } from "./links/store";
 import { WelcomeScreen } from "./screens/link/WelcomeScreen";
 import { SignedOut } from "./screens/shared/SignedOut";
 import { Spinner } from "./ui/kit";
+import { SampleFrame } from "./sample/SampleBanner";
 import { PushRegistration } from "./push/PushRegistration";
 import { WatchBridgeProvider } from "./watch/WatchBridge";
 import { ThemeProvider, lookForChild, useTheme } from "./ui/theme";
@@ -90,7 +91,9 @@ export default function App() {
             <FaceIdProvider>
               <WatchBridgeProvider>
                 <PushRegistration />
-                <Root />
+                <SampleFrame>
+                  <Root />
+                </SampleFrame>
               </WatchBridgeProvider>
             </FaceIdProvider>
           </MacDataProvider>

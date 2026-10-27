@@ -291,10 +291,15 @@ export function ThisDeviceScreen() {
           onPress={async () => {
             if (unlinking === null) return;
             setBusy(true);
-            await familyApi.unlinkSelf(unlinking.transport);
-            await links.forget(unlinking.macId);
-            // The last Mac gone: this phone's Face ID key goes too (the Mac forgot its half).
-            if (grownUp.macs.length <= 1) SkycotDeviceKey?.remove();
+            if (unlinking.sample === true) {
+              // Nothing was ever linked: leaving the sample is all there is to undo.
+              links.leaveSample();
+            } else {
+              await familyApi.unlinkSelf(unlinking.transport);
+              await links.forget(unlinking.macId);
+              // The last Mac gone: this phone's Face ID key goes too (the Mac forgot its half).
+              if (grownUp.macs.length <= 1) SkycotDeviceKey?.remove();
+            }
             setBusy(false);
             setUnlinking(null);
           }}

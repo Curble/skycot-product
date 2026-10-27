@@ -130,7 +130,8 @@ export function MacsScreen() {
           if (forgetting === null) return null;
           const yes = await familyApi.verify(forgetting.transport, { code, purpose: "settings" });
           if (!yes.ok) return yes.message;
-          await links.forget(forgetting.macId);
+          if (forgetting.sample === true) links.leaveSample();
+          else await links.forget(forgetting.macId);
           setForgetting(null);
           return null;
         }}

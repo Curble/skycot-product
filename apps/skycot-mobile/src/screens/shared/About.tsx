@@ -9,17 +9,31 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useOptionalChild } from "../../app/child/ChildContext";
+import { useLinks } from "../../links/store";
+import { SAMPLE_ABOUT_TEXT, SAMPLE_ABOUT_TITLE } from "../../sample/sampleCopy";
 import { CHILD_ABOUT_COPY, GROWN_UP_PRIVACY_COPY } from "./aboutCopy";
 import { MIT_LICENCE_T3_CODE, NOT_AFFILIATED } from "../../legal/licences";
 import { Mascot, Row, Section, Sheet, Txt } from "../../ui/kit";
 
 export function AboutContent() {
   const child = useOptionalChild();
+  const sample = useLinks().sample !== null;
   const [licence, setLicence] = useState(false);
   const version = Constants.expoConfig?.version ?? "0.1.0";
+  const sampleNote = sample ? (
+    <View style={{ gap: 4, padding: 16 }}>
+      <Txt variant="headline" center>
+        {SAMPLE_ABOUT_TITLE}
+      </Txt>
+      <Txt tone="label2" center>
+        {SAMPLE_ABOUT_TEXT}
+      </Txt>
+    </View>
+  ) : null;
   if (child !== null) {
     return (
       <View style={{ alignItems: "center", gap: 10, padding: 20 }}>
+        {sampleNote}
         <Mascot pose="hello" size={96} />
         <Txt variant="title2">{CHILD_ABOUT_COPY.title}</Txt>
         <Txt center>{CHILD_ABOUT_COPY.sam}</Txt>
@@ -31,6 +45,7 @@ export function AboutContent() {
   }
   return (
     <View>
+      {sampleNote}
       <View style={{ alignItems: "center", gap: 6, paddingTop: 12 }}>
         <Mascot pose="hello" size={96} />
         <Txt variant="title2">SKYCOT</Txt>

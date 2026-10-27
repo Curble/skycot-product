@@ -31,7 +31,12 @@ import * as Effect from "effect/Effect";
 import type { MacTransport } from "../transport/MacTransport";
 import { withMacRpc } from "../transport/rpc";
 import { newId } from "./ids";
+import { SAMPLE_NEW_CONVERSATION, SAMPLE_PROVIDER } from "../sample/fixtures";
 import type { ShellSnapshot, ThreadProjection } from "./types";
+
+// The sample family (src/sample) has no command channel: its reads are plain requests, answered
+// from fixtures, and every command below ends in a harmless local acknowledgement.
+const inSample = (transport: MacTransport): boolean => transport.kind === "sample";
 
 export class EngineError extends Error {
   override readonly name = "EngineError";
@@ -115,6 +120,9 @@ export interface MacConfig {
 }
 
 export function readMacConfig(transport: MacTransport): Promise<MacConfig> {
+  if (inSample(transport)) {
+    return Promise.resolve({ providers: [SAMPLE_PROVIDER], questionsRoot: null });
+  }
   return withMacRpc(transport, (client) =>
     client[WS_METHODS.serverGetConfig]({}).pipe(
       Effect.map((config) => ({
@@ -133,6 +141,7 @@ const command = () => CommandId.make(newId());
 
 /** Just ask: the engine's Questions space (made on first use); each question gets its own folder. */
 export function openQuestions(transport: MacTransport): Promise<{ readonly projectId: string }> {
+  if (inSample(transport)) return Promise.resolve({ projectId: "sample-project-questions" });
   return withMacRpc(transport, (client) =>
     client[WS_METHODS.projectsEnsureScratch]({}).pipe(
       Effect.map((result) => ({ projectId: String(result.projectId) })),
@@ -154,6 +163,7 @@ export function startConversation(
   transport: MacTransport,
   input: StartConversationInput,
 ): Promise<{ readonly threadId: string }> {
+  if (inSample(transport)) return Promise.resolve({ threadId: SAMPLE_NEW_CONVERSATION });
   const threadId = ThreadId.make(newId());
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.launchThread]({
@@ -181,6 +191,7 @@ export function sendMessage(
     readonly plan?: { readonly planId: string };
   },
 ): Promise<unknown> {
+  if (inSample(transport)) return Promise.resolve(null);
   const threadId = ThreadId.make(input.threadId);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
@@ -209,6 +220,7 @@ export function respondToRequest(
     readonly decision: Extract<ProviderApprovalDecision, "accept" | "decline" | "cancel">;
   },
 ): Promise<unknown> {
+  if (inSample(transport)) return Promise.resolve(null);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
       type: "runtime-request.respond",
@@ -228,6 +240,7 @@ export function answerQuestion(
     readonly answers: Readonly<Record<string, string>>;
   },
 ): Promise<unknown> {
+  if (inSample(transport)) return Promise.resolve(null);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
       type: "runtime-request.respond",
@@ -244,6 +257,7 @@ export function undoTo(
   transport: MacTransport,
   input: { readonly threadId: string; readonly scopeId: string; readonly checkpointId: string },
 ): Promise<unknown> {
+  if (inSample(transport)) return Promise.resolve(null);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
       type: "checkpoint.rollback",
@@ -257,6 +271,7 @@ export function undoTo(
 }
 
 export function stopConversation(transport: MacTransport, threadId: string): Promise<unknown> {
+  if (inSample(transport)) return Promise.resolve(null);
   return withMacRpc(transport, (client) =>
     client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
       type: "thread.stop",
