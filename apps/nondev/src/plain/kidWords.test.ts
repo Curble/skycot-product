@@ -67,6 +67,25 @@ describe("kid words in progress lines", () => {
   it("names the instructions file the same way when the assistant reads it directly", () => {
     expect(kidNouns("Read the agents text")).toBe("Read the instructions");
     expect(kidNouns("Edited the booking page")).toBe("Edited the booking page");
+    expect(kidNouns('Read "the agents text" and edit agents-text.md')).toBe(
+      'Read "the agents text" and edit agents-text.md',
+    );
+  });
+
+  it("keeps names intact and gives a new HTML page a plain checklist line", () => {
+    expect(kidStep({ infinitive: "create index.html", kind: "file" }, "page")?.past).toBe(
+      "Made the page",
+    );
+    for (const infinitive of [
+      'add a heading called "Welcome, Ava"',
+      'change the title to "My Space Lab"',
+      "edit styles.css",
+      "add a button named Start",
+      "use the React library",
+      "create README.md",
+    ]) {
+      expect(kidStep({ infinitive, kind: "command" }, "page")).toBeNull();
+    }
   });
 
   it("folds several steps in one command into 'a few things'", () => {

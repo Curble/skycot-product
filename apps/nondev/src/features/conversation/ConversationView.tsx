@@ -112,7 +112,12 @@ import {
   makeProjectOffer,
   projectForConversation,
 } from "../questions/questions";
-import { conversationTitle, describeThreadStatus, type ConversationStatus } from "./status";
+import {
+  conversationTitle,
+  describeThreadStatus,
+  hasReadyCheckpointPill,
+  type ConversationStatus,
+} from "./status";
 import { Timeline } from "./Timeline";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
 import { BuildJourney } from "../journey/BuildJourney";
@@ -446,20 +451,21 @@ export function ConversationView({
               Put away
             </Pill>
           ) : null}
-          <Pill tone={status.tone} size="sm">
-            {latestId !== null && status.kind === "ready" ? "Done" : status.headline}
-          </Pill>
-          {latestId !== null && !active ? (
+          {hasReadyCheckpointPill(status, latestId, active) ? (
             <Pill
               tone="ok"
               size="sm"
               icon={Receipt}
               label="Jump to what changed"
-              onClick={() => scrollToCheckpoint(latestId)}
+              onClick={() => scrollToCheckpoint(latestId!)}
             >
               Ready to look at
             </Pill>
-          ) : null}
+          ) : (
+            <Pill tone={status.tone} size="sm">
+              {latestId !== null && status.kind === "ready" ? "Done" : status.headline}
+            </Pill>
+          )}
           {elapsed && !childView ? (
             <span className="fm-strip__time">
               <Clock size={13} strokeWidth={1.8} aria-hidden />

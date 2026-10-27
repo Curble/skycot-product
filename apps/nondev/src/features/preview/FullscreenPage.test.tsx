@@ -1,6 +1,8 @@
+// @effect-diagnostics nodeBuiltinImport:off - jsdom does not load CSS, so this test reads its style rule.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 const state = vi.hoisted(() => ({ child: false }));
@@ -43,6 +45,49 @@ afterEach(() => {
 });
 
 describe("page fullscreen control", () => {
+  it("keeps the Family notice below the fullscreen exit pill", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    Object.defineProperty(window, "desktopBridge", {
+      configurable: true,
+      value: {
+        getWindowFullscreenState: () => true,
+        onWindowFullscreenStateChange: () => () => {},
+      },
+    });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(
+        <div className="fm-shell" data-columns="1">
+          <FullscreenPage game>
+            <div className="fm-preview__notice">Stay here</div>
+            <h1 className="fm-conv-header__name">Preview a very long project title</h1>
+          </FullscreenPage>
+        </div>,
+      ),
+    );
+    host.querySelector(".fm-fullscreen-page")!.classList.add("is-fullscreen");
+    const notice = host.querySelector<HTMLElement>(".fm-preview__notice");
+    expect(notice).not.toBeNull();
+    expect(notice!.closest(".fm-fullscreen-page.is-fullscreen")).not.toBeNull();
+    const styles = readFileSync("apps/nondev/src/styles/preview.css", "utf8");
+    const noticeStyle = styles.match(
+      /\.fm-fullscreen-page\.is-fullscreen\s+\.fm-preview__notice\s*\{([^}]+)\}/,
+    )?.[1];
+    expect(noticeStyle).toMatch(/position:\s*absolute/);
+    expect(noticeStyle).toMatch(/top:\s*max\(58px,/);
+    const headerStyles = readFileSync("apps/nondev/src/styles/shell.css", "utf8");
+    const titleStyle = headerStyles.match(
+      /\.fm-shell\[data-columns="1"\] \.fm-conv-header__name\s*\{([^}]+)\}/,
+    )?.[1];
+    expect(titleStyle).toMatch(/text-overflow:\s*ellipsis/);
+    expect(titleStyle).toMatch(/white-space:\s*nowrap/);
+    expect(titleStyle).toMatch(/overflow-wrap:\s*normal/);
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
   it("allows fullscreen in the browser frame and keeps the sealed sandbox unchanged", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const host = document.createElement("div");

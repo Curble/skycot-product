@@ -175,7 +175,13 @@ export function childApprovalSentence(
   card: Pick<ApprovalCard, "whatItWants" | "technical">,
   assistantName: string,
 ): string {
-  const wants = card.whatItWants.replace(/^The assistant wants to /i, "").replace(/[.!?]+$/, "");
+  const outsideRead = /file outside your project/i.test(card.whatItWants);
+  const wants = outsideRead
+    ? "read a file outside your project"
+    : card.whatItWants
+        .replace(/^The assistant wants to /i, "")
+        .replace(/\s*\([^)]*(?:\/|\\)[^)]*\)/g, "")
+        .replace(/[.!?]+$/, "");
   if (/quiz check|check the quiz/i.test(`${card.whatItWants}\n${card.technical}`)) {
     return `${assistantName} wants to test the quiz by running it. A grown-up needs to say yes.`;
   }

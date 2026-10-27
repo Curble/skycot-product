@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 const state = vi.hoisted(() => ({
+  child: false,
   requireParentCode: vi.fn(async () => true),
   dispatch: vi.fn(async () => null),
 }));
@@ -17,7 +18,7 @@ vi.mock("../../../state/vcs", () => ({ vcsEnvironment: { status: vi.fn() } }));
 vi.mock("../../../themes/useCrew", () => ({
   useCrew: () => ({ named: false, builder: { name: "Sam" } }),
 }));
-vi.mock("../../../app/useChildView", () => ({ useChildView: () => false }));
+vi.mock("../../../app/useChildView", () => ({ useChildView: () => state.child }));
 vi.mock("../../family/FamilyProvider", () => ({
   useFamily: () => ({
     enabled: true,
@@ -40,11 +41,50 @@ import { items } from "../../../plain/fixtures.test-helpers";
 import { RequestCard } from "./RequestCard";
 
 afterEach(() => {
+  state.child = false;
   state.requireParentCode.mockClear();
   state.dispatch.mockClear();
 });
 
 describe("grown-up command card project approval", () => {
+  it("keeps an outside file path out of the child card", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    state.child = true;
+    const path = "/Users/ava/.claude/projects/-Users-ava-Projects-demo/memory/MEMORY.md";
+    const item = items.approval("file-read", { prompt: `Read ${path}` });
+    const projection = {
+      turnItems: [item],
+      runtimeRequests: [
+        { id: item.requestId, status: "pending", responseCapability: { type: "resumable" } },
+      ],
+      runs: [],
+    } as never;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(
+        <RequestCard
+          item={item}
+          context={{
+            item,
+            index: 0,
+            items: [item],
+            projection,
+            environmentId: "env-1" as never,
+            threadId: "thread-1" as never,
+            shell: { projectId: "project-1", runtimeMode: "approval-required" } as never,
+            projectName: "demo",
+          }}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain("read a file outside your project");
+    expect(host.textContent).not.toContain(path);
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
   it("shows the project option for the wrapped Lobster font request and sends project scope", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const command =

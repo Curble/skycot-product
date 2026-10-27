@@ -37,6 +37,8 @@ export function kidStep(
   thing: KidThing,
 ): KidVerb | null {
   const { infinitive, kind } = step;
+  if (/^create (?:the )?[\w.-]+\.html$/i.test(infinitive))
+    return kidVerb("make the page", "made the page", "making the page");
   // Several steps in one command: "Ran 2 steps: …" is not for a child to read.
   if (/^run \d+ steps: /.test(infinitive))
     return kidVerb("do a few things", "did a few things", "doing a few things");
@@ -58,6 +60,7 @@ export function kidStep(
     return kidVerb("save some information", "saved some information", "saving some information");
   if (/^look at the (agents|claude|gemini) text$/.test(infinitive))
     return kidVerb("read the instructions", "read the instructions", "reading the instructions");
+  if (/['"`]|\b[\w.-]+\.(?:html?|css|js|jsx|ts|tsx|md|json)\b/i.test(infinitive)) return null;
   return null;
 }
 
@@ -78,5 +81,12 @@ export function kidTestOutcome(
 
 /** The instructions file is "the instructions" to a child, wherever a line names it. */
 export function kidNouns(headline: string): string {
-  return headline.replace(/\bthe (?:agents|claude|gemini) text\b/g, "the instructions");
+  return headline
+    .split(/((?:"[^"]*"|'[^']*'|`[^`]*`)|\b[\w.-]+\.(?:html?|css|js|jsx|ts|tsx|md|json)\b)/gi)
+    .map((part, index) =>
+      index % 2 === 0
+        ? part.replace(/\bthe (?:agents|claude|gemini) text\b/g, "the instructions")
+        : part,
+    )
+    .join("");
 }
