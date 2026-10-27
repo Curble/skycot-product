@@ -103,7 +103,7 @@ export function MagnetThumb({
     <div ref={ref} className="fm-magnet__thumb" aria-hidden>
       {useCard ? (
         <img
-          className="fm-magnet__frame"
+          className="fm-magnet__card"
           alt=""
           loading="lazy"
           src={cardImageSource(cardAnswer.svg)}

@@ -1092,6 +1092,7 @@ html.dark .fm-standalone__foot {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding-right: 12px;
 }
 .fm-child-tab__label {
   font-size: calc(14.5px * var(--fm-text-scale));
