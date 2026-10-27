@@ -208,9 +208,6 @@ import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts
 import * as ProjectService from "./project/ProjectService.ts";
 import { threadWorkspaceRoot } from "./project/threadWorkspaceRoot.ts";
 import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
-import * as SkycotFamilyLimits from "./skycot/family-limits/SkycotFamilyLimits.ts"; // nondev-seam: skycot-child-project-folder-ws
-import * as SkycotQuestions from "./skycot/questions/SkycotQuestions.ts"; // nondev-seam: skycot-child-project-folder-ws
-import { childQuestionsFolder } from "@t3tools/skycot-rules/questions"; // nondev-seam: skycot-child-project-folder-ws
 import { projectMutationOperation } from "./project/ProjectMutation.ts";
 import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
@@ -1197,7 +1194,6 @@ export const layerWsRpc = (
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
-      const fileSystem = yield* FileSystem.FileSystem;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
         | ThreadManagementService.ThreadManagementService
@@ -1210,25 +1206,8 @@ export const layerWsRpc = (
       const projectStore = yield* ProjectStore.ProjectStoreV2;
       const projectService = yield* ProjectService.ProjectService;
       const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
-      const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
-      // Resolved here from the server config (inside a handler neither it nor Path is in reach):
-      // T3's Scratch folder under the base dir, where SKYCOT keeps each child's space
-      // (nondev-seam: skycot-child-project-folder-ws).
-      const questionsRootAtStart = yield* SkycotQuestions.questionsRootOption.pipe(
-        Effect.flatMap((root) =>
-          root !== null
-            ? Effect.succeed(root)
-            : Effect.serviceOption(ServerConfig.ServerConfig).pipe(
-                Effect.map((config) =>
-                  Option.isSome(config)
-                    ? `${config.value.baseDir.replace(/\/+$/u, "")}/scratch`
-                    : null,
-                ),
-              ),
-        ),
-      );
-      if (questionsRootAtStart === null)
-        yield* Effect.logWarning("skycot-child-projects.no-questions-root");
+      // nondev-seam: skycot-child-project-folder-ws
+      const familyGate = yield* Effect.serviceOption(SkycotFamilyGate.SkycotFamilyGate);
       const eventLoopMonitor = yield* EventLoopMonitor.EventLoopMonitor;
       const threadSearch = yield* ThreadSearch.ThreadSearch;
 
@@ -2628,41 +2607,21 @@ export const layerWsRpc = (
             ),
           ),
         [WS_METHODS.projectsCreateNew]: (input) =>
+          // nondev-seam: skycot-child-project-folder-ws
+          // A child's new project goes in their own space (the Family gate knows whose window
+          // this is) and is recorded as theirs; a grown-up's, or a Mac without a child chosen,
+          // goes where T3 puts named projects.
           Effect.gen(function* () {
-            if (Option.isNone(familyLimits)) {
-              if (SkycotPolicy.isSkycotPolicyEnabled(process.env))
-                return yield* new ManagedProjectFolders.NamedProjectFolderError({
-                  folder: "",
-                  cause: "The child's SKYCOT folder is unavailable.",
-                });
-              return yield* managedFolders.createNamedProject(input);
-            }
-            const session = yield* familyLimits.value.forSession({ sessionId: currentSessionId });
-            if (session.device === "grown-up" || session.limits === null)
-              return yield* managedFolders.createNamedProject(input);
-            if (session.childId === null) {
-              return yield* new ManagedProjectFolders.NamedProjectFolderError({
-                folder: "",
-                cause: "Choose a child before making a project.",
-              });
-            }
-            const questionsRoot = questionsRootAtStart;
-            const childFolder = childQuestionsFolder(questionsRoot, session.childId);
-            if (childFolder === null) {
-              return yield* new ManagedProjectFolders.NamedProjectFolderError({
-                folder: "",
-                cause: "The child's SKYCOT folder is unavailable.",
-              });
-            }
-            const path = yield* Path.Path;
-            yield* fileSystem.makeDirectory(path.join(childFolder, "projects"), {
-              recursive: true,
-            });
+            if (Option.isNone(familyGate)) return yield* managedFolders.createNamedProject(input);
+            const home = yield* familyGate.value
+              .childProjectHome(currentSessionId)
+              .pipe(Effect.orElseSucceed(() => Option.none()));
+            if (Option.isNone(home)) return yield* managedFolders.createNamedProject(input);
             const created = yield* managedFolders.createNamedProject({
               ...input,
-              parentRoot: path.join(childFolder, "projects"),
+              parentRoot: home.value.parentRoot,
             });
-            yield* familyLimits.value.recordStart({
+            yield* familyGate.value.recordChildProject({
               sessionId: currentSessionId,
               projectId: created.projectId,
             });

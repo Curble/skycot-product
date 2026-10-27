@@ -725,6 +725,21 @@ export class SkycotFamilyGate extends Context.Service<
       Option.Option<{ readonly projectId: ProjectId }>,
       EnvironmentAuthorizationError | OrchestrationDispatchCommandError
     >;
+    /**
+     * Where a child's new project goes: a `projects` folder inside their own space, with the
+     * child it is for; none for a grown-up or a Mac with no child chosen.
+     */
+    readonly childProjectHome: (
+      sessionId: string,
+    ) => Effect.Effect<
+      Option.Option<{ readonly parentRoot: string; readonly childId: string }>,
+      EnvironmentAuthorizationError | OrchestrationDispatchCommandError
+    >;
+    /** Records a project the window's child just made as theirs (best effort). */
+    readonly recordChildProject: (input: {
+      readonly sessionId: string;
+      readonly projectId: ProjectId;
+    }) => Effect.Effect<void>;
   }
 >()("t3/skycot/SkycotFamilyGate") {}
 
@@ -1255,6 +1270,32 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const childProjectHome: SkycotFamilyGate["Service"]["childProjectHome"] = Effect.fn(
+    "SkycotFamilyGate.childProjectHome",
+  )(function* (sessionId) {
+    const space = yield* questionsSpaceFor(sessionId);
+    if (Option.isNone(space) || Option.isNone(limits)) return Option.none();
+    const session = yield* limits.value.forSession({ sessionId });
+    if (session.childId === null) return Option.none();
+    const project = yield* projects
+      .get(space.value.projectId)
+      .pipe(Effect.orElseSucceed(() => Option.none()));
+    if (Option.isNone(project)) return Option.none();
+    return Option.some({
+      parentRoot: path.join(project.value.workspaceRoot, "projects"),
+      childId: session.childId,
+    });
+  });
+
+  const recordChildProject: SkycotFamilyGate["Service"]["recordChildProject"] = Effect.fn(
+    "SkycotFamilyGate.recordChildProject",
+  )(function* (input) {
+    if (Option.isNone(limits)) return;
+    yield* limits.value
+      .recordStart({ sessionId: input.sessionId, projectId: input.projectId })
+      .pipe(Effect.ignore);
+  });
+
   const check: SkycotFamilyGate["Service"]["check"] = (input) =>
     Effect.suspend(() =>
       judgeDevice(input).pipe(
@@ -1303,6 +1344,8 @@ const make = Effect.gen(function* () {
     describeRequest,
     withVisibility,
     questionsSpaceFor,
+    childProjectHome,
+    recordChildProject,
   });
 });
 
