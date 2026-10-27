@@ -38,6 +38,21 @@ export function ownThreadProjects(
   );
 }
 
+/** The projects that hold a sibling's conversations (recorded as another child's). */
+export function siblingsThreadProjects(
+  view: ChildView,
+  threads: ReadonlyArray<ThreadLike>,
+): Set<string> {
+  return new Set(
+    threads
+      .filter((thread) => {
+        const owner = view.owners.threads[thread.id];
+        return owner !== undefined && owner !== view.childId;
+      })
+      .map((thread) => thread.projectId),
+  );
+}
+
 function filterThreadsAndProjects<
   T extends ThreadLike,
   P extends Pick<OrchestrationProjectShell, "id">,
@@ -51,8 +66,13 @@ function filterThreadsAndProjects<
     childSeesThread(view.childId, thread.id, view.owners),
   );
   const withOwn = ownThreadProjects(view, [...threads, ...extraThreads]);
-  const visibleProjects = projects.filter((project) =>
-    childSeesProject(view.childId, project.id, view.owners, withOwn),
+  // A project nobody recorded as theirs, whose conversations all belong to other children, is
+  // theirs in all but name (made before projects were recorded): it stays out of this child's list.
+  const othersOnly = siblingsThreadProjects(view, [...threads, ...extraThreads]);
+  const visibleProjects = projects.filter(
+    (project) =>
+      childSeesProject(view.childId, project.id, view.owners, withOwn) &&
+      !(othersOnly.has(project.id) && !withOwn.has(project.id)),
   );
   return { visibleThreads, visibleProjects, withOwn };
 }

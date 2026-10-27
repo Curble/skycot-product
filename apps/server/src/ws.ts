@@ -1211,8 +1211,24 @@ export const layerWsRpc = (
       const projectService = yield* ProjectService.ProjectService;
       const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
       const familyLimits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
-      // Resolved here, with the server config in reach; inside a handler it is not (nondev-seam: skycot-child-project-folder-ws).
-      const questionsRootAtStart = yield* SkycotQuestions.questionsRootOption;
+      // Resolved here from the server config (inside a handler neither it nor Path is in reach):
+      // T3's Scratch folder under the base dir, where SKYCOT keeps each child's space
+      // (nondev-seam: skycot-child-project-folder-ws).
+      const questionsRootAtStart = yield* SkycotQuestions.questionsRootOption.pipe(
+        Effect.flatMap((root) =>
+          root !== null
+            ? Effect.succeed(root)
+            : Effect.serviceOption(ServerConfig.ServerConfig).pipe(
+                Effect.map((config) =>
+                  Option.isSome(config)
+                    ? `${config.value.baseDir.replace(/\/+$/u, "")}/scratch`
+                    : null,
+                ),
+              ),
+        ),
+      );
+      if (questionsRootAtStart === null)
+        yield* Effect.logWarning("skycot-child-projects.no-questions-root");
       const eventLoopMonitor = yield* EventLoopMonitor.EventLoopMonitor;
       const threadSearch = yield* ThreadSearch.ThreadSearch;
 
