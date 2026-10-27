@@ -5,6 +5,25 @@ export interface StarterPlaceholder {
   readonly end: number;
 }
 
+export interface StarterDraft {
+  readonly text: string;
+  readonly selection: { readonly start: number; readonly end: number };
+}
+
+export function selectStarterPlaceholder(text: string, start: number, end: number): StarterDraft {
+  return { text, selection: { start, end } };
+}
+
+export function replaceSelectedStarterText(
+  text: string,
+  selection: StarterDraft["selection"],
+  replacement: string,
+): StarterDraft {
+  const nextText = text.slice(0, selection.start) + replacement + text.slice(selection.end);
+  const caret = selection.start + replacement.length;
+  return { text: nextText, selection: { start: caret, end: caret } };
+}
+
 export function starterPlaceholders(text: string): Array<StarterPlaceholder> {
   return [...text.matchAll(/\[([^\]\n]+)\]/gu)].map((match) => ({
     text: match[0],

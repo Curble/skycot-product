@@ -57,6 +57,17 @@ let state: State = {
 const listeners = new Set<() => void>();
 let nonce = 0;
 
+export function shouldClosePreviewOnRouteChange(
+  previous: { readonly name: string; readonly threadId?: string | null },
+  next: { readonly name: string; readonly threadId?: string | null },
+): boolean {
+  return (
+    (previous.name === "thread" &&
+      (next.name !== "thread" || next.threadId !== previous.threadId)) ||
+    (previous.name !== next.name && next.name !== "thread")
+  );
+}
+
 function update(next: State) {
   state = next;
   for (const listener of listeners) listener();

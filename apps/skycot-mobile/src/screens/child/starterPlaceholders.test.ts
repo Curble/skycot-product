@@ -2,7 +2,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { readStarterMarker } from "@t3tools/skycot-rules/starter";
 
-import { starterPlaceholders } from "./starterPlaceholders";
+import {
+  replaceSelectedStarterText,
+  selectStarterPlaceholder,
+  starterPlaceholders,
+} from "./starterPlaceholders";
 import {
   KID_STARTERS,
   starterMessageText,
@@ -33,5 +37,21 @@ describe("starter placeholders", () => {
     });
     expect(readStarterMarker(composed)).toBe(starter.id);
     expect(visibleMessageText(composed)).toBe(visibleText);
+  });
+
+  it("replaces tapped chips in sequence and sends only the visible words", () => {
+    const starter = KID_STARTERS.find((item) => item.id === "birthday") ?? KID_STARTERS[0]!;
+    const original = starterPrompt(starter);
+    let draft = { text: original, selection: { start: 0, end: 0 } };
+    const recipient = starterPlaceholders(draft.text)[0]!;
+    draft = selectStarterPlaceholder(draft.text, recipient.start, recipient.end);
+    draft = replaceSelectedStarterText(draft.text, draft.selection, "for my Nan");
+    const age = starterPlaceholders(draft.text)[0]!;
+    draft = selectStarterPlaceholder(draft.text, age.start, age.end);
+    draft = replaceSelectedStarterText(draft.text, draft.selection, "70");
+
+    const sent = starterMessageText(draft.text, { starterId: starter.id, text: original });
+    expect(visibleMessageText(sent)).toBe(draft.text);
+    expect(draft.text).not.toMatch(/\[[^\]]+\]/u);
   });
 });

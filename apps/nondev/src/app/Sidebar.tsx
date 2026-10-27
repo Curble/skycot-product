@@ -57,6 +57,7 @@ import { grownUpSessionFor, useGrownUpSessionId } from "../features/family/grown
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
 import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
+import { projectCreationProblem } from "../features/projects/projectProblem";
 import { showToast } from "../ui/Toast";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -402,7 +403,7 @@ export function AppSidebar({
                   setCreatingProject(false);
                   if (outcome._tag === "Failure") {
                     const reason = squashAtomCommandFailure(outcome);
-                    showToast(`Couldn't make a project: ${reason}`);
+                    showToast(projectCreationProblem(String(reason)));
                     return;
                   }
                   showList(() =>

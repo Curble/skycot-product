@@ -22,6 +22,7 @@ import {
   programTokens,
   splitShellSegments,
   unwrapShellWrapper,
+  fileWriteTargets,
 } from "./shell.ts";
 
 export type HardRuleId =
@@ -703,12 +704,16 @@ function evaluateSegment(segment: string, ctx: RuleContext, namesOnly = false): 
   // Outside the project. The assistant reading its own plugin and skill instructions is not
   // the person's business, as long as the step only looks.
   const onlyLooks = looksWithoutWriting(base, args, segment);
+  const writeTargets = fileWriteTargets(segment).map((write) => write.path);
+  const outsideWrites = writeTargets.filter((path) => isOutsideProject(path, projectRoots(ctx)));
+  for (const path of outsideWrites) hit("outside-project", path);
   const outside = [
     ...(base === "cd" ? positional.slice(0, 1) : []),
     ...pathTokens(withoutScripts(base, args)),
   ].filter(
     (candidate) =>
       isOutsideProject(candidate, projectRoots(ctx)) &&
+      !writeTargets.includes(candidate) &&
       !(onlyLooks && isProviderInstructionPath(candidate)),
   );
   if (outside.length > 0) {

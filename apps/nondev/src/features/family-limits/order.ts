@@ -28,7 +28,7 @@ export function rowsForChild<R>(
   return childId === null ? [] : rows.filter((row) => owners[threadIdOf(row)] === childId);
 }
 
-/** Projects are shared when nobody owns them, and siblings' projects stay private. */
+/** Only projects the engine records for this child may appear in their picker. */
 export function projectsForChild<P>(
   projects: ReadonlyArray<P>,
   projectIdOf: (project: P) => string,
@@ -40,7 +40,7 @@ export function projectsForChild<P>(
   return projects.filter((project) => {
     const id = projectIdOf(project);
     const owner = owners[id];
-    return owner === undefined || owner === childId || ownProjectIds.has(id);
+    return owner === childId || ownProjectIds.has(id);
   });
 }
 

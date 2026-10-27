@@ -16,6 +16,7 @@ import {
   startApproval,
   type PickedElement,
 } from "./model";
+import { shouldClosePreviewOnRouteChange } from "./store";
 
 const command = { runner: "npm run dev", script: "node server.js" };
 const mac = { hostname: "localhost", origin: "http://localhost:3773" };
@@ -86,6 +87,21 @@ describe("shouldReload", () => {
   it("keeps older engines and non-running answers quiet", () => {
     expect(shouldReload(running(), running("1:2"))).toBe(false);
     expect(shouldReload(null, running("1:2"))).toBe(false);
+  });
+});
+
+describe("preview route changes", () => {
+  it("closes an open preview when leaving its conversation or moving between Home and the fridge", () => {
+    expect(
+      shouldClosePreviewOnRouteChange({ name: "thread", threadId: "a" }, { name: "home" }),
+    ).toBe(true);
+    expect(shouldClosePreviewOnRouteChange({ name: "fridge" }, { name: "home" })).toBe(true);
+    expect(
+      shouldClosePreviewOnRouteChange(
+        { name: "thread", threadId: "a" },
+        { name: "thread", threadId: "a" },
+      ),
+    ).toBe(false);
   });
 });
 

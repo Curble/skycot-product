@@ -14,6 +14,7 @@ import { Mascot } from "../brand/Mascot";
 
 import { isElectron } from "../../app/platform";
 import { useChildView } from "../../app/useChildView";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import { connectionAtomRuntime } from "../../connection/runtime";
 import { serverEnvironment } from "../../state/server";
 import { Banner } from "../../ui/Banner";
@@ -103,6 +104,10 @@ export function QuickLook({
     void filesApi.read(at, entry.path).then(async (answer) => {
       if (cancelled) return;
       if (!answer.ok) {
+        if (isNotTheirsMessage(answer.message)) {
+          returnHomeFromOwnershipRefusal(answer.message);
+          return;
+        }
         setLoad({ state: "refused", message: answer.message });
         return;
       }
@@ -155,7 +160,7 @@ export function QuickLook({
       icon={KIND_ICON[kind]}
       iconTone={kind === "picture" ? "orange" : kind === "page" ? "blue" : "grey"}
       title={childView && file?.mode === "page" ? "Look at your page" : entry.name}
-      description={entryDetails(entry, now)}
+      description={entryDetails(entry, now, childView)}
       wide
       actions={
         <>

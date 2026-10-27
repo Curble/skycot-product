@@ -10,7 +10,12 @@ export type PreviewAnswer =
   | { readonly ok: true; readonly status: PreviewStatusView }
   | {
       readonly ok: false;
-      readonly reason: "needs-approval" | "needs-grown-up" | "not-startable" | "unreachable";
+      readonly reason:
+        | "needs-approval"
+        | "needs-grown-up"
+        | "not-startable"
+        | "not-theirs"
+        | "unreachable";
       readonly message: string;
       readonly requestId?: string;
     };
@@ -29,13 +34,24 @@ async function ask(
     const record =
       typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
     const error = record["error"];
-    if (error === "needs-approval" || error === "needs-grown-up" || error === "not-startable") {
+    if (
+      error === "needs-approval" ||
+      error === "needs-grown-up" ||
+      error === "not-startable" ||
+      error === "not-theirs"
+    ) {
       return {
         ok: false,
         reason: error,
         message: typeof record["message"] === "string" ? record["message"] : UNREACHABLE,
         ...(typeof record["requestId"] === "string" ? { requestId: record["requestId"] } : {}),
       };
+    }
+    if (
+      typeof record["message"] === "string" &&
+      record["message"].includes("That's not yours to open")
+    ) {
+      return { ok: false, reason: "not-theirs", message: record["message"] };
     }
     const status = response.ok ? parsePreviewStatus(parsed) : null;
     return status === null

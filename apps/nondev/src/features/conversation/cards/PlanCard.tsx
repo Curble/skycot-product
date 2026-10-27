@@ -21,7 +21,7 @@ import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
 import { replacedByNewerPlan } from "../plans";
 import { useChildView } from "../../../app/useChildView";
-import { kidSafeText } from "../kidSafeText";
+import { kidSafePlan } from "../kidSafeText";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -113,7 +113,7 @@ export function PlanCard({
         <CardHeader icon={ListChecks} tone="blue" title="Here's my plan" subtitle={subtitle} />
         <CardBody>
           <Markdown
-            text={childView ? kidSafeText(item.markdown) : item.markdown}
+            text={childView ? kidSafePlan(item.markdown) : item.markdown}
             className="fm-md--plan"
           />
           {state === "actionable" ? <p className="fm-plan__note">{card.ifYouSayNo}</p> : null}

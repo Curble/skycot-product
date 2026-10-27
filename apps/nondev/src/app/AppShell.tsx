@@ -1,7 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
+import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import type {
   EnvironmentId,
   OrchestrationV2ThreadShell,
+  ServerConfig,
   ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
@@ -16,7 +18,12 @@ import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
 import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
 import { PreviewPanel } from "../features/preview/PreviewPanel";
-import { closePreview, usePreviewElsewhere, usePreviewOpen } from "../features/preview/store";
+import {
+  closePreview,
+  shouldClosePreviewOnRouteChange,
+  usePreviewElsewhere,
+  usePreviewOpen,
+} from "../features/preview/store";
 import { catalogEntryFor } from "../features/settings/providerCatalog";
 import { ReadyNotifier } from "../features/updates/ReadyNotifier";
 import { UpdatePill } from "../features/updates/UpdatePill";
@@ -50,6 +57,12 @@ import { TitleBar } from "./TitleBar";
 import { useColumns, type Columns } from "./useColumns";
 import { useChildView } from "./useChildView";
 import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
+import { APP_VERSION } from "~/branding";
+import { canReloadForEngineUpdate, engineBuildIsNewer } from "./engineUpdate";
+
+const EMPTY_CONFIG_ATOM = Atom.make<ServerConfig | null>(null).pipe(
+  Atom.withLabel("nondev-app-shell:empty-config"),
+);
 
 /**
  * The Messages window. Decides which columns exist at this width and which
@@ -77,14 +90,47 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   useEffect(() => {
     const previous = previousRoute.current;
     previousRoute.current = route;
-    if (
-      previous.name === "thread" &&
-      (route.name !== "thread" || route.threadId !== previous.threadId)
-    ) {
+    if (shouldClosePreviewOnRouteChange(previous, route)) {
       closePreview();
     }
   }, [route]);
   const columns = useColumns();
+  const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
+  const config = useAtomValue(
+    environmentIds[0] === undefined
+      ? EMPTY_CONFIG_ATOM
+      : serverEnvironment.configValueAtom(environmentIds[0]),
+  );
+  const threadShells = useAtomValue(environmentThreadShells.navigationThreadShellsAtom);
+  useEffect(() => {
+    const engineBuild = config?.environment.serverVersion ?? null;
+    if (!engineBuildIsNewer(engineBuild, APP_VERSION)) return;
+    const key = `skycot:reloaded-for:${engineBuild}`;
+    const reloadWhenIdle = () => {
+      try {
+        if (sessionStorage.getItem(key) === "1") return true;
+      } catch {
+        // Reloading is still safe when this browser blocks session storage.
+      }
+      const hasUnsentText = [...document.querySelectorAll("textarea, input")].some(
+        (field) => (field as HTMLTextAreaElement | HTMLInputElement).value.trim().length > 0,
+      );
+      const hasActiveRun = threadShells.some((thread) => threadRuntimeIsActive(thread.runtime));
+      if (!canReloadForEngineUpdate({ hasActiveRun, hasUnsentText })) return false;
+      try {
+        sessionStorage.setItem(key, "1");
+      } catch {
+        // This page reloads once; the next build will have a different key.
+      }
+      window.location.reload();
+      return true;
+    };
+    if (reloadWhenIdle()) return;
+    const timer = window.setInterval(() => {
+      if (reloadWhenIdle()) window.clearInterval(timer);
+    }, 2_000);
+    return () => window.clearInterval(timer);
+  }, [config?.environment.serverVersion, threadShells]);
   const shell = useShellState();
   const childView = useChildView();
   const selectedThreadId: ThreadId | null = route.name === "thread" ? route.threadId : null;

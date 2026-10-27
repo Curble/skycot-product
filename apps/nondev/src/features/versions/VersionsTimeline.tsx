@@ -8,7 +8,13 @@ import { restoreExplainerFor } from "../../plain/versions";
 import { Button } from "../../ui/Button";
 import { Pill, type PillTone } from "../../ui/Pill";
 import { RestoreSheet } from "./RestoreSheet";
-import { formatVersionTime, useVersionsTimeline, type NumberedVersion } from "./timeline";
+import {
+  formatVersionTime,
+  timelineLabel,
+  timelineTitle,
+  useVersionsTimeline,
+  type NumberedVersion,
+} from "./timeline";
 import { useChildView } from "../../app/useChildView";
 
 const KIND_TONE: Record<NumberedVersion["kind"], PillTone> = {
@@ -71,9 +77,11 @@ export function VersionsTimeline({
               >
                 <div className="fm-tm__text">
                   <span className="fm-tm__title">
-                    {entry.number ? `Version ${entry.number}` : entry.label}
+                    {timelineTitle(entry.number, entry.label, childView)}
                   </span>
-                  {entry.number ? <RailLabel label={entry.label} /> : null}
+                  {entry.number ? (
+                    <RailLabel label={timelineLabel(entry.label, childView)} />
+                  ) : null}
                   <span className="fm-tm__meta">
                     {formatVersionTime(entry.timestamp)}
                     {entry.isCurrent ? " · now" : ""}

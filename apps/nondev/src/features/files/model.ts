@@ -160,9 +160,10 @@ export function changedAgo(at: number | null, now: number): string | null {
 }
 
 /** The row's second line: "Picture · 24 KB · changed 5 minutes ago". */
-export function entryDetails(entry: FilesEntry, now: number): string {
+export function entryDetails(entry: FilesEntry, now: number, childView = false): string {
   const parts: Array<string> = [FILE_KIND_LABEL[kindOfEntry(entry)]];
-  if (entry.kind === "file" && entry.size !== null) parts.push(formatSize(entry.size));
+  if (!childView && entry.kind === "file" && entry.size !== null)
+    parts.push(formatSize(entry.size));
   const changed = changedAgo(entry.modifiedAt, now);
   if (changed !== null) parts.push(changed);
   return parts.join(" · ");

@@ -184,13 +184,14 @@ export function askWhoStarted(threadIds: ReadonlyArray<string>): void {
 export async function chooseChild(childId: string): Promise<FamilyResult<SessionLimits>> {
   const before = readLimits().session?.childId ?? null;
   const result = await familyApi.choose({ childId });
-  if (result.ok) applySessionLimits(result.value);
   // Another child than before on the shared Mac: the window starts fresh, with the previous
-  // child's cached conversations and projects deleted before anything shows (freshStart.ts).
+  // child's cache and every in-memory atom discarded before the new child's session is applied.
   if (result.ok && before !== null && before !== childId) {
     markFreshStart();
     window.location.hash = HOME_HREF;
     window.location.reload();
+  } else if (result.ok) {
+    applySessionLimits(result.value);
   }
   return result;
 }

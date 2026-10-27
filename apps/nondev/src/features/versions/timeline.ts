@@ -283,6 +283,15 @@ const sameDay = (a: Date, b: Date) =>
   a.getDate() === b.getDate();
 
 /** "8:41 am" today, "Thu 8:41 am" this week, "9 Oct, 8:41 am" otherwise. */
+export function timelineTitle(number: number | null, label: string, childView: boolean): string {
+  if (number === null) return label;
+  return childView ? `Try ${number}` : `Version ${number}`;
+}
+
+export function timelineLabel(label: string, childView: boolean): string {
+  return childView ? label.replace(/\s*\(\+\d+ \/ −\d+ lines?\)$/, "") : label;
+}
+
 export function formatVersionTime(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";

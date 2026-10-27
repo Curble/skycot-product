@@ -1,5 +1,6 @@
 // nondev-seam: skycot-policy-reactor-network-guard-test
 // nondev-seam: skycot-project-approval-enforcement-test
+// nondev-seam: skycot-alternate-write-hold-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -1425,6 +1426,40 @@ describe("SkycotPolicyReactor", () => {
         }),
       );
     });
+
+    it.effect("holds the same outside write when Sam switches from file edit to shell", () =>
+      Effect.gen(function* () {
+        yield* markBuild;
+        const fileEdit = yield* run(
+          buildTurn([approvalItem("file-change", "write /tmp/outside.html")]),
+          requestEvent(request("file-change")),
+        );
+        const shellWrite = yield* run(
+          buildTurn([approvalItem("command"), commandItem("cat > /tmp/outside.html")]),
+          requestEvent(request("command")),
+        );
+        assert.equal(fileEdit.outcome.type, "held");
+        assert.equal(shellWrite.outcome.type, "held");
+        if (fileEdit.outcome.type === "held" && shellWrite.outcome.type === "held") {
+          assert.isTrue(fileEdit.outcome.family?.needsGrownUp);
+          assert.isTrue(shellWrite.outcome.family?.needsGrownUp);
+          assert.equal(fileEdit.outcome.evaluation.risk, "high");
+          assert.equal(shellWrite.outcome.evaluation.risk, "high");
+          assert.include(
+            fileEdit.outcome.evaluation.matches.map((match) => match.rule.id),
+            "outside-project",
+          );
+          assert.include(
+            shellWrite.outcome.evaluation.matches.map((match) => match.rule.id),
+            "outside-project",
+          );
+          assert.deepEqual(fileEdit.dispatched, []);
+          assert.deepEqual(shellWrite.dispatched, []);
+        }
+        assert.deepEqual(fileEdit.dispatched, []);
+        assert.deepEqual(shellWrite.dispatched, []);
+      }),
+    );
 
     it.effect("with the profile off, a Family-style thread is not governed (unchanged)", () =>
       Effect.gen(function* () {

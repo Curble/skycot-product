@@ -10,6 +10,7 @@ import * as Path from "effect/Path";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
+import * as SkycotFamilyVisibility from "../family-devices/SkycotFamilyVisibility.ts";
 import * as SkycotFiles from "./SkycotFiles.ts";
 
 const CODE = "482913";
@@ -17,6 +18,8 @@ const SESSION = "session-1";
 const PROJECT = ProjectId.make("project:pets");
 const THREAD = ThreadId.make("thread:pets");
 const OTHER_THREAD = ThreadId.make("thread:elsewhere");
+const SIBLING_THREAD = ThreadId.make("thread:sibling");
+const OWN_THREAD = ThreadId.make("thread:own");
 
 /**
  * A project folder beside a "rest of the disk" folder, with the files a child's project has,
@@ -92,9 +95,37 @@ const withFiles = <A, E, R>(
                   worktreePath: outside,
                   deletedAt: null,
                 } as never)
-              : Effect.die("no such thread"),
+              : threadId === SIBLING_THREAD || threadId === OWN_THREAD
+                ? Effect.succeed({
+                    projectId: PROJECT,
+                    worktreePath: copy,
+                    deletedAt: null,
+                  } as never)
+                : Effect.die("no such thread"),
       }),
     );
+    const visibility = Layer.mock(SkycotFamilyVisibility.SkycotFamilyVisibility)({
+      childViewFor: (sessionId) =>
+        Effect.succeed(
+          sessionId === "child-device" || sessionId === "shared-mac-child"
+            ? {
+                childId: "leo",
+                owners: {
+                  threads: { [String(SIBLING_THREAD)]: "ava", [String(OWN_THREAD)]: "leo" },
+                  projects: {},
+                },
+                pinned: new Set(),
+                ...(sessionId === "shared-mac-child" ? { sharedSession: true } : {}),
+              }
+            : null,
+        ),
+      allows: (view, referenced) =>
+        Effect.succeed(
+          referenced.threadIds.every((threadId) => view.owners.threads[threadId] === view.childId),
+        ),
+      filterShellStream: (_sessionId, stream) => stream,
+      filterArchivedStream: (_sessionId, stream) => stream,
+    });
     const layerFamily = SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME));
     return yield* Effect.gen(function* () {
       const files = yield* SkycotFiles.SkycotFiles;
@@ -103,7 +134,7 @@ const withFiles = <A, E, R>(
     }).pipe(
       Effect.provide(
         Layer.effect(SkycotFiles.SkycotFiles, SkycotFiles.make).pipe(
-          Layer.provideMerge(Layer.merge(layerStores, layerFamily)),
+          Layer.provideMerge(Layer.mergeAll(layerStores, layerFamily, visibility)),
         ),
       ),
     );
@@ -198,6 +229,27 @@ it.layer(NodeServices.layer)("SkycotFiles", (it) => {
           ),
           "no-project",
         );
+      }),
+    ),
+  );
+
+  // nondev-seam: skycot-files-child-ownership-test
+  it.effect("refuses sibling conversation files on a child device and chosen shared Mac", () =>
+    withFiles(({ files }) =>
+      Effect.gen(function* () {
+        for (const sessionId of ["child-device", "shared-mac-child"]) {
+          assert.equal(
+            yield* reasonOf(
+              files.list({ sessionId, projectId: PROJECT, threadId: SIBLING_THREAD, path: "" }),
+            ),
+            "not-theirs",
+          );
+          assert.equal(
+            (yield* files.list({ sessionId, projectId: PROJECT, threadId: OWN_THREAD, path: "" }))
+              .privateCopy,
+            true,
+          );
+        }
       }),
     ),
   );

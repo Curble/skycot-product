@@ -4,7 +4,14 @@ import { checkpoint } from "../../plain/fixtures.test-helpers";
 import { buildVersionsTimeline } from "../../plain/versions";
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
 
-import { buildTimeline, decorateTimeline, START_LABEL, UNDONE_BLOCKER } from "./timeline";
+import {
+  buildTimeline,
+  decorateTimeline,
+  START_LABEL,
+  timelineLabel,
+  timelineTitle,
+  UNDONE_BLOCKER,
+} from "./timeline";
 
 const at = (minute: number) => `2026-10-21T09:${String(minute).padStart(2, "0")}:00.000Z`;
 const start = checkpoint({ id: "c0", ordinalWithinScope: 0, capturedAt: at(0), files: [] });
@@ -15,6 +22,15 @@ const two = checkpoint({
   ordinalWithinScope: 3,
   capturedAt: at(10),
   files: [{ path: "menu.html", kind: "M", additions: 2, deletions: 1 }],
+});
+
+describe("child version words", () => {
+  it("uses tries and hides line counts", () => {
+    expect(timelineTitle(2, "Changed 1 file (+118 / −15 lines)", true)).toBe("Try 2");
+    expect(timelineLabel("Changed 1 file (+118 / −15 lines)", true)).toBe("Changed 1 file");
+    expect(timelineTitle(2, "Changed 1 file", false)).toBe("Version 2");
+    expect(timelineLabel("Changed 1 file (+118 / −15 lines)", false)).toContain("+118");
+  });
 });
 
 describe("decorateTimeline", () => {

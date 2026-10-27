@@ -6,6 +6,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { projectEnvironment } from "../../state/projects";
 import { showToast } from "../../ui/Toast";
 import { isFamilyRefusal } from "../family/cards";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import type { TidyOutcome } from "../tidy/useTidy";
 import type { ProjectChange } from "./projectIcons";
 
@@ -39,6 +40,7 @@ export function useProjectTidy() {
     if (outcome._tag === "Failure") {
       const cause = squashAtomCommandFailure(outcome);
       const message = cause instanceof Error ? cause.message : String(cause);
+      if (isNotTheirsMessage(message)) returnHomeFromOwnershipRefusal(message);
       return { ok: false, message: isFamilyRefusal(message) ? message : DIDNT_GO };
     }
     if (options.toast !== false) {

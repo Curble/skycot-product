@@ -10,8 +10,8 @@ describe("child work visibility", () => {
     ]);
   });
 
-  it("keeps shared and own projects, including a sibling project with the child's own work", () => {
-    const projects = [{ id: "shared" }, { id: "leo" }, { id: "ava" }];
+  it("keeps only the child's projects and a sibling project with the child's own work", () => {
+    const projects = [{ id: "developer" }, { id: "leo" }, { id: "ava" }];
     expect(
       projectsForChild(
         projects,
@@ -20,7 +20,7 @@ describe("child work visibility", () => {
         "leo",
         new Set(),
       ),
-    ).toEqual([{ id: "shared" }, { id: "leo" }]);
+    ).toEqual([{ id: "leo" }]);
     expect(
       projectsForChild(
         projects,
@@ -29,6 +29,6 @@ describe("child work visibility", () => {
         "leo",
         new Set(["ava"]),
       ),
-    ).toEqual(projects);
+    ).toEqual([{ id: "leo" }, { id: "ava" }]);
   });
 });

@@ -34,7 +34,11 @@ import { Banner, Button, Card, Row, Section, Symbol, Txt, haptic } from "../../u
 import { useTheme } from "../../ui/theme";
 import { VoiceButton } from "./VoiceButton";
 import { titleFrom } from "./titles";
-import { starterPlaceholders } from "./starterPlaceholders";
+import {
+  selectStarterPlaceholder,
+  starterPlaceholders,
+  type StarterDraft,
+} from "./starterPlaceholders";
 import { shouldShowDestinationPicker } from "./destinationPicker";
 
 type Target = { readonly macId: string; readonly projectId: string | null };
@@ -48,6 +52,8 @@ export function NewConversationScreen() {
   const starter =
     KID_STARTERS.find((candidate) => candidate.id === route.params?.starterId) ?? null;
   const [text, setText] = useState(() => (starter ? starterPrompt(starter) : ""));
+  const [selection, setSelection] = useState<StarterDraft["selection"]>({ start: 0, end: 0 });
+  const [makeNewPage, setMakeNewPage] = useState(true);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [shieldShown, setShieldShown] = useState(false);
@@ -103,7 +109,10 @@ export function NewConversationScreen() {
     setBusy(true);
     setProblem(null);
     try {
-      const projectId = target.projectId ?? (await openQuestions(mac.transport)).projectId;
+      const projectId =
+        target.projectId === null || (projects.length > 0 && makeNewPage)
+          ? (await openQuestions(mac.transport)).projectId
+          : target.projectId;
       const { threadId } = await startConversation(mac.transport, {
         projectId,
         title:
@@ -193,9 +202,15 @@ export function NewConversationScreen() {
               <TextInput
                 ref={input}
                 value={text}
+                selection={selection}
+                onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
                 onChangeText={(value) => {
                   setText(value);
                   setShieldShown(false);
+                  setSelection((current) => {
+                    const caret = Math.min(current.start, value.length);
+                    return { start: caret, end: caret };
+                  });
                 }}
                 multiline
                 autoFocus={starter === null}
@@ -227,7 +242,7 @@ export function NewConversationScreen() {
                 <Txt variant="caption" tone="label3">
                   {starter
                     ? "Change the words in [brackets], then Send."
-                    : `${BUILDER_NAME} shows you a plan before making anything.`}
+                    : `${BUILDER_NAME} shows you a plan for big things.`}
                 </Txt>
                 {voiceAllowed ? (
                   <VoiceButton
@@ -247,15 +262,35 @@ export function NewConversationScreen() {
                     accessibilityLabel={`Replace ${placeholder.text}`}
                     onPress={() => {
                       input.current?.focus();
-                      input.current?.setNativeProps({
-                        selection: { start: placeholder.start, end: placeholder.end },
-                      });
+                      const next = selectStarterPlaceholder(
+                        text,
+                        placeholder.start,
+                        placeholder.end,
+                      );
+                      setSelection(next.selection);
                     }}
                   >
                     <Txt tone="accent">{placeholder.text}</Txt>
                   </Pressable>
                 ))}
               </View>
+            ) : null}
+            {target?.projectId !== null && projects.length > 0 ? (
+              <Card style={{ gap: 8 }}>
+                <Txt variant="subheadline" weight="600">
+                  What should Sam do?
+                </Txt>
+                <Button
+                  title="Make a new one"
+                  kind={makeNewPage ? "tinted" : "grey"}
+                  onPress={() => setMakeNewPage(true)}
+                />
+                <Button
+                  title="Change this one"
+                  kind={makeNewPage ? "grey" : "tinted"}
+                  onPress={() => setMakeNewPage(false)}
+                />
+              </Card>
             ) : null}
             {shieldShown && caught !== null ? (
               <Card style={{ gap: 10 }}>

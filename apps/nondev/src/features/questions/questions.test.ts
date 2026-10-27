@@ -11,11 +11,12 @@ import {
 } from "./questions";
 
 const ENV = "env-1";
-const project = (id: string, workspaceRoot: string, isScratch = false) => ({
+const project = (id: string, workspaceRoot: string, isScratch = false, createdAt = "") => ({
   environmentId: ENV,
   id,
   title: id,
   workspaceRoot,
+  createdAt,
   ...(isScratch ? { isScratch: true as const } : {}),
 });
 const SPACE = "/Users/ava/.skycot/scratch";
@@ -34,8 +35,13 @@ const target = (over: Partial<Parameters<typeof composeTargetFor>[0]>) =>
   });
 
 describe("where a new conversation goes", () => {
-  it("asks when there are several projects and nothing was chosen", () => {
-    expect(target({})).toBeNull();
+  it("starts in the newest project when several projects exist and nothing was chosen", () => {
+    const older = project("older", "/Users/ava/older", false, "2026-01-01");
+    const newest = project("newest", "/Users/ava/newest", false, "2026-02-01");
+    expect(target({ projects: [questions, older, newest], defaultToNewest: true })).toEqual({
+      kind: "project",
+      project: newest,
+    });
   });
 
   it("follows the person's pick in the box, then the sidebar, then the last one used", () => {

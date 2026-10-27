@@ -232,6 +232,14 @@ describe("evaluateCommand — outside the project and secrets", () => {
     expect(ids("cat ~/.zshrc")).toContain("reads-outside-project");
   });
 
+  it("treats a cat redirection target outside the project as a write", () => {
+    const result = evaluateCommand("cat > /tmp/outside.html", { projectRoot: ROOT });
+    expect(result.decision).toBe("hold");
+    expect(result.risk).toBe("high");
+    expect(result.matches.map((match) => match.rule.id)).toContain("outside-project");
+    expect(result.matches.map((match) => match.rule.id)).not.toContain("reads-outside-project");
+  });
+
   it("treats the private copy as inside and /dev/null as harmless", () => {
     expect(ids("cat /Users/me/site/menu.html")).toEqual([]);
     expect(ids("cat /Users/me/site-old/menu.html")).toContain("reads-outside-project");

@@ -169,7 +169,7 @@ export function ConversationView({
     }, 1500);
     return () => window.clearTimeout(timer);
   }, [notTheirs]);
-  const fullProjection = state ? Option.getOrNull(state.data) : null;
+  const fullProjection = state && !notTheirs ? Option.getOrNull(state.data) : null;
   // A child never sees the assistant's own housekeeping (plan-mode notes, tool look-ups).
   const projection = useMemo(
     () =>

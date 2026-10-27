@@ -12,3 +12,12 @@ export function kidSafeText(text: string): string {
     .replace(/letting SKYCOT pause for approval/giu, "asking a grown-up for help")
     .replace(/\*\*|__|~~|[*_]/gu, "");
 }
+
+/** Keep only the numbered steps from a plan; headings and setup notes are for Sam. */
+export function kidSafePlan(markdown: string): string {
+  return markdown
+    .split(/\r?\n/u)
+    .filter((line) => /^\s*\d+[.)]\s+/u.test(line))
+    .map((line) => kidSafeText(line.trim()))
+    .join("\n");
+}

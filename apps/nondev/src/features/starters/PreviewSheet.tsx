@@ -22,6 +22,7 @@ import { Sheet } from "../../ui/Sheet";
 import { openItChoice, useOfflinePreviewDocument, usesModules } from "./preview";
 import { Mascot } from "../brand/Mascot";
 import { useChildView } from "../../app/useChildView";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import { useSealedInternet } from "../page-internet/useSealedInternet";
 import { FullscreenPage } from "../preview/FullscreenPage";
@@ -132,6 +133,10 @@ export function PreviewSheet({
       const answer = await filesApi.read(at, relativePath);
       if (cancelled) return;
       if (!answer.ok) {
+        if (isNotTheirsMessage(answer.message)) {
+          returnHomeFromOwnershipRefusal(answer.message);
+          return;
+        }
         if (!watching) setLoad({ state: "problem", message: answer.message });
         return;
       }

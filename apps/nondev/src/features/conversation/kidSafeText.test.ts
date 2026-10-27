@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { kidSafeText } from "./kidSafeText";
+import { kidSafePlan, kidSafeText } from "./kidSafeText";
 
 describe("kidSafeText", () => {
   it("hides code, addresses and developer wording while keeping the sentence", () => {
@@ -21,5 +21,15 @@ describe("kidSafeText", () => {
 
   it("removes markdown markers that the phone cannot render", () => {
     expect(kidSafeText("**How I did it:** I drew a box.")).toBe("How I did it: I drew a box.");
+  });
+});
+
+describe("kidSafePlan", () => {
+  it("shows only numbered steps in kid words", () => {
+    expect(
+      kidSafePlan(
+        "CONTEXT\nPLAN\n1. Draw a big star.\n2. Run `node test.mjs` and check the page.\nTHINGS\nVerification: done",
+      ),
+    ).toBe("1. Draw a big star.\n2. Run something behind the scenes and check the page.");
   });
 });

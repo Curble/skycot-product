@@ -13,6 +13,7 @@ import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { formatVersionTime, restoreSentence } from "./timeline";
 import { useChildView } from "../../app/useChildView";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 
 export type RestoreIntent = "undo" | "restore";
 
@@ -81,7 +82,10 @@ export function RestoreSheet({
     });
     setBusy(false);
     if (outcome._tag === "Failure") {
-      setProblem(plainRestoreProblem(squashAtomCommandFailure(outcome)));
+      const cause = squashAtomCommandFailure(outcome);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (isNotTheirsMessage(message)) returnHomeFromOwnershipRefusal(message);
+      setProblem(plainRestoreProblem(cause));
       return;
     }
     void reportBadgeEvent({ type: "undo", threadId });
@@ -159,6 +163,7 @@ export function RestoreSheet({
 /** The engine's reasons, in household English. Never a raw error string. */
 export function plainRestoreProblem(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
+  if (isNotTheirsMessage(message)) return "That's not yours to open.";
   if (/isolated worktree|shared/i.test(message))
     return "This project folder is shared with other work, so files can't be rolled back here.";
   if (/stale|missing|unavailable|cannot be restored/i.test(message))

@@ -7,6 +7,7 @@ import {
   ThreadId,
   WS_METHODS,
   WsSubscribeServerConfigRpc,
+  WsProjectsCreateNewRpc,
   type OrchestrationV2StoredEvent,
   type OrchestrationProjectShell,
   type ServerConfig,
@@ -15,6 +16,7 @@ import {
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
@@ -94,6 +96,7 @@ import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as ServerConfigModule from "./config.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as SkycotFamilyGate from "./skycot/SkycotFamilyGate.ts";
 
 import * as EventStore from "./orchestration-v2/EventStore.ts";
 import * as ProjectionMaintenance from "./orchestration-v2/ProjectionMaintenance.ts";
@@ -532,6 +535,130 @@ it.effect(
       ),
       Effect.scoped,
     ),
+);
+
+// nondev-seam: skycot-child-project-folder-ws-test
+it.effect("creates a chosen child's project under the Family gate's questions space", () =>
+  Effect.gen(function* () {
+    const createdInputs: Array<{ readonly name: string; readonly parentRoot?: string }> = [];
+    const recorded: Array<{ readonly sessionId: string; readonly projectId: ProjectId }> = [];
+    const previewBroker = {
+      connect: () => Effect.succeed(Stream.empty),
+      focusHost: () => Effect.void,
+      respond: () => Effect.void,
+      invoke: () => Effect.die("Preview automation is unused in this RPC test"),
+    };
+    const serverBrowser = {
+      attachViewer: () => Effect.die("Browser automation is unused in this RPC test"),
+      answerFileChooser: () => Effect.succeed(false),
+      openDownload: () => Effect.succeed(Option.none()),
+      clearProfile: () => Effect.void,
+      reportProfiles: () => Effect.void,
+    };
+    const services = Layer.mergeAll(
+      layerUnusedConfigRpcServices,
+      Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+        scratchRoot: Effect.succeedNone,
+        namedProjectsRoot: "/t3/projects",
+        createNamedProject: (input) => {
+          createdInputs.push(input);
+          return Effect.succeed({
+            projectId: ProjectId.make("project:leo-game"),
+            workspaceRoot: `${input.parentRoot}/leo-game`,
+          });
+        },
+      }),
+      Layer.mock(SkycotFamilyGate.SkycotFamilyGate)({
+        childProjectHome: (sessionId) =>
+          Effect.succeed(
+            sessionId === AuthSessionId.make("child-session")
+              ? Option.some({ childId: "leo", parentRoot: "/questions/children/leo/projects" })
+              : Option.none(),
+          ),
+        recordChildProject: (input) =>
+          Effect.sync(() => {
+            recorded.push(input);
+          }),
+      }),
+      Layer.mock(ServerEnvironment.ServerEnvironment)({
+        getDescriptor: Effect.succeed({
+          environmentId: EnvironmentId.make("ws-project-test"),
+          label: "WS project test",
+          platform: { os: "darwin", arch: "arm64" },
+          serverVersion: "0.0.0",
+          capabilities: { repositoryIdentity: false },
+        }),
+      }),
+      Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+        getDescriptor: () =>
+          Effect.succeed({
+            policy: "loopback-browser",
+            bootstrapMethods: [],
+            sessionMethods: ["browser-session-cookie"],
+            sessionCookieName: "ws-project-test-session",
+          }),
+      }),
+      Layer.mock(ExternalLauncher.ExternalLauncher)({
+        resolveAvailableEditors: () => Effect.succeed([]),
+        resolveFileManagerRevealKind: () => Effect.succeed(undefined),
+      }),
+      Layer.mock(ProviderRegistry.ProviderRegistry)({
+        getProviders: Effect.succeed([]),
+        streamChanges: Stream.never,
+      }),
+      Layer.mock(UsageLimitSources.UsageLimitSources)({ streamChanges: Stream.empty }),
+      Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({ resolveTargets: () => Effect.succeed([]) }),
+      Layer.mock(DirectEndpoints.DirectEndpoints)({ resolve: () => Effect.succeed([]) }),
+      Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
+      Layer.mock(ServerBrowser.ServerBrowser)({}),
+    );
+    const responses = yield* Queue.unbounded<unknown>();
+    const server = yield* RpcServer.makeNoSerialization(RpcGroup.make(WsProjectsCreateNewRpc), {
+      ...WS_RPC_SERVER_OPTIONS,
+      onFromServer: (response) =>
+        response._tag === "Chunk"
+          ? Effect.forEach(response.values, (value) => Queue.offer(responses, value), {
+              discard: true,
+            })
+          : Effect.asVoid(Queue.offer(responses, response)),
+    }).pipe(
+      Effect.provide(
+        layerWsRpc(
+          {
+            sessionId: AuthSessionId.make("child-session"),
+            subject: "child-session",
+            method: "browser-session-cookie",
+            scopes: [],
+          },
+          {},
+          {},
+          previewBroker,
+          serverBrowser,
+        ).pipe(Layer.provide(Layer.merge(services, layerConfigSources))),
+      ),
+    );
+    const requestId = RpcMessage.RequestId("child-project");
+    yield* server.write(0, { _tag: "Ack", requestId });
+    const request = server.write(0, {
+      _tag: "Request",
+      id: requestId,
+      tag: WS_METHODS.projectsCreateNew,
+      payload: { name: "Leo game" },
+      headers: Headers.empty,
+    });
+    yield* request;
+    const response = yield* Queue.take(responses);
+    assert.isNotNull(response, JSON.stringify(response));
+    assert.deepEqual(createdInputs, [
+      { name: "Leo game", parentRoot: "/questions/children/leo/projects" },
+    ]);
+    assert.deepEqual(recorded, [
+      {
+        sessionId: AuthSessionId.make("child-session"),
+        projectId: ProjectId.make("project:leo-game"),
+      },
+    ]);
+  }).pipe(Effect.scoped),
 );
 
 // Compaction keeps the oldest and newest event per message, so a cursor older

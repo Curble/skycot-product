@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, FileText, Folder, FolderOpen, Lock } from "l
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { useColumns } from "../../app/useColumns";
+import { useChildView } from "../../app/useChildView";
 import { navigate, threadHref } from "../../router";
 import { projectAtomOrEmpty } from "../../state/projects";
 import { environmentThreadShells } from "../../state/threads";
@@ -22,6 +23,7 @@ import { SearchField } from "../../ui/SearchField";
 import { Switch } from "../../ui/Switch";
 import { conversationTitle } from "../conversation/status";
 import { useFamily } from "../family/FamilyProvider";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import { filesApi, type FilesPlace } from "./api";
 import {
   crumbsOf,
@@ -69,6 +71,7 @@ export function FilesScreen({
       : environmentThreadShells.threadShellAtom({ environmentId, threadId }),
   );
   const family = useFamily();
+  const childView = useChildView();
   const columns = useColumns();
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const [path, setPath] = useState("");
@@ -84,6 +87,10 @@ export function FilesScreen({
     let cancelled = false;
     void filesApi.list({ projectId, threadId }, path).then((answer) => {
       if (cancelled) return;
+      if (!answer.ok && isNotTheirsMessage(answer.message)) {
+        returnHomeFromOwnershipRefusal(answer.message);
+        return;
+      }
       setLoad(
         answer.ok
           ? { state: "ready", listing: answer.value }
@@ -242,6 +249,7 @@ export function FilesScreen({
                 key={entry.path}
                 entry={entry}
                 now={now}
+                childView={childView}
                 onOpen={() => (entry.kind === "folder" ? open(entry.path) : setLooking(entry))}
               />
             ))}
@@ -282,10 +290,12 @@ function emptyTitle(search: string, listing: FilesListing): string {
 function FileRow({
   entry,
   now,
+  childView,
   onOpen,
 }: {
   readonly entry: FilesEntry;
   readonly now: number;
+  readonly childView: boolean;
   readonly onOpen: () => void;
 }) {
   const kind = kindOfEntry(entry);
@@ -303,7 +313,7 @@ function FileRow({
         </span>
         <span className="fm-files__text">
           <span className="fm-files__name">{entry.name}</span>
-          <span className="fm-files__details">{entryDetails(entry, now)}</span>
+          <span className="fm-files__details">{entryDetails(entry, now, childView)}</span>
         </span>
         {entry.kind === "folder" ? (
           <ChevronRight size={14} strokeWidth={1.8} className="fm-files__chevron" aria-hidden />

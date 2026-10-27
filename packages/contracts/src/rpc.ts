@@ -1252,7 +1252,8 @@ const WsProjectsEnsureScratchRpc = Rpc.make(WS_METHODS.projectsEnsureScratch, {
   error: Schema.Union([OrchestrationDispatchCommandError, EnvironmentAuthorizationError]),
 });
 
-const WsProjectsCreateNewRpc = Rpc.make(WS_METHODS.projectsCreateNew, {
+// nondev-seam: skycot-child-project-folder-ws-rpc-schema
+export const WsProjectsCreateNewRpc = Rpc.make(WS_METHODS.projectsCreateNew, {
   payload: ProjectCreateNewInput,
   success: ProjectCreateNewResult,
   error: Schema.Union([OrchestrationDispatchCommandError, EnvironmentAuthorizationError]),

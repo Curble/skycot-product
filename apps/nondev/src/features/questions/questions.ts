@@ -34,6 +34,7 @@ interface ProjectLike {
   readonly id: string;
   readonly workspaceRoot: string;
   readonly isScratch?: boolean | undefined;
+  readonly createdAt?: string | undefined;
 }
 
 export const keyOf = (project: { readonly environmentId: string; readonly id: string }) =>
@@ -109,9 +110,13 @@ export function composeTargetFor<P extends ProjectLike>(input: {
   readonly chosen: string | null;
   readonly preferredKey: string | null;
   readonly last: { readonly environmentId: string; readonly projectId: string } | null;
+  /** A child always starts in their newest owned project instead of a sibling's old choice. */
+  readonly defaultToNewest?: boolean | undefined;
 }): ComposeTarget<P> | null {
   const { projects, questionsAvailable } = input;
-  const own = realProjects(projects);
+  const own = realProjects(projects).toSorted((left, right) =>
+    (right.createdAt ?? "").localeCompare(left.createdAt ?? ""),
+  );
   const question = questionsAvailable ? ({ kind: "question" } as const) : null;
   const byKey = (key: string | null): ComposeTarget<P> | null => {
     if (key === null) return null;
@@ -126,7 +131,9 @@ export function composeTargetFor<P extends ProjectLike>(input: {
     byKey(input.chosen) ??
     byKey(input.preferredKey) ??
     last ??
-    (own.length === 1 ? { kind: "project", project: own[0]! } : null) ??
+    (own.length === 1 || (input.defaultToNewest === true && own.length > 0)
+      ? { kind: "project", project: own[0]! }
+      : null) ??
     (own.length === 0 ? question : null)
   );
 }

@@ -40,6 +40,7 @@ import { catalogEntryFor } from "../settings/providerCatalog";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import { projectsForChild, rowsForChild } from "../family-limits/order";
 import { noteStartedHere, useLimits } from "../family-limits/store";
 import { familyApi } from "../family/api"; // nondev-seam: skycot-project-memory
@@ -171,6 +172,7 @@ export function NewConversationComposer({
     chosen: chosenKey,
     preferredKey: preferredProjectKey,
     last: lastProject,
+    defaultToNewest: childView,
   });
   const project = target?.kind === "project" ? target.project : null;
   const asking = target?.kind === "question";
@@ -256,7 +258,7 @@ export function NewConversationComposer({
                         close();
                       }}
                     >
-                      {childView ? `Project ${index + 1}` : candidate.title}
+                      {candidate.title}
                     </MenuItem>
                   ))}
                 </>
@@ -728,6 +730,10 @@ function calm(error: unknown, childView = false, builder = "Sam"): string {
   const message = error instanceof Error ? error.message : String(error);
   // The screen stays plain-language; the real cause goes to the console for whoever debugs.
   console.warn("[skycot] starting a conversation failed:", error);
+  if (isNotTheirsMessage(message)) {
+    returnHomeFromOwnershipRefusal(message);
+    return "That's not yours to open.";
+  }
   if (/scope|permission|not allowed|unauthori/i.test(message)) {
     return "This connection isn't allowed to start conversations.";
   }

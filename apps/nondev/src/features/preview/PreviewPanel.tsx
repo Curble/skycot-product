@@ -37,6 +37,7 @@ import { useModal } from "../../ui/useModal";
 import { Mascot } from "../brand/Mascot";
 import { Disclosure } from "../conversation/cards/Disclosure";
 import { useFamily } from "../family/FamilyProvider";
+import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
 import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import {
   checkPreviewAddress,
@@ -85,6 +86,10 @@ function usePreviewAnswer(threadId: string, familyOn: boolean) {
       const mine = ++latest;
       const next = await fetchPreviewStatus(threadId);
       if (!live || mine !== latest) return;
+      if (!next.ok && isNotTheirsMessage(next.message)) {
+        returnHomeFromOwnershipRefusal(next.message);
+        return;
+      }
       setAnswer(next);
       // A Family page asks a grown-up soon after it tries the internet (internetAsks).
       const every =

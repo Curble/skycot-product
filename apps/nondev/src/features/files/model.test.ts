@@ -34,6 +34,9 @@ describe("rows", () => {
     expect(entryDetails(entry({ name: "cat.png", size: 24_300 }), NOW)).toBe(
       "Picture · 24 KB · changed 5 minutes ago",
     );
+    expect(entryDetails(entry({ name: "cat.png", size: 999 }), NOW, true)).toBe(
+      "Picture · changed 5 minutes ago",
+    );
     expect(entryDetails(entry({ name: "pictures", kind: "folder", size: null }), NOW)).toBe(
       "Folder · changed 5 minutes ago",
     );
