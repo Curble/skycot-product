@@ -58,7 +58,7 @@ import { useColumns, type Columns } from "./useColumns";
 import { useChildView } from "./useChildView";
 import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
 import { APP_VERSION } from "~/branding";
-import { canReloadForEngineUpdate, engineBuildIsNewer } from "./engineUpdate";
+import { canReloadForEngineUpdate, clientBundleStamp, engineBuildIsNewer } from "./engineUpdate";
 
 const EMPTY_CONFIG_ATOM = Atom.make<ServerConfig | null>(null).pipe(
   Atom.withLabel("nondev-app-shell:empty-config"),
@@ -104,8 +104,14 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   const threadShells = useAtomValue(environmentThreadShells.navigationThreadShellsAtom);
   useEffect(() => {
     const engineBuild = config?.environment.serverVersion ?? null;
-    if (!engineBuildIsNewer(engineBuild, APP_VERSION)) return;
-    const key = `skycot:reloaded-for:${engineBuild}`;
+    const engineStamp = config?.environment.clientBuildStamp ?? null;
+    const loadedStamp = clientBundleStamp(
+      [...document.querySelectorAll("script[src], link[rel=stylesheet][href]")].map(
+        (element) => element.getAttribute("src") ?? element.getAttribute("href"),
+      ),
+    );
+    if (!engineBuildIsNewer(engineBuild, APP_VERSION, engineStamp, loadedStamp)) return;
+    const key = `skycot:reloaded-for:${engineBuild}:${engineStamp ?? ""}`;
     const reloadWhenIdle = () => {
       try {
         if (sessionStorage.getItem(key) === "1") return true;
@@ -130,7 +136,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
       if (reloadWhenIdle()) window.clearInterval(timer);
     }, 2_000);
     return () => window.clearInterval(timer);
-  }, [config?.environment.serverVersion, threadShells]);
+  }, [config?.environment.serverVersion, config?.environment.clientBuildStamp, threadShells]);
   const shell = useShellState();
   const childView = useChildView();
   const selectedThreadId: ThreadId | null = route.name === "thread" ? route.threadId : null;

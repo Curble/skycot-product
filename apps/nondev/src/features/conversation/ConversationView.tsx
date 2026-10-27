@@ -47,7 +47,11 @@ import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
 import { useConversationShell } from "../../state/oldConversations";
 import { environmentProjects, projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
-import { environmentThreads, threadEnvironment } from "../../state/threads";
+import {
+  environmentThreadShells,
+  environmentThreads,
+  threadEnvironment,
+} from "../../state/threads";
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { useCrew } from "../../themes/useCrew";
 import { Banner } from "../../ui/Banner";
@@ -90,6 +94,8 @@ import { ConversationMenuButton } from "../tidy/ConversationMenu";
 import { DeleteSheet } from "../tidy/DeleteSheet";
 import { RenameSheet } from "../tidy/RenameSheet";
 import { useTidy } from "../tidy/useTidy";
+import { useProjectTidy } from "../projects/useProjectTidy";
+import { projectTitleFromFirstMake } from "../../plain/titles";
 import { PointerChips } from "../preview/PointerChips";
 import {
   clearPointers,
@@ -206,6 +212,9 @@ export function ConversationView({
   const family = useFamily();
   const familySteps = useFamilySteps();
   const planFirst = usePlanFirst();
+  const projectTidy = useProjectTidy();
+  const projectTitleAttempted = useRef(new Set<string>());
+  const threadShells = useAtomValue(environmentThreadShells.navigationThreadShellsAtom);
   const runtimeMode =
     shell === null ? null : enforcedRuntimeMode(shell.runtimeMode, family.enabled);
 
@@ -254,6 +263,32 @@ export function ConversationView({
   );
 
   const projectName = project?.title ?? null;
+
+  useEffect(() => {
+    if (
+      !childView ||
+      project === null ||
+      shell === null ||
+      !/^Project \d+$/u.test(project.title) ||
+      projectTitleAttempted.current.has(project.id) ||
+      projection === null ||
+      !projection.runs.some((run) => run.status === "completed" && run.completedAt !== null) ||
+      threadShells.some(
+        (thread) =>
+          thread.id !== shell.id &&
+          thread.projectId === project.id &&
+          thread.latestRun?.status === "completed",
+      )
+    ) {
+      return;
+    }
+    const firstRequest = projection.messages.find((message) => message.role === "user")?.text;
+    if (!firstRequest) return;
+    const title = projectTitleFromFirstMake(firstRequest);
+    if (title === project.title) return;
+    projectTitleAttempted.current.add(project.id);
+    void projectTidy.apply(project, { title }, { toast: false });
+  }, [childView, project, shell, projection, threadShells, projectTidy]);
 
   // When a run finishes with file changes, its What-changed card is the thing
   // to read next: bring it into view once (on open, or when the reader is

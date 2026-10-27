@@ -284,7 +284,7 @@ const sameDay = (a: Date, b: Date) =>
 
 /** "8:41 am" today, "Thu 8:41 am" this week, "9 Oct, 8:41 am" otherwise. */
 export function timelineTitle(number: number | null, label: string, childView: boolean): string {
-  if (number === null) return label;
+  if (number === null) return childView && label === "Restore point" ? "Saved try" : label;
   return childView ? `Try ${number}` : `Version ${number}`;
 }
 

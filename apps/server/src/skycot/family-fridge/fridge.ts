@@ -28,8 +28,48 @@ export interface FridgeItem {
   readonly madeAt: number;
   readonly page: string;
   readonly contentHash?: string;
+  readonly thumbnailSvg?: string;
   readonly cwd: string;
   readonly pinnedAt: number | null;
+}
+
+function xmlText(text: string): string {
+  return text.replace(/[&<>"']/gu, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&apos;";
+    }
+  });
+}
+
+/** A tiny inert picture for the fridge; page markup is only read as text, never opened. */
+// nondev-seam: skycot-q51-fridge-svg
+export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string {
+  const title = fridgePageTitle(html) ?? fallbackTitle;
+  const heading = (html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ?? "")
+    .replace(/<[^>]*>/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  const colors = html.match(/#[\da-f]{3}(?:[\da-f]{3})?\b/giu) ?? [];
+  const colorCounts = new Map<string, number>();
+  for (const color of colors) colorCounts.set(color, (colorCounts.get(color) ?? 0) + 1);
+  const background = [...colorCounts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "#5b7cfa";
+  const kind = /quiz|trivia|question/iu.test(`${title} ${html}`)
+    ? "?"
+    : /birthday|card/iu.test(title)
+      ? "♡"
+      : /game|play|bounce/iu.test(`${title} ${html}`)
+        ? "✦"
+        : "▤";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="20" fill="${background}"/><circle cx="160" cy="65" r="38" fill="#ffffff" fill-opacity=".22"/><text x="160" y="79" text-anchor="middle" font-size="44" fill="#ffffff">${kind}</text><text x="18" y="137" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#ffffff">${xmlText(title.slice(0, 30))}</text><text x="18" y="161" font-family="system-ui,sans-serif" font-size="12" fill="#ffffff">${xmlText(heading.slice(0, 42))}</text></svg>`;
 }
 
 /** A page's own name wins over the conversation's first request. */

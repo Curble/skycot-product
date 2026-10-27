@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { friendlyTitle, promptTitle } from "./titles";
+import { friendlyTitle, projectTitleFromFirstMake, promptTitle } from "./titles";
 
 describe("friendlyTitle", () => {
   // Real titles the assistant wrote in the beta walkthrough (Ava and Leo).
@@ -42,5 +42,16 @@ describe("raw request titles", () => {
     expect(promptTitle("Please make a birthday card for Mum with stars")).toBe(
       "Birthday Card For Mum",
     );
+  });
+});
+
+describe("first project name", () => {
+  it("uses a kid-friendly make name and keeps it within 32 characters", () => {
+    expect(projectTitleFromFirstMake("make a page with a big friendly robot that waves")).toBe(
+      "Big Friendly Robot",
+    );
+    expect(
+      projectTitleFromFirstMake("my very long dinosaur project title with lots of extra words"),
+    ).toHaveLength(32);
   });
 });

@@ -2,6 +2,25 @@
 export const MAX_THUMBNAIL_CACHE_BYTES = 4_000_000;
 export const MAX_THUMBNAIL_CACHE_PAGES = 100;
 
+const svgCache = new Map<string, string>();
+
+// nondev-seam: skycot-q51-fridge-svg-cache
+export function cachedSvgThumbnail(
+  pagePath: string,
+  contentHash: string,
+  create: () => string,
+): string {
+  const key = `${pagePath}\n${contentHash}`;
+  const cached = svgCache.get(key);
+  if (cached !== undefined) return cached;
+  const svg = create();
+  svgCache.set(key, svg);
+  if (svgCache.size > MAX_THUMBNAIL_CACHE_PAGES) {
+    svgCache.delete(svgCache.keys().next().value!);
+  }
+  return svg;
+}
+
 export interface ThumbnailCacheEntry {
   readonly pagePath: string;
   readonly contentHash: string;

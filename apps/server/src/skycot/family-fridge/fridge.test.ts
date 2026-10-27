@@ -1,13 +1,28 @@
 // nondev-seam: skycot-iphone-q50-fridge-title-test
+// nondev-seam: skycot-q51-fridge-svg-test
 import { describe, expect, it } from "@effect/vitest";
 
-import { fridgeItems, fridgePageTitle, type FridgeThread } from "./fridge.ts";
+import { fridgeItems, fridgePageTitle, fridgeSvgThumbnail, type FridgeThread } from "./fridge.ts";
 
 describe("fridge page titles", () => {
   it("uses a page title or first heading and cleans up its text", () => {
     expect(fridgePageTitle("<title> A &amp; B </title><h1>Later</h1>")).toBe("A & B");
     expect(fridgePageTitle("<h1>Hello <em>there</em></h1>")).toBe("Hello there");
     expect(fridgePageTitle("<p>No heading</p>")).toBeNull();
+  });
+});
+
+describe("fridge SVG thumbnails", () => {
+  it("draws safe title, heading, dominant CSS color and a kind mark without page code", () => {
+    const svg = fridgeSvgThumbnail(
+      "<title>Quiz &amp; fun</title><h1>Big quiz</h1><style>body{background:#123456} .a{color:#123456}</style><script>alert(1)</script>",
+      "Fallback",
+    );
+    expect(svg).toContain('fill="#123456"');
+    expect(svg).toContain("Quiz &amp; fun");
+    expect(svg).toContain("Big quiz");
+    expect(svg).toContain(">?</text>");
+    expect(svg).not.toContain("alert(1)");
   });
 });
 

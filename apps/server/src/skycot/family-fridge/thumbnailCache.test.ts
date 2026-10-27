@@ -1,8 +1,10 @@
 // nondev-seam: skycot-fridge-thumbnail-cache-test
+// nondev-seam: skycot-q51-fridge-svg-cache-test
 import { assert, it } from "@effect/vitest";
 
 import {
   cachedThumbnail,
+  cachedSvgThumbnail,
   MAX_THUMBNAIL_CACHE_BYTES,
   rememberThumbnail,
   secretLookingPath,
@@ -26,6 +28,14 @@ it("hits only the same page and content hash", () => {
   assert.equal(cachedThumbnail(entries, "games/index.html", "a"), "safe page");
   assert.isNull(cachedThumbnail(entries, "games/index.html", "b"));
   assert.isNull(cachedThumbnail(entries, "other/index.html", "a"));
+});
+
+it("caches SVG cards by page content hash", () => {
+  let rendered = 0;
+  const make = () => `svg-${++rendered}`;
+  assert.equal(cachedSvgThumbnail("svg-test.html", "a", make), "svg-1");
+  assert.equal(cachedSvgThumbnail("svg-test.html", "a", make), "svg-1");
+  assert.equal(cachedSvgThumbnail("svg-test.html", "b", make), "svg-2");
 });
 
 it("replaces stale content and prunes oldest pages within the byte bound", () => {

@@ -18,6 +18,7 @@
 // child's space (`<scratch>/children/<childId>`) is that child's, and the shared space (T3's
 // Scratch, the questions from before) is the grown-ups', so a child's device lists it only while
 // it holds questions of their own.
+// nondev-seam: skycot-q51-project-kind-engine
 
 // The fridge's pins are read as plain JSON of any shape (only their keys matter here).
 // @effect-diagnostics preferSchemaOverJson:off
@@ -49,6 +50,7 @@ import {
   archivedItemVisible,
   folderOwner,
   makeShellItemFilter,
+  projectLooksGrownUp,
   referencedBy,
   type ChildView,
   type Referenced,
@@ -114,6 +116,37 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   const projects = yield* ProjectStore.ProjectStoreV2;
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
+  // Children keep their own conversations, but a code checkout is not a place of their own.
+  const grownUpProjectIds = Effect.fnUntraced(function* () {
+    const rows = yield* projects.list().pipe(Effect.orElseSucceed(() => []));
+    const ids = new Set<string>();
+    const hasFile = (target: string) =>
+      fs.stat(target).pipe(
+        Effect.map((info) => info.type === "File"),
+        Effect.orElseSucceed(() => false),
+      );
+    for (const row of rows) {
+      const root = path.resolve(row.workspaceRoot);
+      const gitConfig = yield* fs
+        .readFileString(path.join(root, ".git", "config"))
+        .pipe(Effect.orElseSucceed(() => ""));
+      const isEngineFolder = root === path.resolve(process.cwd());
+      const hasPackageFiles =
+        (yield* hasFile(path.join(root, "package.json"))) ||
+        (yield* hasFile(path.join(root, "pnpm-workspace.yaml")));
+      if (
+        projectLooksGrownUp({
+          isEngineFolder,
+          hasPackageFiles,
+          hasGitRemote: /^\s*\[remote /imu.test(gitConfig),
+        })
+      ) {
+        ids.add(String(row.projectId));
+      }
+    }
+    return ids;
+  });
+
   /** Who owns each project: as recorded, with every Questions space's owner read from its folder. */
   const projectOwners = Effect.fnUntraced(function* (recorded: Readonly<Record<string, string>>) {
     if (questionsRoot === null) return recorded;
@@ -148,6 +181,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
       childId,
       owners: { threads: today.threads, projects: yield* projectOwners(today.projects) },
       pinned: yield* readPins(fs, pinsFile),
+      grownUpProjects: yield* grownUpProjectIds(),
       ...(who.kind === "shared" ? { sharedSession: true } : {}),
     } satisfies ChildView;
   });
@@ -200,6 +234,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   });
 
   const projectAllowed = Effect.fnUntraced(function* (view: ChildView, projectId: string) {
+    if (view.grownUpProjects?.has(projectId)) return false;
     if (view.sharedSession) return childSeesProject(view.childId, projectId, view.owners);
     if (childSeesProject(view.childId, projectId, view.owners)) return true;
     return childSeesProject(view.childId, projectId, view.owners, yield* ownThreadProjects(view));

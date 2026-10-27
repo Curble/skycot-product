@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { filesHref, navigate } from "../../router";
 import { useCrew } from "../../themes/useCrew";
+import { useChildView } from "../../app/useChildView";
 import { IconButton } from "../../ui/Button";
 import { MenuItem, MenuSeparator, Popover, type PopoverTriggerProps } from "../../ui/Popover";
 import { putAwayBlocked } from "./tidy";
@@ -29,6 +30,7 @@ export function ConversationMenuItems({
 }) {
   const tidy = useTidy();
   const crew = useCrew();
+  const childView = useChildView();
   const blocked = archived ? null : putAwayBlocked(shell, crew.builder.name);
   return (
     <>
@@ -69,17 +71,21 @@ export function ConversationMenuItems({
         </MenuItem>
       )}
       {blocked !== null ? <p className="fm-menu-note">{blocked}</p> : null}
-      <MenuSeparator />
-      <MenuItem
-        destructive
-        disabled={blocked !== null}
-        onSelect={() => {
-          close();
-          onDelete();
-        }}
-      >
-        Delete…
-      </MenuItem>
+      {!childView ? (
+        <>
+          <MenuSeparator />
+          <MenuItem
+            destructive
+            disabled={blocked !== null}
+            onSelect={() => {
+              close();
+              onDelete();
+            }}
+          >
+            Delete…
+          </MenuItem>
+        </>
+      ) : null}
     </>
   );
 }

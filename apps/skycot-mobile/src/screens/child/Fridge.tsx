@@ -3,10 +3,12 @@
  * (the engine decides which). Pin to the fridge and Take it down never delete anything.
  */
 // nondev-seam: skycot-iphone-q50-fridge-mobile
+// nondev-seam: skycot-q51-fridge-svg-mobile
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
+import { WebView } from "react-native-webview";
 
 import {
   childFridgeTitle,
@@ -63,19 +65,26 @@ function Magnet(props: {
       })}
     >
       <Card padded={false} style={{ overflow: "hidden" }}>
-        <View
-          style={{
-            height: props.compact ? 70 : 110,
-            backgroundColor: color,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Symbol
-            name={fridgeIcon(props.item.title, props.item.page)}
-            size={props.compact ? 28 : 40}
-            color="#FFFFFF"
-          />
+        <View style={{ height: props.compact ? 70 : 110, backgroundColor: color }}>
+          {props.item.thumbnailSvg ? (
+            <WebView
+              source={{ html: props.item.thumbnailSvg }}
+              javaScriptEnabled={false}
+              domStorageEnabled={false}
+              scrollEnabled={false}
+              pointerEvents="none"
+              originWhitelist={["about:blank"]}
+              style={{ flex: 1, backgroundColor: "transparent" }}
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <Symbol
+                name={fridgeIcon(props.item.title, props.item.page)}
+                size={props.compact ? 28 : 40}
+                color="#FFFFFF"
+              />
+            </View>
+          )}
           {props.item.pinnedAt !== null ? (
             <View style={{ position: "absolute", top: 8, right: 8 }}>
               <Symbol name="pin.fill" size={16} color="#FFFFFF" />

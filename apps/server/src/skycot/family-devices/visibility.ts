@@ -4,6 +4,7 @@
 // shell snapshot and its live items, the archived list, and the ids a call names.
 //
 // Grown-ups' devices and the family's Mac see everything; only a child's own device is filtered.
+// nondev-seam: skycot-q51-project-kind
 import type {
   OrchestrationProjectShell,
   OrchestrationV2ArchivedShellSnapshot,
@@ -22,6 +23,20 @@ export interface ChildView {
   readonly pinned: ReadonlySet<string>;
   /** The family's Mac uses the selected child without the linked-device legacy filters. */
   readonly sharedSession?: boolean;
+  /** Code checkouts and the engine's own folder stay out of a child's project list. */
+  readonly grownUpProjects?: ReadonlySet<string>;
+}
+
+export function projectIsGrownUpProject(view: ChildView, projectId: string): boolean {
+  return view.grownUpProjects?.has(projectId) ?? false;
+}
+
+export function projectLooksGrownUp(input: {
+  readonly isEngineFolder: boolean;
+  readonly hasGitRemote: boolean;
+  readonly hasPackageFiles: boolean;
+}): boolean {
+  return input.isEngineFolder || input.hasGitRemote || input.hasPackageFiles;
 }
 
 type ThreadLike = Pick<OrchestrationV2ThreadShell, "id" | "projectId">;
@@ -71,6 +86,7 @@ function filterThreadsAndProjects<
   const othersOnly = siblingsThreadProjects(view, [...threads, ...extraThreads]);
   const visibleProjects = projects.filter(
     (project) =>
+      !projectIsGrownUpProject(view, project.id) &&
       childSeesProject(view.childId, project.id, view.owners, withOwn) &&
       !(othersOnly.has(project.id) && !withOwn.has(project.id)),
   );
@@ -141,7 +157,8 @@ export function makeShellItemFilter() {
         return item;
       }
       case "project.updated":
-        return childSeesProject(view.childId, item.project.id, view.owners, projectsWithOwn)
+        return !projectIsGrownUpProject(view, item.project.id) &&
+          childSeesProject(view.childId, item.project.id, view.owners, projectsWithOwn)
           ? item
           : null;
     }

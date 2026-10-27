@@ -184,6 +184,7 @@ const makeIdentity = Effect.gen(function* () {
 export const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const serverConfig = yield* ServerConfig.ServerConfig;
+  const fs = yield* FileSystem.FileSystem;
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const identity = yield* ServerEnvironmentIdentity;
   const hostPlatform = yield* HostProcess.Platform;
@@ -205,6 +206,21 @@ export const make = Effect.gen(function* () {
   const desktopAppUpdate =
     serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
 
+  // nondev-seam: skycot-q51-client-build-stamp-server
+  const clientIndex =
+    serverConfig.staticDir === undefined
+      ? null
+      : yield* fs
+          .readFileString(path.join(serverConfig.staticDir, "simple", "index.html"))
+          .pipe(Effect.match({ onFailure: () => null, onSuccess: (contents) => contents }));
+  const clientBuildStamp =
+    clientIndex === null
+      ? undefined
+      : [...clientIndex.matchAll(/(?:src|href)="([^"]+\/[\w.-]+-[\w.-]+\.(?:js|css))"/gu)]
+          .map((match) => match[1])
+          .sort()
+          .join("|");
+
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
     label,
@@ -214,6 +230,7 @@ export const make = Effect.gen(function* () {
       ...(machine === null ? {} : { machine }),
     },
     serverVersion: packageJson.version,
+    ...(clientBuildStamp ? { clientBuildStamp } : {}),
     orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
     capabilities: {
       repositoryIdentity: true,

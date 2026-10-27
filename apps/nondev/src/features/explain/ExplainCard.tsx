@@ -100,7 +100,7 @@ export function ExplainCard({
                 </span>
               </p>
             ) : null}
-            {checkpoint !== null ? (
+            {checkpoint !== null && !childView ? (
               <div className="fm-explain__peek">
                 <Button
                   size="sm"
@@ -108,7 +108,7 @@ export function ExplainCard({
                   aria-expanded={peeking}
                   onClick={() => setPeeking((open) => !open)}
                 >
-                  {peeking ? "Hide the code" : "Peek at the code"}
+                  {peeking ? "Hide the code" : "See how it's made"}
                 </Button>
                 {peeking ? (
                   diff.data ? (

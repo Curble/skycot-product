@@ -27,9 +27,11 @@ import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import { pageOf } from "../family-recap/recap.ts";
 import { loadThread } from "../family-recap/threads.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
-import { fridgeItems, fridgePageTitle, type FridgeItem } from "./fridge.ts";
+import { fridgeItems, fridgePageTitle, fridgeSvgThumbnail, type FridgeItem } from "./fridge.ts";
 import { MAX_ASSET_BYTES, MAX_PAGE_BYTES, selfContainedPage } from "./thumbnail.ts";
 import {
+  // nondev-seam: skycot-q51-fridge-svg
+  cachedSvgThumbnail,
   cachedThumbnail,
   rememberThumbnail,
   secretLookingPath,
@@ -201,10 +203,15 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
         if (info?.type !== "File" || Number(info.size) > MAX_PAGE_BYTES) return item;
         const source = yield* fs.readFile(realPage).pipe(Effect.orElseSucceed(() => null));
         if (source === null) return item;
+        const contentHash = NodeCrypto.createHash("sha256").update(source).digest("hex");
+        const html = new TextDecoder().decode(source);
         return {
           ...item,
-          title: fridgePageTitle(new TextDecoder().decode(source)) ?? item.title,
-          contentHash: NodeCrypto.createHash("sha256").update(source).digest("hex"),
+          title: fridgePageTitle(html) ?? item.title,
+          contentHash,
+          thumbnailSvg: cachedSvgThumbnail(realPage, contentHash, () =>
+            fridgeSvgThumbnail(html, item.title),
+          ),
         };
       }),
     );

@@ -30,6 +30,7 @@ describe("child version words", () => {
     expect(timelineLabel("Changed 1 file (+118 / −15 lines)", true)).toBe("Changed 1 file");
     expect(timelineTitle(2, "Changed 1 file", false)).toBe("Version 2");
     expect(timelineLabel("Changed 1 file (+118 / −15 lines)", false)).toContain("+118");
+    expect(timelineTitle(null, "Restore point", true)).toBe("Saved try");
   });
 });
 

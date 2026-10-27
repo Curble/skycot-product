@@ -160,6 +160,9 @@ export const ExecutionEnvironmentDescriptor = Schema.Struct({
   label: TrimmedNonEmptyString,
   platform: ExecutionEnvironmentPlatform,
   serverVersion: TrimmedNonEmptyString,
+  // nondev-seam: skycot-q51-client-build-stamp
+  // Hashed client asset names let an idle tab notice a same-version web rebuild.
+  clientBuildStamp: Schema.optionalKey(TrimmedNonEmptyString),
   orchestrationProtocolVersion: Schema.optionalKey(Schema.Int),
   capabilities: ExecutionEnvironmentCapabilities,
 });

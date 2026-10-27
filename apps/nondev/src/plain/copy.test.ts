@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { childErrors } from "./copy";
+import { approvals, childErrors } from "./copy";
 
 describe("child error copy", () => {
   it("gives a child a calm next step during a rest", () => {
@@ -11,5 +11,6 @@ describe("child error copy", () => {
     expect(childErrors.allowance).toBe(
       "Sam needs a short rest. Your work is safe. You can look at your page while you wait.",
     );
+    expect(approvals.ifNoQuestion).toBe("Sam carries on with its best guess.");
   });
 });

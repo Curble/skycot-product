@@ -27,6 +27,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import {
   describeChanges,
   describeTurnDiff,
+  childChangeSummary,
   fromCheckpointFiles,
   type ChangeArea,
   type WhatChanged,
@@ -314,7 +315,7 @@ export function ReviewSection({
           }
         />
         <CardBody>
-          <p>{what.summary}</p>
+          <p>{childView ? childChangeSummary(what.summary) : what.summary}</p>
           {!childView
             ? what.groups.map((group) => (
                 <section key={group.area} className="fm-review__area" aria-label={group.label}>

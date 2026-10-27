@@ -1,4 +1,5 @@
 // nondev-seam: skycot-plan-tweak-test
+// nondev-seam: skycot-q51-empty-project-test
 // The personal-details shield and explain mode, as the provider receives them.
 import { assert, describe, it } from "@effect/vitest";
 import { MessageId } from "@t3tools/contracts";
@@ -34,6 +35,11 @@ const message = (
 const SHOWPIECE = "my name is Ava Smith and I go to St Kilda Primary";
 
 describe("the personal-details shield on Family turns", () => {
+  it("tells Sam to make the first page in an empty project", () => {
+    assert.include(Instructions.FAMILY_RULES_TEXT, "Make the requested page");
+    assert.include(Instructions.FAMILY_RULES_TEXT, "Say this project is empty");
+  });
+
   it.effect("hides a full name and a school before the provider sees them", () =>
     Effect.gen(function* () {
       const wrapped = yield* Instructions.withFamilyRules(familyOn(true), message(SHOWPIECE));

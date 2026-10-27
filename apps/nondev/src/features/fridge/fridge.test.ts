@@ -84,6 +84,13 @@ describe("the family fridge", () => {
     expect(parseFridge({ items: [item("older-engine")] })?.[0]?.contentHash).toBeUndefined();
   });
 
+  it("accepts a static SVG card from the engine", () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><text>Rocket</text></svg>';
+    expect(parseFridge({ items: [item("svg", { thumbnailSvg: svg })] })?.[0]?.thumbnailSvg).toBe(
+      svg,
+    );
+  });
+
   it("repairs generic and cut magnet names and chooses a kind icon", () => {
     const madeAt = Date.parse("2026-10-27T09:00:00Z");
     expect(childFridgeTitle({ title: "Page", madeAt }, "Ava")).toBe("Ava's page · 27 Oct");

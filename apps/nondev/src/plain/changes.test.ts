@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   describeChanges,
+  childChangeSummary,
   describeFile,
   describeTurnDiff,
   fromCheckpointFiles,
@@ -236,5 +237,21 @@ describe("describeChanges", () => {
     expect(describeChanges(changes).summary).toBe(
       "Changed 3 files: 2 pages and 1 style file (+12 / −22 lines).",
     );
+  });
+});
+
+describe("child What changed copy", () => {
+  it("hides line counts without changing the developer summary", () => {
+    const summary = "Changed 1 file: 1 page (+1 / −1 lines).";
+    expect(childChangeSummary(summary)).toBe("Changed 1 file: 1 page.");
+    expect(childChangeSummary("Nothing changed.")).toBe("Nothing changed.");
+  });
+});
+
+describe("child What changed copy", () => {
+  it("hides line counts while leaving the developer summary intact", () => {
+    const summary = "Changed 1 file: 1 page (+1 / −1 lines).";
+    expect(childChangeSummary(summary)).toBe("Changed 1 file: 1 page.");
+    expect(childChangeSummary("Nothing changed.")).toBe("Nothing changed.");
   });
 });

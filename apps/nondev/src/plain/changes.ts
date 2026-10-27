@@ -311,15 +311,17 @@ export function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 
+export function childChangeSummary(summary: string): string {
+  return summary.replace(/\s*\(\+\d+ \/ −\d+ lines?\)(?=\.)/u, "");
+}
+
 export function describeFileChange(change: FileChange): FileChangeLine {
   const described = describeFile(change.path);
   const noun = described.noun;
   const size =
-    change.binary === true
+    change.binary === true || change.additions + change.deletions === 0
       ? ""
-      : change.additions + change.deletions === 0
-        ? ""
-        : ` (+${change.additions} / −${change.deletions} lines)`;
+      : ` (+${change.additions} / −${change.deletions} lines)`;
   const verb =
     change.operation === "added"
       ? `Added ${noun}`

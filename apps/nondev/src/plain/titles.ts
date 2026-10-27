@@ -90,6 +90,20 @@ export function promptTitle(title: string): string {
     : summary.map((word) => word[0]!.toUpperCase() + word.slice(1)).join(" ");
 }
 
+/** A first project name from a finished make, short enough for the sidebar. */
+// nondev-seam: skycot-q51-project-title
+export function projectTitleFromFirstMake(request: string): string {
+  const title = friendlyTitle(request) || "My project";
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(title)];
+  return graphemes.length <= 32
+    ? title
+    : `${graphemes
+        .slice(0, 31)
+        .map((part) => part.segment)
+        .join("")
+        .trimEnd()}…`;
+}
+
 /**
  * The title to show on a magnet, the recap or a certificate. A title the person gave it
  * (`renamed`) or wrote themselves (not Title Case) is shown as it is; an assistant-written

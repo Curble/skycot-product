@@ -1,4 +1,5 @@
 // Test fixtures use loose stand-ins on purpose.
+// nondev-seam: skycot-q51-project-kind-test
 // @effect-diagnostics anyUnknownInErrorContext:off
 // @effect-diagnostics unsafeEffectTypeAssertion:off
 // @effect-diagnostics nodeBuiltinImport:off
@@ -49,7 +50,12 @@ import * as SkycotFamilyDevices from "./SkycotFamilyDevices.ts";
 import type { PendingApproval } from "./SkycotFamilyDevices.ts";
 import * as SkycotFamilyIdentity from "./SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
-import { filterShellSnapshot, folderOwner, referencedBy } from "./visibility.ts";
+import {
+  filterShellSnapshot,
+  folderOwner,
+  projectLooksGrownUp,
+  referencedBy,
+} from "./visibility.ts";
 
 // nondev-seam: skycot-page-internet-approver-test
 // nondev-seam: skycot-project-approval-fingerprint-test
@@ -663,6 +669,21 @@ describe("who is who: pure parts", () => {
     );
   });
 
+  it("recognizes developer checkouts by contents or the engine folder", () => {
+    assert.isTrue(
+      projectLooksGrownUp({ isEngineFolder: false, hasGitRemote: true, hasPackageFiles: false }),
+    );
+    assert.isTrue(
+      projectLooksGrownUp({ isEngineFolder: false, hasGitRemote: false, hasPackageFiles: true }),
+    );
+    assert.isTrue(
+      projectLooksGrownUp({ isEngineFolder: true, hasGitRemote: false, hasPackageFiles: false }),
+    );
+    assert.isFalse(
+      projectLooksGrownUp({ isEngineFolder: false, hasGitRemote: false, hasPackageFiles: false }),
+    );
+  });
+
   it("a private copy beats its project folder; the project wins a tie", () => {
     const known = {
       threads: [
@@ -706,6 +727,29 @@ describe("who is who: pure parts", () => {
       filtered.projects.map((project) => project.id),
       ["pl", "pf"],
     );
+  });
+
+  it("hides a code checkout project while keeping the child's own conversation", () => {
+    const filtered = filterShellSnapshot(
+      {
+        childId: "ava",
+        owners: { threads: { a: "ava" }, projects: {} },
+        pinned: new Set(),
+        grownUpProjects: new Set(["checkout"]),
+      },
+      {
+        schemaVersion: 1,
+        snapshotSequence: 1,
+        threads: [{ id: "a", projectId: "checkout" }] as never,
+        archivedThreads: [],
+        projects: [{ id: "checkout" }] as never,
+      },
+    );
+    assert.deepEqual(
+      filtered.threads.map((thread) => thread.id),
+      ["a"],
+    );
+    assert.deepEqual(filtered.projects, []);
   });
 });
 

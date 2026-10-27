@@ -10,6 +10,7 @@ export interface FridgeItem {
   readonly madeAt: number;
   readonly page: string;
   readonly contentHash?: string;
+  readonly thumbnailSvg?: string;
   readonly cwd: string;
   readonly pinnedAt: number | null;
 }
@@ -51,7 +52,9 @@ export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
       typeof (item as FridgeItem).cwd === "string" &&
       typeof (item as FridgeItem).madeAt === "number" &&
       ((item as FridgeItem).contentHash === undefined ||
-        typeof (item as FridgeItem).contentHash === "string"),
+        typeof (item as FridgeItem).contentHash === "string") &&
+      ((item as FridgeItem).thumbnailSvg === undefined ||
+        typeof (item as FridgeItem).thumbnailSvg === "string"),
   );
 }
 

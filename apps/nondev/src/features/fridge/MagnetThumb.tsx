@@ -13,12 +13,14 @@ export function MagnetThumb({
   page,
   version,
   title,
+  thumbnailSvg,
 }: {
   readonly threadId: string;
   readonly page: string;
   /** When the page last changed, so a newer version is fetched again. */
   readonly version: number | string;
   readonly title: string;
+  readonly thumbnailSvg?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
@@ -39,7 +41,7 @@ export function MagnetThumb({
     return () => observer.disconnect();
   }, [seen]);
   useEffect(() => {
-    if (!seen) return;
+    if (!seen || thumbnailSvg) return;
     let live = true;
     void readMagnetPage({ threadId, page, version }).then((result) => {
       if (live) setLoaded({ key, page: result });
@@ -47,12 +49,19 @@ export function MagnetThumb({
     return () => {
       live = false;
     };
-  }, [seen, key, threadId, page, version]);
+  }, [seen, key, threadId, page, version, thumbnailSvg]);
   const current = loaded?.key === key ? loaded.page : null;
   const sealedDocument = useOfflinePreviewDocument(current?.kind === "page" ? current.html : "");
   return (
     <div ref={ref} className="fm-magnet__thumb" aria-hidden>
-      {current?.kind === "page" ? (
+      {thumbnailSvg ? (
+        <img
+          className="fm-magnet__frame"
+          alt=""
+          loading="lazy"
+          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(thumbnailSvg)}`}
+        />
+      ) : current?.kind === "page" ? (
         <iframe
           className="fm-magnet__frame"
           title={`Picture of ${title}`}
