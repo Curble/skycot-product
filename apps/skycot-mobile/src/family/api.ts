@@ -246,6 +246,14 @@ function parseToday(body: unknown): Today | null {
   return { children, threads };
 }
 
+/** `{ pngBase64 }` from the Mac, as an image address; null for anything else. */
+export function pictureDataUri(body: unknown): string | null {
+  const value = record(body).pngBase64;
+  return typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/u.test(value)
+    ? `data:image/png;base64,${value}`
+    : null;
+}
+
 export const familyApi = {
   status: (transport: MacTransport) =>
     call(transport, { method: "GET", path: FAMILY_API_PATH }, parseServerStatus),
@@ -300,6 +308,23 @@ export const familyApi = {
       return answer.status === 200 && typeof answer.text === "string"
         ? parseMagnetCard(answer.text)
         : null;
+    } catch {
+      return null;
+    }
+  },
+  // nondev-seam: skycot-fridge-picture-mobile
+  /**
+   * The real picture of a fridge page as a `data:image/png;base64,...` string, ready for an
+   * Image. Null when the Mac has none by that name, is older, or sent something else.
+   */
+  fridgePicture: async (transport: MacTransport, hash: string): Promise<string | null> => {
+    try {
+      const answer = await transport.request({
+        method: "GET",
+        path: `${FAMILY_API_PATH}/fridge/picture-data`,
+        query: { hash },
+      });
+      return answer.status === 200 ? pictureDataUri(answer.json) : null;
     } catch {
       return null;
     }

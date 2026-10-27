@@ -1369,6 +1369,22 @@ const fridgePictureRoute = madeRoute("GET", "/fridge/picture", ({ fridge, query 
   }),
 );
 
+/**
+ * The same picture as JSON (base64), for the phone: its link to the Mac, and the relay when
+ * away from home, carry text only. A page picture is at most 400 KB, so this stays small.
+ */
+// nondev-seam: skycot-fridge-picture-data
+const fridgePictureDataRoute = madeRoute("GET", "/fridge/picture-data", ({ fridge, query }) =>
+  Effect.gen(function* () {
+    const png = yield* fridge.picture(query.get("hash") ?? "");
+    if (png === null) return json({ error: "invalid-request" }, 404);
+    return json({ pngBase64: Buffer.from(png).toString("base64") }, 200, {
+      "cache-control": "private, max-age=31536000, immutable",
+      "x-content-type-options": "nosniff",
+    });
+  }),
+);
+
 const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query, childView }) =>
   Effect.gen(function* () {
     const threadId = query.get("threadId") ?? "";
@@ -2094,6 +2110,7 @@ export const layerMadeRoutes = Layer.mergeAll(
   fridgeCardRoute,
   fridgePictureStoreRoute,
   fridgePictureRoute,
+  fridgePictureDataRoute,
 );
 
 /** The profile's own routes. */

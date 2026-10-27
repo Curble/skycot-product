@@ -611,6 +611,16 @@ it.layer(
       assert.equal(served.headers["content-type"], "image/png");
       assert.equal(served.headers["content-security-policy"], "default-src 'none'; sandbox");
       assert.deepEqual(Array.from(new Uint8Array(yield* served.arrayBuffer)), [...magic, 7, 7]);
+
+      // The JSON twin (for the phone): same lookup, the bytes as base64.
+      const dataUrl = "/api/skycot/family/fridge/picture-data";
+      assert.equal((yield* send("GET", `${dataUrl}?hash=${"b".repeat(64)}`, child)).status, 404);
+      assert.equal((yield* send("GET", `${dataUrl}?hash=..%2F..%2Fx`, child)).status, 404);
+      const twin = yield* send("GET", `${dataUrl}?hash=${hash}`, child);
+      assert.equal(twin.status, 200);
+      assert.equal(twin.headers["cache-control"], "private, max-age=31536000, immutable");
+      const twinBody = (yield* twin.json) as { pngBase64: string };
+      assert.deepEqual(Array.from(Buffer.from(twinBody.pngBase64, "base64")), [...magic, 7, 7]);
     }),
   );
 

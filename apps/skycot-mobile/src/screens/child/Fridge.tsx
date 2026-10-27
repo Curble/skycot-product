@@ -7,7 +7,7 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Image, Pressable, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import { WebView } from "react-native-webview";
 
@@ -70,6 +70,35 @@ function useCardSvg(mac: Mac, hash: string | undefined): string | null {
   return svg;
 }
 
+// nondev-seam: skycot-fridge-picture-mobile
+// Real page pictures (as image addresses), kept by hash like the cards (bounded).
+const pictureCache = createCardCache();
+
+/** The real picture of a page, or null while loading, on failure, or when there is none. */
+function usePicture(mac: Mac, hash: string | undefined, wanted: boolean): string | null {
+  const key = wanted ? hash : undefined;
+  const [uri, setUri] = useState<string | null>(key === undefined ? null : pictureCache.peek(key));
+  useEffect(() => {
+    if (key === undefined) {
+      setUri(null);
+      return;
+    }
+    const kept = pictureCache.peek(key);
+    setUri(kept);
+    if (kept !== null) return;
+    let live = true;
+    void pictureCache
+      .load(key, (name) => familyApi.fridgePicture(mac.transport, name))
+      .then((found) => {
+        if (live) setUri(found);
+      });
+    return () => {
+      live = false;
+    };
+  }, [mac.transport, key]);
+  return uri;
+}
+
 const MAGNET_COLORS = ["#F26B4E", "#3A9DF6", "#3FA66F", "#8E5AA8", "#E8A50C", "#E0603F"];
 
 function Magnet(props: {
@@ -84,6 +113,7 @@ function Magnet(props: {
   const color = MAGNET_COLORS[props.index % MAGNET_COLORS.length]!;
   const grid = useGridBasis();
   const card = useCardSvg(props.mac, props.item.cardHash);
+  const picture = usePicture(props.mac, props.item.cardHash, props.item.hasPicture === true);
   return (
     <Pressable
       accessibilityRole="button"
@@ -100,7 +130,15 @@ function Magnet(props: {
     >
       <Card padded={false} style={{ overflow: "hidden" }}>
         <View style={{ height: props.compact ? 70 : 110, backgroundColor: color }}>
-          {card !== null ? (
+          {picture !== null ? (
+            // The page as the child made it: a real picture, filling the same frame.
+            <Image
+              source={{ uri: picture }}
+              resizeMode="cover"
+              accessibilityElementsHidden
+              style={{ width: "100%", height: "100%" }}
+            />
+          ) : card !== null ? (
             // The engine's static card, drawn as a picture (never through a web view).
             <SvgXml xml={card} width="100%" height="100%" pointerEvents="none" />
           ) : props.item.thumbnailSvg ? (

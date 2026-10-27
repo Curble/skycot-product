@@ -238,6 +238,9 @@ export function createSampleTransport(
           ? { status: 404, json: null }
           : { status: 200, json: null, text: svg };
       }
+      case `${FAMILY}/fridge/picture-data`:
+        // The sample family has no real pictures: its magnets keep showing cards.
+        return { status: 404, json: null };
       default: {
         const thread = /^\/api\/orchestration\/threads\/(.+)$/u.exec(input.path);
         const projection = thread === null ? undefined : threadNow(decodeURIComponent(thread[1]!));

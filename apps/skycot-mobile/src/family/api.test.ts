@@ -139,4 +139,31 @@ describe("fridge picture cards on the phone", () => {
       familyApi.fridgeCard(missing as unknown as MacTransport, "h3"),
     ).resolves.toBeNull();
   });
+
+  it("fetches a page's real picture as an image address, or null", async () => {
+    const ask = vi.fn(async () => ({ status: 200, json: { pngBase64: "iVBORw0KGgo=" } }));
+    await expect(
+      familyApi.fridgePicture({ request: ask } as unknown as MacTransport, "h1"),
+    ).resolves.toBe("data:image/png;base64,iVBORw0KGgo=");
+    expect(ask).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/api/skycot/family/fridge/picture-data",
+      query: { hash: "h1" },
+    });
+    for (const answer of [
+      { status: 404, json: { error: "invalid-request" } },
+      { status: 200, json: { pngBase64: 'x"onload=' } },
+      { status: 200, json: null },
+    ]) {
+      await expect(
+        familyApi.fridgePicture({ request: async () => answer } as unknown as MacTransport, "h"),
+      ).resolves.toBeNull();
+    }
+    const down = {
+      request: async () => {
+        throw new Error("offline");
+      },
+    };
+    await expect(familyApi.fridgePicture(down as unknown as MacTransport, "h")).resolves.toBeNull();
+  });
 });
