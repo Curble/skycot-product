@@ -22,7 +22,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { OpenFolderSheet } from "../../app/OpenFolderSheet";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
-import { CREW_NAME, PRODUCT_NAME } from "../../brand";
+import { ADVANCED_MODE_LABEL, CREW_NAME, PRODUCT_NAME } from "../../brand";
 import { HOME_HREF, navigate, settingsHref } from "../../router";
 import { readAutonomy, writeAutonomy, writeLastProject } from "../../state/preferences";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
@@ -53,21 +53,39 @@ import { familyCopy } from "../family/copy";
 import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { familyAgeTermsNote } from "../family/assistantAllowance";
-import { DEFAULT_READING_LEVEL, type ReadingLevel } from "../family/children";
+import { handBack } from "../family/handoff";
+import {
+  childLabel,
+  DEFAULT_READING_LEVEL,
+  MAX_CHILDREN,
+  type ReadingLevel,
+} from "../family/children";
 import { FamilySetupForm } from "../family/FamilySetupForm";
 import {
+  endGrownUpSession,
   grownUpSessionFor,
   readGrownUpSessionId,
   startGrownUpSession,
 } from "../family/grownUpSession";
-import { readFamilyView, tryParentCode, updateChild, refreshFamily } from "../family/store";
+import {
+  addChild,
+  lockFamilyGrants,
+  readFamilyView,
+  tryParentCode,
+  updateChild,
+  refreshFamily,
+  useFamilyView,
+} from "../family/store";
 import { markPickedThisWindow } from "../family-limits/FamilyLimitsHost";
 import { rememberChild } from "../family-limits/idlePicker";
+import { openChildPicker } from "../family-limits/FamilyLimitsHost";
 import { chooseChild } from "../family-limits/store";
 import { showToast } from "../../ui/Toast";
 import { PictureStep } from "./PictureStep";
 import {
+  addSibling,
   canContinue,
+  handOverLabel,
   onboardingProgress,
   onboardingSteps,
   projectsSummary,
@@ -98,7 +116,13 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
     icon: KeyRound,
     title: `Set up the ${familyCopy.title}`,
     description:
-      "A first name for the greeting, and a parent code of 4 to 6 digits. The code guards publishing, automations, the developer tools and turning the profile off.",
+      "A first name for the greeting, and a parent code of 4 to 6 digits. The code guards publishing, automations, Advanced mode and turning the profile off.",
+  },
+  children: {
+    icon: Users,
+    title: "Any other children?",
+    description:
+      "Add brothers and sisters now, so each has their own picture and reading level. You can change anything later in Settings → Family.",
   },
   picture: {
     icon: UserRound,
@@ -117,7 +141,7 @@ const STEP_META: Record<Step, { icon: LucideIcon; title: string; description: st
   },
   autonomy: {
     icon: ShieldCheck,
-    title: "How much should the AI do on its own?",
+    title: "How much should Sam do on its own?",
     description: "You can change this any time, for everything or for one conversation.",
   },
   look: {
@@ -137,7 +161,7 @@ const FAMILY_AUTONOMY_DESCRIPTION = `Fixed by the ${familyCopy.title}: safe step
 
 /**
  * First-run onboarding as one macOS sheet with short steps: who it is for,
- * (the Family set-up), assistant, folder, autonomy, look, done. Skippable at
+ * (the Family set-up), AI sign-in, folder, how much Sam does alone, look, done. Skippable at
  * every step; Settings → AI assistants → "Run the welcome steps again" reopens it.
  */
 export function OnboardingSheet({
@@ -169,8 +193,12 @@ export function OnboardingSheet({
   const steps = onboardingSteps(audience, familyAtOpen);
   const index = Math.max(0, steps.indexOf(step));
   const progress = onboardingProgress(steps, step);
-  const meta = STEP_META[step];
   const childPath = audience === "child";
+  const firstChildName = family.profile.children[0]?.name ?? (draft.childName.trim() || null);
+  const meta =
+    step === "done" && childPath
+      ? { ...STEP_META.done, title: handOverLabel(firstChildName) }
+      : STEP_META[step];
   const finish = (state: "done" | "skipped") => {
     writeOnboardingState(state);
     onClose();
@@ -220,13 +248,13 @@ export function OnboardingSheet({
         }
       }
       if (!hasChosenTheme()) setActiveTheme(FAMILY_THEME_ID);
-      setStep("assistant");
+      setStep("children");
       return;
     }
     setStep(steps[index + 1]!);
   };
   // Only the final button turns the Family profile on; skipping half-way leaves nothing locked.
-  const complete = async () => {
+  const complete = async (handOver = false) => {
     if (finishing) return;
     if (childPath && !family.enabled && setupReady(draft)) {
       setFinishing(true);
@@ -255,12 +283,28 @@ export function OnboardingSheet({
         writeLastProject({ environmentId, projectId: existing.id as ProjectId });
       }
     }
-    if (childPath) await landOnChild();
+    if (childPath) await landOnChild(!handOver);
+    if (childPath && handOver) {
+      // The same steps as "Done — hand back" in the grown-up menu. The first child is already
+      // chosen above, so the picker stays shut and they land on their own Home.
+      writeOnboardingState("done");
+      onClose();
+      handBack(
+        {
+          lock: () => void lockFamilyGrants(),
+          endSession: endGrownUpSession,
+          openPicker: openChildPicker,
+          goHome: () => navigate(HOME_HREF),
+        },
+        { picker: false },
+      );
+      return;
+    }
     finish("done");
   };
   // The child just set up is the one using SKYCOT here; the grown-up note appears only while
   // a grown-up session is really open (see setupLanding).
-  const landOnChild = async () => {
+  const landOnChild = async (withNote: boolean) => {
     const view = readFamilyView();
     const landing = setupLanding({
       childId: view.children[0]?.id ?? null,
@@ -271,7 +315,7 @@ export function OnboardingSheet({
       const chosen = await chooseChild(landing.chooseChildId);
       if (chosen.ok) rememberChild(landing.chooseChildId, Date.now());
     }
-    if (landing.note !== null) showToast(landing.note);
+    if (withNote && landing.note !== null) showToast(landing.note);
   };
 
   return (
@@ -325,7 +369,16 @@ export function OnboardingSheet({
           {index > 0 && step !== "done" && !(steps[index - 1] === "family" && family.enabled) ? (
             <Button onClick={() => setStep(steps[index - 1]!)}>Back</Button>
           ) : null}
-          {step === "done" ? (
+          {step === "done" && childPath ? (
+            <>
+              <Button variant="quiet" disabled={finishing} onClick={() => void complete(false)}>
+                Stay in grown-up settings for now
+              </Button>
+              <Button variant="primary" disabled={finishing} onClick={() => void complete(true)}>
+                {finishing ? "Setting up…" : handOverLabel(firstChildName)}
+              </Button>
+            </>
+          ) : step === "done" ? (
             <Button variant="primary" disabled={finishing} onClick={() => void complete()}>
               {finishing ? "Setting up…" : `Open ${PRODUCT_NAME}`}
             </Button>
@@ -359,6 +412,7 @@ export function OnboardingSheet({
           </p>
         </>
       ) : null}
+      {step === "children" ? <ChildrenStep defaultLevel={readingLevel} /> : null}
       {step === "picture" ? <PictureStep /> : null}
       {step === "assistant" ? (
         <AssistantStep environmentId={environmentId} forChild={childPath} />
@@ -411,7 +465,7 @@ function WhoStep({
         <WhoCard
           icon={UserRound}
           title="Me"
-          text="The usual set-up. Every autonomy level that keeps a safety promise, the developer tools a tap away."
+          text={`The usual set-up, with every way of working that keeps a safety promise. ${ADVANCED_MODE_LABEL} (for grown-ups who code) is a tap away.`}
           checked={audience === "me"}
           disabled={familyEnabled}
           onClick={() => onAudience("me")}
@@ -419,7 +473,7 @@ function WhoStep({
         <WhoCard
           icon={Users}
           title="A child I look after"
-          text={`${familyCopy.title}: SKYCOT's engine keeps the assistant asking first and child-friendly, and a parent code guards the internet, installs, publishing, automations and the developer tools. The Workshop look, unless you've picked another.`}
+          text={`${familyCopy.title}: SKYCOT on this Mac keeps Sam asking first and child-friendly, and a parent code guards the internet, installs, publishing, automations and Advanced mode. The Workshop look, unless you've picked another.`}
           checked={audience === "child"}
           onClick={() => onAudience("child")}
         />
@@ -486,16 +540,99 @@ function WhoCard({
   );
 }
 
+/** After the first child: add brothers and sisters one by one (name + reading band), then go on. */
+function ChildrenStep({ defaultLevel }: { readonly defaultLevel: ReadingLevel }) {
+  const { children } = useFamilyView();
+  const [name, setName] = useState("");
+  const [level, setLevel] = useState<ReadingLevel>(defaultLevel);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = children.length >= MAX_CHILDREN;
+
+  const add = async () => {
+    if (busy || name.trim().length === 0) return;
+    setBusy(true);
+    setProblem(null);
+    const result = await addSibling(
+      { name, readingLevel: level, childrenSoFar: children.length },
+      addChild,
+    );
+    setBusy(false);
+    if (result === null) return;
+    if (!result.ok) {
+      setProblem(
+        "That child couldn't be added. Try again, or add them later in Settings → Family.",
+      );
+      return;
+    }
+    setName("");
+  };
+
+  return (
+    <div className="fm-onboarding">
+      <List label="Children">
+        {children.map((child, index) => (
+          <ListRow
+            key={child.id}
+            leading={<StepBadge state="done" />}
+            title={childLabel(child, index)}
+            subtitle={
+              READING_BANDS.find((band) => band.value === child.readingLevel)?.label ?? undefined
+            }
+          />
+        ))}
+      </List>
+      {full ? null : (
+        <div className="fm-onboarding__inline">
+          <TextField
+            label="Add another child"
+            placeholder="First name"
+            autoComplete="off"
+            value={name}
+            onChange={(event) => setName(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void add();
+            }}
+          />
+          <p className="fm-help">How simply should Sam explain things for them?</p>
+          <SegmentedControl
+            label="How simply Sam explains"
+            options={READING_BANDS}
+            value={level}
+            onChange={setLevel}
+            wrap
+          />
+          <div className="fm-onboarding__inline-actions">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy || name.trim().length === 0}
+              onClick={() => void add()}
+            >
+              {busy ? "Adding…" : "Add child"}
+            </Button>
+          </div>
+        </div>
+      )}
+      {problem ? <Banner tone="warning">{problem}</Banner> : null}
+      <p className="fm-help">
+        Each child gets their own picture colour. Pictures, bedtimes and limits are in Settings →
+        Family. Nobody else to add? Press Continue.
+      </p>
+    </div>
+  );
+}
+
 function FamilyAutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const policyEnforced = config?.skycotPolicy === true;
   return (
     <div className="fm-onboarding">
-      <List label="Autonomy">
+      <List label="How much Sam does on its own">
         <ListRow
           leading={<StepBadge state="ok" icon={ShieldCheck} />}
           title={`Safe steps run by themselves (${familyCopy.title})`}
-          subtitle={`${familyCopy.safeSteps}, and nothing changes until the plan is built. A parent can have a child asked before each step in Settings → Family. The riskier levels are hidden while the profile is on.`}
+          subtitle={`${familyCopy.safeSteps}, and nothing changes until the plan is built. A parent can have a child asked before each step in Settings → Family. The riskier choices are hidden while the profile is on.`}
           trailing={
             <Pill tone="neutral" size="sm">
               Fixed
@@ -531,7 +668,7 @@ function AssistantStep({
   const others = PROVIDER_CATALOG.filter((entry) => !entry.primary);
   return (
     <div className="fm-onboarding">
-      <List label="AI assistants">
+      <List label="AI helpers">
         {primary.map((entry) => (
           <ProviderRow
             key={entry.driver}
@@ -544,7 +681,7 @@ function AssistantStep({
         ))}
         <ListRow
           title="More…"
-          subtitle="Cursor, Grok, OpenCode and other developer tools."
+          subtitle="Cursor, Grok, OpenCode and other tools for people who code."
           trailing={
             moreOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />
           }
@@ -566,10 +703,21 @@ function AssistantStep({
       </List>
       <p className="fm-help">
         {anyProviderReady(providers)
-          ? "At least one assistant is ready. You can connect more later in Settings."
-          : "To make something, choose an assistant and sign in on its website; SKYCOT notices when you return."}
+          ? "At least one AI is ready. You can connect more later in Settings."
+          : "To make something, choose an AI and sign in on its website; SKYCOT notices when you return."}
       </p>
-      {forChild ? <p className="fm-help">{familyAgeTermsNote()}</p> : null}
+      {forChild ? (
+        <>
+          <p className="fm-help">
+            Each AI service has its own age rules, and the choice is yours. Any other AI needs your
+            OK in Settings → Family.
+          </p>
+          <details className="fm-help">
+            <summary>Read the terms</summary>
+            <p>{familyAgeTermsNote()}</p>
+          </details>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -702,7 +850,7 @@ function AutonomyStep({ environmentId }: { readonly environmentId: EnvironmentId
   return (
     <div className="fm-onboarding">
       <SegmentedControl
-        label="Autonomy"
+        label="How much Sam does on its own"
         value={autonomy}
         onChange={choose}
         block
@@ -767,12 +915,12 @@ function DoneStep({
           title={
             ready.length > 0
               ? `${ready.map((provider) => provider.displayName ?? String(provider.driver)).join(", ")} ready`
-              : "No assistant yet"
+              : "No AI connected yet"
           }
           subtitle={
             ready.length > 0
               ? "New conversations use it automatically."
-              : "Connect one in Settings → AI assistants when you're ready."
+              : "Connect one in Settings when you're ready."
           }
         />
         <ListRow
@@ -804,7 +952,7 @@ function DoneStep({
           subtitle={
             familyFor !== undefined
               ? `Anything risky waits for a grown-up. Fixed by the ${familyCopy.title}.`
-              : "Your default autonomy. Change it in Settings → Autonomy & safety."
+              : "How much Sam does on its own. You can change it in Settings."
           }
           trailing={
             <Pill tone="neutral" size="sm">

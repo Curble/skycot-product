@@ -125,6 +125,6 @@ export function familyAgeTermsNote(): string {
     "Codex comes from OpenAI, and Claude from Anthropic.",
     assistantAgeTerms("codex").sentence,
     assistantAgeTerms("claudeAgent").sentence.replace(/^As of October 2026, /, ""),
-    "Each service sets its own rules, and the choice is yours. Any other assistant needs your OK in Settings › Family.",
+    "Each service sets its own rules, and the choice is yours. Any other AI needs your OK in Settings › Family.",
   ].join(" ");
 }

@@ -67,8 +67,8 @@ export function FamilyAssistantsGroup({
   return (
     <>
       <SettingsGroup
-        title="AI assistants for children"
-        footer="SKYCOT switches off Codex's and Claude's own add-ons for a child. Any other assistant starts only once a grown-up allows it with the parent code; its own add-ons stay on. Stopping needs no code."
+        title="AI helpers for children"
+        footer="SKYCOT switches off Codex's and Claude's own add-ons for a child. Any other AI starts only once a grown-up allows it with the parent code; its own add-ons stay on. Stopping needs no code."
       >
         {drivers.map((driver) => {
           const state = assistantFamilyState(driver, profile.allowedAssistants);

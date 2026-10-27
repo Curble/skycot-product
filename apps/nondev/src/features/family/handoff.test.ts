@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { consumeHandoff, readHandoff, withoutHandoff } from "./handoff";
+import { consumeHandoff, handBack, readHandoff, withoutHandoff } from "./handoff";
 
 const actions = () => ({ lock: vi.fn(), endSession: vi.fn(), openPicker: vi.fn() });
 const at = (search: string) => ({ search, pathname: "/simple/index.html", hash: "#/" });
@@ -42,5 +42,27 @@ describe("handoff from Advanced mode", () => {
     expect(consumeHandoff(at(""), replace, a)).toBeNull();
     expect(replace).not.toHaveBeenCalled();
     expect(a.openPicker).not.toHaveBeenCalled();
+  });
+});
+
+describe("handBack (the sidebar's Done, and the end of set-up)", () => {
+  it("locks, ends the grown-up session, opens the picker and lands Home, in that order", () => {
+    const order: string[] = [];
+    handBack({
+      lock: () => order.push("lock"),
+      endSession: () => order.push("end"),
+      openPicker: () => order.push("picker"),
+      goHome: () => order.push("home"),
+    });
+    expect(order).toEqual(["lock", "end", "picker", "home"]);
+  });
+
+  it("the hand-over after set-up runs the same steps, minus the picker (the child is chosen)", () => {
+    const a = { ...actions(), goHome: vi.fn() };
+    handBack(a, { picker: false });
+    expect(a.lock).toHaveBeenCalledOnce();
+    expect(a.endSession).toHaveBeenCalledOnce();
+    expect(a.openPicker).not.toHaveBeenCalled();
+    expect(a.goHome).toHaveBeenCalledOnce();
   });
 });

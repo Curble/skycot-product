@@ -85,7 +85,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
       <>
         <SettingsGroup
           title={familyCopy.title}
-          footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), lets safe steps run by themselves while anything risky waits for a grown-up, hides the developer tools, and guards publishing and automations with a parent code."
+          footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), lets safe steps run by themselves while anything risky waits for a grown-up, hides Advanced mode, and guards publishing and automations with a parent code."
         >
           <ListRow
             leading={<StepBadge state="todo" icon={Users} />}
@@ -234,13 +234,13 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
 
       {profile.me.kind === "shared" ? (
         <SettingsGroup
-          title="Developer tools"
+          title="Advanced mode (for grown-ups who code)"
           footer="The full workshop is hidden from the sidebar and Settings while the profile is on. A parent can still open it here."
         >
           <ListRow
             leading={<StepBadge state="todo" icon={Wrench} />}
             title={`${grownUpPlainNames.advanced} (parent code)`}
-            subtitle="The full developer interface. It stays open on this device for 15 minutes."
+            subtitle="The full set of tools for people who code. It stays open on this device for 15 minutes."
             trailing={
               <Button size="sm" onClick={() => setAdvancedOpen(true)}>
                 Open…
@@ -254,7 +254,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
         <ListRow
           leading={<StepBadge state="warn" icon={Power} />}
           title={`Turn off the ${familyCopy.title}`}
-          subtitle="Confirms, then asks for the parent code. The look and text size stay as they are; autonomy, Advanced mode and publishing open up again."
+          subtitle="Confirms, then asks for the parent code. The look and text size stay as they are; how much Sam does on its own, Advanced mode and publishing open up again."
           trailing={
             <Button size="sm" variant="destructive" onClick={() => setConfirmOff(true)}>
               Turn off…
@@ -278,7 +278,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
         icon={Power}
         iconTone="red"
         title={`Turn off the ${familyCopy.title}?`}
-        description="Every guardrail it added goes: the assistant can be set to do more on its own, Advanced mode comes back, and publishing, the internet and installs no longer ask for a code. The child's name and the code are forgotten."
+        description="Every guardrail it added goes: Sam can be set to do more on its own, Advanced mode comes back, and publishing, the internet and installs no longer ask for a code. The child's name and the code are forgotten."
         sober
         dismissOnBackdrop={false}
         actions={
@@ -482,7 +482,7 @@ function MoveLegacyPane() {
                 disabled={!entry.canSubmit}
                 onClick={() => void entry.submit()}
               >
-                {entry.busy ? "Moving…" : "Move to the engine"}
+                {entry.busy ? "Moving…" : "Move into SKYCOT"}
               </Button>
             </div>
           </div>

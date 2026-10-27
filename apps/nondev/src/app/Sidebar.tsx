@@ -59,6 +59,7 @@ import { ChildAvatar } from "../features/family/ChildAvatar";
 import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
 import { lockFamilyGrants } from "../features/family/store";
 import { endGrownUpSession } from "../features/family/grownUpSession";
+import { handBack } from "../features/family/handoff";
 import type { FamilyChild } from "../features/family/children";
 import { grownUpSessionFor, useGrownUpSessionId } from "../features/family/grownUpSession";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
@@ -549,10 +550,12 @@ export function AppSidebar({
               onSettings={() => select(() => navigate(SETTINGS_HREF))}
               onHelp={() => select(() => navigate(settingsHref("help")))}
               onHandBack={() => {
-                void lockFamilyGrants();
-                endGrownUpSession();
-                openChildPicker();
-                navigate(HOME_HREF);
+                handBack({
+                  lock: () => void lockFamilyGrants(),
+                  endSession: endGrownUpSession,
+                  openPicker: openChildPicker,
+                  goHome: () => navigate(HOME_HREF),
+                });
               }}
             />
           ) : (

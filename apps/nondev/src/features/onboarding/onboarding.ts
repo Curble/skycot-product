@@ -1,6 +1,8 @@
 import type { ServerProvider } from "@t3tools/contracts";
 
 import type { Route } from "../../router";
+import { draftFor, patchFor } from "../family/ChildEditorSheet";
+import type { ChildPatch } from "../family/api";
 import type { ReadingLevel } from "../family/children";
 import type { OnboardingState } from "../settings/localPrefs";
 
@@ -38,6 +40,7 @@ export type Audience = "me" | "child";
 export type OnboardingStep =
   | "who"
   | "family"
+  | "children"
   | "picture"
   | "assistant"
   | "work"
@@ -56,7 +59,8 @@ export function onboardingSteps(
 ): ReadonlyArray<OnboardingStep> {
   // A child needs the parent code and an assistant before making a first thing. Pictures,
   // folders and looks can be changed after the child lands in the Workshop.
-  const family: OnboardingStep[] = audience === "child" && !familyEnabled ? ["family"] : [];
+  const family: OnboardingStep[] =
+    audience === "child" && !familyEnabled ? ["family", "children"] : [];
   return [
     "who",
     ...family,
@@ -137,4 +141,37 @@ export function projectsSummary(titles: ReadonlyArray<string>, forChild: boolean
       ? "A place to make things is ready"
       : "Places to make things are ready";
   return titles.length === 1 ? `1 project: ${titles[0]}` : `${titles.length} projects`;
+}
+
+/**
+ * A brother or sister added during set-up: just a name and a reading band. The picture colour
+ * follows on from the children already saved, and everything else starts at the same sensible
+ * defaults as Settings › Family › Add another child.
+ */
+export function siblingPatch(
+  name: string,
+  readingLevel: ReadingLevel,
+  childrenSoFar: number,
+): ChildPatch {
+  return patchFor({ ...draftFor(null, childrenSoFar), name, readingLevel });
+}
+
+/** Saves one more child through the family API; `add` is the store's `addChild`. */
+export async function addSibling<R extends { readonly ok: boolean }>(
+  input: {
+    readonly name: string;
+    readonly readingLevel: ReadingLevel;
+    readonly childrenSoFar: number;
+  },
+  add: (patch: ChildPatch) => Promise<R>,
+): Promise<R | null> {
+  const name = input.name.trim();
+  if (name.length === 0) return null;
+  return add(siblingPatch(name, input.readingLevel, input.childrenSoFar));
+}
+
+/** The name on the hand-over button, with a kind fallback when the first child has none. */
+export function handOverLabel(firstChildName: string | null | undefined): string {
+  const name = firstChildName?.trim();
+  return `Ready — hand SKYCOT to ${name ? name : "your child"}`;
 }

@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { vi } from "vite-plus/test";
+
+import onboardingSheetSource from "./OnboardingSheet.tsx?raw";
+import pictureStepSource from "./PictureStep.tsx?raw";
+import familySetupFormSource from "../family/FamilySetupForm.tsx?raw";
+import familyAssistantsGroupSource from "../family/FamilyAssistantsGroup.tsx?raw";
+import familyPaneSource from "../settings/panes/FamilyPane.tsx?raw";
+import familyCopySource from "../family/copy.ts?raw";
+import { familyCopy } from "../family/copy";
+import { mascotCopy } from "../brand/mascotCopy";
+import { familyAgeTermsNote } from "../family/assistantAllowance";
 import {
+  addSibling,
+  handOverLabel,
+  siblingPatch,
   canContinue,
   onboardingProgress,
   GROWN_UP_UNTIL_DONE,
@@ -15,7 +29,7 @@ describe("onboardingSteps", () => {
   it("keeps the child setup to family code and assistant before making", () => {
     expect(onboardingSteps(null)).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
     expect(onboardingSteps("me")).toEqual(["who", "assistant", "work", "autonomy", "look", "done"]);
-    expect(onboardingSteps("child")).toEqual(["who", "family", "assistant", "done"]);
+    expect(onboardingSteps("child")).toEqual(["who", "family", "children", "assistant", "done"]);
   });
 
   it("skips the Family set-up when a profile is already on", () => {
@@ -32,8 +46,8 @@ describe("onboardingProgress", () => {
     expect(me.index).toBe(2);
 
     const child = onboardingProgress(onboardingSteps("child"), "assistant");
-    expect(child.steps).toHaveLength(3);
-    expect(child.index).toBe(2);
+    expect(child.steps).toHaveLength(4);
+    expect(child.index).toBe(3);
   });
 
   it("keeps the final setup dot selected on done", () => {
@@ -114,5 +128,87 @@ describe("projectsSummary", () => {
   it("keeps the folder's name for someone setting up for themselves", () => {
     expect(projectsSummary(["site"], false)).toBe("1 project: site");
     expect(projectsSummary(["a", "b"], false)).toBe("2 projects");
+  });
+});
+
+describe("adding more children during set-up", () => {
+  it("saves two children through the family API, each with its own colour and band", async () => {
+    const added: unknown[] = [];
+    const add = vi.fn(async (patch: unknown) => {
+      added.push(patch);
+      return { ok: true as const };
+    });
+    expect(
+      await addSibling({ name: "  Theo ", readingLevel: "makers", childrenSoFar: 1 }, add),
+    ).toEqual({
+      ok: true,
+    });
+    await addSibling({ name: "Isla", readingLevel: "little-makers", childrenSoFar: 2 }, add);
+    expect(add).toHaveBeenCalledTimes(2);
+    const [theo, isla] = added as ReturnType<typeof siblingPatch>[];
+    expect(theo).toMatchObject({ name: "Theo", readingLevel: "makers" });
+    expect(isla).toMatchObject({ name: "Isla", readingLevel: "little-makers" });
+    expect(theo!.avatar).not.toEqual(isla!.avatar);
+  });
+
+  it("does not save a child without a name", async () => {
+    const add = vi.fn(async () => ({ ok: true as const }));
+    expect(
+      await addSibling({ name: "  ", readingLevel: "makers", childrenSoFar: 1 }, add),
+    ).toBeNull();
+    expect(add).not.toHaveBeenCalled();
+  });
+
+  it("names the first child on the hand-over button", () => {
+    expect(handOverLabel("Mia")).toBe("Ready — hand SKYCOT to Mia");
+    expect(handOverLabel(null)).toBe("Ready — hand SKYCOT to your child");
+  });
+});
+
+const BANNED = /\b(engine|assistants?|autonomy|developer|dev tools?)\b/i;
+
+/** Every sentence a parent can read in a source file: quoted strings with a space in them, and JSX text. */
+function readableStrings(raw: string): string[] {
+  const source = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/^import[\s\S]*?from\s+"[^"]*";$/gm, "");
+  const found: string[] = [];
+  for (const match of source.matchAll(/"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)) {
+    // `${...}` holes are code, not words.
+    const text = (match[1] ?? match[2] ?? "").replace(/\$\{[^}]*\}/g, "");
+    if (/\s/.test(text.trim())) found.push(text);
+  }
+  for (const match of source.matchAll(/(?<![=-])>([^<>{}]*[A-Za-z][^<>{}]*)</g))
+    found.push(match[1]!);
+  return found;
+}
+
+describe("plain family words in set-up and the Family screen", () => {
+  const files: Record<string, string> = {
+    "OnboardingSheet.tsx": onboardingSheetSource,
+    "PictureStep.tsx": pictureStepSource,
+    "FamilySetupForm.tsx": familySetupFormSource,
+    "FamilyAssistantsGroup.tsx": familyAssistantsGroupSource,
+    "FamilyPane.tsx": familyPaneSource,
+    "copy.ts": familyCopySource,
+  };
+  for (const [file, source] of Object.entries(files)) {
+    it(`${file} has no developer words`, () => {
+      // "This assistant" is a code comparison against the rules package's fallback title, never shown.
+      const offending = readableStrings(source).filter(
+        (text) => BANNED.test(text) && text !== "This assistant",
+      );
+      expect(offending).toEqual([]);
+    });
+  }
+
+  it("the shared sentences a parent reads carry none either", () => {
+    const lines = [
+      ...Object.values(familyCopy).flatMap((value) => (Array.isArray(value) ? value : [value])),
+      mascotCopy.introduction,
+      familyAgeTermsNote(),
+    ].filter((value): value is string => typeof value === "string");
+    expect(lines.filter((text) => BANNED.test(text))).toEqual([]);
   });
 });

@@ -29,6 +29,22 @@ export interface HandoffActions {
   readonly openPicker: () => void;
 }
 
+export interface HandBackActions extends HandoffActions {
+  readonly goHome: () => void;
+}
+
+/**
+ * "Done — hand back", in one place: lock the grown-up grants, end the grown-up session, open the
+ * picker (unless the caller has already chosen the child), and land on Home. The sidebar and the
+ * end of set-up both call this, so the two can never drift apart.
+ */
+export function handBack(actions: HandBackActions, options: { readonly picker?: boolean } = {}) {
+  actions.lock();
+  actions.endSession();
+  if (options.picker !== false) actions.openPicker();
+  actions.goHome();
+}
+
 /**
  * Runs the note found in `location` once and strips it. Returns what it did (null: nothing).
  * "hand-back" = lock the grown-up grants, end the grown-up session, open the picker (exactly the
