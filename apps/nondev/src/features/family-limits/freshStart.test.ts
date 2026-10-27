@@ -48,3 +48,13 @@ describe("fresh start when the picker moves to another child", () => {
     expect(takeFreshStart(storage)).toBe(false);
   });
 });
+
+describe("pickRestartsFresh", () => {
+  it("restarts for another child, and for the same child after a grown-up's turn", async () => {
+    const { pickRestartsFresh } = await import("./freshStart");
+    expect(pickRestartsFresh("a", "b", false)).toBe(true);
+    expect(pickRestartsFresh("a", "a", true)).toBe(true);
+    expect(pickRestartsFresh("a", "a", false)).toBe(false);
+    expect(pickRestartsFresh(null, "a", false)).toBe(false);
+  });
+});

@@ -54,3 +54,43 @@ export function clearCachedEngineData(
     setTimeout(done, 2000);
   });
 }
+
+// The engine's live lists are filtered per viewer when the subscription starts, so a window that
+// has shown a grown-up's everything holds more than any child may see (and one that showed a
+// child holds less than a grown-up should). The first time a grown-up's turn opens the window
+// restarts fresh; when the child comes back the next pick restarts it again, even for the same
+// child. The mark lives for the tab, so it survives those reloads.
+const GROWN_UP_SEEN_KEY = "skycot:grown-up-cache";
+
+export function markGrownUpSeen(storage: Pick<Storage, "setItem"> = sessionStorage): void {
+  try {
+    storage.setItem(GROWN_UP_SEEN_KEY, "1");
+  } catch {
+    // Blocked storage: the child switch still restarts when the child changed.
+  }
+}
+
+export function grownUpSeen(storage: Pick<Storage, "getItem"> = sessionStorage): boolean {
+  try {
+    return storage.getItem(GROWN_UP_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function clearGrownUpSeen(storage: Pick<Storage, "removeItem"> = sessionStorage): void {
+  try {
+    storage.removeItem(GROWN_UP_SEEN_KEY);
+  } catch {
+    // Nothing stored.
+  }
+}
+
+/** Pure: whether picking a child restarts the window fresh. */
+export function pickRestartsFresh(
+  before: string | null,
+  chosen: string,
+  grownUpHadTurn: boolean,
+): boolean {
+  return grownUpHadTurn || (before !== null && before !== chosen);
+}

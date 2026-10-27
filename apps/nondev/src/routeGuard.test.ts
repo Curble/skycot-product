@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { FOR_GROWN_UPS_NOTE, routeForViewer } from "./routeGuard";
+import { FOR_GROWN_UPS_NOTE, landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
 import { parseRoute } from "./router";
 
 describe("routeForViewer", () => {
@@ -22,5 +22,14 @@ describe("routeForViewer", () => {
     for (const hash of ["#/", "#/makes", "#/fridge", "#/stickers", "#/settings/appearance"]) {
       expect(routeForViewer(parseRoute(hash), true)).toEqual({ allowed: true });
     }
+  });
+});
+
+describe("landsHomeAfterGrownUp", () => {
+  it("sends the child Home only when a grown-up's turn has just ended", () => {
+    expect(landsHomeAfterGrownUp(true, false)).toBe(true);
+    expect(landsHomeAfterGrownUp(false, false)).toBe(false);
+    expect(landsHomeAfterGrownUp(false, true)).toBe(false);
+    expect(landsHomeAfterGrownUp(true, true)).toBe(false);
   });
 });

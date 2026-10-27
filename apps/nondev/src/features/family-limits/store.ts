@@ -3,7 +3,7 @@
 // every child's day for Settings › Family. One timer for the heartbeat and one for the next
 // wall-clock change the engine named (bedtime starting, extra time ending); no polling beyond.
 import { HOME_HREF } from "../../router";
-import { markFreshStart } from "./freshStart";
+import { clearGrownUpSeen, grownUpSeen, markFreshStart, pickRestartsFresh } from "./freshStart";
 import { useSyncExternalStore } from "react";
 
 import { familyApi, request } from "../family/api";
@@ -181,15 +181,25 @@ export function askWhoStarted(threadIds: ReadonlyArray<string>): void {
   void refreshToday();
 }
 
+/** The new child always starts at Home: the address is set first, so the reload cannot come back on a grown-up page. */
+export function startFreshWindow(
+  win: { readonly location: { hash: string; reload: () => void } } = window,
+  mark: () => void = markFreshStart,
+  hash: string | null = HOME_HREF,
+): void {
+  if (hash !== null) win.location.hash = hash;
+  mark();
+  win.location.reload();
+}
+
 export async function chooseChild(childId: string): Promise<FamilyResult<SessionLimits>> {
   const before = readLimits().session?.childId ?? null;
   const result = await familyApi.choose({ childId });
   // Another child than before on the shared Mac: the window starts fresh, with the previous
   // child's cache and every in-memory atom discarded before the new child's session is applied.
-  if (result.ok && before !== null && before !== childId) {
-    markFreshStart();
-    window.location.hash = HOME_HREF;
-    window.location.reload();
+  if (result.ok && pickRestartsFresh(before, childId, grownUpSeen())) {
+    clearGrownUpSeen();
+    startFreshWindow();
   } else if (result.ok) {
     applySessionLimits(result.value);
   }

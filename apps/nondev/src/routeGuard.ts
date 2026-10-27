@@ -18,3 +18,8 @@ export function routeForViewer(
   if (childView && isGrownUpOnlyRoute(route)) return { allowed: false, note: FOR_GROWN_UPS_NOTE };
   return { allowed: true };
 }
+
+/** A grown-up's turn just ended (hand back, Done, or the code lapsed): the child lands Home, whatever page the grown-up was on. */
+export function landsHomeAfterGrownUp(wasGrownUp: boolean, isGrownUp: boolean): boolean {
+  return wasGrownUp && !isGrownUp;
+}

@@ -15,6 +15,7 @@ import { SidebarSheetsHost } from "./app/SidebarSheets";
 import { PRODUCT_NAME } from "./brand";
 import { AutomationsScreen } from "./features/automations/AutomationsScreen";
 import { FamilyProvider, useFamily } from "./features/family/FamilyProvider";
+import { grownUpSessionFor, useGrownUpSessionId } from "./features/family/grownUpSession";
 import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
 import { GrownUpApp } from "./features/grown-up/GrownUpApp";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
@@ -35,7 +36,9 @@ import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
 import { useColumns } from "./app/useColumns";
 import { useChildView } from "./app/useChildView";
-import { routeForViewer } from "./routeGuard";
+import { grownUpSeen, markFreshStart, markGrownUpSeen } from "./features/family-limits/freshStart";
+import { startFreshWindow } from "./features/family-limits/store";
+import { landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
 import { Button } from "./ui/Button";
 import { showToast } from "./ui/Toast";
 
@@ -126,6 +129,7 @@ export function App() {
   return (
     <FamilyProvider>
       <WhoIsWho>
+        <HandBackHome />
         <SidebarSheetsHost>
           <AppShell route={route}>
             <OnboardingGate route={route} />
@@ -227,6 +231,26 @@ function GrownUpOnly({
     navigate(HOME_HREF);
   }, [verdict.allowed]);
   return known && verdict.allowed ? <>{children}</> : null;
+}
+
+/** When the grown-up's turn on the shared Mac ends, the child lands on Home, never on the grown-up page left open. */
+function HandBackHome() {
+  const family = useFamily();
+  const grownUp = grownUpSessionFor(useGrownUpSessionId(), family.profile, Date.now()) !== null;
+  const was = useRef(grownUp);
+  useEffect(() => {
+    if (landsHomeAfterGrownUp(was.current, grownUp)) navigate(HOME_HREF);
+    was.current = grownUp;
+    // The engine's lists were filtered for the child when they were fetched: restart once so the
+    // grown-up sees every child's projects (the same reload also clears the cache on the way back).
+    if (grownUp && !grownUpSeen()) {
+      markGrownUpSeen();
+      const timer = window.setTimeout(() => startFreshWindow(window, markFreshStart, null), 400);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [grownUp]);
+  return null;
 }
 
 /**
