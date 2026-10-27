@@ -1216,6 +1216,11 @@ html.dark .fm-standalone__foot {
 .fm-sidebar__footer-row {
   position: relative;
 }
+/* The Popover's anchor is an inline span around the tag; it must span the row so the menu does. */
+.fm-sidebar__footer-row > span {
+  display: block;
+  width: 100%;
+}
 /* The Projects tab is a drawer, not a place: open shows a nudge and a turned chevron, never tape. */
 .fm-child-tab--open {
   transform: translateX(6px) !important;
