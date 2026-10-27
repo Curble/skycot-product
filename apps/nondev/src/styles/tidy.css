@@ -94,7 +94,8 @@ h1.fm-conv-header__name {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: normal;
-  overflow-wrap: anywhere;
+  /* Wraps between words; only a single word wider than the line is ever broken ("Creat / e"). */
+  overflow-wrap: break-word;
   margin: 0;
   font-family: var(--fm-font-label);
   font-size: calc(15px * var(--fm-text-scale));

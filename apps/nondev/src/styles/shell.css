@@ -445,8 +445,9 @@
   border-bottom: 1px solid var(--fm-sep);
 }
 .fm-conv-header__who {
-  min-width: 0;
-  flex: 1;
+  /* Never squeezed below a readable width by the tool buttons (gate 19: 51px with the Preview open). */
+  min-width: 140px;
+  flex: 1 1 160px;
 }
 .fm-conv-header__name {
   display: block;
@@ -471,9 +472,12 @@
 .fm-conv-header__tools {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 4px;
   margin-left: auto;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .fm-strip {
   display: flex;
@@ -507,6 +511,8 @@
 .fm-stream {
   flex: 1;
   min-height: 0;
+  /* Lets the journey layout measure the chat column itself (it narrows when the Preview opens). */
+  container-type: inline-size;
   overflow-y: auto;
   padding: 16px 18px 8px;
   display: flex;
