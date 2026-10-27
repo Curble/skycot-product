@@ -1013,9 +1013,9 @@ html.dark .fm-standalone__foot {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   width: 100%;
-  padding: 9px 11px;
+  padding: 9px 9px;
   border: 2px solid var(--fm-ink);
   border-radius: 7px;
   background: color-mix(in srgb, var(--fm-tab-tint) 65%, var(--fm-bg-card));
@@ -1089,7 +1089,7 @@ html.dark .fm-standalone__foot {
   min-width: 0;
 }
 .fm-child-tab__label {
-  font-size: calc(15px * var(--fm-text-scale));
+  font-size: calc(14.5px * var(--fm-text-scale));
   font-weight: 600;
   line-height: 1.1;
   white-space: nowrap;
@@ -1123,8 +1123,8 @@ html.dark .fm-standalone__foot {
 }
 .fm-child-tab__badge {
   position: absolute;
-  top: -9px;
-  right: -8px;
+  top: -8px;
+  right: -5px;
   min-width: 24px;
   height: 24px;
   padding: 0 6px;
@@ -1202,9 +1202,16 @@ html.dark .fm-standalone__foot {
 /* The name tag's menu fits inside the column (the column scrolls, so it cannot spill out). */
 .fm-sidebar__footer .fm-popover {
   min-width: 0;
-  width: calc(100% - 6px);
+  width: calc(100% - 2px);
   max-width: none;
-  left: 3px;
+  left: 1px;
+  padding: 4px;
+}
+.fm-sidebar__footer .fm-menu-item {
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 7px;
+  padding-bottom: 7px;
 }
 .fm-sidebar__footer-row {
   position: relative;
