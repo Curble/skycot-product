@@ -27,6 +27,7 @@ import { PageInternetAsk } from "../page-internet/PageInternetAsk";
 import { useSealedInternet } from "../page-internet/useSealedInternet";
 import { FullscreenPage } from "../preview/FullscreenPage";
 import { SealedPreviewFrame } from "../preview/SealedPreviewFrame";
+import { CAPTURE_DELAY_MS, captureMagnetPicture } from "../fridge/capture";
 
 /** One page to open: the conversation that made it, its project, and its project path. */
 export interface OpenItTarget {
@@ -122,6 +123,19 @@ export function PreviewSheet({
   );
   const name = relativePath.split("/").at(-1) ?? relativePath;
   const { projectId, threadId } = place;
+
+  // Once the page has had a moment to paint, the Mac app takes a small picture of this frame
+  // for the page's fridge magnet (desktop only; it does nothing, quietly, anywhere else).
+  const captureTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(captureTimer.current), []);
+  const onFrameLoaded = () => {
+    setFrameLoaded(true);
+    if (threadId === null) return;
+    window.clearTimeout(captureTimer.current);
+    captureTimer.current = window.setTimeout(() => {
+      void captureMagnetPicture({ frame: frame.current, threadId, page: relativePath });
+    }, CAPTURE_DELAY_MS);
+  };
 
   // The page as last read: when Sam changes the file while the sheet is open, the frame reloads
   // by itself (checked every few seconds) so the child never wonders whether anything happened.
@@ -253,7 +267,7 @@ export function PreviewSheet({
                 className="fm-preview-frame"
                 title={`Preview of ${name}`}
                 srcDoc={sealedDocument}
-                onLoad={() => setFrameLoaded(true)}
+                onLoad={onFrameLoaded}
               />
             </div>
           </FullscreenPage>

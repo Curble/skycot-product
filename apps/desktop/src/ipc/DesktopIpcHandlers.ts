@@ -52,6 +52,8 @@ import {
   revealWindow,
   // nondev-seam: skycot-page-fullscreen-registration
   setWindowFullscreen,
+  // nondev-seam: skycot-fridge-capture-registration
+  captureRegion,
   pickFolder,
   pickProjectFavicon,
   pickThemeFiles,
@@ -103,6 +105,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(getWindowFullscreenState);
   // nondev-seam: skycot-page-fullscreen-registration
   yield* ipc.handle(setWindowFullscreen);
+  // nondev-seam: skycot-fridge-capture-registration
+  yield* ipc.handle(captureRegion);
   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
   yield* ipc.handleSync(getLocalEnvironmentEnabled);
   yield* ipc.handle(setLocalEnvironmentEnabled);

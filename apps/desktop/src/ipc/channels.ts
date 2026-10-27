@@ -19,6 +19,8 @@ export const GET_WINDOW_FULLSCREEN_STATE_CHANNEL = "desktop:get-window-fullscree
 export const WINDOW_FULLSCREEN_STATE_CHANNEL = "desktop:window-fullscreen-state";
 // nondev-seam: skycot-page-fullscreen-channel
 export const SET_WINDOW_FULLSCREEN_CHANNEL = "desktop:set-window-fullscreen";
+// nondev-seam: skycot-fridge-capture-channel
+export const CAPTURE_REGION_CHANNEL = "desktop:capture-region";
 export const DESKTOP_APP_ACTIVATION_READY_CHANNEL = "desktop:app-activation-ready";
 export const DESKTOP_APP_ACTIVATION_COMPLETE_CHANNEL = "desktop:app-activation-complete";
 export const DESKTOP_APP_ACTIVATION_REQUEST_CHANNEL = "desktop:app-activation-request";

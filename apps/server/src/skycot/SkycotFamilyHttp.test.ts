@@ -566,6 +566,54 @@ it.layer(
       }),
   );
 
+  // nondev-seam: skycot-fridge-picture-route-test
+  it.effect("keeps a page picture only when it is a small PNG of a page the child owns", () =>
+    Effect.gen(function* () {
+      const { send, dir } = yield* makeClient();
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const child = { headers: { authorization: CHILD_BEARER } };
+      const magic = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+      const b64 = (bytes: ReadonlyArray<number>) => Buffer.from(bytes).toString("base64");
+      const body = (pngBase64: string, threadId = "own-thread") => ({
+        body: { threadId, page: "game.html", contentHash: "abc", pngBase64 },
+        ...child,
+      });
+      const url = "/api/skycot/family/fridge/picture";
+      // Wrong signature, not base64, empty, and too big: all "invalid-request".
+      for (const bad of [
+        b64([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        "not base64!",
+        "",
+        b64([...magic, ...new Array(400_001).fill(0)]),
+      ]) {
+        assert.equal((yield* send("POST", url, body(bad))).status, 400);
+      }
+      // Another child's page is refused.
+      assert.equal(
+        (yield* send("POST", url, body(b64([...magic, 1, 2, 3]), "other-thread"))).status,
+        403,
+      );
+      // A real PNG for a page with no magnet (or an old version) is quietly not kept.
+      const quiet = yield* send("POST", url, body(b64([...magic, 1, 2, 3])));
+      assert.equal(quiet.status, 200);
+      assert.deepEqual(yield* quiet.json, { stored: false });
+
+      // Reading: only a hash finds a file; a saved picture comes back as a locked-down image.
+      assert.equal((yield* send("GET", `${url}?hash=..%2F..%2Fx`, child)).status, 404);
+      const hash = "a".repeat(64);
+      assert.equal((yield* send("GET", `${url}?hash=${hash}`, child)).status, 404);
+      const cards = path.join(dir, "skycot-fridge-cards");
+      yield* fs.makeDirectory(cards, { recursive: true });
+      yield* fs.writeFile(path.join(cards, `${hash}.png`), new Uint8Array([...magic, 7, 7]));
+      const served = yield* send("GET", `${url}?hash=${hash}`, child);
+      assert.equal(served.status, 200);
+      assert.equal(served.headers["content-type"], "image/png");
+      assert.equal(served.headers["content-security-policy"], "default-src 'none'; sandbox");
+      assert.deepEqual(Array.from(new Uint8Array(yield* served.arrayBuffer)), [...magic, 7, 7]);
+    }),
+  );
+
   // nondev-seam: skycot-page-internet-ask-route-test
   it.effect("a child can ask only for a real page in their own conversation", () =>
     Effect.gen(function* () {

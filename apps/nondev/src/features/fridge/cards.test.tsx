@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 const callEngine = vi.hoisted(() => vi.fn());
 vi.mock("../family/api", () => ({ callEngine, FAMILY_API_PATH: "/api/skycot/family" }));
 vi.mock("../starters/preview", () => ({ useOfflinePreviewDocument: () => "" }));
+const readMagnetPicture = vi.hoisted(() => vi.fn());
+vi.mock("./pictures", () => ({ readMagnetPicture }));
 vi.mock("./pages", () => ({ readMagnetPage: () => new Promise(() => {}) }));
 
 import { cardImageSource, cardMatColor, parseMagnetCard } from "./cardText";
@@ -19,11 +21,12 @@ const answer = (text: string, status = 200) => ({
 
 afterEach(() => {
   callEngine.mockReset();
+  readMagnetPicture.mockReset();
   vi.useRealTimers();
   document.body.innerHTML = "";
 });
 
-async function show(props: { cardHash?: string; calm?: boolean }) {
+async function show(props: { cardHash?: string; calm?: boolean; hasPicture?: boolean }) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div");
   document.body.append(host);
@@ -36,6 +39,7 @@ async function show(props: { cardHash?: string; calm?: boolean }) {
         version="v1"
         title="My game"
         {...(props.calm ? { calm: true } : {})}
+        {...(props.hasPicture ? { hasPicture: true } : {})}
         {...(props.cardHash === undefined ? {} : { cardHash: props.cardHash })}
       />,
     ),
@@ -108,5 +112,35 @@ describe("fridge picture cards", () => {
     });
     expect(host.textContent).not.toContain("Getting it ready…");
     expect(host.querySelector("[data-kind-icon]")).not.toBeNull();
+  });
+
+  it("prefers the captured picture of the real page, and does not even read the card", async () => {
+    readMagnetPicture.mockResolvedValue({ kind: "picture", src: "data:image/png;base64,AAAA" });
+    callEngine.mockResolvedValue(answer("<svg>card one</svg>"));
+    const host = await show({ cardHash: "hash-picture", hasPicture: true });
+    const img = host.querySelector("img[data-page-picture]");
+    expect(img?.getAttribute("src")).toBe("data:image/png;base64,AAAA");
+    expect(readMagnetPicture).toHaveBeenCalledWith("hash-picture");
+    expect(callEngine).not.toHaveBeenCalled();
+    expect(host.querySelector("iframe")).toBeNull();
+  });
+
+  it("falls back to the card when the picture cannot be read", async () => {
+    readMagnetPicture.mockResolvedValue({ kind: "unavailable" });
+    callEngine.mockResolvedValue(answer("<svg>card two</svg>"));
+    const host = await show({ cardHash: "hash-fallback", hasPicture: true });
+    expect(host.querySelector("img[data-page-picture]")).toBeNull();
+    expect(host.querySelector("img")?.getAttribute("src")).toContain(
+      encodeURIComponent("card two"),
+    );
+  });
+
+  it("shows the card as before when the item has no picture", async () => {
+    callEngine.mockResolvedValue(answer("<svg>card three</svg>"));
+    const host = await show({ cardHash: "hash-nopicture" });
+    expect(readMagnetPicture).not.toHaveBeenCalled();
+    expect(host.querySelector("img")?.getAttribute("src")).toContain(
+      encodeURIComponent("card three"),
+    );
   });
 });

@@ -25,6 +25,8 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SkycotFridge from "./family-fridge/SkycotFridge.ts";
+// nondev-seam: skycot-fridge-card-store
+import { looksLikePng, MAX_PICTURE_BYTES } from "./family-fridge/cardStore.ts";
 import * as SkycotFamilyLimits from "./family-limits/SkycotFamilyLimits.ts";
 import { RECAP_RANGES, type RecapRange } from "./family-recap/recap.ts";
 import * as SkycotFamilyRecap from "./family-recap/SkycotFamilyRecap.ts";
@@ -1308,6 +1310,65 @@ const fridgeCardRoute = madeRoute("GET", "/fridge/card", ({ fridge, query }) =>
   }),
 );
 
+/**
+ * A picture of the real page, captured by the Mac app from the child's own Preview and kept
+ * beside the card. Only for a page the child made, and only for the page as it is now.
+ */
+// nondev-seam: skycot-fridge-card-store
+const fridgePictureStoreRoute = madeRoute(
+  "POST",
+  "/fridge/picture",
+  ({ fridge, body, childView }) =>
+    Effect.gen(function* () {
+      const threadId = text(body["threadId"]);
+      const page = text(body["page"]);
+      const contentHash = text(body["contentHash"]);
+      const encoded = text(body["pngBase64"]);
+      // Base64 of the biggest allowed picture, with a little room for padding.
+      if (
+        threadId.length === 0 ||
+        page.length === 0 ||
+        contentHash.length === 0 ||
+        encoded.length === 0 ||
+        encoded.length > Math.ceil(MAX_PICTURE_BYTES / 3) * 4 + 4 ||
+        !/^[A-Za-z0-9+/]+={0,2}$/u.test(encoded)
+      ) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      if (childView !== null && childView.owners.threads[threadId] !== childView.childId) {
+        return deviceRefused;
+      }
+      const png = new Uint8Array(Buffer.from(encoded, "base64"));
+      if (png.length > MAX_PICTURE_BYTES || !looksLikePng(png)) {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      const result = yield* fridge.storePicture({ threadId, page, contentHash, png });
+      if (result === "invalid") {
+        return yield* new SkycotFamily.FamilyError({ reason: "invalid-request" });
+      }
+      // "gone" and "stale" are quiet: the page changed or went, so there is nothing to keep.
+      return json({ stored: result === "stored" });
+    }),
+);
+
+/** A saved picture of a page, by card hash; the same cache and lock-down as the card. */
+// nondev-seam: skycot-fridge-card-store
+const fridgePictureRoute = madeRoute("GET", "/fridge/picture", ({ fridge, query }) =>
+  Effect.gen(function* () {
+    const png = yield* fridge.picture(query.get("hash") ?? "");
+    if (png === null) return json({ error: "invalid-request" }, 404);
+    return HttpServerResponse.uint8Array(png, {
+      status: 200,
+      contentType: "image/png",
+      headers: {
+        "cache-control": "private, max-age=31536000, immutable",
+        "content-security-policy": "default-src 'none'; sandbox",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }),
+);
+
 const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query, childView }) =>
   Effect.gen(function* () {
     const threadId = query.get("threadId") ?? "";
@@ -2031,6 +2092,8 @@ export const layerMadeRoutes = Layer.mergeAll(
   fridgePinRoute,
   fridgePageRoute,
   fridgeCardRoute,
+  fridgePictureStoreRoute,
+  fridgePictureRoute,
 );
 
 /** The profile's own routes. */

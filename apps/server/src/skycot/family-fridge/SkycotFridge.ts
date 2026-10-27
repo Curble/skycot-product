@@ -97,6 +97,21 @@ export class SkycotFridge extends Context.Service<
     /** A saved card by its hash (`FridgeItem.cardHash`), or null; the picture itself, as text. */
     // nondev-seam: skycot-fridge-card-store
     readonly card: (hash: string) => Effect.Effect<string | null>;
+    /** A saved picture of the real page (PNG bytes) by card hash, or null. */
+    // nondev-seam: skycot-fridge-card-store
+    readonly picture: (hash: string) => Effect.Effect<Uint8Array | null>;
+    /**
+     * Keeps a picture of the page as the child saw it. Only for the item's current content
+     * (`contentHash`), so a stale picture is never kept; "gone" when the page has no magnet,
+     * "stale" when it has changed since, "invalid" when the bytes are not a small PNG.
+     */
+    // nondev-seam: skycot-fridge-card-store
+    readonly storePicture: (input: {
+      readonly threadId: string;
+      readonly page: string;
+      readonly contentHash: string;
+      readonly png: Uint8Array;
+    }) => Effect.Effect<"stored" | "gone" | "stale" | "invalid">;
     // nondev-seam: skycot-playable-copy
     readonly playable: (input: {
       readonly threadId: string;
@@ -231,6 +246,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
           contentHash,
           thumbnailSvg,
           cardHash,
+          hasPicture: yield* cards.hasPicture(cardHash),
         };
       }),
     );
@@ -262,6 +278,22 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   });
 
   const card: SkycotFridge["Service"]["card"] = (hash) => cards.read(hash);
+  const picture: SkycotFridge["Service"]["picture"] = (hash) => cards.readPicture(hash);
+
+  const storePicture: SkycotFridge["Service"]["storePicture"] = Effect.fn(
+    "SkycotFridge.storePicture",
+  )(function* (input) {
+    const items = yield* list;
+    const item = items.find(
+      (candidate) => candidate.threadId === input.threadId && candidate.page === input.page,
+    );
+    if (item?.cardHash === undefined) return "gone" as const;
+    if (item.contentHash !== input.contentHash) return "stale" as const;
+    const kept = yield* cards
+      .writePicture(item.cardHash, input.png)
+      .pipe(Effect.orElseSucceed(() => false));
+    return kept ? ("stored" as const) : ("invalid" as const);
+  });
 
   const page: SkycotFridge["Service"]["page"] = Effect.fn("SkycotFridge.page")(function* (input) {
     const thread = yield* loadThread(projections, projects, input.threadId as ThreadId, {
@@ -483,7 +515,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     },
   );
 
-  return SkycotFridge.of({ list, pin, page, card, playable, pagePath });
+  return SkycotFridge.of({ list, pin, page, card, picture, storePicture, playable, pagePath });
 });
 
 /** For tests and tools: a fridge file at an explicit path. */

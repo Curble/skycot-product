@@ -32,6 +32,8 @@ export interface FridgeItem {
   // nondev-seam: skycot-fridge-card-store
   /** Names the saved card file (`/fridge/card?hash=`); changes whenever the page does. */
   readonly cardHash?: string;
+  /** True when a picture of the real page is saved (`/fridge/picture?hash=<cardHash>`). */
+  readonly hasPicture?: boolean;
   readonly cwd: string;
   readonly pinnedAt: number | null;
 }
@@ -55,6 +57,29 @@ function xmlText(text: string): string {
 
 /** A tiny inert picture for the fridge; page markup is only read as text, never opened. */
 // nondev-seam: skycot-q51-fridge-svg
+/** Relative luminance (0 dark, 1 light) of a `#rgb` or `#rrggbb` colour; null if it is not one. */
+export function colorLuminance(color: string): number | null {
+  const hex = /^#([\da-f]{3}|[\da-f]{6})$/iu.exec(color)?.[1];
+  if (hex === undefined) return null;
+  const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
+  const [r, g, b] = [0, 2, 4].map((at) => {
+    const channel = Number.parseInt(full.slice(at, at + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/**
+ * The words' colour for a card's mat: dark ink on a light mat, light ink on a dark one. A mid
+ * tone suits neither, so it also gets a small plate in the opposite shade behind the words.
+ */
+export function cardInk(mat: string): { readonly ink: string; readonly plate: string | null } {
+  const luminance = colorLuminance(mat) ?? 0.2;
+  const ink = luminance > 0.4 ? "#1d1d1f" : "#ffffff";
+  const midTone = luminance > 0.18 && luminance < 0.5;
+  return { ink, plate: midTone ? (ink === "#ffffff" ? "#000000" : "#ffffff") : null };
+}
+
 export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string {
   const title = fridgePageTitle(html) ?? fallbackTitle;
   const heading = (html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ?? "")
@@ -72,7 +97,13 @@ export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string 
       : /game|play|bounce/iu.test(`${title} ${html}`)
         ? "✦"
         : "▤";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="20" fill="${background}"/><circle cx="160" cy="65" r="38" fill="#ffffff" fill-opacity=".22"/><text x="160" y="79" text-anchor="middle" font-size="44" fill="#ffffff">${kind}</text><text x="18" y="137" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#ffffff">${xmlText(title.slice(0, 30))}</text><text x="18" y="161" font-family="system-ui,sans-serif" font-size="12" fill="#ffffff">${xmlText(heading.slice(0, 42))}</text></svg>`;
+  const { ink, plate } = cardInk(background);
+  const plateRect =
+    plate === null
+      ? ""
+      : `<rect x="8" y="112" width="304" height="58" rx="12" fill="${plate}" fill-opacity=".38"/>`;
+  const sparkle = ink === "#ffffff" ? "#ffffff" : "#000000";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="20" fill="${background}"/><circle cx="160" cy="65" r="38" fill="${sparkle}" fill-opacity=".18"/><text x="160" y="79" text-anchor="middle" font-size="44" fill="${ink}">${kind}</text>${plateRect}<text x="18" y="137" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="${ink}">${xmlText(title.slice(0, 30))}</text><text x="18" y="161" font-family="system-ui,sans-serif" font-size="12" fill="${ink}">${xmlText(heading.slice(0, 42))}</text></svg>`;
 }
 
 /** A page's own name wins over the conversation's first request. */

@@ -13,6 +13,8 @@ export interface FridgeItem {
   readonly thumbnailSvg?: string;
   /** Names the engine's picture card for this page; a new page version has a new hash. */
   readonly cardHash?: string;
+  /** True when the engine holds a captured picture of the real page for `cardHash`. */
+  readonly hasPicture?: boolean;
   readonly cwd: string;
   readonly pinnedAt: number | null;
 }
@@ -71,7 +73,9 @@ export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
       ((item as FridgeItem).thumbnailSvg === undefined ||
         typeof (item as FridgeItem).thumbnailSvg === "string") &&
       ((item as FridgeItem).cardHash === undefined ||
-        typeof (item as FridgeItem).cardHash === "string"),
+        typeof (item as FridgeItem).cardHash === "string") &&
+      ((item as FridgeItem).hasPicture === undefined ||
+        typeof (item as FridgeItem).hasPicture === "boolean"),
   );
 }
 

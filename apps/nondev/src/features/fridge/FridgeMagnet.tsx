@@ -59,6 +59,7 @@ export function FridgeMagnet({
           version={item.contentHash ?? String(item.madeAt)}
           title={title}
           {...(item.cardHash === undefined ? {} : { cardHash: item.cardHash })}
+          hasPicture={item.hasPicture === true}
           {...(item.thumbnailSvg === undefined ? {} : { thumbnailSvg: item.thumbnailSvg })}
         />
       </button>

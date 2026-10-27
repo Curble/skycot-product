@@ -117,6 +117,78 @@ export const setWindowFullscreen = DesktopIpc.makeIpcMethod({
   }),
 });
 
+// nondev-seam: skycot-fridge-capture-ipc
+const CAPTURE_MIN_SIDE = 40;
+const CAPTURE_DEFAULT_MAX_WIDTH = 640;
+const CAPTURE_LIMIT_MAX_WIDTH = 1280;
+const CaptureRegionPayload = Schema.Struct({
+  x: Schema.Number,
+  y: Schema.Number,
+  width: Schema.Number,
+  height: Schema.Number,
+  maxWidth: Schema.optional(Schema.Number),
+});
+const CaptureRegionResult = Schema.NullOr(Schema.Struct({ pngBase64: Schema.String }));
+
+/**
+ * A small picture of part of the app window as it is on screen right now (the child's open
+ * preview), as PNG bytes in memory: nothing is written to disk here. Only the app's own
+ * renderer may ask, and only for a region of at least 40 by 40 inside the window.
+ */
+// nondev-seam: skycot-fridge-capture-ipc
+export const captureRegion = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.CAPTURE_REGION_CHANNEL,
+  payload: CaptureRegionPayload,
+  result: CaptureRegionResult,
+  handler: Effect.fn("desktop.ipc.window.captureRegion")(function* (region, event) {
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const window = yield* electronWindow.main;
+    if (
+      event === undefined ||
+      Option.isNone(window) ||
+      window.value.isDestroyed() ||
+      window.value.webContents.id !== event.sender.id
+    )
+      return null;
+    const bounds = window.value.getContentBounds();
+    const rect = {
+      x: Math.max(0, Math.round(region.x)),
+      y: Math.max(0, Math.round(region.y)),
+      width: Math.round(region.width),
+      height: Math.round(region.height),
+    };
+    rect.width = Math.min(rect.width, bounds.width - rect.x);
+    rect.height = Math.min(rect.height, bounds.height - rect.y);
+    if (
+      !Number.isFinite(rect.x + rect.y + rect.width + rect.height) ||
+      Math.round(region.width) > bounds.width ||
+      Math.round(region.height) > bounds.height ||
+      rect.width < CAPTURE_MIN_SIDE ||
+      rect.height < CAPTURE_MIN_SIDE
+    )
+      return null;
+    const maxWidth = Math.min(
+      Math.max(Math.round(region.maxWidth ?? CAPTURE_DEFAULT_MAX_WIDTH), CAPTURE_MIN_SIDE),
+      CAPTURE_LIMIT_MAX_WIDTH,
+    );
+    const taken = yield* Effect.tryPromise(() => window.value.webContents.capturePage(rect)).pipe(
+      Effect.orElseSucceed(() => null),
+    );
+    if (taken === null || taken.isEmpty()) return null;
+    const size = taken.getSize();
+    const longer = Math.max(size.width, size.height);
+    const scaled =
+      longer > maxWidth
+        ? taken.resize(
+            size.width >= size.height
+              ? { width: maxWidth, quality: "good" }
+              : { height: maxWidth, quality: "good" },
+          )
+        : taken;
+    return { pngBase64: scaled.toPNG().toString("base64") };
+  }),
+});
+
 export const getLocalEnvironmentBootstraps = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL,
   result: Schema.Array(DesktopEnvironmentBootstrapSchema),

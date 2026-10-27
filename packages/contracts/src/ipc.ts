@@ -1131,6 +1131,18 @@ export interface DesktopBridge {
   // nondev-seam: skycot-page-fullscreen-contract
   setWindowFullscreen?: (fullscreen: boolean) => Promise<void>;
   onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
+  /**
+   * A small PNG (base64) of a region of the app window, in window pixels; null when refused
+   * (too small, outside the window, not the app's own page). Older desktop shells omit it.
+   */
+  // nondev-seam: skycot-fridge-capture-contract
+  captureRegion?: (region: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly maxWidth?: number;
+  }) => Promise<{ readonly pngBase64: string } | null>;
   /** App window zoom; older desktop shells omit this method. */
   getWindowZoomFactor?: () => number;
   getUpdateState: () => Promise<DesktopUpdateState>;

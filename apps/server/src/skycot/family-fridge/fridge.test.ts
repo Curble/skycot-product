@@ -2,7 +2,14 @@
 // nondev-seam: skycot-q51-fridge-svg-test
 import { describe, expect, it } from "@effect/vitest";
 
-import { fridgeItems, fridgePageTitle, fridgeSvgThumbnail, type FridgeThread } from "./fridge.ts";
+import {
+  cardInk,
+  colorLuminance,
+  fridgeItems,
+  fridgePageTitle,
+  fridgeSvgThumbnail,
+  type FridgeThread,
+} from "./fridge.ts";
 
 describe("fridge page titles", () => {
   it("uses a page title or first heading and cleans up its text", () => {
@@ -98,5 +105,34 @@ describe("fridgeItems", () => {
       ],
     });
     expect(fridgeItems([replaced], {}, {})[0]?.page).toBe("birthday-card.html");
+  });
+});
+
+// nondev-seam: skycot-fridge-card-ink-test
+describe("fridge card ink", () => {
+  it("uses dark words on light mats and light words on dark mats, never white on white", () => {
+    expect(cardInk("#ffffff")).toEqual({ ink: "#1d1d1f", plate: null });
+    expect(cardInk("#fff").ink).toBe("#1d1d1f");
+    expect(cardInk("#fdf6e3").ink).toBe("#1d1d1f");
+    expect(cardInk("#111827")).toEqual({ ink: "#ffffff", plate: null });
+    expect(cardInk("#5b7cfa").ink).toBe("#ffffff");
+    expect(colorLuminance("nonsense")).toBeNull();
+  });
+
+  it("puts a plate behind the words on a mid-tone mat", () => {
+    const mid = cardInk("#7a8a99");
+    expect(mid.plate).not.toBeNull();
+    expect(mid.plate).not.toBe(mid.ink);
+  });
+
+  it("draws the card with the chosen ink", () => {
+    const light = fridgeSvgThumbnail(
+      '<title>Bubbles</title><body style="background:#ffffff">',
+      "x",
+    );
+    expect(light).toContain('fill="#1d1d1f"');
+    expect(light).not.toContain('font-weight="700" fill="#ffffff"');
+    const dark = fridgeSvgThumbnail('<title>Night</title><body style="background:#101820">', "x");
+    expect(dark).toContain('font-weight="700" fill="#ffffff"');
   });
 });

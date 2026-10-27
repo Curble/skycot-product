@@ -298,4 +298,56 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
       assert.lengthOf(yield* fs.readDirectory(cardsDir), 2);
     }).pipe(Effect.scoped),
   );
+
+  // nondev-seam: skycot-fridge-picture-test
+  it.effect("keeps a picture of the real page only for the page as it is now", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fridge-picture-" });
+      const root = path.join(dir, "games");
+      yield* fs.makeDirectory(root, { recursive: true });
+      const record = records("live", "Hello bounce game", false);
+      yield* fs.writeFileString(path.join(root, "index.html"), "<title>Bounce</title>");
+      const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getShellSnapshot: () =>
+          Effect.succeed({ threads: [record.thread], archivedThreads: [] } as never),
+        getThreadRecords: (() => Effect.succeed(record as never)) as never,
+      });
+      const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
+        get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
+      });
+      const layer = SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+        Layer.provide(Layer.merge(projections, projects)),
+      );
+      const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+      const result = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        const item = (yield* fridge.list)[0]!;
+        const input = { threadId: "live", page: item.page, contentHash: item.contentHash!, png };
+        const before = item.hasPicture;
+        const stale = yield* fridge.storePicture({ ...input, contentHash: "old" });
+        const gone = yield* fridge.storePicture({ ...input, threadId: "nobody" });
+        const invalid = yield* fridge.storePicture({ ...input, png: new Uint8Array([1, 2, 3]) });
+        const stored = yield* fridge.storePicture(input);
+        const after = (yield* fridge.list)[0]!;
+        return {
+          before,
+          stale,
+          gone,
+          invalid,
+          stored,
+          after: after.hasPicture,
+          bytes: Array.from((yield* fridge.picture(after.cardHash!))!),
+        };
+      }).pipe(Effect.provide(layer));
+      assert.isFalse(result.before);
+      assert.equal(result.stale, "stale");
+      assert.equal(result.gone, "gone");
+      assert.equal(result.invalid, "invalid");
+      assert.equal(result.stored, "stored");
+      assert.isTrue(result.after);
+      assert.deepEqual(result.bytes, Array.from(png));
+    }).pipe(Effect.scoped),
+  );
 });
