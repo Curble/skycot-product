@@ -60,7 +60,7 @@ import {
   readGrownUpSessionId,
   startGrownUpSession,
 } from "../family/grownUpSession";
-import { readFamilyView, tryParentCode, updateChild } from "../family/store";
+import { readFamilyView, tryParentCode, updateChild, refreshFamily } from "../family/store";
 import { markPickedThisWindow } from "../family-limits/FamilyLimitsHost";
 import { rememberChild } from "../family-limits/idlePicker";
 import { chooseChild } from "../family-limits/store";
@@ -200,13 +200,19 @@ export function OnboardingSheet({
       // The code just set opens the grown-up settings here, so the pictures save without asking
       // for it a second time, and this window is theirs until Done in the grown-up bar.
       const opened = await tryParentCode(draft.code, "settings", undefined, { quiet: true });
+      // The engine's answer to the code carries the grants, not the people: read the profile
+      // again so the child just set up is really there before anything is saved for them.
+      if (opened.ok) await refreshFamily();
       const grownUp = readFamilyView().grownUps[0];
       const justSetUp = readFamilyView().children[0];
       // The child just set up is who Done hands back to.
       if (opened.ok && grownUp !== undefined)
         startGrownUpSession(grownUp.id, justSetUp?.id ?? null);
-      if (opened.ok && justSetUp !== undefined && readingLevel !== DEFAULT_READING_LEVEL) {
-        const saved = await updateChild(justSetUp.id, { readingLevel });
+      if (opened.ok && readingLevel !== DEFAULT_READING_LEVEL) {
+        const saved =
+          justSetUp === undefined
+            ? ({ ok: false } as const)
+            : await updateChild(justSetUp.id, { readingLevel });
         if (!saved.ok) {
           setProblem(
             "The reading level didn't save. Change it any time in Settings → Family → Edit.",
