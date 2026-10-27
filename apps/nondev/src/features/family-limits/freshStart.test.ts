@@ -58,3 +58,13 @@ describe("pickRestartsFresh", () => {
     expect(pickRestartsFresh(null, "a", false)).toBe(false);
   });
 });
+
+describe("grownUpTurnRestarts", () => {
+  it("restarts the first grown-up turn, but never while the welcome steps are open", async () => {
+    const { grownUpTurnRestarts } = await import("./freshStart");
+    expect(grownUpTurnRestarts(true, false, false)).toBe(true);
+    expect(grownUpTurnRestarts(true, false, true)).toBe(false);
+    expect(grownUpTurnRestarts(true, true, false)).toBe(false);
+    expect(grownUpTurnRestarts(false, false, false)).toBe(false);
+  });
+});

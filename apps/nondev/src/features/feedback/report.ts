@@ -37,7 +37,7 @@ export function detailLines(
 ): ReadonlyArray<string> {
   const lines = [
     `${PRODUCT_NAME} version: ${details.appVersion}`,
-    ...(details.engineVersion ? [`Engine version: ${details.engineVersion}`] : []),
+    ...(details.engineVersion ? [`SKYCOT on this Mac: ${details.engineVersion}`] : []),
     ...(details.computer ? [`Computer: ${details.computer}`] : []),
     `Family profile: ${details.familyProfileOn ? "on" : "off"}`,
     ...(details.readingLevel

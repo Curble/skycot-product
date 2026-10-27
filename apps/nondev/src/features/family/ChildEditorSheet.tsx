@@ -181,7 +181,7 @@ export function ChildEditorSheet({
       icon={UserRound}
       iconTone="orange"
       title={child === null ? "Add another child" : `${child.name ?? "Your child"}'s settings`}
-      description="Their own picture, look, voice, steps and limits. SKYCOT's engine keeps them on this Mac and holds every limit, whatever device they use."
+      description="Their own picture, look, voice, steps and limits. SKYCOT keeps them on this Mac and holds every limit, whatever device they use."
       wide
       sober
       initialFocus="first"

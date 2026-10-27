@@ -487,7 +487,15 @@ export function ReviewActions({
         </Button>
       ) : null}
       <Button variant={hasPage ? "secondary" : "primary"} disabled={keepDisabled} onClick={onKeep}>
-        {childView ? "Keep it" : keeping ? "Keeping…" : kept ? "Kept" : "Keep these changes"}
+        {keeping
+          ? "Keeping…"
+          : kept
+            ? childView
+              ? "Kept ✓"
+              : "Kept"
+            : childView
+              ? "Keep it"
+              : "Keep these changes"}
       </Button>
       <Button
         variant="destructive"

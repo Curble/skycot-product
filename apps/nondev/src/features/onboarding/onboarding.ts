@@ -175,3 +175,13 @@ export function handOverLabel(firstChildName: string | null | undefined): string
   const name = firstChildName?.trim();
   return `Ready — hand SKYCOT to ${name ? name : "your child"}`;
 }
+
+// Whether the welcome steps are on screen in this window. Read by the shell before it restarts
+// the window for a grown-up's first turn (see family-limits/freshStart.ts grownUpTurnRestarts).
+let setupOpenNow = false;
+export function markSetupOpen(open: boolean): void {
+  setupOpenNow = open;
+}
+export function isSetupOpen(): boolean {
+  return setupOpenNow;
+}

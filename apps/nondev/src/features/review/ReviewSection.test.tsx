@@ -28,4 +28,28 @@ describe("ReviewSection actions in the child view", () => {
     expect(html).not.toContain("Git");
     expect(html).not.toContain("Ask for a tweak");
   });
+
+  it("shows Keeping… and Kept ✓ in the child view", () => {
+    const render = (keeping: boolean, kept: boolean) =>
+      renderToStaticMarkup(
+        <ReviewActions
+          childView
+          hasPage
+          keepDisabled={keeping || kept}
+          keeping={keeping}
+          kept={kept}
+          canUndo
+          undoNoteId="undo-note"
+          undoBlocker={null}
+          onPlay={vi.fn()}
+          onKeep={vi.fn()}
+          onUndo={vi.fn()}
+          onChange={vi.fn()}
+        />,
+      );
+    expect(render(true, false)).toContain("Keeping…");
+    const done = render(false, true);
+    expect(done).toContain("Kept ✓");
+    expect(done).not.toContain("Keep it");
+  });
 });

@@ -94,3 +94,14 @@ export function pickRestartsFresh(
 ): boolean {
   return grownUpHadTurn || (before !== null && before !== chosen);
 }
+
+/**
+ * Pure: whether a grown-up's turn opening restarts the window now. Never during first-run
+ * set-up: the parent code opens their turn in the middle of the welcome steps, and a restart
+ * there throws the sheet away (the profile is on by the time the window is back, so the steps
+ * never reopen). The set-up window loaded before any child existed, so its lists hold
+ * everything already; the mark stays unset so the next grown-up turn still restarts.
+ */
+export function grownUpTurnRestarts(grownUp: boolean, seen: boolean, setupOpen: boolean): boolean {
+  return grownUp && !seen && !setupOpen;
+}

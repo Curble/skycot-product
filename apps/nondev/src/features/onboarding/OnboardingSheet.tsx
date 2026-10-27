@@ -86,6 +86,7 @@ import {
   addSibling,
   canContinue,
   handOverLabel,
+  markSetupOpen,
   onboardingProgress,
   onboardingSteps,
   projectsSummary,
@@ -199,6 +200,12 @@ export function OnboardingSheet({
     step === "done" && childPath
       ? { ...STEP_META.done, title: handOverLabel(firstChildName) }
       : STEP_META[step];
+  // While the steps are up, the shell must not restart the window (the parent code opens a
+  // grown-up turn half-way through, and a restart here would end set-up at the code).
+  useEffect(() => {
+    markSetupOpen(true);
+    return () => markSetupOpen(false);
+  }, []);
   const finish = (state: "done" | "skipped") => {
     writeOnboardingState(state);
     onClose();

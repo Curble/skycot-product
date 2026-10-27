@@ -19,7 +19,7 @@ import { grownUpSessionFor, useGrownUpSessionId } from "./features/family/grownU
 import { FamilyLimitsHost } from "./features/family-limits/FamilyLimitsHost";
 import { GrownUpApp } from "./features/grown-up/GrownUpApp";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
-import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
+import { isSetupOpen, shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { FridgeScreen } from "./features/fridge/FridgeScreen";
 import { MakesScreen } from "./features/home/MakesScreen";
 import { FilesScreen } from "./features/files/FilesScreen";
@@ -36,7 +36,12 @@ import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
 import { useColumns } from "./app/useColumns";
 import { useChildView } from "./app/useChildView";
-import { grownUpSeen, markFreshStart, markGrownUpSeen } from "./features/family-limits/freshStart";
+import {
+  grownUpSeen,
+  grownUpTurnRestarts,
+  markFreshStart,
+  markGrownUpSeen,
+} from "./features/family-limits/freshStart";
 import { startFreshWindow } from "./features/family-limits/store";
 import { landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
 import { Button } from "./ui/Button";
@@ -243,7 +248,8 @@ function HandBackHome() {
     was.current = grownUp;
     // The engine's lists were filtered for the child when they were fetched: restart once so the
     // grown-up sees every child's projects (the same reload also clears the cache on the way back).
-    if (grownUp && !grownUpSeen()) {
+    // Not while the welcome steps are up: the parent code opens this turn mid set-up.
+    if (grownUpTurnRestarts(grownUp, grownUpSeen(), isSetupOpen())) {
       markGrownUpSeen();
       const timer = window.setTimeout(() => startFreshWindow(window, markFreshStart, null), 400);
       return () => window.clearTimeout(timer);
