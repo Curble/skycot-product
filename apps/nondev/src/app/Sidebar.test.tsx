@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ChildMakesList, childMakeBadge, nextChildProjectName, SidebarIdentity } from "./Sidebar";
+import {
+  ChildMakesList,
+  childMakeBadge,
+  nextChildProjectName,
+  ProfileMenu,
+  SidebarIdentity,
+} from "./Sidebar";
 import type { FamilyChild } from "../features/family/children";
 import type { ConversationRow } from "../state/conversations";
 
@@ -20,10 +26,20 @@ const child: FamilyChild = {
 describe("Sidebar identity in the child view", () => {
   it("shows the child's identity and switch action", () => {
     const html = renderToStaticMarkup(
-      <SidebarIdentity familyOn childView child={child} onSwitch={vi.fn()} />,
+      <ProfileMenu
+        childView
+        child={child}
+        grownUp={null}
+        onSwitch={vi.fn()}
+        onChildSettings={vi.fn()}
+        onSettings={vi.fn()}
+        onHandBack={vi.fn()}
+      />,
     );
     expect(html).toContain("Ava");
-    expect(html).toContain("Switch who&#x27;s using SKYCOT");
+    // The name tag is the way to switch (its menu opens on press).
+    expect(html).toContain("fm-nametag");
+    expect(html).toContain("my name is");
     expect(html).not.toContain("Grown-up mode");
   });
 
@@ -40,7 +56,7 @@ describe("Sidebar identity in the child view", () => {
       shell: { id: `thread-${index}`, environmentId: "env" },
     })) as unknown as ReadonlyArray<ConversationRow>;
     const html = renderToStaticMarkup(<ChildMakesList rows={rows} onOpen={vi.fn()} />);
-    expect(html).toContain("My makes");
+    expect(html).toContain("Things I made");
     expect(html).toContain("Ready to look at");
     expect(html).toContain("Waiting for a grown-up");
     expect(html).toContain("Building now");

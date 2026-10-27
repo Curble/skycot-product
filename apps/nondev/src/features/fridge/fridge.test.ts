@@ -5,6 +5,7 @@ import {
   fridgeOrder,
   childFridgeTitle,
   fridgeIcon,
+  fridgeKindLabel,
   fridgeShelves,
   homeMagnets,
   madeLabel,
@@ -105,6 +106,8 @@ describe("the family fridge", () => {
     expect(fridgeIcon("Birthday card", "card.html")).toBe("gift.fill");
     expect(fridgeIcon("Bounce", "bounce.html")).toBe("gamecontroller.fill");
     expect(fridgeIcon("Poster", "index.html")).toBe("doc.richtext.fill");
+    expect(fridgeKindLabel("Birthday card", "card.html")).toBe("Card");
+    expect(fridgeKindLabel("Bounce", "bounce.html")).toBe("Game");
   });
 });
 

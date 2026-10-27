@@ -399,7 +399,7 @@ function RequestCard(props: {
             </>
           ) : null}
           <Button
-            title="Decline"
+            title="Not now"
             kind="grey"
             busy={busy}
             onPress={decline}

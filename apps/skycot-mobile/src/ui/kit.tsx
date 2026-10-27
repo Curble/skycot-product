@@ -238,6 +238,7 @@ export function RowIcon(props: { readonly name: SymbolViewProps["name"]; readonl
 export function Row(props: {
   readonly title: string;
   readonly subtitle?: string | null;
+  readonly subtitleNumberOfLines?: number;
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
   readonly detail?: string | null;
@@ -270,7 +271,7 @@ export function Row(props: {
           {props.title}
         </Txt>
         {props.subtitle ? (
-          <Txt variant="subheadline" tone="label2" numberOfLines={3}>
+          <Txt variant="subheadline" tone="label2" numberOfLines={props.subtitleNumberOfLines ?? 3}>
             {props.subtitle}
           </Txt>
         ) : null}
@@ -636,13 +637,14 @@ export function Sheet(props: {
   readonly onClose: () => void;
   readonly children: ReactNode;
   readonly closeLabel?: string;
+  readonly halfHeight?: boolean;
 }) {
   const theme = useTheme();
   return (
     <Modal
       visible={props.visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={props.halfHeight ? "formSheet" : "pageSheet"}
       onRequestClose={props.onClose}
     >
       <View style={{ flex: 1, backgroundColor: theme.color.background }}>

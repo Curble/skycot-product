@@ -25,6 +25,8 @@ export type Route =
     }
   | { readonly name: "automations" }
   | { readonly name: "people" }
+  /** The child's own makes, newest first ("Things I made"). */
+  | { readonly name: "makes" }
   /** The family fridge: everything the children made. */
   | { readonly name: "fridge" }
   /** This child's sticker book. */
@@ -79,6 +81,8 @@ export function parseRoute(hash: string): Route {
         return { name: "automations" };
       case "people":
         return { name: "people" };
+      case "makes":
+        return { name: "makes" };
       case "fridge":
         return { name: "fridge" };
       case "stickers":
@@ -132,6 +136,7 @@ export const HOME_HREF = "#/";
 export const NEW_HREF = "#/new";
 export const AUTOMATIONS_HREF = "#/automations";
 export const PEOPLE_HREF = "#/people";
+export const MAKES_HREF = "#/makes";
 export const FRIDGE_HREF = "#/fridge";
 export const STICKERS_HREF = "#/stickers";
 export const SETTINGS_HREF = "#/settings";

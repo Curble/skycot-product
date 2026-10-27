@@ -20,6 +20,7 @@ import { GrownUpApp } from "./features/grown-up/GrownUpApp";
 import { OnboardingSheet } from "./features/onboarding/OnboardingSheet";
 import { shouldShowOnboarding, welcomeEntry } from "./features/onboarding/onboarding";
 import { FridgeScreen } from "./features/fridge/FridgeScreen";
+import { MakesScreen } from "./features/home/MakesScreen";
 import { FilesScreen } from "./features/files/FilesScreen";
 import { BadgeHost, CertificateScreen, StickerBook } from "./features/badges";
 import { PeopleScreen } from "./features/people/PeopleScreen";
@@ -136,6 +137,8 @@ export function App() {
                   return <SettingsScreen section={route.section} />;
                 case "recap":
                   return <SettingsScreen section="family" recapChildId={route.childId} />;
+                case "makes":
+                  return <MakesScreen showBack={columns === 1} />;
                 case "fridge":
                   return <FridgeScreen />;
                 case "files":

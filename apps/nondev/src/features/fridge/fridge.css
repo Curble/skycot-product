@@ -160,7 +160,7 @@
 }
 .fm-magnet--compact .fm-magnet__title {
   font-size: calc(12.5px * var(--fm-text-scale));
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 .fm-magnet__when {
   font-size: calc(12px * var(--fm-text-scale));

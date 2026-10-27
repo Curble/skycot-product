@@ -256,8 +256,11 @@ describe("what the grown-ups read", () => {
         () => "3:40 pm",
       ),
     ).toEqual([
-      "Claude was resting, so SKYCOT used ChatGPT instead 2 times.",
-      "ChatGPT was resting at 3:40 pm, so SKYCOT used Claude instead.",
+      "Sam's usual helper had a rest 2 times today, so another helped out.",
+      "Sam's usual helper had a rest at 3:40 pm, so another helped out.",
     ]);
+    expect(
+      grownUpSwitchLines([{ at, from: "claudeAgent", to: "codex" }], () => "now")[0],
+    ).not.toMatch(/Claude|ChatGPT|SKYCOT/);
   });
 });

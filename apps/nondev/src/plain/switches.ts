@@ -197,10 +197,8 @@ export function grownUpSwitchLines(
     else group.count += 1;
   }
   return [...groups.values()].map((group) => {
-    const from = brandForDriver(group.from);
-    const to = brandForDriver(group.to);
-    return group.count === 1
-      ? `${from} was resting at ${when(group.at)}, so SKYCOT used ${to} instead.`
-      : `${from} was resting, so SKYCOT used ${to} instead ${group.count} times.`;
+    if (group.count > 1)
+      return `Sam's usual helper had a rest ${group.count} times today, so another helped out.`;
+    return `Sam's usual helper had a rest at ${when(group.at)}, so another helped out.`;
   });
 }

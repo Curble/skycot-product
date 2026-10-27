@@ -7,7 +7,7 @@ import type { CSSProperties } from "react";
 import { CrewAvatar } from "../../themes/CrewAvatar";
 import { Button } from "../../ui/Button";
 import { displayTitle } from "../tidy/renamedTitles";
-import { madeLabel, type FridgeItem } from "./fridge";
+import { fridgeKindLabel, madeLabel, type FridgeItem } from "./fridge";
 import { MagnetThumb } from "./MagnetThumb";
 
 /** A small, stable tilt per magnet, so a sticky-note fridge never looks machine-aligned. */
@@ -64,7 +64,7 @@ export function FridgeMagnet({
       <div className="fm-magnet__meta">
         <b className="fm-magnet__title">{title}</b>
         <small className="fm-magnet__when">
-          {madeLabel(item.madeAt, now)}
+          {fridgeKindLabel(item.title, item.page)} · {madeLabel(item.madeAt, now)}
           {maker ? ` · by ${maker}` : ""}
         </small>
       </div>

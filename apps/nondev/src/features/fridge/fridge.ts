@@ -39,6 +39,19 @@ export function fridgeIcon(
   return "doc.richtext.fill";
 }
 
+export function fridgeKindLabel(title: string, page: string): string {
+  switch (fridgeIcon(title, page)) {
+    case "questionmark.square.fill":
+      return "Quiz";
+    case "gift.fill":
+      return "Card";
+    case "gamecontroller.fill":
+      return "Game";
+    default:
+      return "Page";
+  }
+}
+
 export function parseFridge(body: unknown): ReadonlyArray<FridgeItem> | null {
   if (typeof body !== "object" || body === null) return null;
   const items = (body as Record<string, unknown>)["items"];

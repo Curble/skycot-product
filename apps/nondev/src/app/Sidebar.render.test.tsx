@@ -161,14 +161,19 @@ describe("child sidebar and make rail", () => {
       Array.from({ length: 8 }, (_, index) => [`thread-${index}`, "ava"]),
     );
     const page = await mounted(false);
-    expect(page.host.textContent).toContain("My makes");
-    expect(page.host.textContent).toContain("New project");
-    expect(page.host.textContent).toContain("Ready to look at");
-    expect(page.host.textContent).toContain("Building now");
-    expect(page.host.textContent).toContain("Show all 8 makes");
+    // The five paper tabs; past makes live behind "Things I made" (its own screen), with the
+    // count on the tab, not as rows in the column.
+    expect(page.host.textContent).toContain("Let's make");
+    expect(page.host.textContent).toContain("Things I made");
+    expect(page.host.textContent).toContain("8 so far");
+    expect(page.host.textContent).toContain("The fridge");
+    expect(page.host.textContent).toContain("My stickers");
+    expect(page.host.textContent).not.toContain("Show all 8 makes");
     expect(page.host.textContent).not.toContain("All conversations");
     expect(page.host.textContent).toContain("Projects");
     expect(page.host.textContent).not.toContain("Your crew");
+    // The Projects tab opens the list, where New project lives.
+    await page.click("Projects");
     await page.click("New project");
     expect(fixture.createNew).toHaveBeenCalledWith({
       environmentId: "environment",

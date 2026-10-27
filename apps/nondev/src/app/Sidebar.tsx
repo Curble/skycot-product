@@ -8,6 +8,7 @@ import {
   BookOpen,
   Bell,
   Blocks,
+  ChevronsUpDown,
   CheckCircle2,
   CircleAlert,
   FolderPlus,
@@ -17,6 +18,7 @@ import {
   Refrigerator,
   Sticker as StickerOutline,
   Settings,
+  Sparkles,
   User,
   Wrench,
 } from "lucide-react";
@@ -27,6 +29,7 @@ import { useLimits } from "../features/family-limits/store";
 import {
   AUTOMATIONS_HREF,
   FRIDGE_HREF,
+  MAKES_HREF,
   STICKERS_HREF,
   HOME_HREF,
   PEOPLE_HREF,
@@ -44,6 +47,7 @@ import { useCrew } from "../themes/useCrew";
 import { Avatar } from "../ui/Avatar";
 import { Button, IconButton } from "../ui/Button";
 import { ContextMenu, type MenuPoint } from "../ui/ContextMenu";
+import { MenuItem, MenuSeparator, Popover } from "../ui/Popover";
 import { SidebarItem, SidebarSection } from "../ui/Sidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
@@ -52,6 +56,8 @@ import { useFamily } from "../features/family/FamilyProvider";
 import { currentChild } from "../features/family/family";
 import { ChildAvatar } from "../features/family/ChildAvatar";
 import { openChildPicker } from "../features/family-limits/FamilyLimitsHost";
+import { lockFamilyGrants } from "../features/family/store";
+import { endGrownUpSession } from "../features/family/grownUpSession";
 import type { FamilyChild } from "../features/family/children";
 import { grownUpSessionFor, useGrownUpSessionId } from "../features/family/grownUpSession";
 import { FridgeIcon } from "../features/fridge/FridgeIcon";
@@ -95,6 +101,8 @@ export function AppSidebar({
     readonly at: MenuPoint;
   } | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  // The child's "Projects" tab opens the list below it (only shown with more than one project).
+  const [childProjectsOpen, setChildProjectsOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const railToggle = useRef<HTMLButtonElement>(null);
   const railPanel = useRef<HTMLElement>(null);
@@ -204,23 +212,23 @@ export function AppSidebar({
         <a
           className="fm-child-rail__item"
           href={HOME_HREF}
-          title="Home"
+          title="Let's make"
           onClick={(event) => {
             event.preventDefault();
             navigate(HOME_HREF);
           }}
         >
           <span className="fm-child-rail__tile fm-child-rail__tile--home" aria-hidden>
-            <Home size={24} strokeWidth={2} />
+            <Sparkles size={24} strokeWidth={2} />
           </span>
-          <span>Home</span>
+          <span>Let's make</span>
         </a>
         {/* Inside a make, so My makes is where the child is. */}
         <button
           type="button"
           className="fm-child-rail__item fm-child-rail__item--current"
           aria-current="page"
-          title="My makes"
+          title="Things I made"
           onClick={() => {
             openedRail.current = true;
             setRailOpen(true);
@@ -229,7 +237,7 @@ export function AppSidebar({
           <span className="fm-child-rail__tile fm-child-rail__tile--makes" aria-hidden>
             <Blocks size={24} strokeWidth={2} />
           </span>
-          <span>My makes</span>
+          <span>Things I made</span>
         </button>
         <a
           className="fm-child-rail__item"
@@ -243,7 +251,7 @@ export function AppSidebar({
           <span className="fm-child-rail__tile fm-child-rail__tile--fridge" aria-hidden>
             <Refrigerator size={24} strokeWidth={2} />
           </span>
-          <span>Fridge</span>
+          <span>The fridge</span>
         </a>
         <a
           className="fm-child-rail__item"
@@ -257,7 +265,7 @@ export function AppSidebar({
           <span className="fm-child-rail__tile fm-child-rail__tile--stickers" aria-hidden>
             <StickerOutline size={24} strokeWidth={2} />
           </span>
-          <span>Stickers</span>
+          <span>My stickers</span>
         </a>
         {child ? (
           <span className="fm-child-rail__avatar" title={child.name ?? undefined}>
@@ -290,20 +298,14 @@ export function AppSidebar({
       <div className="fm-sidebar__scroll">
         <SidebarSection>
           {childView ? (
-            <>
-              <SidebarItem
-                icon={Home}
-                label="Home"
-                selected={route.name === "home"}
-                href={HOME_HREF}
-              />
-              <ChildMakesList
-                rows={childMakes}
-                onOpen={(row) =>
-                  select(() => navigate(threadHref(row.shell.environmentId, row.shell.id)))
-                }
-              />
-            </>
+            <ChildTabs
+              route={route}
+              makes={childMakes.length}
+              projects
+              projectsOpen={childProjectsOpen}
+              onToggleProjects={() => setChildProjectsOpen((value) => !value)}
+              onGo={(href) => select(() => navigate(href))}
+            />
           ) : (
             <>
               <SidebarItem
@@ -335,106 +337,116 @@ export function AppSidebar({
               />
             </>
           )}
-          <SidebarItem
-            glyph={<FridgeIcon size={15} />}
-            label="The fridge"
-            selected={route.name === "fridge"}
-            href={FRIDGE_HREF}
-          />
-          <SidebarItem
-            glyph={<Sticker id="first-creation" size={18} tilted={false} />}
-            label="My stickers"
-            selected={route.name === "stickers" || route.name === "certificate"}
-            href={STICKERS_HREF}
-          />
+          {childView ? null : (
+            <>
+              <SidebarItem
+                glyph={<FridgeIcon size={15} />}
+                label="The fridge"
+                selected={route.name === "fridge"}
+                href={FRIDGE_HREF}
+              />
+              <SidebarItem
+                glyph={<Sticker id="first-creation" size={18} tilted={false} />}
+                label="My stickers"
+                selected={route.name === "stickers" || route.name === "certificate"}
+                href={STICKERS_HREF}
+              />
+            </>
+          )}
         </SidebarSection>
 
-        <SidebarSection title="Projects">
-          {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
-          {[...visibleProjects]
-            .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
-            .map((project) => {
-              const key = projectKeyOf({
-                environmentId: project.environmentId,
-                projectId: project.id,
-              });
-              return (
-                <SidebarItem
-                  key={key}
-                  glyph={<ProjectAvatar project={project} size="sm" />}
-                  label={project.title}
-                  count={countsByProject.get(key) ?? 0}
-                  attention={attentionByProject.has(key)}
-                  selected={conversationRoute && shell.projectKey === key}
-                  onClick={() => showList(() => shell.setProjectKey(key))}
-                  // Questions is SKYCOT's own space: nothing to rename or re-icon.
-                  {...(project.isScratch === true
-                    ? {}
-                    : {
-                        menuOpen: projectMenu?.project === project,
-                        onContextMenu: (event: MouseEvent) => {
-                          event.preventDefault();
-                          setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
-                        },
-                        trailing: (
-                          <ProjectMenuButton
-                            project={project}
-                            expanded={projectMenu?.project === project}
-                            onOpen={(at) => setProjectMenu({ project, at })}
-                          />
-                        ),
-                      })}
-                />
-              );
-            })}
-          {childView ? (
-            <SidebarItem
-              icon={FolderPlus}
-              label={creatingProject ? "Making project…" : "New project"}
-              muted={creatingProject}
-              onClick={() => {
-                if (creatingProject || !primaryEnvironmentId) return;
-                setCreatingProject(true);
-                const name = nextChildProjectName(visibleProjects.map((project) => project.title));
-                void createNewProject({
-                  environmentId: primaryEnvironmentId,
-                  input: { name },
-                }).then((outcome) => {
-                  setCreatingProject(false);
-                  if (outcome._tag === "Failure") {
-                    const reason = squashAtomCommandFailure(outcome);
-                    showToast(projectCreationProblem(String(reason)));
-                    return;
-                  }
-                  showList(() =>
-                    shell.setProjectKey(
-                      projectKeyOf({
-                        environmentId: primaryEnvironmentId,
-                        projectId: outcome.value.projectId,
-                      }),
-                    ),
+        {childView && !childProjectsOpen ? null : (
+          <SidebarSection title="Projects">
+            {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
+            {[...visibleProjects]
+              .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
+              .map((project) => {
+                const key = projectKeyOf({
+                  environmentId: project.environmentId,
+                  projectId: project.id,
+                });
+                return (
+                  <SidebarItem
+                    key={key}
+                    glyph={<ProjectAvatar project={project} size="sm" />}
+                    label={project.title}
+                    count={countsByProject.get(key) ?? 0}
+                    attention={attentionByProject.has(key)}
+                    selected={conversationRoute && shell.projectKey === key}
+                    onClick={() => showList(() => shell.setProjectKey(key))}
+                    // Questions is SKYCOT's own space: nothing to rename or re-icon.
+                    {...(project.isScratch === true
+                      ? {}
+                      : {
+                          menuOpen: projectMenu?.project === project,
+                          onContextMenu: (event: MouseEvent) => {
+                            event.preventDefault();
+                            setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
+                          },
+                          trailing: (
+                            <ProjectMenuButton
+                              project={project}
+                              expanded={projectMenu?.project === project}
+                              onOpen={(at) => setProjectMenu({ project, at })}
+                            />
+                          ),
+                        })}
+                  />
+                );
+              })}
+            {childView ? (
+              <SidebarItem
+                icon={FolderPlus}
+                label={creatingProject ? "Making project…" : "New project"}
+                muted={creatingProject}
+                onClick={() => {
+                  if (creatingProject || !primaryEnvironmentId) return;
+                  setCreatingProject(true);
+                  const name = nextChildProjectName(
+                    visibleProjects.map((project) => project.title),
                   );
-                });
-              }}
-            />
-          ) : null}
-          {!childView ? (
-            <SidebarItem
-              icon={FolderPlus}
-              label="Open a folder…"
-              muted
-              onClick={() => {
-                if (!primaryEnvironmentId) return;
-                const environmentId = primaryEnvironmentId;
-                sheets.openFolder({
-                  environmentId,
-                  onOpened: (projectId) =>
-                    showList(() => shell.setProjectKey(projectKeyOf({ environmentId, projectId }))),
-                });
-              }}
-            />
-          ) : null}
-        </SidebarSection>
+                  void createNewProject({
+                    environmentId: primaryEnvironmentId,
+                    input: { name },
+                  }).then((outcome) => {
+                    setCreatingProject(false);
+                    if (outcome._tag === "Failure") {
+                      const reason = squashAtomCommandFailure(outcome);
+                      showToast(projectCreationProblem(String(reason)));
+                      return;
+                    }
+                    showList(() =>
+                      shell.setProjectKey(
+                        projectKeyOf({
+                          environmentId: primaryEnvironmentId,
+                          projectId: outcome.value.projectId,
+                        }),
+                      ),
+                    );
+                  });
+                }}
+              />
+            ) : null}
+            {!childView ? (
+              <SidebarItem
+                icon={FolderPlus}
+                label="Open a folder…"
+                muted
+                onClick={() => {
+                  if (!primaryEnvironmentId) return;
+                  const environmentId = primaryEnvironmentId;
+                  sheets.openFolder({
+                    environmentId,
+                    onOpened: (projectId) =>
+                      showList(() =>
+                        shell.setProjectKey(projectKeyOf({ environmentId, projectId })),
+                      ),
+                  });
+                }}
+              />
+            ) : null}
+          </SidebarSection>
+        )}
 
         {crew.named && !childView ? (
           <SidebarSection title="Your crew">
@@ -494,22 +506,30 @@ export function AppSidebar({
       </ContextMenu>
 
       <footer className="fm-sidebar__footer">
-        <div className="fm-sidebar__footer-row">
-          <SidebarIdentity
-            familyOn={family.enabled}
+        {family.enabled ? (
+          <ProfileMenu
             childView={childView}
             child={child}
             grownUp={grownUp}
-            onSwitch={openChildPicker}
+            onSwitch={() => select(openChildPicker)}
+            onChildSettings={sheets.openChildSettings}
+            onSettings={() => select(() => navigate(SETTINGS_HREF))}
+            onHandBack={() => {
+              void lockFamilyGrants();
+              endGrownUpSession();
+              openChildPicker();
+              navigate(HOME_HREF);
+            }}
           />
-          {childView ? (
-            <IconButton
-              icon={Settings}
-              label="Settings"
-              size="sm"
-              onClick={sheets.openChildSettings}
+        ) : (
+          <div className="fm-sidebar__footer-row">
+            <SidebarIdentity
+              familyOn={family.enabled}
+              childView={childView}
+              child={child}
+              grownUp={grownUp}
+              onSwitch={openChildPicker}
             />
-          ) : (
             <IconButton
               icon={Settings}
               label="Settings"
@@ -517,8 +537,8 @@ export function AppSidebar({
               aria-current={route.name === "settings" ? "page" : undefined}
               onClick={() => select(() => navigate(SETTINGS_HREF))}
             />
-          )}
-        </div>
+          </div>
+        )}
         {/* A child's view keeps the developer tools out of reach; a grown-up in grown-up mode gets the button (it still asks for the code). */}
         {family.enabled && childView ? null : (
           <div className="fm-sidebar__footer-row">
@@ -573,7 +593,7 @@ export function ChildMakesList({
   return (
     <li className="fm-child-makes">
       <div className="fm-child-makes__heading">
-        My makes <span>{rows.length}</span>
+        Things I made <span>{rows.length}</span>
       </div>
       {(showAll ? rows : rows.slice(0, 6)).map((row) => (
         <button
@@ -596,6 +616,220 @@ export function ChildMakesList({
         </button>
       ) : null}
     </li>
+  );
+}
+
+/** The child's five paper tabs (design-explorations narrow-2); Projects opens the list below. */
+export function ChildTabs({
+  route,
+  makes,
+  projects,
+  projectsOpen,
+  onToggleProjects,
+  onGo,
+}: {
+  readonly route: Route;
+  readonly makes: number;
+  /** Always offered to a child: the list under it is where New project lives. */
+  readonly projects: boolean;
+  readonly projectsOpen: boolean;
+  readonly onToggleProjects: () => void;
+  readonly onGo: (href: string) => void;
+}) {
+  const tab = (
+    href: string,
+    label: string,
+    sub: string,
+    tone: string,
+    icon: React.ReactNode,
+    selected: boolean,
+    badge?: number,
+  ) => (
+    <li key={label}>
+      <a
+        className={`fm-child-tab${selected ? " fm-child-tab--selected" : ""}`}
+        data-tone={tone}
+        href={href}
+        aria-current={selected ? "page" : undefined}
+        onClick={(event) => {
+          event.preventDefault();
+          onGo(href);
+        }}
+      >
+        <span className="fm-child-tab__tile" aria-hidden>
+          {icon}
+        </span>
+        <span className="fm-child-tab__text">
+          <span className="fm-child-tab__label">{label}</span>
+          <span className="fm-child-tab__sub">{sub}</span>
+        </span>
+        {badge !== undefined && badge > 0 ? (
+          <span className="fm-child-tab__badge" aria-label={`${badge} makes`}>
+            {badge}
+          </span>
+        ) : null}
+      </a>
+    </li>
+  );
+  const making = route.name === "home" || route.name === "new";
+  const inMake = route.name === "makes" || route.name === "thread";
+  return (
+    <li>
+      <ul className="fm-child-tabs" aria-label="Places">
+        {tab(
+          HOME_HREF,
+          "Let's make",
+          "Pick a card or say an idea",
+          "orange",
+          <Sparkles size={22} strokeWidth={2} />,
+          making,
+        )}
+        {tab(
+          MAKES_HREF,
+          "Things I made",
+          makes === 0 ? "Nothing yet" : `${makes} so far`,
+          "green",
+          <Blocks size={22} strokeWidth={2} />,
+          inMake,
+          makes,
+        )}
+        {tab(
+          FRIDGE_HREF,
+          "The fridge",
+          "What everyone made",
+          "blue",
+          <Refrigerator size={22} strokeWidth={2} />,
+          route.name === "fridge",
+        )}
+        {tab(
+          STICKERS_HREF,
+          "My stickers",
+          "Collect them all",
+          "pink",
+          <StickerOutline size={22} strokeWidth={2} />,
+          route.name === "stickers" || route.name === "certificate",
+        )}
+        {projects ? (
+          <li>
+            <button
+              type="button"
+              className={`fm-child-tab${projectsOpen ? " fm-child-tab--selected" : ""}`}
+              data-tone="purple"
+              aria-expanded={projectsOpen}
+              onClick={onToggleProjects}
+            >
+              <span className="fm-child-tab__tile" aria-hidden>
+                <FolderPlus size={22} strokeWidth={2} />
+              </span>
+              <span className="fm-child-tab__text">
+                <span className="fm-child-tab__label">Projects</span>
+                <span className="fm-child-tab__sub">Where your makes live</span>
+              </span>
+            </button>
+          </li>
+        ) : null}
+      </ul>
+    </li>
+  );
+}
+
+/**
+ * The "HELLO my name is" tag at the bottom: a button whose menu holds the few things that are
+ * about the person, not the work. A child gets Switch and My settings; a grown-up in grown-up
+ * mode gets Settings, Switch and, set apart, Done — hand back.
+ */
+export function ProfileMenu({
+  childView,
+  child,
+  grownUp,
+  onSwitch,
+  onChildSettings,
+  onSettings,
+  onHandBack,
+}: {
+  readonly childView: boolean;
+  readonly child: FamilyChild | null;
+  readonly grownUp: Pick<FamilyChild, "avatar" | "name"> | null;
+  readonly onSwitch: () => void;
+  readonly onChildSettings: () => void;
+  readonly onSettings: () => void;
+  readonly onHandBack: () => void;
+}) {
+  const person = childView ? child : grownUp;
+  const name = person?.name ?? (childView ? "You" : "Grown-up");
+  return (
+    <div className="fm-sidebar__footer-row">
+      <Popover
+        placement="top-start"
+        role="menu"
+        label={childView ? `${name}'s menu` : "Grown-up menu"}
+        trigger={
+          <button type="button" className="fm-nametag">
+            <span className="fm-nametag__top" aria-hidden>
+              <span>Hello</span>
+              <small>my name is</small>
+            </span>
+            <span className="fm-nametag__body">
+              {person ? <ChildAvatar child={person} size={32} /> : null}
+              <span className="fm-nametag__name">{name}</span>
+              <ChevronsUpDown className="fm-nametag__chev" size={16} aria-hidden />
+            </span>
+            <span className="fm-nametag__bot" aria-hidden />
+          </button>
+        }
+      >
+        {(close) =>
+          childView ? (
+            <>
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onSwitch();
+                }}
+              >
+                Switch who's using SKYCOT
+              </MenuItem>
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onChildSettings();
+                }}
+              >
+                My settings
+              </MenuItem>
+            </>
+          ) : (
+            <>
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onSettings();
+                }}
+              >
+                Settings
+              </MenuItem>
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onSwitch();
+                }}
+              >
+                Switch who's using SKYCOT
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onHandBack();
+                }}
+              >
+                Done — hand back
+              </MenuItem>
+            </>
+          )
+        }
+      </Popover>
+    </div>
   );
 }
 

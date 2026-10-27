@@ -34,6 +34,8 @@ import {
   pageToolbarCopy,
   rememberGameButtons,
   reportedSites,
+  fallbackPageCopy,
+  type PageDiagnosticEntry,
   type PlayCopy,
 } from "./pagePreviewLogic";
 
@@ -100,6 +102,7 @@ export function PagePreview(props: {
     setReportCopied(false);
     setLinkNotice(false);
     setInternetNotice(false);
+    setInternetNoticeSeen(false);
     setNotice(null);
     setNoticeHosts([]);
     setSites([]);
@@ -122,7 +125,7 @@ export function PagePreview(props: {
       return;
     }
     const fallback = await familyApi.fridgePage(props.mac.transport, props.threadId, props.page);
-    if (fallback.ok) setHtml(fallback.value);
+    if (fallback.ok) setHtml(fallback.value === null ? null : fallbackPageCopy(fallback.value));
     else setProblem(fallback.message);
   }, [props.mac, props.threadId, props.page]);
 
@@ -197,6 +200,18 @@ export function PagePreview(props: {
       return;
     }
     const nextSites = reportedSites(data, sites);
+    if (nextSites.length > sites.length) {
+      setDiagnostics((current) => ({
+        ...current,
+        entries: [
+          ...current.entries,
+          {
+            kind: "policy",
+            text: `page rule blocked ${nextSites.at(-1)!}`,
+          } satisfies PageDiagnosticEntry,
+        ].slice(-30),
+      }));
+    }
     if (!internetNoticeSeen && nextSites.length > sites.length) {
       setInternetNotice(true);
       setInternetNoticeSeen(true);
@@ -334,10 +349,10 @@ export function PagePreview(props: {
         <WebView<object>
           ref={webView}
           source={{ html: play?.html ?? html!, baseUrl: "about:blank" }}
-          javaScriptEnabled={play !== null}
+          javaScriptEnabled
           originWhitelist={["about:*"]}
           onShouldStartLoadWithRequest={(request) => allowsPlayNavigation(request.url)}
-          onMessage={play === null ? undefined : onMessage}
+          onMessage={onMessage}
           onLoadEnd={() => {
             setDiagnosticsElapsed(0);
             setTimeout(() => setDiagnosticsElapsed(3000), 3000);
@@ -538,6 +553,7 @@ export function PagePreview(props: {
       <Sheet
         visible={linkNotice}
         title="Links stay closed here"
+        halfHeight
         onClose={() => setLinkNotice(false)}
         closeLabel="Done"
       >

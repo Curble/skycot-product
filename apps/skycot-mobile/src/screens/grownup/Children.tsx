@@ -107,7 +107,7 @@ export function ChildrenScreen() {
                     subtitle="15 or 30 minutes, or no bedtime tonight."
                     trailing={
                       <Button
-                        title="Give…"
+                        title="Give time"
                         kind="tinted"
                         size="small"
                         onPress={() => setMoreTime({ mac, child })}

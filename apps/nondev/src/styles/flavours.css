@@ -370,18 +370,20 @@ html[data-flavour-labels="handwritten"] .fm-marker-underline {
   display: inline-block;
   isolation: isolate;
 }
+/* An underline, not a block: a thin marker stroke under the baseline that never covers the
+   letters (Mark, 27 Oct 2026: the highlighter blocked out too much of the words). */
 html[data-flavour-labels="handwritten"] .fm-marker-underline::after {
   content: "";
   position: absolute;
-  left: -4px;
-  right: -4px;
-  bottom: 0.08em;
-  height: 0.38em;
+  left: -2px;
+  right: -2px;
+  bottom: -0.12em;
+  height: 0.16em;
   z-index: -1;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--fm-marker);
-  transform: rotate(-1.2deg) skewX(-8deg);
-  opacity: 0.9;
+  transform: rotate(-0.8deg) skewX(-8deg);
+  opacity: 0.95;
 }
 html[data-flavour-labels="handwritten"] .fm-marker-underline--green::after {
   background: var(--fm-green-soft);

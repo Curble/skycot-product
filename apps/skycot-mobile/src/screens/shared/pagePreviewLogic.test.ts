@@ -6,6 +6,7 @@ import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 
 import {
   allowsPlayNavigation,
+  fallbackPageCopy,
   isPageLinkMessage,
   diagnosticReport,
   diagnosticSheetCopy,
@@ -118,6 +119,17 @@ describe("the sealed page viewer", () => {
     expect(reportedSites(report, ["dog.ceo"])).toEqual(["dog.ceo"]);
     const full = Array.from({ length: MAX_PAGE_SITES }, (_, index) => `site${index}.example`);
     expect(reportedSites(report, full)).toBe(full);
+  });
+
+  it("adds the internet reporter and offline rules to an older Mac's copied page", () => {
+    const copy = fallbackPageCopy(
+      "<html><body><img src='https://images.example/cat.png'></body></html>",
+    );
+    expect(copy).toContain("securitypolicyviolation");
+    expect(copy).toContain("skycot:'page-internet'");
+    expect(copy).toContain("default-src 'none'");
+    expect(copy).toContain("script-src 'unsafe-inline'");
+    expect(copy).toContain("images.example/cat.png");
   });
 
   it("parses bounded diagnostics, identifies a stalled or broken page, and keeps reports private", () => {
@@ -274,5 +286,14 @@ describe("the sealed page viewer", () => {
     expect(copy.lines.join(" ")).toContain(
       "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
     );
+    expect(copy.lines.join(" ")).not.toContain("stopped the game from using");
+  });
+
+  it("does not repeat that a working game can keep going", () => {
+    const copy = diagnosticSheetCopy(
+      parsePageDiagnostic({ skycot: "diag", facts: { frames: 12 } }, EMPTY_PAGE_DIAGNOSTICS),
+      true,
+    );
+    expect(copy.lines.filter((line) => line.includes("keep using it"))).toHaveLength(1);
   });
 });

@@ -2,9 +2,11 @@
 // nondev-seam: skycot-iphone-q39-page-copy
 // nondev-seam: skycot-iphone-q50-page-logic
 import {
+  BLOCKED_REPORTER,
   MAX_PAGE_SITES,
   reportedPageLink,
   reportedSite,
+  withHeadStart,
 } from "@t3tools/skycot-rules/page-internet";
 
 export const GAME_BUTTONS_DEFAULT = false;
@@ -159,6 +161,12 @@ export function playableCopy(result: {
   return result.ok && result.value?.html !== null && result.value?.html !== undefined
     ? result.value
     : null;
+}
+
+/** Older Macs return the page without the packed viewer helpers; keep it offline and report blocks. */
+export function fallbackPageCopy(html: string): string {
+  const helpers = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src blob: data:; frame-src 'none'; form-action 'none'">${BLOCKED_REPORTER}`;
+  return withHeadStart(html, helpers);
 }
 
 /**
@@ -324,8 +332,6 @@ export function diagnosticSheetCopy(
         `A picture or sound couldn't be found: ${entry.text.replace(/^(?:img|audio|video|source):\s*/iu, "") || `${thing} file`}`,
       );
     else if (entry.kind === "policy") {
-      const host = /\bblocked ([\w.-]+)/iu.exec(entry.text)?.[1];
-      lines.push(`The ${device} stopped the ${thing} from using ${host ?? "something it needed"}.`);
       lines.push(
         "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
       );
@@ -343,7 +349,7 @@ export function diagnosticSheetCopy(
     );
   while (lines.length < 3) {
     const fallback = running
-      ? [`You can keep using your ${thing}.`, "A grown-up can help if something is wrong."][
+      ? ["A grown-up can help if something is wrong.", "You can copy these clues for a grown-up."][
           lines.length - 1
         ]!
       : [

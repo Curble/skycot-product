@@ -13,6 +13,7 @@ import { WebView } from "react-native-webview";
 import {
   childFridgeTitle,
   fridgeIcon,
+  fridgeKindLabel,
   fridgeOrder,
   madeLabel,
   type FridgeItem,
@@ -96,6 +97,7 @@ function Magnet(props: {
             {friendlyTitle(childFridgeTitle(props.item, props.childName))}
           </Txt>
           <Txt variant="caption" tone="label2">
+            {fridgeKindLabel(props.item.title, props.item.page)} ·{" "}
             {madeLabel(props.item.madeAt, Date.now())}
           </Txt>
           {props.onPin ? (

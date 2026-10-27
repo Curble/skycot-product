@@ -994,3 +994,261 @@ html.dark .fm-standalone__foot {
   font-weight: 500;
   color: var(--fm-label);
 }
+
+/* ---------------------------------------------------------------------------
+   The child's sidebar as hand-cut paper tabs (chosen 27 Oct 2026, design-explorations narrow-2):
+   five sticky-note tabs, the current one taped down in marker-yellow; past makes live behind
+   "Things I made", not in the column.
+   --------------------------------------------------------------------------- */
+.fm-child-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 10px 4px 4px;
+  list-style: none;
+  margin: 0;
+}
+.fm-child-tab {
+  --fm-tab-tint: var(--fm-accent-soft, rgba(10, 132, 255, 0.16));
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 2px solid var(--fm-ink);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--fm-tab-tint) 65%, var(--fm-bg-card));
+  box-shadow: 3px 4px 0 var(--fm-ink);
+  color: var(--fm-label);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: default;
+  transition: transform 120ms ease;
+}
+.fm-child-tab:nth-child(2n) {
+  transform: rotate(0.6deg);
+}
+.fm-child-tab:nth-child(3n) {
+  transform: rotate(-0.4deg);
+}
+.fm-child-tab:nth-child(5n) {
+  transform: rotate(0.9deg);
+}
+.fm-child-tab:hover {
+  transform: translateX(3px);
+}
+.fm-child-tab:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+.fm-child-tab[data-tone="orange"] {
+  --fm-tab-tint: var(--fm-orange-soft);
+}
+.fm-child-tab[data-tone="green"] {
+  --fm-tab-tint: var(--fm-green-soft);
+}
+.fm-child-tab[data-tone="purple"] {
+  --fm-tab-tint: rgba(175, 82, 222, 0.18);
+}
+.fm-child-tab[data-tone="blue"] {
+  --fm-tab-tint: rgba(111, 180, 234, 0.2);
+}
+.fm-child-tab[data-tone="pink"] {
+  --fm-tab-tint: rgba(255, 180, 162, 0.22);
+}
+.fm-child-tab__tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--fm-accent);
+}
+.fm-child-tab[data-tone="orange"] .fm-child-tab__tile {
+  background: #ff9f0a;
+}
+.fm-child-tab[data-tone="green"] .fm-child-tab__tile {
+  background: #30d158;
+}
+.fm-child-tab[data-tone="purple"] .fm-child-tab__tile {
+  background: #bf5af2;
+}
+.fm-child-tab[data-tone="blue"] .fm-child-tab__tile {
+  background: #5ac8fa;
+}
+.fm-child-tab[data-tone="pink"] .fm-child-tab__tile {
+  background: #ff6482;
+}
+.fm-child-tab__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fm-child-tab__label {
+  font-size: calc(16px * var(--fm-text-scale));
+  font-weight: 600;
+  line-height: 1.1;
+}
+.fm-child-tab__sub {
+  font-size: calc(11.5px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+  margin-top: 2px;
+}
+.fm-child-tab--selected {
+  transform: translateX(6px) !important;
+  background: color-mix(in srgb, var(--fm-marker) 55%, var(--fm-bg-card));
+  color: var(--fm-marker-ink);
+}
+.fm-child-tab--selected .fm-child-tab__sub {
+  color: var(--fm-marker-ink);
+  opacity: 0.75;
+}
+.fm-child-tab--selected::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 54px;
+  height: 16px;
+  margin-left: -27px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  transform: rotate(-2deg);
+  pointer-events: none;
+}
+.fm-child-tab__badge {
+  position: absolute;
+  top: -9px;
+  right: -8px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 2px solid var(--fm-ink);
+  background: var(--fm-accent);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* "HELLO my name is": the child's (or grown-up's) name tag at the bottom, a button with a menu. */
+.fm-nametag {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 2px solid var(--fm-ink);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--fm-bg-card);
+  color: var(--fm-label);
+  box-shadow: 3px 4px 0 var(--fm-ink);
+  transform: rotate(-1.2deg);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.fm-nametag:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+.fm-nametag__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 10px;
+  background: var(--fm-accent);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.fm-nametag__top small {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+.fm-nametag__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 9px;
+  min-width: 0;
+}
+.fm-nametag__name {
+  font-size: calc(20px * var(--fm-text-scale));
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fm-nametag__chev {
+  margin-left: auto;
+  color: var(--fm-label-3);
+  flex: none;
+}
+.fm-nametag__bot {
+  height: 5px;
+  background: var(--fm-accent);
+}
+.fm-sidebar__footer .fm-popover {
+  min-width: 236px;
+}
+.fm-menu-item--apart {
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* "Things I made": the child's own makes as Workshop rows. */
+.fm-makes-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fm-makes-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--fm-ink);
+  border-radius: 10px;
+  background: var(--fm-bg-card);
+  box-shadow: 3px 4px 0 var(--fm-ink);
+  color: var(--fm-label);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.fm-makes-row:hover {
+  transform: translateX(2px);
+}
+.fm-makes-row:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+.fm-makes-row__title {
+  font-size: calc(15px * var(--fm-text-scale));
+  font-weight: 600;
+  min-width: 0;
+}
+.fm-makes-row__badge {
+  color: var(--fm-label-2);
+  white-space: nowrap;
+}
+.fm-makes-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}

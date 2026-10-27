@@ -319,6 +319,8 @@ function useTitleDetail(
       return "Automations";
     case "people":
       return "People";
+    case "makes":
+      return "Things I made";
     case "fridge":
       return "The fridge";
     case "files":

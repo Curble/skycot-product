@@ -111,6 +111,7 @@ export function ThisDeviceScreen() {
               available: faceId.native?.available ?? false,
               everywhere: faceId.everywhere,
             })}
+            subtitleNumberOfLines={5}
             trailing={
               faceIdAction === "settings" ? (
                 <Button
