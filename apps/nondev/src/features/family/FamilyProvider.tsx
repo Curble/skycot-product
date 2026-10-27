@@ -24,6 +24,7 @@ import {
   startGrownUpSession,
 } from "./grownUpSession";
 import { openChildPicker } from "../family-limits/FamilyLimitsHost";
+import { consumeHandoff } from "./handoff";
 import { chooseChild } from "../family-limits/store";
 import { Sheet } from "../../ui/Sheet";
 import type { FamilyResult } from "./api";
@@ -141,6 +142,15 @@ export function FamilyProvider({ children }: { readonly children: ReactNode }) {
 
   // The engine is the truth: ask on mount and whenever this window comes back to the front
   // (a parent may have changed it from another device).
+  // Arriving from Advanced mode with "Switch" / "Done — hand back" chosen there (see handoff.ts).
+  useEffect(() => {
+    consumeHandoff(window.location, (url) => window.history.replaceState(null, "", url), {
+      lock: () => void lockFamilyGrants(),
+      endSession: endGrownUpSession,
+      openPicker: openChildPicker,
+    });
+  }, []);
+
   useEffect(() => {
     void refreshFamily();
     const onVisible = () => {

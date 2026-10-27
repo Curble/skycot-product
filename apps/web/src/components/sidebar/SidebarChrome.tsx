@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon, UserRoundIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -22,9 +22,11 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
+import { goToSimpleView, isGrownUpSession } from "./skycotHandoff";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
@@ -230,17 +232,31 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             <SidebarUtilityItem
               icon={<SkycotBackMark className="size-5" />}
               label="Back to SKYCOT"
-              onClick={() => {
-                // Remember the choice (going in recorded "advanced"), then open the plain view's
-                // own page, which every host serves (the Mac app's protocol and the server).
-                try {
-                  window.localStorage.setItem("skycot:uiMode", "simple");
-                } catch {
-                  // Storage blocked: nothing to remember.
-                }
-                window.location.assign("/simple/index.html");
-              }}
+              onClick={() => goToSimpleView()}
             />
+          ) : null}
+          {/* nondev-seam: web-advanced-grown-up-menu — a grown-up in Advanced mode gets the same two exits as the simple view's name tag; both leave Advanced mode first, then the simple view finishes the job (skycotHandoff.ts). */}
+          {window.localStorage.getItem("skycot:uiMode") !== null &&
+          isGrownUpSession(window.sessionStorage) ? (
+            <SidebarMenuItem>
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <SidebarMenuButton aria-label="Grown-up menu" size="icon">
+                      <UserRoundIcon />
+                    </SidebarMenuButton>
+                  }
+                />
+                <MenuPopup side="top" align="start">
+                  <MenuItem onClick={() => goToSimpleView()}>Back to SKYCOT</MenuItem>
+                  <MenuItem onClick={() => goToSimpleView("switch")}>
+                    Switch who&apos;s using SKYCOT
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem onClick={() => goToSimpleView("hand-back")}>Done — hand back</MenuItem>
+                </MenuPopup>
+              </Menu>
+            </SidebarMenuItem>
           ) : null}
         </>
       )}
