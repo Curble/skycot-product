@@ -194,7 +194,10 @@ describe("the sealed page viewer", () => {
       ),
       true,
     );
-    expect(policyCopy.lines.join(" ")).toContain("stopped the game from using games.example");
+    // Blocked sites read as one calm sentence now (no host names on the child's phone).
+    expect(policyCopy.lines.join(" ")).toContain(
+      "This page tried to get something from the internet",
+    );
     expect(policyCopy.lines.join(" ")).not.toContain("script-src");
     const report = diagnosticReport(
       diagnostics,
