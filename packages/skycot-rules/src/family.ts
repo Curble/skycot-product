@@ -1215,6 +1215,7 @@ export const deleteConversationApprovalId = (threadId: string) => `delete-conver
 
 /** Programs that only print, list or search, and never write a file or start another one. */
 const READ_ONLY_PROGRAMS = new Set([
+  "node",
   "ls",
   "cat",
   "head",
@@ -1287,6 +1288,7 @@ function segmentOnlyReads(segment: string): boolean {
   if (program.includes("/") && base !== program) return false;
   if (!READ_ONLY_PROGRAMS.has(base)) return false;
   const args = tokens.slice(1);
+  if (base === "node") return args.length === 2 && args[0] === "--check";
   const writing = WRITING_FLAGS[base];
   if (writing !== undefined && args.some((arg) => writing.test(arg))) return false;
   if (base === "git") return args[0] !== undefined && GIT_READ_ONLY.test(args[0]);

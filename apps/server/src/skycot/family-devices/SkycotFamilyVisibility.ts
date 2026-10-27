@@ -67,6 +67,11 @@ export class SkycotFamilyVisibility extends Context.Service<
   {
     /** The child view for a child's own device; null where everything is visible. */
     readonly childViewFor: (sessionId: string) => Effect.Effect<ChildView | null>;
+    /** Thread ids a child may search; fridge pins from siblings are deliberately excluded. */
+    // nondev-seam: skycot-child-thread-search
+    readonly searchableThreadIds: (
+      sessionId: string,
+    ) => Effect.Effect<ReadonlyArray<ThreadId> | null>;
     /** Whether a child's device may use everything a call names. */
     readonly allows: (
       view: ChildView,
@@ -145,6 +150,16 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
       pinned: yield* readPins(fs, pinsFile),
       ...(who.kind === "shared" ? { sharedSession: true } : {}),
     } satisfies ChildView;
+  });
+
+  const searchableThreadIds: SkycotFamilyVisibility["Service"]["searchableThreadIds"] = Effect.fn(
+    "SkycotFamilyVisibility.searchableThreadIds",
+  )(function* (sessionId) {
+    const view = yield* childViewFor(sessionId);
+    if (view === null) return null;
+    return Object.entries(view.owners.threads)
+      .filter(([, owner]) => owner === view.childId)
+      .map(([threadId]) => threadId as ThreadId);
   });
 
   /** A conversation id the engine has never seen is a new one the child is starting. */
@@ -297,6 +312,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
 
   return SkycotFamilyVisibility.of({
     childViewFor,
+    searchableThreadIds,
     allows,
     filterShellStream,
     filterArchivedStream,

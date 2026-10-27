@@ -26,7 +26,14 @@ export class ThreadSearchError extends Schema.TaggedError<ThreadSearchError>()(
   }
 }
 
-const SearchRequest = Schema.Struct({ pattern: Schema.String, limit: Schema.Int });
+const SearchRequest = Schema.Struct({
+  pattern: Schema.String,
+  limit: Schema.Int,
+  allowedThreadIdsJson: Schema.String,
+});
+const encodeAllowedThreadIds = Schema.encodeEffect(
+  Schema.fromJsonString(Schema.NullOr(Schema.Array(ThreadId))),
+);
 const SearchRow = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
@@ -64,6 +71,8 @@ export class ThreadSearch extends Context.Service<
   {
     readonly search: (
       input: OrchestrationSearchThreadsInput,
+      // nondev-seam: skycot-child-thread-search
+      allowedThreadIds?: ReadonlyArray<ThreadId>,
     ) => Effect.Effect<OrchestrationSearchThreadsResult, ThreadSearchError>;
   }
 >()("t3/orchestration-v2/ThreadSearch") {}
@@ -75,7 +84,7 @@ export const make = Effect.gen(function* () {
   const searchRows = SqlSchema.findAll({
     Request: SearchRequest,
     Result: SearchRow,
-    execute: ({ pattern, limit }) => sql`
+    execute: ({ pattern, limit, allowedThreadIdsJson }) => sql`
       WITH candidate AS (
         SELECT
           threads.thread_id,
@@ -96,6 +105,9 @@ export const make = Effect.gen(function* () {
           AND messages.streaming = 0
           AND messages.role IN ('user', 'assistant')
           AND json_extract(messages.payload_json, '$.text') LIKE ${pattern} ESCAPE '!'
+          AND (${allowedThreadIdsJson} = 'null' OR threads.thread_id IN (
+            SELECT value FROM json_each(${allowedThreadIdsJson})
+          ))
       ),
       ranked AS (
         SELECT
@@ -129,7 +141,10 @@ export const make = Effect.gen(function* () {
   });
 
   const search: ThreadSearch["Service"]["search"] = Effect.fn("ThreadSearch.search")(
-    function* (input) {
+    function* (input, allowedThreadIds) {
+      const allowedThreadIdsJson = yield* encodeAllowedThreadIds(allowedThreadIds ?? null).pipe(
+        Effect.mapError((cause) => new ThreadSearchError({ operation: "decode", cause })),
+      );
       // The scan reads every message, so run it on the reader worker rather
       // than the event loop.
       const rows = yield* sql
@@ -137,6 +152,7 @@ export const make = Effect.gen(function* () {
           searchRows({
             pattern: `%${escapeLikePattern(input.query)}%`,
             limit: input.limit ?? 50,
+            allowedThreadIdsJson,
           }),
         )
         .pipe(

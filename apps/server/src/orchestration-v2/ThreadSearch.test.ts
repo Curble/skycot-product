@@ -1,3 +1,4 @@
+// nondev-seam: skycot-child-thread-search-test
 import { assert, it } from "@effect/vitest";
 import {
   EventId,
@@ -146,6 +147,7 @@ it.layer(layerTest)("ThreadSearch", (it) => {
 
       const both = ThreadId.make("thread:both");
       const assistantOnly = ThreadId.make("thread:assistant");
+      const sibling = ThreadId.make("thread:sibling");
       const events: ReadonlyArray<OrchestrationV2DomainEvent> = [
         thread(both, project),
         message(both, "both-assistant", "assistant", "needle from the answer", { minute: 3 }),
@@ -157,6 +159,8 @@ it.layer(layerTest)("ThreadSearch", (it) => {
           streaming: true,
         }),
         message(assistantOnly, "assistant-system", "system", "needle system prompt"),
+        thread(sibling, project),
+        message(sibling, "sibling-message", "user", "needle from sibling"),
         thread(ThreadId.make("thread:archived"), project, { archivedAt: at(1) }),
         message(ThreadId.make("thread:archived"), "archived", "user", "needle archived"),
         thread(ThreadId.make("thread:deleted"), project, { deletedAt: at(1) }),
@@ -171,10 +175,18 @@ it.layer(layerTest)("ThreadSearch", (it) => {
         result.matches.map((match) => [match.threadId, match.source, match.snippet]),
         [
           [both, "user", "newer needle question"],
+          [sibling, "user", "needle from sibling"],
           [assistantOnly, "assistant", "needle in an answer"],
         ],
       );
       assert.lengthOf((yield* search.search({ query: "needle", limit: 1 })).matches, 1);
+      assert.deepEqual(
+        (yield* search.search({ query: "needle", limit: 20 }, [both])).matches.map(
+          (match) => match.threadId,
+        ),
+        [both],
+      );
+      assert.deepEqual((yield* search.search({ query: "needle" }, [])).matches, []);
       assert.deepEqual((yield* search.search({ query: "ne%le" })).matches, []);
     }),
   );

@@ -1210,6 +1210,9 @@ export const layerWsRpc = (
       const familyGate = yield* Effect.serviceOption(SkycotFamilyGate.SkycotFamilyGate);
       const eventLoopMonitor = yield* EventLoopMonitor.EventLoopMonitor;
       const threadSearch = yield* ThreadSearch.ThreadSearch;
+      const familyVisibility = yield* Effect.serviceOption(
+        SkycotFamilyVisibility.SkycotFamilyVisibility,
+      );
 
       const providerSessionsV2 = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const mcpAppRequests = yield* McpAppRequests.McpAppRequests;
@@ -1902,7 +1905,16 @@ export const layerWsRpc = (
             .searchThreadStream(input)
             .pipe(Stream.mapError((cause) => new OrchestrationV2SearchThreadError({ cause }))),
         [ORCHESTRATION_V2_WS_METHODS.searchThreads]: (input) =>
-          threadSearch.search(input).pipe(
+          (Option.isNone(familyVisibility)
+            ? threadSearch.search(input)
+            : familyVisibility.value
+                .searchableThreadIds(currentSessionId)
+                .pipe(
+                  Effect.flatMap((ids) =>
+                    threadSearch.search(input, ids === null ? undefined : ids),
+                  ),
+                )
+          ).pipe(
             Effect.mapError(
               (cause) =>
                 new OrchestrationSearchThreadsError({
