@@ -12,6 +12,7 @@ import {
   lastChildSession,
   SESSION_GAP_MS,
   trackChildSession,
+  closeChildSession,
   type ChildDay,
 } from "./limits.ts";
 
@@ -230,5 +231,25 @@ describe("a child's work session", () => {
     expect(trackChildSession(first, "ava", 1000 * M + SESSION_GAP_MS)).toHaveLength(1);
     expect(trackChildSession(first, "ava", 1000 * M + SESSION_GAP_MS + 1)).toHaveLength(2);
     expect(lastChildSession([], "ava")).toBeNull();
+  });
+
+  it("starts a new session after a grown-up closed the last one, even within the gap", () => {
+    const open = trackChildSession([], "ava", 1000 * M);
+    const closed = closeChildSession(open, 1001 * M);
+    expect(closed[0]).toMatchObject({ closed: true, endedAt: 1000 * M });
+    const next = trackChildSession(closed, "ava", 1002 * M);
+    expect(next).toHaveLength(2);
+    expect(next[1]!.id).not.toBe(next[0]!.id);
+    expect(lastChildSession(next, "ava")).toMatchObject({ startedAt: 1002 * M });
+    // The new session grows normally and is not closed.
+    expect(trackChildSession(next, "ava", 1010 * M)).toHaveLength(2);
+  });
+
+  it("closing with nothing open changes nothing", () => {
+    const empty: ReadonlyArray<never> = [];
+    expect(closeChildSession(empty, 1000 * M)).toBe(empty);
+    const closed = closeChildSession(trackChildSession([], "ava", 1000 * M), 1000 * M);
+    expect(closeChildSession(closed, 1001 * M)).toBe(closed);
+    expect(closeChildSession(closed, 1001 * M, "leo")).toBe(closed);
   });
 });

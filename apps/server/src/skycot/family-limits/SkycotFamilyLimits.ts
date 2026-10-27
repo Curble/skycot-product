@@ -52,6 +52,7 @@ import {
   type LimitState,
   type MoreTime,
   trackChildSession,
+  closeChildSession as closeSessionIn,
 } from "./limits.ts";
 
 export const ACTIVITY_FILE_NAME = "skycot-family-activity.json";
@@ -141,6 +142,7 @@ const ActivityFile = Schema.Struct({
         childId: Schema.String,
         startedAt: Schema.Number,
         endedAt: Schema.Number,
+        closed: Schema.optionalKey(Schema.Literal(true)),
       }),
     ),
   ),
@@ -329,6 +331,11 @@ export class SkycotFamilyLimits extends Context.Service<
       readonly sessionId: string;
       readonly active: boolean;
     }) => Effect.Effect<SessionLimits>;
+    /**
+     * A grown-up took over: ends the child's current work session (the newest one when no child
+     * is named), so the child's next work starts a new one for the "last session" recap.
+     */
+    readonly closeChildSession: (input?: { readonly childId?: string }) => Effect.Effect<void>;
     /**
      * "Who's using SKYCOT?" for this device. Free, except moving away from a child SKYCOT is
      * asleep for, which needs a grown-up (otherwise bedtime is one tap away).
@@ -665,6 +672,16 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
     return yield* sessionView(loaded.profile, activity, input.sessionId, at);
   }, lock.withPermits(1));
 
+  const closeChildSession: SkycotFamilyLimits["Service"]["closeChildSession"] = Effect.fn(
+    "SkycotFamilyLimits.closeChildSession",
+  )(function* (input) {
+    const loaded = yield* current;
+    if (loaded === null) return;
+    const kept = loaded.activity.childSessions ?? [];
+    const sessions = closeSessionIn(kept, yield* now, input?.childId);
+    if (sessions !== kept) yield* save({ ...loaded.activity, childSessions: sessions });
+  }, lock.withPermits(1));
+
   const choose: SkycotFamilyLimits["Service"]["choose"] = Effect.fn("SkycotFamilyLimits.choose")(
     function* (input) {
       const loaded = yield* current;
@@ -965,6 +982,7 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
   return SkycotFamilyLimits.of({
     forSession,
     heartbeat,
+    closeChildSession,
     choose,
     admitTurn,
     startableOn,

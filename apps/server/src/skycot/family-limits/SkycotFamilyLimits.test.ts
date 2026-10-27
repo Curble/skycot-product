@@ -141,6 +141,31 @@ it.layer(NodeServices.layer)("SkycotFamilyLimits", (it) => {
       ),
   );
 
+  it.effect("a grown-up taking over closes the session, so the next work starts a new one", () =>
+    withLimits(({ family, limits }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: "Ava", timeZone: MELBOURNE });
+        yield* at("2026-10-22T16:00:00+11:00");
+        yield* limits.heartbeat({ sessionId: SESSION, active: true });
+        const sessionsNow = () =>
+          limits.snapshot.pipe(Effect.map((snap) => snap?.activity.childSessions ?? []));
+        const first = (yield* sessionsNow())[0]!;
+        yield* TestClock.adjust("5 minutes");
+        yield* limits.heartbeat({ sessionId: SESSION, active: true });
+        assert.lengthOf(yield* sessionsNow(), 1);
+
+        yield* limits.closeChildSession();
+        assert.isTrue((yield* sessionsNow())[0]!.closed);
+        yield* TestClock.adjust("2 minutes");
+        yield* limits.heartbeat({ sessionId: SESSION, active: true });
+        const after = yield* sessionsNow();
+        assert.lengthOf(after, 2);
+        assert.notEqual(after[1]!.id, first.id);
+        assert.isUndefined(after[1]!.closed);
+      }),
+    ),
+  );
+
   it.effect("a heartbeat that is not active counts nothing", () =>
     withLimits(({ family, limits }) =>
       Effect.gen(function* () {

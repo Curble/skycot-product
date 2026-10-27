@@ -343,7 +343,7 @@ const verifyRoute = route(
   "POST",
   "/verify",
   AuthOrchestrationOperateScope,
-  ({ family, body, sessionId, who }) =>
+  ({ family, limits, body, sessionId, who }) =>
     Effect.gen(function* () {
       const purpose = text(body["purpose"]) as SkycotFamily.FamilyPurpose;
       const requestId = nullableText(body["requestId"]) ?? undefined;
@@ -364,6 +364,11 @@ const verifyRoute = route(
         requestId,
         scope,
       });
+      // A grown-up taking over ends the child's current work session, so the child's next work
+      // starts a fresh one and the "last session" recap shows it next time. Only the codes that
+      // hand the Mac to the grown-up count (settings, advanced). A code for approve, publish,
+      // files or update is a quick yes while the child keeps working, not a takeover.
+      if (purpose === "settings" || purpose === "advanced") yield* limits.closeChildSession();
       // The developer interface is a page load, not an RPC: it needs a cookie the static
       // handler can read. HttpOnly, so nothing in either client can copy it.
       const headers =

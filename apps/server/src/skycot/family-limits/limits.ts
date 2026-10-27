@@ -89,6 +89,11 @@ export interface ChildSession {
   readonly childId: string;
   readonly startedAt: number;
   readonly endedAt: number;
+  /**
+   * A grown-up took over (entered the code for settings): this session is over, whatever the
+   * gap, and the child's next work starts a new one with a new id.
+   */
+  readonly closed?: true;
 }
 
 export const SESSION_GAP_MS = 60 * MINUTE;
@@ -106,6 +111,7 @@ export function trackChildSession(
   if (
     last !== undefined &&
     last.childId === childId &&
+    last.closed !== true &&
     at >= last.startedAt &&
     at - last.endedAt <= SESSION_GAP_MS
   ) {
@@ -115,6 +121,26 @@ export function trackChildSession(
   }
   return [...sessions, { id: `${childId}-${at}`, childId, startedAt: at, endedAt: at }].slice(
     -SESSIONS_KEEP,
+  );
+}
+
+/**
+ * Ends the newest session (of `childId` when given, else the newest of anyone). `endedAt` stays
+ * where the child's last active minute left it. The same list when there is nothing open.
+ */
+export function closeChildSession(
+  sessions: ReadonlyArray<ChildSession>,
+  _at: number,
+  childId?: string,
+): ReadonlyArray<ChildSession> {
+  const index =
+    childId === undefined
+      ? sessions.length - 1
+      : sessions.findLastIndex((session) => session.childId === childId);
+  const target = sessions[index];
+  if (target === undefined || target.closed === true) return sessions;
+  return sessions.map((session, at) =>
+    at === index ? { ...session, closed: true as const } : session,
   );
 }
 
