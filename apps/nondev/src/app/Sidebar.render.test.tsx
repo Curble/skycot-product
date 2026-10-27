@@ -187,7 +187,14 @@ describe("child sidebar and make rail", () => {
     const page = await mounted();
     expect(page.host.querySelector(".fm-child-rail")).not.toBeNull();
     await page.click("Show sidebar");
-    expect(page.host.querySelector(".fm-sidebar--child-overlay")).not.toBeNull();
+    const overlay = page.host.querySelector(".fm-sidebar--child-overlay");
+    expect(overlay).not.toBeNull();
+    // The sidebar's content is there, not a blank panel.
+    expect(overlay?.textContent).toContain("Let's make");
+    expect(overlay?.textContent).toContain("Things I made");
+    // The rail keeps its place in the page grid (the floating sidebar is out of the grid's flow,
+    // so without it the conversation fell into the rail's narrow column), but cannot be used.
+    expect(page.host.querySelector(".fm-child-rail")?.hasAttribute("inert")).toBe(true);
     await page.key("Escape");
     expect(page.host.querySelector(".fm-sidebar--child-overlay")).toBeNull();
     expect(page.host.querySelector(".fm-child-rail")).not.toBeNull();

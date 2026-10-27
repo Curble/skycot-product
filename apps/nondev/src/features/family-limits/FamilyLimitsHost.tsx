@@ -17,6 +17,7 @@ import { ChildPicker } from "./ChildPicker";
 import {
   endGrownUpSession,
   grownUpSessionFor,
+  grownUpSessionStep,
   useGrownUpSessionId,
 } from "../family/grownUpSession";
 import {
@@ -160,17 +161,12 @@ export function FamilyLimitsHost() {
       openChildPicker();
     }
   }, [engineKnown, session, view.children, view.me.kind, view.needsChoice]);
-  // Only a change from open to closed ends it: right after the code, the session is marked a
-  // moment before the refreshed view shows the grant open, and that is not an ending.
+  // Only a change from open to closed ends it (see grownUpSessionStep).
   const wasActive = useRef(false);
   useEffect(() => {
-    if (grownUpActive) {
-      wasActive.current = true;
-      return;
-    }
-    if (grownUpId === null || !wasActive.current) return;
-    wasActive.current = false;
-    endGrownUpSession();
+    const step = grownUpSessionStep(wasActive.current, grownUpId, grownUpActive);
+    wasActive.current = step.sawOpen;
+    if (step.end) endGrownUpSession();
   }, [grownUpId, grownUpActive]);
 
   useEffect(() => {

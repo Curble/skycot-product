@@ -74,6 +74,24 @@ export function grownUpSessionFor(
   return view.grownUps.some((person) => person.id === personId) ? personId : null;
 }
 
+/**
+ * What the shared Mac does about a grown-up's session each time the session mark or the engine's
+ * grant changes. `sawOpen` is true once the grant was seen open for the session now marked.
+ * Right after the code the mark is set a moment before the refreshed view shows the grant, and
+ * that is not an ending; an ending is only open → closed for the same mark. The memory must be
+ * forgotten whenever the mark goes away, or the NEXT grown-up's first code would be taken for an
+ * ending and thrown out (the first-try dead end).
+ */
+export function grownUpSessionStep(
+  sawOpen: boolean,
+  markedId: string | null,
+  grantOpen: boolean,
+): { readonly sawOpen: boolean; readonly end: boolean } {
+  if (markedId === null) return { sawOpen: false, end: false };
+  if (grantOpen) return { sawOpen: true, end: false };
+  return sawOpen ? { sawOpen: false, end: true } : { sawOpen: false, end: false };
+}
+
 export function useGrownUpSessionId(): string | null {
   return useSyncExternalStore(
     (listener) => {

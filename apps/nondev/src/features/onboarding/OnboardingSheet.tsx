@@ -53,15 +53,26 @@ import { familyCopy } from "../family/copy";
 import { EMPTY_SETUP_DRAFT, setupReady, type FamilySetupDraft } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { familyAgeTermsNote } from "../family/assistantAllowance";
+import { DEFAULT_READING_LEVEL, type ReadingLevel } from "../family/children";
 import { FamilySetupForm } from "../family/FamilySetupForm";
-import { startGrownUpSession } from "../family/grownUpSession";
-import { readFamilyView, tryParentCode } from "../family/store";
+import {
+  grownUpSessionFor,
+  readGrownUpSessionId,
+  startGrownUpSession,
+} from "../family/grownUpSession";
+import { readFamilyView, tryParentCode, updateChild } from "../family/store";
 import { markPickedThisWindow } from "../family-limits/FamilyLimitsHost";
+import { rememberChild } from "../family-limits/idlePicker";
+import { chooseChild } from "../family-limits/store";
+import { showToast } from "../../ui/Toast";
 import { PictureStep } from "./PictureStep";
 import {
   canContinue,
   onboardingProgress,
   onboardingSteps,
+  projectsSummary,
+  READING_BANDS,
+  setupLanding,
   type Audience,
   type OnboardingStep,
 } from "./onboarding";
@@ -142,6 +153,11 @@ export function OnboardingSheet({
   const [audience, setAudience] = useState<Audience | null>(family.enabled ? "child" : null);
   const [draft, setDraft] = useState<FamilySetupDraft>(EMPTY_SETUP_DRAFT);
   const [step, setStep] = useState<Step>("who");
+  // Only the band (how simply Sam explains), never an age; saved once the profile is on.
+  const [readingLevel, setReadingLevel] = useState<ReadingLevel>(DEFAULT_READING_LEVEL);
+  // The steps are fixed when the sheet opens: turning the profile on half-way must not drop the
+  // code screen from the list, or the progress dots shrink under the parent.
+  const [familyAtOpen] = useState(family.enabled);
   const [finishing, setFinishing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [skipWarning, setSkipWarning] = useState(false);
@@ -150,7 +166,7 @@ export function OnboardingSheet({
   const availableProjects = useAtomValue(environmentProjects.projectsAtom).filter(
     (project) => project.environmentId === environmentId,
   );
-  const steps = onboardingSteps(audience, family.enabled);
+  const steps = onboardingSteps(audience, familyAtOpen);
   const index = Math.max(0, steps.indexOf(step));
   const progress = onboardingProgress(steps, step);
   const meta = STEP_META[step];
@@ -185,7 +201,18 @@ export function OnboardingSheet({
       // for it a second time, and this window is theirs until Done in the grown-up bar.
       const opened = await tryParentCode(draft.code, "settings", undefined, { quiet: true });
       const grownUp = readFamilyView().grownUps[0];
-      if (opened.ok && grownUp !== undefined) startGrownUpSession(grownUp.id);
+      const justSetUp = readFamilyView().children[0];
+      // The child just set up is who Done hands back to.
+      if (opened.ok && grownUp !== undefined)
+        startGrownUpSession(grownUp.id, justSetUp?.id ?? null);
+      if (opened.ok && justSetUp !== undefined && readingLevel !== DEFAULT_READING_LEVEL) {
+        const saved = await updateChild(justSetUp.id, { readingLevel });
+        if (!saved.ok) {
+          setProblem(
+            "The reading level didn't save. Change it any time in Settings → Family → Edit.",
+          );
+        }
+      }
       if (!hasChosenTheme()) setActiveTheme(FAMILY_THEME_ID);
       setStep("assistant");
       return;
@@ -222,7 +249,23 @@ export function OnboardingSheet({
         writeLastProject({ environmentId, projectId: existing.id as ProjectId });
       }
     }
+    if (childPath) await landOnChild();
     finish("done");
+  };
+  // The child just set up is the one using SKYCOT here; the grown-up note appears only while
+  // a grown-up session is really open (see setupLanding).
+  const landOnChild = async () => {
+    const view = readFamilyView();
+    const landing = setupLanding({
+      childId: view.children[0]?.id ?? null,
+      currentChildId: view.currentChildId,
+      grownUpSessionOpen: grownUpSessionFor(readGrownUpSessionId(), view, Date.now()) !== null,
+    });
+    if (landing.chooseChildId !== null) {
+      const chosen = await chooseChild(landing.chooseChildId);
+      if (chosen.ok) rememberChild(landing.chooseChildId, Date.now());
+    }
+    if (landing.note !== null) showToast(landing.note);
   };
 
   return (
@@ -245,18 +288,20 @@ export function OnboardingSheet({
       sober={step === "family"}
       actions={
         <>
-          <span
-            className="fm-steps"
-            role="img"
-            aria-label={`Step ${progress.index + 1} of ${progress.steps.length}`}
-          >
-            {progress.steps.map((entry, position) => (
-              <span
-                key={entry}
-                className={`fm-steps__dot${position === progress.index ? " fm-steps__dot--on" : ""}`}
-              />
-            ))}
-          </span>
+          {audience === null ? null : (
+            <span
+              className="fm-steps"
+              role="img"
+              aria-label={`Step ${progress.index + 1} of ${progress.steps.length}`}
+            >
+              {progress.steps.map((entry, position) => (
+                <span
+                  key={entry}
+                  className={`fm-steps__dot${position === progress.index ? " fm-steps__dot--on" : ""}`}
+                />
+              ))}
+            </span>
+          )}
           {step !== "done" ? (
             <Button
               variant="quiet"
@@ -271,7 +316,7 @@ export function OnboardingSheet({
               {skipWarning ? "Skip without protection" : "Skip for now"}
             </Button>
           ) : null}
-          {index > 0 && step !== "done" ? (
+          {index > 0 && step !== "done" && !(steps[index - 1] === "family" && family.enabled) ? (
             <Button onClick={() => setStep(steps[index - 1]!)}>Back</Button>
           ) : null}
           {step === "done" ? (
@@ -291,11 +336,17 @@ export function OnboardingSheet({
       }
     >
       {step === "who" ? (
-        <WhoStep audience={audience} onAudience={setAudience} familyEnabled={family.enabled} />
+        <WhoStep
+          audience={audience}
+          onAudience={setAudience}
+          familyEnabled={family.enabled}
+          readingLevel={readingLevel}
+          onReadingLevel={setReadingLevel}
+        />
       ) : null}
       {step === "family" ? (
         <>
-          <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus />
+          <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus foldHonesty />
           <p className="fm-help">
             Bedtime and daily time limits start off. Set them in Settings → Family before your child
             uses SKYCOT.
@@ -330,11 +381,7 @@ export function OnboardingSheet({
             : {})}
         />
       ) : null}
-      {childPath ? (
-        <p className="fm-help">
-          SKYCOT never sends your files, messages or projects. It only sends anonymous daily totals.
-        </p>
-      ) : null}
+      {childPath ? <p className="fm-help">{familyCopy.privacyLine}</p> : null}
     </Sheet>
   );
 }
@@ -343,10 +390,14 @@ function WhoStep({
   audience,
   onAudience,
   familyEnabled,
+  readingLevel,
+  onReadingLevel,
 }: {
   readonly audience: Audience | null;
   readonly onAudience: (audience: Audience) => void;
   readonly familyEnabled: boolean;
+  readonly readingLevel: ReadingLevel;
+  readonly onReadingLevel: (level: ReadingLevel) => void;
 }) {
   return (
     <div className="fm-onboarding">
@@ -367,6 +418,18 @@ function WhoStep({
           onClick={() => onAudience("child")}
         />
       </div>
+      {audience === "child" && !familyEnabled ? (
+        <div className="fm-help">
+          <p>How simply should Sam explain things?</p>
+          <SegmentedControl
+            label="How simply Sam explains"
+            options={READING_BANDS}
+            value={readingLevel}
+            onChange={onReadingLevel}
+            wrap
+          />
+        </div>
+      ) : null}
       {familyEnabled ? (
         <Banner tone="info">
           The {familyCopy.title} is on {audience === "child" ? "on this Mac" : ""}. To set{" "}
@@ -708,13 +771,10 @@ function DoneStep({
         />
         <ListRow
           leading={<StepBadge state={projects.length > 0 ? "done" : "warn"} />}
-          title={
-            projects.length === 0
-              ? "No project yet"
-              : projects.length === 1
-                ? `1 project: ${projects[0]!.title}`
-                : `${projects.length} projects`
-          }
+          title={projectsSummary(
+            projects.map((project) => project.title),
+            familyFor !== undefined,
+          )}
           subtitle={
             projects.length > 0
               ? "Pick it in the sidebar to start a conversation."

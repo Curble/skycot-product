@@ -1,6 +1,7 @@
 import type { ServerProvider } from "@t3tools/contracts";
 
 import type { Route } from "../../router";
+import type { ReadingLevel } from "../family/children";
 import type { OnboardingState } from "../settings/localPrefs";
 
 /**
@@ -89,4 +90,51 @@ export function canContinue(
   if (step === "who") return audience !== null;
   if (step === "family") return familyDraftReady;
   return true;
+}
+
+/**
+ * The one tap on "Who is this for?": how simply Sam explains. Only the band is kept (the
+ * engine's existing reading level); no age number is asked for, stored or sent to the AI.
+ */
+export const READING_BANDS: ReadonlyArray<{
+  readonly value: ReadingLevel;
+  readonly label: string;
+}> = [
+  { value: "little-makers", label: "Little makers (5–7)" },
+  { value: "makers", label: "Makers (8–10)" },
+  { value: "big-makers", label: "Big makers (11+)" },
+];
+
+export const GROWN_UP_UNTIL_DONE = "You're in grown-up mode until you press Done.";
+
+/**
+ * Where the end of child set-up leaves the window. The child just set up becomes the one using
+ * SKYCOT here (so the grown-up's Done hands over to their Let's make screen, not a picker). The
+ * note about grown-up mode is only true, and only shown, while a grown-up session is open;
+ * otherwise the window simply lands as the child.
+ */
+export function setupLanding(input: {
+  readonly childId: string | null;
+  readonly currentChildId: string | null;
+  readonly grownUpSessionOpen: boolean;
+}): { readonly chooseChildId: string | null; readonly note: string | null } {
+  return {
+    chooseChildId:
+      input.childId !== null && input.childId !== input.currentChildId ? input.childId : null,
+    note: input.grownUpSessionOpen ? GROWN_UP_UNTIL_DONE : null,
+  };
+}
+
+/**
+ * The "You're set" line about projects. A parent setting up for a child does not need the name
+ * of the folder the engine happened to start in ("1 project: project"); they need to know a
+ * place to make things exists. Someone setting up for themselves still sees the folder's name.
+ */
+export function projectsSummary(titles: ReadonlyArray<string>, forChild: boolean): string {
+  if (titles.length === 0) return "No project yet";
+  if (forChild)
+    return titles.length === 1
+      ? "A place to make things is ready"
+      : "Places to make things are ready";
+  return titles.length === 1 ? `1 project: ${titles[0]}` : `${titles.length} projects`;
 }

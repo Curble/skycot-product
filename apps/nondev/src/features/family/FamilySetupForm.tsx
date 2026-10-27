@@ -20,10 +20,13 @@ export function FamilySetupForm({
   draft,
   onDraft,
   autoFocus = false,
+  foldHonesty = false,
 }: {
   readonly draft: FamilySetupDraft;
   readonly onDraft: (next: FamilySetupDraft) => void;
   readonly autoFocus?: boolean;
+  /** First-run set-up: one sentence, with the full lists behind "What does SKYCOT do?". */
+  readonly foldHonesty?: boolean;
 }) {
   const strength = codeStrength(draft.code);
   const problem = setupProblem(draft);
@@ -78,7 +81,17 @@ export function FamilySetupForm({
         {showProblem ? <Banner tone="warning">{problem}</Banner> : null}
       </div>
       {/* The form always sits under a sheet's h2, so its sub-headings are h3. */}
-      <FamilyHonestyBox headingLevel={3} />
+      {foldHonesty ? (
+        <>
+          <p className="fm-help">{familyCopy.short}</p>
+          <details className="fm-help">
+            <summary>What does SKYCOT do?</summary>
+            <FamilyHonestyBox headingLevel={3} />
+          </details>
+        </>
+      ) : (
+        <FamilyHonestyBox headingLevel={3} />
+      )}
     </div>
   );
 }

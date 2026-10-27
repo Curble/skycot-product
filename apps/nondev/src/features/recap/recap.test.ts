@@ -5,7 +5,9 @@ import {
   grownUpLines,
   madeSummary,
   minutesPhrase,
+  nothingBuiltSentence,
   parseRecap,
+  recapHeadline,
   recapOpenOn,
   weekBars,
 } from "./recap";
@@ -157,5 +159,17 @@ describe("asking for the code before the recap loads", () => {
     expect(recapOpenOn({ recap: now + 60_000 }, now)).toBe(true);
     expect(recapOpenOn({ settings: now + 60_000 }, now)).toBe(true);
     expect(recapOpenOn({ advanced: now + 60_000 }, now)).toBe(true);
+  });
+});
+
+describe("a day with a plan but nothing built yet", () => {
+  const quiet = { range: "session" as const, made: [], messages: 0, asks: [] };
+  const planning = { ...quiet, messages: 1 };
+
+  it("counts asking Sam as activity instead of saying nothing happened", () => {
+    expect(recapHeadline(quiet, "Lily")).toBe("Lily didn't make anything today");
+    expect(recapHeadline(planning, "Lily")).toBe("Lily has been planning something today");
+    expect(nothingBuiltSentence(quiet, "Lily", "today")).toBe("No conversations today.");
+    expect(nothingBuiltSentence(planning, "Lily", "today")).toContain("asking Sam");
   });
 });

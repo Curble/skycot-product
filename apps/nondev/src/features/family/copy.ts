@@ -26,8 +26,13 @@ export const familyCopy = {
     "Lock the Mac, limit screen time or replace Screen Time. Other apps — Terminal, Finder, other browsers — are outside SKYCOT.",
     "Stop someone who can use this Mac's Terminal or Finder: deleting the profile file in SKYCOT's data folder turns it off.",
   ],
+  /** The one visible sentence in first-run set-up; the full lists sit behind "What does SKYCOT do?". */
+  short:
+    "A parent code keeps settings, publishing and the developer tools for grown-ups, and everything stays on this Mac.",
   honesty:
     "These are guardrails for a child who isn't trying to get round them, kept by SKYCOT's engine on this Mac — not a security product.",
+  /** The approved one-line privacy promise (Settings › Privacy says the same). */
+  privacyLine: `${PRODUCT_NAME} never sends your files, messages or projects. It only sends anonymous daily totals.`,
   storage: `${PRODUCT_NAME}'s engine keeps a scrambled version of the code on this Mac. Nobody can read it back, including ${PRODUCT_NAME}. If you forget it, use the reset steps below.`,
   /** While the engine answers a safe step itself, in place of its card. */
   checkingStep: "Checking this step…",

@@ -135,6 +135,19 @@ export const CHILD_DEVICE_CLOSED_METHODS: ReadonlySet<string> = new Set([
   "pullRequests.linkedThreads",
 ]);
 
+/**
+ * Grown-up furniture a chosen child must not read, on their own device or on the shared Mac
+ * (until a grown-up's code opens grown-up mode): the automations list and their webhook logs.
+ * The source-control discovery (which names the parent's GitHub account) stays open because a
+ * child's Publish step needs it after the code; the client keeps the "Who can help" page shut.
+ */
+export const CHILD_VIEW_CLOSED_METHODS: ReadonlySet<string> = new Set([
+  WS_METHODS.scheduledTasksList,
+  WS_METHODS.scheduledTasksSubscribe,
+  WS_METHODS.scheduledTasksListWebhookDeliveries,
+  WS_METHODS.scheduledTasksGetWebhookDelivery,
+]);
+
 /** Calls that only read a file, where a page pinned to the fridge stays open to every child. */
 const READ_ONLY_METHODS: ReadonlySet<string> = new Set([
   "projects.readFile",
@@ -1231,6 +1244,13 @@ const make = Effect.gen(function* () {
     }
     const view = yield* visibility.value.childViewFor(input.sessionId);
     if (view === null) return;
+    if (CHILD_VIEW_CLOSED_METHODS.has(input.method)) {
+      yield* Effect.logInfo("skycot-family.device-refused", {
+        method: input.method,
+        why: "child-view",
+      });
+      return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
+    }
     const allowed = yield* visibility.value.allows(
       view,
       SkycotFamilyVisibility.referencedBy(input.payload),

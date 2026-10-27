@@ -17,6 +17,7 @@ import {
   AuthTerminalOperateScope,
   type AuthSessionId,
   ORCHESTRATION_V2_WS_METHODS,
+  WS_METHODS,
   type OrchestrationV2ShellStreamItem,
   type ProjectId,
   type ThreadId,
@@ -444,6 +445,23 @@ it.layer(NodeServices.layer)("who is who", (it) => {
               ),
             ),
           );
+        }),
+      ),
+  );
+
+  it.effect(
+    "the automations list is grown-up furniture: closed to a chosen child, own device or Mac",
+    () =>
+      withWorld(({ gate }) =>
+        Effect.gen(function* () {
+          for (const method of [
+            WS_METHODS.scheduledTasksList,
+            WS_METHODS.scheduledTasksSubscribe,
+            WS_METHODS.scheduledTasksListWebhookDeliveries,
+          ]) {
+            assert.isTrue(yield* refused(gate.check(call("ava-ipad", method, {}))), method);
+            assert.isTrue(yield* refused(gate.check(call("mac-ava", method, {}))), method);
+          }
         }),
       ),
   );

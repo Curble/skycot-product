@@ -3,7 +3,10 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   canContinue,
   onboardingProgress,
+  GROWN_UP_UNTIL_DONE,
   onboardingSteps,
+  projectsSummary,
+  setupLanding,
   shouldShowOnboarding,
   welcomeEntry,
 } from "./onboarding";
@@ -75,5 +78,41 @@ describe("welcomeEntry", () => {
     expect(welcomeEntry(true, true)).toBe("ask");
     expect(welcomeEntry(true, false)).toBe("open");
     expect(welcomeEntry(false, true)).toBe("wait");
+  });
+});
+
+describe("setupLanding", () => {
+  it("hands the child just set up the window, and says grown-up mode only while it is open", () => {
+    expect(
+      setupLanding({ childId: "ava", currentChildId: null, grownUpSessionOpen: true }),
+    ).toEqual({ chooseChildId: "ava", note: GROWN_UP_UNTIL_DONE });
+  });
+
+  it("lands as the child, with no note, when no grown-up session is open", () => {
+    expect(
+      setupLanding({ childId: "ava", currentChildId: null, grownUpSessionOpen: false }),
+    ).toEqual({ chooseChildId: "ava", note: null });
+  });
+
+  it("does not choose a child who is already the one here, or when there is none", () => {
+    expect(
+      setupLanding({ childId: "ava", currentChildId: "ava", grownUpSessionOpen: false })
+        .chooseChildId,
+    ).toBeNull();
+    expect(
+      setupLanding({ childId: null, currentChildId: null, grownUpSessionOpen: true }).chooseChildId,
+    ).toBeNull();
+  });
+});
+
+describe("projectsSummary", () => {
+  it("never shows a parent the engine's folder name when setting up for a child", () => {
+    expect(projectsSummary(["project"], true)).toBe("A place to make things is ready");
+    expect(projectsSummary([], true)).toBe("No project yet");
+  });
+
+  it("keeps the folder's name for someone setting up for themselves", () => {
+    expect(projectsSummary(["site"], false)).toBe("1 project: site");
+    expect(projectsSummary(["a", "b"], false)).toBe("2 projects");
   });
 });

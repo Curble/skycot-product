@@ -228,10 +228,19 @@ export function grownUpLines(
 }
 
 /** The headline: "Here's what Ava made today" / "Ava made 2 things this week". */
-export function recapHeadline(report: Pick<RecapReport, "range" | "made">, name: string): string {
+export function recapHeadline(
+  report: Pick<RecapReport, "range" | "made" | "messages">,
+  name: string,
+): string {
   const things = report.made.length;
   if (report.range === "session") {
-    return things === 0 ? `${name} didn't make anything today` : `Here's what ${name} made today`;
+    // A plan waiting for "Build it" is activity: a child who only asked has not "made nothing".
+    if (things === 0) {
+      return report.messages > 0
+        ? `${name} has been planning something today`
+        : `${name} didn't make anything today`;
+    }
+    return `Here's what ${name} made today`;
   }
   return things === 0
     ? `A quiet week for ${name}`
@@ -282,4 +291,16 @@ export function recapOpenOn(
   return [openUntil.recap, openUntil.settings, openUntil.advanced].some(
     (until) => until !== undefined && until > now,
   );
+}
+
+/** Under "What <name> made" when nothing was built: asking Sam (a plan ready) still counts. */
+export function nothingBuiltSentence(
+  report: Pick<RecapReport, "made" | "messages" | "asks">,
+  name: string,
+  span: string,
+): string | null {
+  if (report.made.length > 0) return null;
+  return report.messages > 0 || report.asks.length > 0
+    ? `Nothing built yet ${span}, but ${name} has been asking Sam. A plan may be waiting for Build it.`
+    : `No conversations ${span}.`;
 }

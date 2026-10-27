@@ -7,6 +7,7 @@ import { useConnected } from "../../app/useConnection";
 import { HOME_HREF, navigate, threadHref } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
+import { familyCopy } from "../family/copy";
 import { useFamily } from "../family/FamilyProvider";
 import { useChildView } from "../../app/useChildView";
 import { askWhoStarted, useLimits } from "../family-limits/store";
@@ -188,6 +189,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               <FridgeHomeTile />
             </div>
           </div>
+          {childView ? <p className="fm-home__privacy fm-help">{familyCopy.privacyLine}</p> : null}
         </div>
       </div>
       <NewConversationComposer preferredProjectKey={shell.projectKey} seed={seed} />

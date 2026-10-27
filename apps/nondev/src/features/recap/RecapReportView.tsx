@@ -18,6 +18,7 @@ import {
   madeSummary,
   minutesPhrase,
   rangeLabel,
+  nothingBuiltSentence,
   recapHeadline,
   weekBars,
   type RecapReport,
@@ -147,7 +148,7 @@ export function RecapReportView({
           title={`What ${name} made`}
           subtitle={
             report.made.length === 0
-              ? `No conversations ${span}.`
+              ? (nothingBuiltSentence(report, name, span) ?? undefined)
               : compact && report.made.length > made.length
                 ? `The newest ${made.length} of ${report.made.length}.`
                 : undefined

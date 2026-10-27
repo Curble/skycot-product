@@ -34,7 +34,10 @@ import { Mascot } from "./features/brand/Mascot";
 import { PairRoute, StandalonePage } from "./routes/Pair";
 import { ThreadRoute } from "./routes/Thread";
 import { useColumns } from "./app/useColumns";
+import { useChildView } from "./app/useChildView";
+import { routeForViewer } from "./routeGuard";
 import { Button } from "./ui/Button";
+import { showToast } from "./ui/Toast";
 
 type GateState = Awaited<ReturnType<typeof resolveInitialServerAuthGateState>>;
 
@@ -163,9 +166,17 @@ export function App() {
                     />
                   );
                 case "automations":
-                  return <AutomationsScreen />;
+                  return (
+                    <GrownUpOnly route={route}>
+                      <AutomationsScreen />
+                    </GrownUpOnly>
+                  );
                 case "people":
-                  return <PeopleScreen />;
+                  return (
+                    <GrownUpOnly route={route}>
+                      <PeopleScreen />
+                    </GrownUpOnly>
+                  );
                 case "not-found":
                   return (
                     <StandalonePage>
@@ -193,6 +204,29 @@ export function App() {
       </WhoIsWho>
     </FamilyProvider>
   );
+}
+
+/**
+ * A child who types a grown-up page's address lands Home with a kind note; the page's own
+ * component never mounts for them, so nothing behind it is asked for.
+ */
+function GrownUpOnly({
+  route,
+  children,
+}: {
+  readonly route: Route;
+  readonly children: React.ReactNode;
+}) {
+  const childView = useChildView();
+  // Until the engine has said whether the Family profile is on, the page stays unmounted.
+  const known = useFamily().profile.source === "engine";
+  const verdict = routeForViewer(route, childView);
+  useEffect(() => {
+    if (verdict.allowed) return;
+    showToast(verdict.note);
+    navigate(HOME_HREF);
+  }, [verdict.allowed]);
+  return known && verdict.allowed ? <>{children}</> : null;
 }
 
 /**

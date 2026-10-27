@@ -193,9 +193,15 @@ export function AppSidebar({
     };
   }, [insideMake, railOpen]);
 
-  if (childView && insideMake && !railOpen) {
-    return (
-      <nav className="fm-child-rail" aria-label="Child navigation">
+  // The rail keeps its place in the page grid while the full sidebar floats over it: the overlay
+  // is out of the grid's flow, so without the rail the conversation slid into its narrow column.
+  const rail =
+    childView && insideMake ? (
+      <nav
+        className="fm-child-rail"
+        aria-label="Child navigation"
+        {...(railOpen ? { inert: true, "aria-hidden": true } : {})}
+      >
         <button
           ref={railToggle}
           type="button"
@@ -275,301 +281,309 @@ export function AppSidebar({
           </span>
         ) : null}
       </nav>
-    );
-  }
+    ) : null;
+  if (rail !== null && !railOpen) return rail;
 
   return (
-    <nav
-      id={childView && insideMake ? "fm-child-sidebar" : undefined}
-      ref={railPanel}
-      className={`fm-sidebar${childView && insideMake ? " fm-sidebar--child-overlay" : ""}`}
-      aria-label="Sidebar"
-    >
-      {childView && insideMake ? (
-        <button
-          className="fm-child-rail__close"
-          type="button"
-          aria-label="Close navigation"
-          aria-expanded={true}
-          aria-controls="fm-child-sidebar"
-          onClick={() => setRailOpen(false)}
-        >
-          Close navigation
-        </button>
-      ) : null}
-      <div className="fm-sidebar__scroll">
-        <SidebarSection>
-          {childView ? (
-            <ChildTabs
-              route={route}
-              makes={childMakes.length}
-              projects
-              projectsOpen={childProjectsOpen}
-              onToggleProjects={() => setChildProjectsOpen((value) => !value)}
-              onGo={(href) => select(() => navigate(href))}
-            />
-          ) : (
-            <>
-              <SidebarItem
-                icon={MessageCircle}
-                label="All conversations"
-                count={rows.length}
-                selected={conversationRoute && shell.filter === "all" && shell.projectKey === null}
-                onClick={() => showList(() => shell.setFilter("all"))}
-              />
-              <SidebarItem
-                icon={CircleAlert}
-                label="Waiting for you"
-                count={waiting}
-                selected={conversationRoute && shell.filter === "waiting"}
-                onClick={() => showList(() => shell.setFilter("waiting"))}
-              />
-              <SidebarItem
-                icon={CheckCircle2}
-                label="Ready to look at"
-                count={ready}
-                selected={conversationRoute && shell.filter === "ready"}
-                onClick={() => showList(() => shell.setFilter("ready"))}
-              />
-              <SidebarItem
-                icon={Archive}
-                label="Old conversations"
-                selected={conversationRoute && shell.filter === "old"}
-                onClick={() => showList(() => shell.setFilter("old"))}
-              />
-            </>
-          )}
-          {childView ? null : (
-            <>
-              <SidebarItem
-                glyph={<FridgeIcon size={15} />}
-                label="The fridge"
-                selected={route.name === "fridge"}
-                href={FRIDGE_HREF}
-              />
-              <SidebarItem
-                glyph={<Sticker id="first-creation" size={18} tilted={false} />}
-                label="My stickers"
-                selected={route.name === "stickers" || route.name === "certificate"}
-                href={STICKERS_HREF}
-              />
-            </>
-          )}
-        </SidebarSection>
-
-        {childView && !childProjectsOpen ? null : (
-          <SidebarSection title="Projects">
-            {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
-            {[...visibleProjects]
-              .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
-              .map((project) => {
-                const key = projectKeyOf({
-                  environmentId: project.environmentId,
-                  projectId: project.id,
-                });
-                return (
-                  <SidebarItem
-                    key={key}
-                    glyph={<ProjectAvatar project={project} size="sm" />}
-                    label={project.title}
-                    count={countsByProject.get(key) ?? 0}
-                    attention={attentionByProject.has(key)}
-                    selected={conversationRoute && shell.projectKey === key}
-                    onClick={() => showList(() => shell.setProjectKey(key))}
-                    // Questions is SKYCOT's own space: nothing to rename or re-icon.
-                    {...(project.isScratch === true
-                      ? {}
-                      : {
-                          menuOpen: projectMenu?.project === project,
-                          onContextMenu: (event: MouseEvent) => {
-                            event.preventDefault();
-                            setProjectMenu({ project, at: { x: event.clientX, y: event.clientY } });
-                          },
-                          trailing: (
-                            <ProjectMenuButton
-                              project={project}
-                              expanded={projectMenu?.project === project}
-                              onOpen={(at) => setProjectMenu({ project, at })}
-                            />
-                          ),
-                        })}
-                  />
-                );
-              })}
-            {childView ? (
-              <SidebarItem
-                icon={FolderPlus}
-                label={creatingProject ? "Making project…" : "New project"}
-                muted={creatingProject}
-                onClick={() => {
-                  if (creatingProject || !primaryEnvironmentId) return;
-                  setCreatingProject(true);
-                  const name = nextChildProjectName(
-                    visibleProjects.map((project) => project.title),
-                  );
-                  void createNewProject({
-                    environmentId: primaryEnvironmentId,
-                    input: { name },
-                  }).then((outcome) => {
-                    setCreatingProject(false);
-                    if (outcome._tag === "Failure") {
-                      const reason = squashAtomCommandFailure(outcome);
-                      showToast(projectCreationProblem(String(reason)));
-                      return;
-                    }
-                    showList(() =>
-                      shell.setProjectKey(
-                        projectKeyOf({
-                          environmentId: primaryEnvironmentId,
-                          projectId: outcome.value.projectId,
-                        }),
-                      ),
-                    );
-                  });
-                }}
-              />
-            ) : null}
-            {!childView ? (
-              <SidebarItem
-                icon={FolderPlus}
-                label="Open a folder…"
-                muted
-                onClick={() => {
-                  if (!primaryEnvironmentId) return;
-                  const environmentId = primaryEnvironmentId;
-                  sheets.openFolder({
-                    environmentId,
-                    onOpened: (projectId) =>
-                      showList(() =>
-                        shell.setProjectKey(projectKeyOf({ environmentId, projectId })),
-                      ),
-                  });
-                }}
-              />
-            ) : null}
-          </SidebarSection>
-        )}
-
-        {crew.named && !childView ? (
-          <SidebarSection title="Your crew">
-            <li className="fm-crew-roster">
-              <CrewAvatar role="builder" size="md" />
-              <span className="fm-crew-roster__text">
-                <b>{crew.builder.name}</b>
-                <small>builds things</small>
-              </span>
-            </li>
-            <li className="fm-crew-roster">
-              <CrewAvatar role="checker" size="md" />
-              <span className="fm-crew-roster__text">
-                <b>{crew.checker.name}</b>
-                <small>checks before anything goes live</small>
-              </span>
-            </li>
-          </SidebarSection>
-        ) : null}
-
-        {!childView ? (
-          <SidebarSection title="Automations">
-            <SidebarItem
-              icon={Bell}
-              label="Automations"
-              selected={route.name === "automations"}
-              href={AUTOMATIONS_HREF}
-            />
-          </SidebarSection>
-        ) : null}
-
-        {!childView ? (
-          <SidebarSection title="People">
-            <SidebarItem
-              icon={User}
-              label="Who can help"
-              selected={route.name === "people"}
-              href={PEOPLE_HREF}
-            />
-          </SidebarSection>
-        ) : null}
-      </div>
-
-      <ContextMenu
-        at={projectMenu?.at ?? null}
-        onClose={closeProjectMenu}
-        label={projectMenu?.project.title ?? "Project"}
+    <>
+      {rail}
+      <nav
+        id={childView && insideMake ? "fm-child-sidebar" : undefined}
+        ref={railPanel}
+        className={`fm-sidebar${childView && insideMake ? " fm-sidebar--child-overlay" : ""}`}
+        aria-label="Sidebar"
       >
-        {(close) =>
-          projectMenu ? (
-            <ProjectMenuItems
-              close={close}
-              onEdit={(focus) => sheets.editProject(projectMenu.project, focus)}
-              {...(childView
-                ? {
-                    onPutAway: () => {
-                      const { project } = projectMenu;
-                      const key = projectKeyOf({
-                        environmentId: project.environmentId,
-                        projectId: project.id,
-                      });
-                      void putProjectAway(project).then((done) => {
-                        // Looking at the project that just left the list: back to the first page.
-                        if (done && shell.projectKey === key) {
-                          shell.setProjectKey(null);
-                          navigate(HOME_HREF);
-                        }
-                      });
-                    },
+        {childView && insideMake ? (
+          <button
+            className="fm-child-rail__close"
+            type="button"
+            aria-label="Close navigation"
+            aria-expanded={true}
+            aria-controls="fm-child-sidebar"
+            onClick={() => setRailOpen(false)}
+          >
+            Close navigation
+          </button>
+        ) : null}
+        <div className="fm-sidebar__scroll">
+          <SidebarSection>
+            {childView ? (
+              <ChildTabs
+                route={route}
+                makes={childMakes.length}
+                projects
+                projectsOpen={childProjectsOpen}
+                onToggleProjects={() => setChildProjectsOpen((value) => !value)}
+                onGo={(href) => select(() => navigate(href))}
+              />
+            ) : (
+              <>
+                <SidebarItem
+                  icon={MessageCircle}
+                  label="All conversations"
+                  count={rows.length}
+                  selected={
+                    conversationRoute && shell.filter === "all" && shell.projectKey === null
                   }
-                : {})}
-            />
-          ) : null
-        }
-      </ContextMenu>
+                  onClick={() => showList(() => shell.setFilter("all"))}
+                />
+                <SidebarItem
+                  icon={CircleAlert}
+                  label="Waiting for you"
+                  count={waiting}
+                  selected={conversationRoute && shell.filter === "waiting"}
+                  onClick={() => showList(() => shell.setFilter("waiting"))}
+                />
+                <SidebarItem
+                  icon={CheckCircle2}
+                  label="Ready to look at"
+                  count={ready}
+                  selected={conversationRoute && shell.filter === "ready"}
+                  onClick={() => showList(() => shell.setFilter("ready"))}
+                />
+                <SidebarItem
+                  icon={Archive}
+                  label="Old conversations"
+                  selected={conversationRoute && shell.filter === "old"}
+                  onClick={() => showList(() => shell.setFilter("old"))}
+                />
+              </>
+            )}
+            {childView ? null : (
+              <>
+                <SidebarItem
+                  glyph={<FridgeIcon size={15} />}
+                  label="The fridge"
+                  selected={route.name === "fridge"}
+                  href={FRIDGE_HREF}
+                />
+                <SidebarItem
+                  glyph={<Sticker id="first-creation" size={18} tilted={false} />}
+                  label="My stickers"
+                  selected={route.name === "stickers" || route.name === "certificate"}
+                  href={STICKERS_HREF}
+                />
+              </>
+            )}
+          </SidebarSection>
 
-      <footer className="fm-sidebar__footer">
-        {family.enabled ? (
-          <ProfileMenu
-            childView={childView}
-            child={child}
-            grownUp={grownUp}
-            onSwitch={() => select(openChildPicker)}
-            onChildSettings={sheets.openChildSettings}
-            onSettings={() => select(() => navigate(SETTINGS_HREF))}
-            onHandBack={() => {
-              void lockFamilyGrants();
-              endGrownUpSession();
-              openChildPicker();
-              navigate(HOME_HREF);
-            }}
-          />
-        ) : (
-          <div className="fm-sidebar__footer-row">
-            <SidebarIdentity
-              familyOn={family.enabled}
+          {childView && !childProjectsOpen ? null : (
+            <SidebarSection title="Projects">
+              {/* Questions (Just ask) first: it is SKYCOT's own space, not one of the person's folders. */}
+              {[...visibleProjects]
+                .sort((a, b) => Number(b.isScratch === true) - Number(a.isScratch === true))
+                .map((project) => {
+                  const key = projectKeyOf({
+                    environmentId: project.environmentId,
+                    projectId: project.id,
+                  });
+                  return (
+                    <SidebarItem
+                      key={key}
+                      glyph={<ProjectAvatar project={project} size="sm" />}
+                      label={project.title}
+                      count={countsByProject.get(key) ?? 0}
+                      attention={attentionByProject.has(key)}
+                      selected={conversationRoute && shell.projectKey === key}
+                      onClick={() => showList(() => shell.setProjectKey(key))}
+                      // Questions is SKYCOT's own space: nothing to rename or re-icon.
+                      {...(project.isScratch === true
+                        ? {}
+                        : {
+                            menuOpen: projectMenu?.project === project,
+                            onContextMenu: (event: MouseEvent) => {
+                              event.preventDefault();
+                              setProjectMenu({
+                                project,
+                                at: { x: event.clientX, y: event.clientY },
+                              });
+                            },
+                            trailing: (
+                              <ProjectMenuButton
+                                project={project}
+                                expanded={projectMenu?.project === project}
+                                onOpen={(at) => setProjectMenu({ project, at })}
+                              />
+                            ),
+                          })}
+                    />
+                  );
+                })}
+              {childView ? (
+                <SidebarItem
+                  icon={FolderPlus}
+                  label={creatingProject ? "Making project…" : "New project"}
+                  muted={creatingProject}
+                  onClick={() => {
+                    if (creatingProject || !primaryEnvironmentId) return;
+                    setCreatingProject(true);
+                    const name = nextChildProjectName(
+                      visibleProjects.map((project) => project.title),
+                    );
+                    void createNewProject({
+                      environmentId: primaryEnvironmentId,
+                      input: { name },
+                    }).then((outcome) => {
+                      setCreatingProject(false);
+                      if (outcome._tag === "Failure") {
+                        const reason = squashAtomCommandFailure(outcome);
+                        showToast(projectCreationProblem(String(reason)));
+                        return;
+                      }
+                      showList(() =>
+                        shell.setProjectKey(
+                          projectKeyOf({
+                            environmentId: primaryEnvironmentId,
+                            projectId: outcome.value.projectId,
+                          }),
+                        ),
+                      );
+                    });
+                  }}
+                />
+              ) : null}
+              {!childView ? (
+                <SidebarItem
+                  icon={FolderPlus}
+                  label="Open a folder…"
+                  muted
+                  onClick={() => {
+                    if (!primaryEnvironmentId) return;
+                    const environmentId = primaryEnvironmentId;
+                    sheets.openFolder({
+                      environmentId,
+                      onOpened: (projectId) =>
+                        showList(() =>
+                          shell.setProjectKey(projectKeyOf({ environmentId, projectId })),
+                        ),
+                    });
+                  }}
+                />
+              ) : null}
+            </SidebarSection>
+          )}
+
+          {crew.named && !childView ? (
+            <SidebarSection title="Your crew">
+              <li className="fm-crew-roster">
+                <CrewAvatar role="builder" size="md" />
+                <span className="fm-crew-roster__text">
+                  <b>{crew.builder.name}</b>
+                  <small>builds things</small>
+                </span>
+              </li>
+              <li className="fm-crew-roster">
+                <CrewAvatar role="checker" size="md" />
+                <span className="fm-crew-roster__text">
+                  <b>{crew.checker.name}</b>
+                  <small>checks before anything goes live</small>
+                </span>
+              </li>
+            </SidebarSection>
+          ) : null}
+
+          {!childView ? (
+            <SidebarSection title="Automations">
+              <SidebarItem
+                icon={Bell}
+                label="Automations"
+                selected={route.name === "automations"}
+                href={AUTOMATIONS_HREF}
+              />
+            </SidebarSection>
+          ) : null}
+
+          {!childView ? (
+            <SidebarSection title="People">
+              <SidebarItem
+                icon={User}
+                label="Who can help"
+                selected={route.name === "people"}
+                href={PEOPLE_HREF}
+              />
+            </SidebarSection>
+          ) : null}
+        </div>
+
+        <ContextMenu
+          at={projectMenu?.at ?? null}
+          onClose={closeProjectMenu}
+          label={projectMenu?.project.title ?? "Project"}
+        >
+          {(close) =>
+            projectMenu ? (
+              <ProjectMenuItems
+                close={close}
+                onEdit={(focus) => sheets.editProject(projectMenu.project, focus)}
+                {...(childView
+                  ? {
+                      onPutAway: () => {
+                        const { project } = projectMenu;
+                        const key = projectKeyOf({
+                          environmentId: project.environmentId,
+                          projectId: project.id,
+                        });
+                        void putProjectAway(project).then((done) => {
+                          // Looking at the project that just left the list: back to the first page.
+                          if (done && shell.projectKey === key) {
+                            shell.setProjectKey(null);
+                            navigate(HOME_HREF);
+                          }
+                        });
+                      },
+                    }
+                  : {})}
+              />
+            ) : null
+          }
+        </ContextMenu>
+
+        <footer className="fm-sidebar__footer">
+          {family.enabled ? (
+            <ProfileMenu
               childView={childView}
               child={child}
               grownUp={grownUp}
-              onSwitch={openChildPicker}
+              onSwitch={() => select(openChildPicker)}
+              onChildSettings={sheets.openChildSettings}
+              onSettings={() => select(() => navigate(SETTINGS_HREF))}
+              onHandBack={() => {
+                void lockFamilyGrants();
+                endGrownUpSession();
+                openChildPicker();
+                navigate(HOME_HREF);
+              }}
             />
-            <IconButton
-              icon={Settings}
-              label="Settings"
-              size="sm"
-              aria-current={route.name === "settings" ? "page" : undefined}
-              onClick={() => select(() => navigate(SETTINGS_HREF))}
-            />
-          </div>
-        )}
-        {/* A child's view keeps the developer tools out of reach; a grown-up in grown-up mode gets the button (it still asks for the code). */}
-        {family.enabled && childView ? null : (
-          <div className="fm-sidebar__footer-row">
-            {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
-            <Button size="sm" variant="quiet" icon={Wrench} block onClick={sheets.openAdvanced}>
-              Open {ADVANCED_MODE_LABEL}…
-            </Button>
-          </div>
-        )}
-      </footer>
-    </nav>
+          ) : (
+            <div className="fm-sidebar__footer-row">
+              <SidebarIdentity
+                familyOn={family.enabled}
+                childView={childView}
+                child={child}
+                grownUp={grownUp}
+                onSwitch={openChildPicker}
+              />
+              <IconButton
+                icon={Settings}
+                label="Settings"
+                size="sm"
+                aria-current={route.name === "settings" ? "page" : undefined}
+                onClick={() => select(() => navigate(SETTINGS_HREF))}
+              />
+            </div>
+          )}
+          {/* A child's view keeps the developer tools out of reach; a grown-up in grown-up mode gets the button (it still asks for the code). */}
+          {family.enabled && childView ? null : (
+            <div className="fm-sidebar__footer-row">
+              {/* A button, not a switch: nothing stays "on"; it opens the confirm sheet. */}
+              <Button size="sm" variant="quiet" icon={Wrench} block onClick={sheets.openAdvanced}>
+                Open {ADVANCED_MODE_LABEL}…
+              </Button>
+            </div>
+          )}
+        </footer>
+      </nav>
+    </>
   );
 }
 
