@@ -175,3 +175,16 @@ describe("fridge picture capture", () => {
     expect(capturePicture).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("loadedPageMatches", () => {
+  it("treats the folder root as index.html and otherwise compares file names", async () => {
+    const { loadedPageMatches } = await import("./capture");
+    expect(loadedPageMatches("http://127.0.0.1:4123/", "index.html")).toBe(true);
+    expect(loadedPageMatches("http://127.0.0.1:4123/index.html", "index.html")).toBe(true);
+    expect(loadedPageMatches("http://127.0.0.1:4123/pages/my-game.html", "my-game.html")).toBe(
+      true,
+    );
+    expect(loadedPageMatches("http://127.0.0.1:4123/other.html", "index.html")).toBe(false);
+    expect(loadedPageMatches("not a url", "index.html")).toBe(false);
+  });
+});

@@ -97,3 +97,21 @@ export async function captureMagnetPicture(input: {
     return false;
   }
 }
+
+/**
+ * Whether the address the Preview pane loaded is the page that was asked for. The pane's own
+ * server answers a folder's `index.html` at the folder itself ("/"), so an address with no file
+ * name counts as `index.html`; otherwise the file names must match.
+ */
+export function loadedPageMatches(url: string, asked: string): boolean {
+  let loadedPath: string;
+  try {
+    loadedPath = decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+  const base = (path: string) => path.split("/").at(-1) ?? "";
+  const loaded = base(loadedPath) || "index.html";
+  const wanted = base(asked) || "index.html";
+  return loaded === wanted;
+}

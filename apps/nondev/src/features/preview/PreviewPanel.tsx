@@ -29,7 +29,7 @@ import { randomUUID } from "~/lib/utils";
 import { useCrew } from "../../themes/useCrew";
 import { useChildView } from "../../app/useChildView";
 import { useConversationShell } from "../../state/oldConversations";
-import { PANE_CAPTURE_DELAY_MS, captureMagnetPicture } from "../fridge/capture";
+import { PANE_CAPTURE_DELAY_MS, captureMagnetPicture, loadedPageMatches } from "../fridge/capture";
 import { previewPageUrl } from "../starters/preview";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
@@ -346,14 +346,7 @@ function PreviewPanelBody({
   const onLoaded = (tabId: string, url: string) => {
     const asked = pageRequest?.path;
     if (asked === undefined || !isLocalPreviewAddress(url)) return;
-    const base = (path: string) => path.split("/").at(-1) ?? "";
-    let loadedPath = "";
-    try {
-      loadedPath = decodeURIComponent(new URL(url).pathname);
-    } catch {
-      return;
-    }
-    if (base(loadedPath) !== base(asked)) return;
+    if (!loadedPageMatches(url, asked)) return;
     window.clearTimeout(captureTimer.current);
     captureTimer.current = window.setTimeout(() => {
       void captureMagnetPicture({ source: { kind: "tab", tabId }, threadId, page: asked });
