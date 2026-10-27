@@ -698,6 +698,7 @@ function ComposerField({
         onSend={() => void sendCleared()}
         canSend={ready && trimmed.length > 0 && !sending}
         disabled={!ready || sending}
+        {...(!ready ? { whyNotSend: placeholder } : sending ? { whyNotSend: "Sending…" } : {})}
         placeholder={placeholder}
         label="New conversation"
         starterBlanks={childView && seed !== null && stillFromStarter(seed.text, text)}

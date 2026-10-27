@@ -23,7 +23,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-async function show(props: { cardHash?: string }) {
+async function show(props: { cardHash?: string; calm?: boolean }) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div");
   document.body.append(host);
@@ -35,6 +35,7 @@ async function show(props: { cardHash?: string }) {
         page="index.html"
         version="v1"
         title="My game"
+        {...(props.calm ? { calm: true } : {})}
         {...(props.cardHash === undefined ? {} : { cardHash: props.cardHash })}
       />,
     ),
@@ -90,6 +91,12 @@ describe("fridge picture cards", () => {
     expect(callEngine).not.toHaveBeenCalled();
     expect(host.querySelector("img")).toBeNull();
     expect(host.textContent).toContain("Getting it ready…");
+  });
+
+  it("shows the kind's icon, never the words, while not ready when calm (the recap)", async () => {
+    const host = await show({ calm: true });
+    expect(host.textContent).not.toContain("Getting it ready");
+    expect(host.querySelector("[data-kind-icon]")).not.toBeNull();
   });
 
   it("swaps 'Getting it ready…' for the kind's icon after five seconds", async () => {

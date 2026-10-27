@@ -121,6 +121,7 @@ export function RecapReportView({
                     page={proudPage}
                     version={proud.at}
                     title={proud.title}
+                    calm
                   />
                 </button>
               ) : null}

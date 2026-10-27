@@ -6,6 +6,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { Skeleton } from "../ui/skeleton";
+import { APP_BASE_NAME } from "~/branding"; // nondev-seam: brand-advanced-mobile-clients-page
 import {
   mobileClientNotificationDetail,
   mobileClientPlatformLabel,
@@ -94,8 +95,8 @@ function EmptyMobileClients() {
       <EmptyHeader>
         <EmptyTitle>No mobile clients</EmptyTitle>
         <EmptyDescription>
-          Install T3 Code on your phone and sign in to T3 Connect to get push notifications and Live
-          Activities.
+          Install {APP_BASE_NAME} on your phone and sign in to T3 Connect to get push notifications
+          and Live Activities.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

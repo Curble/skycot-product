@@ -32,6 +32,7 @@ export function MagnetThumb({
   title,
   thumbnailSvg,
   cardHash,
+  calm = false,
 }: {
   readonly threadId: string;
   readonly page: string;
@@ -41,6 +42,8 @@ export function MagnetThumb({
   readonly thumbnailSvg?: string;
   /** The engine's picture card for this page; a different hash is a different card. */
   readonly cardHash?: string;
+  /** While the page is not ready, show the kind's icon rather than the words (the recap). */
+  readonly calm?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
@@ -137,7 +140,7 @@ export function MagnetThumb({
         <span className="fm-magnet__placeholder">
           {current?.kind === "gone" ? (
             "This one isn't here now"
-          ) : slowKey === key ? (
+          ) : slowKey === key || calm ? (
             <KindIcon size={32} aria-hidden data-kind-icon="" />
           ) : (
             "Getting it ready…"

@@ -163,3 +163,13 @@ describe("Build Journey notebook", () => {
     await page.unmount();
   });
 });
+
+describe("elapsedLabel", () => {
+  it("spells units out so a child never sees a doubled s", async () => {
+    const { elapsedLabel } = await import("./BuildJourney");
+    expect(elapsedLabel(5_000)).toBe("5 seconds");
+    expect(elapsedLabel(1_000)).toBe("1 second");
+    expect(elapsedLabel(80_000)).toBe("1 minute 20 seconds");
+    expect(elapsedLabel(300_000)).toBe("5 minutes");
+  });
+});

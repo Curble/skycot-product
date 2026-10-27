@@ -1,7 +1,7 @@
 import type { OrchestrationV2ThreadProjection } from "@t3tools/contracts";
 import { useEffect, useState } from "react";
 
-import { estimateCopy } from "../../plain/estimate";
+import { elapsedWords, estimateCopy } from "../../plain/estimate";
 import { estimateForRun } from "../conversation/runEstimate";
 import { ReadAloudButton } from "../voice/ReadAloud";
 import { useFamily } from "../family/FamilyProvider";
@@ -34,12 +34,12 @@ function lookBackFor(step: JourneyStep, facts: ReadonlyArray<string>): string {
   return "Sam worked through this step.";
 }
 
-function elapsedLabel(milliseconds: number): string {
+export function elapsedLabel(milliseconds: number): string {
   const seconds = Math.floor(milliseconds / 1000);
-  if (seconds < 60) return `${seconds} s`;
-  const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
-  return minutes === 1 && remainder > 0 ? `1 min ${remainder} s` : `${minutes} min`;
+  return seconds >= 60 && seconds < 120 && remainder > 0
+    ? `1 minute ${remainder} ${remainder === 1 ? "second" : "seconds"}`
+    : elapsedWords(milliseconds);
 }
 
 export function BuildJourney({

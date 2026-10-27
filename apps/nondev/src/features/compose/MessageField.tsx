@@ -37,6 +37,7 @@ export function MessageField({
   label = "Message",
   inputRef,
   starterBlanks = false,
+  whyNotSend,
 }: {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -54,6 +55,8 @@ export function MessageField({
   readonly label?: string;
   readonly inputRef?: Ref<HTMLTextAreaElement>;
   readonly starterBlanks?: boolean;
+  /** Why Send is off while it is (shown as its tooltip); a missing message is said here too. */
+  readonly whyNotSend?: string;
 }) {
   const id = useId();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -189,6 +192,12 @@ export function MessageField({
             type="button"
             className="fm-composer__send"
             aria-label="Send"
+            title={
+              disabled || !canSend
+                ? (whyNotSend ??
+                  (value.trim().length === 0 ? "Write a message to send it" : "Not ready yet"))
+                : "Send (Return)"
+            }
             disabled={disabled || !canSend}
             onClick={send}
           >

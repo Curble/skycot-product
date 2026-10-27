@@ -130,3 +130,34 @@ describe("starter blanks in the message box", () => {
     expect(sent).toHaveBeenCalledWith("Make a card for [nickname] who is [age].");
   });
 });
+
+describe("Send button affordance", () => {
+  it("says why Send is off, and that Return also sends when it is on", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const render = (props: { canSend: boolean; why?: string; value: string }) =>
+      act(async () =>
+        root.render(
+          <MessageField
+            value={props.value}
+            onChange={() => {}}
+            onSend={() => {}}
+            placeholder="Your idea"
+            canSend={props.canSend}
+            {...(props.why === undefined ? {} : { whyNotSend: props.why })}
+          />,
+        ),
+      );
+    const button = () => host.querySelector<HTMLButtonElement>("[aria-label='Send']")!;
+    await render({ canSend: false, value: "" });
+    expect(button().disabled).toBe(true);
+    expect(button().title).toBe("Write a message to send it");
+    await render({ canSend: false, value: "hi", why: "Waiting for your Mac to reconnect…" });
+    expect(button().title).toBe("Waiting for your Mac to reconnect…");
+    await render({ canSend: true, value: "hi" });
+    expect(button().disabled).toBe(false);
+    expect(button().title).toBe("Send (Return)");
+  });
+});

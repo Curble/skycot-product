@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import { elapsedCopy, estimateBuildTime, estimateCopy, type BuildSample } from "./estimate";
+import {
+  elapsedCopy,
+  elapsedWords,
+  estimateBuildTime,
+  estimateCopy,
+  type BuildSample,
+} from "./estimate";
 
 describe("build time estimates", () => {
   it("uses a single minute value when both ends round to it", () => {
@@ -56,6 +62,16 @@ describe("build time estimates", () => {
   });
 });
 
+describe("elapsedWords", () => {
+  it("spells the unit out and never doubles an s", () => {
+    expect(elapsedWords(1_000)).toBe("1 second");
+    expect(elapsedWords(5_400)).toBe("5 seconds");
+    expect(elapsedWords(60_000)).toBe("1 minute");
+    expect(elapsedWords(300_000)).toBe("5 minutes");
+    expect(elapsedCopy(5_000, "plan", null, "x")).toContain("5 seconds so far");
+  });
+});
+
 describe("taking longer than usual", () => {
   it("waits until a build is well past its usual time, and skips an empty step", () => {
     const plan = { low: 4_000, high: 6_000 };
@@ -64,10 +80,10 @@ describe("taking longer than usual", () => {
     const build = { low: 60_000, high: 180_000 };
     expect(elapsedCopy(200_000, "build", build, "Testing your game")).not.toContain("longer");
     expect(elapsedCopy(300_000, "build", build, "Testing your game")).toBe(
-      "Taking a bit longer than usual · 5 min so far · now: Testing your game",
+      "Taking a bit longer than usual · 5 minutes so far · now: Testing your game",
     );
     expect(elapsedCopy(300_000, "build", build, "Working on it…")).toBe(
-      "Taking a bit longer than usual · 5 min so far",
+      "Taking a bit longer than usual · 5 minutes so far",
     );
   });
 });

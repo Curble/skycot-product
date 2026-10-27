@@ -50,16 +50,23 @@ export function estimateCopy(
     : `Usually about ${low}–${high} minutes.`;
 }
 
+/** "1 second", "5 seconds", "1 minute", "5 minutes": whole words, never a bare unit letter. */
+export function elapsedWords(elapsedMs: number): string {
+  if (elapsedMs < 60_000) {
+    const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+    return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+  }
+  const minutes = Math.floor(elapsedMs / 60_000);
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
 export function elapsedCopy(
   elapsedMs: number,
   phase: BuildPhase,
   range: { readonly low: number; readonly high: number } | null,
   now: string,
 ): string {
-  const elapsed =
-    elapsedMs < 60_000
-      ? `${Math.max(1, Math.floor(elapsedMs / 1000))} s`
-      : `${Math.floor(elapsedMs / 60_000)} min`;
+  const elapsed = elapsedWords(elapsedMs);
   // Only well past the usual time: half as long again, and at least 30 s over (a 6 s plan that
   // takes 7 s is not "longer than usual" to a child).
   const beyond = range !== null && elapsedMs > Math.max(range.high * 1.5, range.high + 30_000);

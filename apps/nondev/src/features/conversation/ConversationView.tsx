@@ -66,6 +66,8 @@ import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
 import { requestMode, usePlanFirst } from "../compose/planFirst";
 import { useEnsureInteractionMode } from "../compose/turnMode";
+import { useMadePage } from "../review/madePage";
+import { useOpenIt } from "../starters/PreviewSheet";
 import { firstBlank, stillFromStarter } from "../starters/starters";
 import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
 import { useStartNote } from "../compose/startNotes";
@@ -408,7 +410,13 @@ export function ConversationView({
               runId={shell?.runtime?.activeRunId ?? null}
             />
           ) : null}
-          {project && !archived ? <PreviewButton threadId={threadId} /> : null}
+          {project && !archived ? (
+            <PreviewButton
+              environmentId={environmentId}
+              threadId={threadId}
+              projectId={shell?.projectId ?? null}
+            />
+          ) : null}
           {shell && family.profile.me.kind !== "grown-up" ? (
             <FilesButton
               onClick={() => {
@@ -737,18 +745,43 @@ function StopButton({
 }
 
 /** Opens the conversation's live preview beside it (a sheet on a phone), or closes it. */
-function PreviewButton({ threadId }: { readonly threadId: ThreadId }) {
+function PreviewButton({
+  environmentId,
+  threadId,
+  projectId,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly projectId: string | null;
+}) {
   const open = usePreviewOpen(threadId);
   const phone = useColumns() === 1;
-  const toggle = () => (open ? closePreview() : openPreview(threadId));
+  // The page THIS conversation made (what "Play it" opens), not whatever the project's index
+  // page is: a project can hold older makes. No page made here: the project's own first page.
+  const madePage = useMadePage(environmentId, threadId);
+  const { openIt, sheet } = useOpenIt(environmentId);
+  const toggle = () => {
+    if (open) closePreview();
+    else if (madePage !== null && projectId !== null)
+      openIt({ threadId, projectId, page: madePage });
+    else openPreview(threadId);
+  };
   // A phone's header has room for the name or a word-button, not both.
   if (phone) {
-    return <IconButton icon={AppWindow} label="Preview" aria-pressed={open} onClick={toggle} />;
+    return (
+      <>
+        <IconButton icon={AppWindow} label="Preview" aria-pressed={open} onClick={toggle} />
+        {sheet}
+      </>
+    );
   }
   return (
-    <Button size="sm" icon={AppWindow} aria-pressed={open} onClick={toggle}>
-      Preview
-    </Button>
+    <>
+      <Button size="sm" icon={AppWindow} aria-pressed={open} onClick={toggle}>
+        Preview
+      </Button>
+      {sheet}
+    </>
   );
 }
 
