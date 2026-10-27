@@ -1274,7 +1274,14 @@ const make = Effect.gen(function* () {
     "SkycotFamilyGate.childProjectHome",
   )(function* (sessionId) {
     const space = yield* questionsSpaceFor(sessionId);
-    if (Option.isNone(space) || Option.isNone(limits)) return Option.none();
+    if (Option.isNone(space) || Option.isNone(limits)) {
+      yield* Effect.logInfo("skycot-child-projects.no-space", {
+        sessionId,
+        hasSpace: Option.isSome(space),
+        hasLimits: Option.isSome(limits),
+      });
+      return Option.none();
+    }
     const session = yield* limits.value.forSession({ sessionId });
     if (session.childId === null) return Option.none();
     const project = yield* projects

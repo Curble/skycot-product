@@ -2613,9 +2613,16 @@ export const layerWsRpc = (
           // goes where T3 puts named projects.
           Effect.gen(function* () {
             if (Option.isNone(familyGate)) return yield* managedFolders.createNamedProject(input);
-            const home = yield* familyGate.value
-              .childProjectHome(currentSessionId)
-              .pipe(Effect.orElseSucceed(() => Option.none()));
+            const home = yield* familyGate.value.childProjectHome(currentSessionId).pipe(
+              Effect.tapError((cause) =>
+                Effect.logWarning("skycot-child-projects.home-failed", { reason: cause.message }),
+              ),
+              Effect.orElseSucceed(() => Option.none()),
+            );
+            yield* Effect.logInfo("skycot-child-projects.create", {
+              sessionId: currentSessionId,
+              inChildSpace: Option.isSome(home),
+            });
             if (Option.isNone(home)) return yield* managedFolders.createNamedProject(input);
             const created = yield* managedFolders.createNamedProject({
               ...input,
