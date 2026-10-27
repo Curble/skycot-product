@@ -1,0 +1,35 @@
+{
+  "name": "SKYCOT",
+  "short_name": "SKYCOT",
+  "description": "The family-friendly AI developer.",
+  "start_url": "/",
+  "display": "minimal-ui",
+  "background_color": "#ffffff",
+  "theme_color": "#0071e3",
+  "icons": [
+    {
+      "src": "/assets/brand/icon-192-day.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/icon-512-day.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/icon-maskable-192-day.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/brand/icon-maskable-512-day.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
