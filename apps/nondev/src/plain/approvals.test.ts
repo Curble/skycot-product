@@ -148,6 +148,20 @@ describe("describeRuntimeRequest — commands", () => {
   });
 });
 
+describe("child approval words", () => {
+  it("describes Sam's quiz check without putting the shell command in the child sentence", () => {
+    const card = describeRuntimeRequest(
+      items.approval("command", {
+        prompt: `cat package.json index.html && mv old.js quiz-check.js && node quiz-check.js && grep -E '<section|class=\"question\"|right:' index.html`,
+      }),
+    );
+    expect(childApprovalSentence(card, "Sam")).toBe(
+      "Sam wants to test the quiz by running it. A grown-up needs to say yes.",
+    );
+    expect(card.technical).toContain("grep -E");
+  });
+});
+
 describe("childApprovalSentence", () => {
   it("explains a short node download plainly and keeps the no-project boundary", () => {
     const card = {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   CHILD_PICK_MEMORY_MS,
+  canReuseCurrentChild,
   bufferPickerCode,
   pickerAfterIdle,
   PICKER_IDLE_MS,
@@ -25,6 +26,27 @@ describe("the shared Mac child picker idle time", () => {
     expect(rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS - 1)).toBe(true);
     expect(rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS)).toBe(false);
     expect(rememberedChildIsFresh(1_000, 999)).toBe(false);
+  });
+
+  it("reuses a recent child in a fresh tab and asks again after the memory expires", () => {
+    expect(
+      canReuseCurrentChild({
+        childCount: 2,
+        currentChildId: "ava",
+        rememberedChildId: rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS - 1)
+          ? "ava"
+          : null,
+      }),
+    ).toBe(true);
+    expect(
+      canReuseCurrentChild({
+        childCount: 2,
+        currentChildId: "ava",
+        rememberedChildId: rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS)
+          ? "ava"
+          : null,
+      }),
+    ).toBe(false);
   });
 
   it("keeps the picker for explicit switches and multi-child choices only", () => {

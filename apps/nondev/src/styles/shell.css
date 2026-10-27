@@ -84,7 +84,9 @@
 }
 .fm-sidebar__scroll {
   flex: 1;
+  min-width: 0;
   min-height: 0;
+  overflow-x: hidden;
   /* The list scrolls above the pinned footer; without this the last rows slid under it. */
   overflow-y: auto;
 }

@@ -336,10 +336,6 @@ export function RequestCard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  if (childView && item.type === "user_input_request" && request?.answers !== undefined) {
-    return null;
-  }
-
   // A new ask lands keyboard focus on the card itself (not a button, so
   // nothing is pre-selected) unless the person is typing somewhere; from the
   // card, one Tab reaches "Don't allow". Sighted mouse users notice nothing.
@@ -356,6 +352,14 @@ export function RequestCard({
     if (typing) return;
     cardRef.current?.focus({ preventScroll: true });
   }, [pendingOnMount]);
+
+  // A question the child already answered leaves the thread quietly (their answer shows as
+  // their own message). After every hook above: a card that stops rendering hooks mid-life
+  // crashes the whole window (React's hook order rule), which is what happened the moment a
+  // child pressed "Send my answer" (round 9, 27 Oct 2026).
+  if (childView && item.type === "user_input_request" && request?.answers !== undefined) {
+    return null;
+  }
 
   const choose = async (
     option: ApprovalOption,

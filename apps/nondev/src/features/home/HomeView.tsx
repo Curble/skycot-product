@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { ChevronLeft, ListTodo, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
@@ -9,7 +9,7 @@ import { conversationRowsAtom, type ConversationRow } from "../../state/conversa
 import { useCrew } from "../../themes/useCrew";
 import { useFamily } from "../family/FamilyProvider";
 import { useChildView } from "../../app/useChildView";
-import { useLimits } from "../family-limits/store";
+import { askWhoStarted, useLimits } from "../family-limits/store";
 import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
 import { IconButton } from "../../ui/Button";
 import { Card, CardBody, CardHeader } from "../../ui/Card";
@@ -22,7 +22,7 @@ import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { homeTip } from "./tip";
-import { homeRows, summarySentence } from "./summary";
+import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 import { greeting as greetingForHour } from "./greeting";
 
 /**
@@ -41,6 +41,10 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const family = useFamily();
   const childView = useChildView();
   const { today } = useLimits();
+  useEffect(() => {
+    const unknown = threadIdsWithoutOwner(rows, today.threads);
+    if (unknown.length > 0) askWhoStarted(unknown);
+  }, [rows, today.threads]);
   // A grown-up who picked themselves on the shared Mac is greeted by name.
   const grownUpId = grownUpSessionFor(useGrownUpSessionId(), family.profile, Date.now());
   const grownUpName =

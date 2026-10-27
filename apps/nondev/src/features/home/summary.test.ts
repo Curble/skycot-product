@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { homeRows, summarySentence } from "./summary";
+import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 
 describe("summarySentence", () => {
   it("keeps the noun when only one kind of job exists", () => {
@@ -36,6 +36,14 @@ describe("summarySentence", () => {
 });
 
 describe("homeRows", () => {
+  it("requests fresh ownership for live shell rows that arrived after the last today snapshot", () => {
+    expect(
+      threadIdsWithoutOwner([{ shell: { id: "known" } }, { shell: { id: "newly-waiting" } }], {
+        known: "ava",
+      }),
+    ).toEqual(["newly-waiting"]);
+  });
+
   it("keeps the Home counts aligned with live child rows and excludes sibling failures", () => {
     const rows = [
       {

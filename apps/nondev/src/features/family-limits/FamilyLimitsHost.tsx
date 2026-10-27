@@ -21,6 +21,7 @@ import {
 } from "../family/grownUpSession";
 import {
   forgetRememberedChild,
+  canReuseCurrentChild,
   pickerAfterIdle,
   PICKER_IDLE_MS,
   rememberedChild,
@@ -126,6 +127,19 @@ export function FamilyLimitsHost() {
     restoreAttempted.current = true;
     const asleep = session?.limits?.asleep === true;
     if (asleep) forgetRememberedChild();
+    if (
+      !asleep &&
+      !view.needsChoice &&
+      canReuseCurrentChild({
+        childCount: view.children.length,
+        currentChildId: view.currentChildId,
+        rememberedChildId: rememberedChild(Date.now()),
+      })
+    ) {
+      // A fresh tab may inherit the Mac's selected child, while its session storage is empty.
+      rememberPicked();
+      setPicked(true);
+    }
     if (view.needsChoice && !asleep) {
       const saved = rememberedChild(Date.now());
       const child = view.children.find((entry) => entry.id === saved);

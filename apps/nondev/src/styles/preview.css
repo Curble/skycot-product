@@ -88,11 +88,10 @@
   position: absolute;
   z-index: 3;
   top: max(12px, env(safe-area-inset-top));
-  left: 50%;
-  max-width: calc(100% - 150px);
+  right: max(190px, calc(env(safe-area-inset-right) + 190px));
+  max-width: calc(100% - 220px);
   min-height: 34px;
   padding: 0 14px;
-  transform: translateX(-50%);
   border: 1px solid var(--fm-sep);
   border-radius: 999px;
   background: var(--fm-bg-toolbar);

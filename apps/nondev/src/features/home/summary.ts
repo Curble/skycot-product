@@ -1,6 +1,14 @@
 /** The one-line status under the Home greeting. */
 import { rowsForChild } from "../family-limits/order";
 
+/** Live shell rows whose owner map still needs the engine's latest answer. */
+export function threadIdsWithoutOwner<R extends { readonly shell: { readonly id: string } }>(
+  rows: ReadonlyArray<R>,
+  owners: Readonly<Record<string, string>>,
+): ReadonlyArray<string> {
+  return rows.map((row) => row.shell.id).filter((threadId) => owners[threadId] === undefined);
+}
+
 /** Rows represented by Home's counts and list. */
 export function homeRows<
   R extends {

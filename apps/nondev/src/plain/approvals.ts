@@ -176,6 +176,9 @@ export function childApprovalSentence(
   assistantName: string,
 ): string {
   const wants = card.whatItWants.replace(/^The assistant wants to /i, "").replace(/[.!?]+$/, "");
+  if (/quiz check|check the quiz/i.test(card.technical)) {
+    return `${assistantName} wants to test the quiz by running it. A grown-up needs to say yes.`;
+  }
   if (/\bnode\b/i.test(card.technical) && /\b(?:fetch|https?:|internet)\b/i.test(card.technical)) {
     return `${assistantName} wants to use a short program to get something from the internet. A grown-up needs to say yes.`;
   }

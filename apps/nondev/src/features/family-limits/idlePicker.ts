@@ -63,3 +63,16 @@ export function shouldShowChildPicker(input: {
 export function rememberedChildIsFresh(selectedAt: number, now: number): boolean {
   return now - selectedAt >= 0 && now - selectedAt < CHILD_PICK_MEMORY_MS;
 }
+
+/** A fresh tab may reuse the engine's current child; an old choice must go through the picker. */
+export function canReuseCurrentChild(input: {
+  readonly childCount: number;
+  readonly currentChildId: string | null;
+  readonly rememberedChildId: string | null;
+}): boolean {
+  return (
+    input.childCount > 1 &&
+    input.currentChildId !== null &&
+    input.currentChildId === input.rememberedChildId
+  );
+}
