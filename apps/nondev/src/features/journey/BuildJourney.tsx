@@ -171,6 +171,7 @@ export function BuildJourney({
       </section>
       <section className="fm-journey__think">
         <h3>Your turn to think</h3>
+        <small className="fm-journey__optional">Just for fun — nothing to answer here.</small>
         {answer ? (
           <>
             <p role="status">{answer.reply}</p>

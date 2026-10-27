@@ -92,7 +92,12 @@ export function MagnetThumb({
   }, [seen, key, threadId, page, version, thumbnailSvg, drawPage]);
   const current = loaded?.key === key ? loaded.page : null;
   const sealedDocument = useOfflinePreviewDocument(current?.kind === "page" ? current.html : "");
-  const waiting = !useCard && !thumbnailSvg && current?.kind !== "page" && current?.kind !== "gone";
+  const waiting =
+    !useCard &&
+    !cardWaiting &&
+    !thumbnailSvg &&
+    current?.kind !== "page" &&
+    current?.kind !== "gone";
   useEffect(() => {
     if (!waiting) return;
     const timer = setTimeout(() => setSlowKey(key), READY_TIMEOUT_MS);
@@ -109,6 +114,8 @@ export function MagnetThumb({
           src={cardImageSource(cardAnswer.svg)}
           style={{ background: cardMatColor(cardAnswer.svg) ?? undefined }}
         />
+      ) : cardWaiting ? (
+        <span className="fm-magnet__calm" data-card-waiting="" />
       ) : thumbnailSvg ? (
         <img
           className="fm-magnet__frame"

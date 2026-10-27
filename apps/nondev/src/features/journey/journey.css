@@ -331,8 +331,28 @@
     overflow: visible;
   }
 }
+/* The same stacking when the chat column itself is narrow, e.g. with the Preview open (gate 19). */
+@container (max-width: 759px) {
+  .fm-stream__inner--journey {
+    display: flex;
+    flex-direction: column;
+  }
+  .fm-stream__inner--journey > .fm-journey {
+    position: static;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .fm-journey__tabs li[data-state="now"] button {
     transform: none;
   }
+}
+
+.fm-journey__optional {
+  display: block;
+  margin-bottom: 8px;
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-ink-2, #6a6a6f);
 }

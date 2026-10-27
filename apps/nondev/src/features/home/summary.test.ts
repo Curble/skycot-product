@@ -84,4 +84,24 @@ describe("homeRows", () => {
       "A grown-up needs to say yes, Your plan is ready.",
     );
   });
+
+  it("recomputes the ready count as soon as a new make is finished and owned", () => {
+    const row = (id: string, kind: string) => ({
+      shell: { id },
+      status: { kind, headline: "" },
+    });
+    const before = homeRows([row("a", "ready"), row("b", "ready")], true, "leo", {
+      a: "leo",
+      b: "leo",
+    });
+    const after = homeRows([row("c", "ready"), row("a", "ready"), row("b", "ready")], true, "leo", {
+      a: "leo",
+      b: "leo",
+      c: "leo",
+    });
+    expect(before.filter((r) => r.status.kind === "ready")).toHaveLength(2);
+    expect(after.filter((r) => r.status.kind === "ready")).toHaveLength(3);
+    // Until the owner is known the row is held back, which is what the re-ask fixes.
+    expect(homeRows([row("c", "ready")], true, "leo", {}).length).toBe(0);
+  });
 });

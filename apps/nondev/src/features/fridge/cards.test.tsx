@@ -76,6 +76,15 @@ describe("fridge picture cards", () => {
     expect(host.querySelector("iframe")).toBeNull();
   });
 
+  it("draws a calm box, no chip and no page, while the card is awaited", async () => {
+    callEngine.mockReturnValue(new Promise(() => {}));
+    const host = await show({ cardHash: "hash-waiting" });
+    expect(host.querySelector("[data-card-waiting]")).not.toBeNull();
+    expect(host.querySelector("[data-kind-icon]")).toBeNull();
+    expect(host.querySelector("iframe")).toBeNull();
+    expect(host.textContent).not.toContain("Getting it ready");
+  });
+
   it("falls back to the page drawing when there is no cardHash", async () => {
     const host = await show({});
     expect(callEngine).not.toHaveBeenCalled();
