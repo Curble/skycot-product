@@ -29,6 +29,9 @@ export interface FridgeItem {
   readonly page: string;
   readonly contentHash?: string;
   readonly thumbnailSvg?: string;
+  // nondev-seam: skycot-fridge-card-store
+  /** Names the saved card file (`/fridge/card?hash=`); changes whenever the page does. */
+  readonly cardHash?: string;
   readonly cwd: string;
   readonly pinnedAt: number | null;
 }

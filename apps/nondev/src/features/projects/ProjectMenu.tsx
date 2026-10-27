@@ -9,9 +9,12 @@ import type { ProjectSheetFocus } from "./ProjectSheet";
 /** The rows a project's menu shows (the sidebar row's "…" and right-click). */
 export function ProjectMenuItems({
   onEdit,
+  onPutAway,
   close,
 }: {
   readonly onEdit: (focus: ProjectSheetFocus) => void;
+  /** The child's "Put away": hides the project from the lists (a grown-up brings it back). */
+  readonly onPutAway?: () => void;
   readonly close: () => void;
 }) {
   return (
@@ -32,6 +35,16 @@ export function ProjectMenuItems({
       >
         Change icon…
       </MenuItem>
+      {onPutAway ? (
+        <MenuItem
+          onSelect={() => {
+            close();
+            onPutAway();
+          }}
+        >
+          Put away
+        </MenuItem>
+      ) : null}
     </>
   );
 }

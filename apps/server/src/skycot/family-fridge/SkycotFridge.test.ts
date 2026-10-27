@@ -1,4 +1,5 @@
 // nondev-seam: skycot-playable-copy-test
+// nondev-seam: skycot-fridge-card-store-test
 // nondev-seam: skycot-fridge-thumbnail-cache-test
 // nondev-seam: skycot-iphone-q50-fridge-title-engine-test
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -255,6 +256,46 @@ it.layer(NodeServices.layer)("SkycotFridge", (it) => {
         [["card", "birthday-card.html"]],
       );
       assert.deepEqual(asked, [[0, 2]]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("saves each card as a file, serves it by hash, and a changed page gets a new one", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "skycot-fridge-cards-" });
+      const root = path.join(dir, "games");
+      yield* fs.makeDirectory(root, { recursive: true });
+      const record = records("live", "Hello bounce game", false);
+      yield* fs.writeFileString(path.join(root, "index.html"), "<title>Bounce</title>");
+      const projections = Layer.mock(ProjectionStore.ProjectionStoreV2)({
+        getShellSnapshot: () =>
+          Effect.succeed({ threads: [record.thread], archivedThreads: [] } as never),
+        getThreadRecords: (() => Effect.succeed(record as never)) as never,
+      });
+      const projects = Layer.mock(ProjectStore.ProjectStoreV2)({
+        get: () => Effect.succeed(Option.some({ title: "Games", workspaceRoot: root } as never)),
+      });
+      const cardsDir = path.join(dir, "skycot-fridge-cards");
+      const layer = SkycotFridge.layerAt(path.join(dir, SkycotFridge.FRIDGE_FILE_NAME)).pipe(
+        Layer.provide(Layer.merge(projections, projects)),
+      );
+      const first = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        const item = (yield* fridge.list)[0]!;
+        return { item, served: yield* fridge.card(item.cardHash!) };
+      }).pipe(Effect.provide(layer));
+      assert.deepEqual(yield* fs.readDirectory(cardsDir), [`${first.item.cardHash}.svg`]);
+      assert.equal(first.served, first.item.thumbnailSvg);
+      assert.include(first.item.thumbnailSvg!, "Bounce");
+
+      yield* fs.writeFileString(path.join(root, "index.html"), "<title>Bounce 2</title>");
+      const second = yield* Effect.gen(function* () {
+        const fridge = yield* SkycotFridge.SkycotFridge;
+        return (yield* fridge.list)[0]!;
+      }).pipe(Effect.provide(layer));
+      assert.notEqual(second.cardHash, first.item.cardHash);
+      assert.lengthOf(yield* fs.readDirectory(cardsDir), 2);
     }).pipe(Effect.scoped),
   );
 });

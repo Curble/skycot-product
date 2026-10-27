@@ -31,12 +31,15 @@ import { fridgeItems, fridgePageTitle, fridgeSvgThumbnail, type FridgeItem } fro
 import { MAX_ASSET_BYTES, MAX_PAGE_BYTES, selfContainedPage } from "./thumbnail.ts";
 import {
   // nondev-seam: skycot-q51-fridge-svg
-  cachedSvgThumbnail,
+  peekSvgThumbnail,
+  storeSvgThumbnail,
   cachedThumbnail,
   rememberThumbnail,
   secretLookingPath,
   type ThumbnailCacheEntry,
 } from "./thumbnailCache.ts"; // nondev-seam: skycot-fridge-thumbnail-cache
+// nondev-seam: skycot-fridge-card-store
+import { CARD_DIRECTORY, cardHashOf, makeCardStore } from "./cardStore.ts";
 // nondev-seam: skycot-playable-copy
 import { MAX_PLAYABLE_FILE_BYTES, playablePage } from "./playable.ts";
 
@@ -91,6 +94,9 @@ export class SkycotFridge extends Context.Service<
       readonly threadId: string;
       readonly page: string;
     }) => Effect.Effect<string | null>;
+    /** A saved card by its hash (`FridgeItem.cardHash`), or null; the picture itself, as text. */
+    // nondev-seam: skycot-fridge-card-store
+    readonly card: (hash: string) => Effect.Effect<string | null>;
     // nondev-seam: skycot-playable-copy
     readonly playable: (input: {
       readonly threadId: string;
@@ -132,6 +138,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
   const limits = yield* Effect.serviceOption(SkycotFamilyLimits.SkycotFamilyLimits);
   const lock = yield* Semaphore.make(1);
   const thumbnailCachePath = path.join(path.dirname(filePath), THUMBNAIL_CACHE_FILE);
+  const cards = yield* makeCardStore(path.join(path.dirname(filePath), CARD_DIRECTORY));
 
   const readPins = fs.readFileString(filePath).pipe(
     Effect.map((raw) => decodeFridge(raw)),
@@ -205,13 +212,25 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
         if (source === null) return item;
         const contentHash = NodeCrypto.createHash("sha256").update(source).digest("hex");
         const html = new TextDecoder().decode(source);
+        // Memory first, then the saved card, and only then draw it (and save it for next time).
+        const cardHash = cardHashOf(contentHash, item.title);
+        let thumbnailSvg = peekSvgThumbnail(realPage, cardHash);
+        if (thumbnailSvg === null) {
+          thumbnailSvg = yield* cards.read(cardHash);
+          if (thumbnailSvg === null) {
+            thumbnailSvg = fridgeSvgThumbnail(html, item.title);
+            yield* cards
+              .write(cardHash, thumbnailSvg)
+              .pipe(Effect.ignoreCause({ log: true, message: "Could not save a fridge card." }));
+          }
+          storeSvgThumbnail(realPage, cardHash, thumbnailSvg);
+        }
         return {
           ...item,
           title: fridgePageTitle(html) ?? item.title,
           contentHash,
-          thumbnailSvg: cachedSvgThumbnail(realPage, contentHash, () =>
-            fridgeSvgThumbnail(html, item.title),
-          ),
+          thumbnailSvg,
+          cardHash,
         };
       }),
     );
@@ -241,6 +260,8 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     );
     return yield* listWith(pins);
   });
+
+  const card: SkycotFridge["Service"]["card"] = (hash) => cards.read(hash);
 
   const page: SkycotFridge["Service"]["page"] = Effect.fn("SkycotFridge.page")(function* (input) {
     const thread = yield* loadThread(projections, projects, input.threadId as ThreadId, {
@@ -462,7 +483,7 @@ const makeAt = Effect.fn("SkycotFridge.make")(function* (filePath: string) {
     },
   );
 
-  return SkycotFridge.of({ list, pin, page, playable, pagePath });
+  return SkycotFridge.of({ list, pin, page, card, playable, pagePath });
 });
 
 /** For tests and tools: a fridge file at an explicit path. */

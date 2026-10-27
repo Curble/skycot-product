@@ -51,6 +51,8 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               devices: [],
               pageInternet: [],
               projectApprovalGrants: [],
+              projectArchives: [],
+              kidsVisibleProjects: [],
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });
@@ -208,6 +210,44 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           );
         }),
       ),
+    );
+
+    // nondev-seam: skycot-project-put-away-test
+    it.effect(
+      "put-away projects and the kids' switch are kept in the file, once each, bounded",
+      () =>
+        withFamily((family, filePath) =>
+          Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            yield* family.enable({ code: CODE, childName: "Ava" });
+            yield* family.putAwayProject({ projectId: "p1", childId: "kid", by: "child" });
+            yield* family.putAwayProject({ projectId: "p1", childId: null, by: "grown-up" });
+            const status = yield* family.status;
+            assert.deepEqual(
+              status.projectArchives.map((entry) => [entry.projectId, entry.by]),
+              [["p1", "grown-up"]],
+            );
+            assert.include(yield* fs.readFileString(filePath), '"projectArchives"');
+            // The child's Undo is theirs and short: not for a grown-up's put-away, not for a sibling.
+            assert.isNull(yield* family.bringBackProject({ projectId: "p1", undoByChild: "kid" }));
+            yield* family.putAwayProject({ projectId: "p2", childId: "kid", by: "child" });
+            assert.isNull(yield* family.bringBackProject({ projectId: "p2", undoByChild: "bea" }));
+            for (let i = 0; i < SkycotFamily.MAX_PROJECT_ARCHIVES + 5; i += 1) {
+              yield* family.putAwayProject({
+                projectId: `many-${i}`,
+                childId: null,
+                by: "grown-up",
+              });
+            }
+            assert.lengthOf(
+              (yield* family.status).projectArchives,
+              SkycotFamily.MAX_PROJECT_ARCHIVES,
+            );
+            yield* family.setKidsVisibleProject({ projectId: "code", visible: true });
+            yield* family.setKidsVisibleProject({ projectId: "code", visible: true });
+            assert.deepEqual((yield* family.status).kidsVisibleProjects, ["code"]);
+          }),
+        ),
     );
 
     it.effect("page asks expire and cannot be answered", () =>

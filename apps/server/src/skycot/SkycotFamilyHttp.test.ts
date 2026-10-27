@@ -26,6 +26,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as TestClock from "effect/testing/TestClock";
 import {
   HttpClient,
   HttpClientRequest,
@@ -140,7 +141,7 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
                 childId: "ava",
                 owners: {
                   threads: { "own-thread": "ava", "other-thread": "bea" },
-                  projects: {},
+                  projects: { "ava-project": "ava", "bea-project": "bea" },
                 },
                 pinned: new Set(),
               } as never)
@@ -620,6 +621,122 @@ it.layer(
       });
       assert.equal(uncheckpointed.status, 400);
     }),
+  );
+
+  // nondev-seam: skycot-project-put-away-test
+  it.effect("a child puts away only their own project; the Undo lasts fifteen seconds", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const child = { headers: { authorization: CHILD_BEARER } };
+      const put = (projectId: string) =>
+        send("POST", "/api/skycot/family/projects/put-away", { ...child, body: { projectId } });
+      const back = (projectId: string, as: typeof child | Record<string, never> = child) =>
+        send("POST", "/api/skycot/family/projects/bring-back", { ...as, body: { projectId } });
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: "Ava" } });
+
+      const sibling = yield* put("bea-project");
+      assert.equal(sibling.status, 403);
+      assert.equal(
+        ((yield* sibling.json) as { message: string }).message,
+        "That's not yours to open.",
+      );
+      assert.equal((yield* put("nobody-project")).status, 403);
+
+      const mine = yield* put("ava-project");
+      assert.equal(mine.status, 200);
+      const record = (
+        (yield* mine.json) as {
+          projectArchives: ReadonlyArray<{ projectId: string; childId: string; by: string }>;
+        }
+      ).projectArchives;
+      assert.deepEqual(
+        record.map((entry) => [entry.projectId, entry.childId, entry.by]),
+        [["ava-project", "ava", "child"]],
+      );
+
+      // Inside the window the child's Undo works; their put-away is gone from the record.
+      yield* TestClock.adjust(10_000);
+      const undone = yield* back("ava-project");
+      assert.equal(undone.status, 200);
+      assert.deepEqual(
+        ((yield* undone.json) as { projectArchives: ReadonlyArray<unknown> }).projectArchives,
+        [],
+      );
+
+      // Past it, only a grown-up's yes brings the project back.
+      yield* put("ava-project");
+      yield* TestClock.adjust(16_000);
+      assert.equal((yield* back("ava-project")).status, 403);
+      assert.equal((yield* back("bea-project")).status, 403);
+      assert.equal((yield* back("ava-project", {})).status, 403);
+      yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "settings" },
+      });
+      const restored = yield* back("ava-project", {});
+      assert.equal(restored.status, 200);
+      assert.deepEqual(
+        ((yield* restored.json) as { projectArchives: ReadonlyArray<unknown> }).projectArchives,
+        [],
+      );
+    }),
+  );
+
+  // nondev-seam: skycot-project-put-away-test
+  it.effect(
+    "a grown-up puts away any project; a child cannot undo it; only grown-ups show a developer project",
+    () =>
+      Effect.gen(function* () {
+        const { send } = yield* makeClient();
+        const child = { headers: { authorization: CHILD_BEARER } };
+        yield* send("POST", "/api/skycot/family/enable", {
+          body: { code: CODE, childName: "Ava" },
+        });
+        // Without the settings yes the parent session is nobody's project owner.
+        const before = yield* send("POST", "/api/skycot/family/projects/put-away", {
+          body: { projectId: "bea-project" },
+        });
+        assert.equal(before.status, 403);
+        const kidsBefore = yield* send("POST", "/api/skycot/family/projects/kids-visible", {
+          body: { projectId: "code", visible: true },
+        });
+        assert.equal(kidsBefore.status, 403);
+        yield* send("POST", "/api/skycot/family/verify", {
+          body: { code: CODE, purpose: "settings" },
+        });
+        const put = yield* send("POST", "/api/skycot/family/projects/put-away", {
+          body: { projectId: "bea-project" },
+        });
+        assert.equal(put.status, 200);
+        assert.equal(
+          ((yield* put.json) as { projectArchives: ReadonlyArray<{ by: string }> })
+            .projectArchives[0]?.by,
+          "grown-up",
+        );
+        const undo = yield* send("POST", "/api/skycot/family/projects/bring-back", {
+          ...child,
+          body: { projectId: "bea-project" },
+        });
+        assert.equal(undo.status, 403);
+        const childKids = yield* send("POST", "/api/skycot/family/projects/kids-visible", {
+          ...child,
+          body: { projectId: "code", visible: true },
+        });
+        assert.equal(childKids.status, 403);
+        const shown = yield* send("POST", "/api/skycot/family/projects/kids-visible", {
+          body: { projectId: "code", visible: true },
+        });
+        assert.deepEqual(
+          ((yield* shown.json) as { kidsVisibleProjects: ReadonlyArray<string> })
+            .kidsVisibleProjects,
+          ["code"],
+        );
+        const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+          projectArchives: ReadonlyArray<unknown>;
+          kidsVisibleProjects: ReadonlyArray<string>;
+        };
+        assert.lengthOf(status.projectArchives, 1);
+        assert.deepEqual(status.kidsVisibleProjects, ["code"]);
+      }),
   );
 
   // QA FK-10: the child could rename themselves without the code.

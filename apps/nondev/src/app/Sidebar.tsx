@@ -66,6 +66,7 @@ import { Sticker } from "../features/badges/stickers/Sticker";
 import { ProjectMenuButton, ProjectMenuItems } from "../features/projects/ProjectMenu";
 import { projectCreationProblem } from "../features/projects/projectProblem";
 import { showToast } from "../ui/Toast";
+import { putProjectAway } from "../features/projects/putAway";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -501,6 +502,24 @@ export function AppSidebar({
             <ProjectMenuItems
               close={close}
               onEdit={(focus) => sheets.editProject(projectMenu.project, focus)}
+              {...(childView
+                ? {
+                    onPutAway: () => {
+                      const { project } = projectMenu;
+                      const key = projectKeyOf({
+                        environmentId: project.environmentId,
+                        projectId: project.id,
+                      });
+                      void putProjectAway(project).then((done) => {
+                        // Looking at the project that just left the list: back to the first page.
+                        if (done && shell.projectKey === key) {
+                          shell.setProjectKey(null);
+                          navigate(HOME_HREF);
+                        }
+                      });
+                    },
+                  }
+                : {})}
             />
           ) : null
         }

@@ -25,6 +25,13 @@ export interface ChildView {
   readonly sharedSession?: boolean;
   /** Code checkouts and the engine's own folder stay out of a child's project list. */
   readonly grownUpProjects?: ReadonlySet<string>;
+  // nondev-seam: skycot-project-put-away
+  /** Projects put away: they and their conversations stay out of the child's lists. */
+  readonly archivedProjects?: ReadonlySet<string>;
+}
+
+export function projectIsPutAway(view: ChildView, projectId: string): boolean {
+  return view.archivedProjects?.has(projectId) ?? false;
 }
 
 export function projectIsGrownUpProject(view: ChildView, projectId: string): boolean {
@@ -77,8 +84,10 @@ function filterThreadsAndProjects<
   projects: ReadonlyArray<P>,
   extraThreads: ReadonlyArray<ThreadLike> = [],
 ) {
-  const visibleThreads = threads.filter((thread) =>
-    childSeesThread(view.childId, thread.id, view.owners),
+  const visibleThreads = threads.filter(
+    (thread) =>
+      childSeesThread(view.childId, thread.id, view.owners) &&
+      !projectIsPutAway(view, thread.projectId),
   );
   const withOwn = ownThreadProjects(view, [...threads, ...extraThreads]);
   // A project nobody recorded as theirs, whose conversations all belong to other children, is
@@ -87,6 +96,7 @@ function filterThreadsAndProjects<
   const visibleProjects = projects.filter(
     (project) =>
       !projectIsGrownUpProject(view, project.id) &&
+      !projectIsPutAway(view, project.id) &&
       childSeesProject(view.childId, project.id, view.owners, withOwn) &&
       !(othersOnly.has(project.id) && !withOwn.has(project.id)),
   );
@@ -106,8 +116,10 @@ export function filterShellSnapshot(
   return {
     ...snapshot,
     threads: visibleThreads,
-    archivedThreads: snapshot.archivedThreads.filter((thread) =>
-      childSeesThread(view.childId, thread.id, view.owners),
+    archivedThreads: snapshot.archivedThreads.filter(
+      (thread) =>
+        childSeesThread(view.childId, thread.id, view.owners) &&
+        !projectIsPutAway(view, thread.projectId),
     ),
     projects: visibleProjects,
   };
@@ -153,11 +165,13 @@ export function makeShellItemFilter() {
       }
       case "thread.updated": {
         if (!childSeesThread(view.childId, item.thread.id, view.owners)) return null;
+        if (projectIsPutAway(view, item.thread.projectId)) return null;
         projectsWithOwn.add(item.thread.projectId);
         return item;
       }
       case "project.updated":
         return !projectIsGrownUpProject(view, item.project.id) &&
+          !projectIsPutAway(view, item.project.id) &&
           childSeesProject(view.childId, item.project.id, view.owners, projectsWithOwn)
           ? item
           : null;
@@ -171,7 +185,10 @@ export function archivedItemVisible(
   item: { readonly kind: string; readonly thread?: ThreadLike },
 ): boolean {
   if (item.kind !== "thread.updated" || item.thread === undefined) return true;
-  return childSeesThread(view.childId, item.thread.id, view.owners);
+  return (
+    childSeesThread(view.childId, item.thread.id, view.owners) &&
+    !projectIsPutAway(view, item.thread.projectId)
+  );
 }
 
 /** The conversations, projects and folders a call names, wherever in its payload they sit. */

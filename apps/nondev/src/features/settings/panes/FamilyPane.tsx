@@ -52,6 +52,7 @@ import {
 import { FamilyAssistantsGroup } from "../../family/FamilyAssistantsGroup";
 import { PageInternetGroup } from "../../family/PageInternetGroup";
 import { ProjectApprovalsGroup } from "../../family/ProjectApprovalsGroup";
+import { ForTheKidsGroup, PutAwayGroup } from "../../family/ProjectVisibilityGroups";
 import { TrustedAddOnsGroup } from "../../family/TrustedAddOnsGroup";
 import { FamilyHonestyBox } from "../../family/FamilySetupForm";
 import { FamilySetupSheet } from "../../family/FamilySetupSheet";
@@ -181,6 +182,8 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
       <TrustedAddOnsGroup />
       <PageInternetGroup />
       <ProjectApprovalsGroup />
+      <ForTheKidsGroup />
+      <PutAwayGroup />
 
       <SettingsGroup title="Parent code" footer={familyCopy.storage}>
         <ListRow

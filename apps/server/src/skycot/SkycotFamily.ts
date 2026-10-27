@@ -99,6 +99,21 @@ export type ProjectApprovalGrant = typeof ProjectApprovalGrant.Type;
 export const PROJECT_APPROVAL_TTL_MS = 30 * 24 * 60 * 60_000;
 export const MAX_PROJECT_APPROVAL_GRANTS = 200;
 
+// nondev-seam: skycot-project-put-away
+/** A project put away (hidden from the children's lists) and who did it; a grown-up brings it back. */
+const ProjectArchive = Schema.Struct({
+  projectId: Schema.String,
+  childId: Schema.NullOr(Schema.String),
+  archivedAt: Schema.Number,
+  by: Schema.Literals(["child", "grown-up"]),
+});
+export type ProjectArchive = typeof ProjectArchive.Type;
+export const MAX_PROJECT_ARCHIVES = 500;
+/** Developer projects a grown-up switched on for the kids ("For the kids"). */
+export const MAX_KIDS_VISIBLE_PROJECTS = 500;
+/** How long after putting a project away the child may take it back on their own (the Undo). */
+export const PROJECT_UNDO_WINDOW_MS = 15_000;
+
 /** The mascot's poses a child can pick as their picture (apps/nondev features/brand/Mascot). */
 export const AVATAR_POSES = [
   "hello",
@@ -392,6 +407,10 @@ const FamilyFile = Schema.Struct({
   pageInternetAsks: Schema.optionalKey(Schema.Array(PageInternetAsk)),
   /** Project-scoped approvals; optional so older Family files continue to load. */
   projectApprovalGrants: Schema.optionalKey(Schema.Array(ProjectApprovalGrant)),
+  /** Projects put away; optional so older Family files continue to load. */
+  projectArchives: Schema.optionalKey(Schema.Array(ProjectArchive)),
+  /** Developer projects shown to the children; optional like the rest. */
+  kidsVisibleProjects: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 type FamilyFile = typeof FamilyFile.Type;
 
@@ -517,7 +536,19 @@ export interface FamilyStatus {
   /** Pages allowed to load things from internet sites (Settings › Family lists them). */
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
   readonly projectApprovalGrants: ReadonlyArray<ProjectApprovalGrant>;
+  /** Projects put away, newest last (Settings › Family lists them under "Put away"). */
+  readonly projectArchives: ReadonlyArray<ProjectArchive>;
+  /** Developer projects a grown-up chose to show the children. */
+  readonly kidsVisibleProjects: ReadonlyArray<string>;
 }
+
+const projectArchivesOf = (
+  file: Pick<FamilyFile, "projectArchives"> | null,
+): ReadonlyArray<ProjectArchive> => (file?.projectArchives ?? []).slice(-MAX_PROJECT_ARCHIVES);
+
+const kidsVisibleProjectsOf = (
+  file: Pick<FamilyFile, "kidsVisibleProjects"> | null,
+): ReadonlyArray<string> => (file?.kidsVisibleProjects ?? []).slice(-MAX_KIDS_VISIBLE_PROJECTS);
 
 const projectApprovalGrantsOf = (
   file: Pick<FamilyFile, "projectApprovalGrants"> | null,
@@ -757,6 +788,30 @@ export class SkycotFamily extends Context.Service<
       readonly id: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /**
+     * Puts a project away: hidden from the children's lists, nothing deleted. The caller has
+     * already checked who may do it. Putting the same project away again keeps one record.
+     */
+    // nondev-seam: skycot-project-put-away
+    readonly putAwayProject: (input: {
+      readonly projectId: string;
+      readonly childId: string | null;
+      readonly by: ProjectArchive["by"];
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /**
+     * Brings a put-away project back. With `undoByChild` it is the child's Undo: it works only
+     * for that child's own put-away, inside `PROJECT_UNDO_WINDOW_MS`, and answers null otherwise.
+     * Without it the caller is a grown-up whose settings "yes" is already checked.
+     */
+    readonly bringBackProject: (input: {
+      readonly projectId: string;
+      readonly undoByChild?: string;
+    }) => Effect.Effect<FamilyStatus | null, FamilyError>;
+    /** "For the kids": shows (or hides again) a developer project in the children's lists. */
+    readonly setKidsVisibleProject: (input: {
+      readonly projectId: string;
+      readonly visible: boolean;
+    }) => Effect.Effect<FamilyStatus, FamilyError>;
+    /**
      * The sites a page may use: null while the profile is off (no policy at all, as before),
      * otherwise the allowed sites (empty: offline). Cheap, like `isEnabled`.
      */
@@ -993,6 +1048,8 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
       devices: [],
       pageInternet: [],
       projectApprovalGrants: [],
+      projectArchives: [],
+      kidsVisibleProjects: [],
     };
   }
   const lockedForMs = lockRemainingMs(file, now);
@@ -1011,6 +1068,8 @@ function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
     devices: (file.devices ?? []).map(deviceView),
     pageInternet: pageInternetOf(file),
     projectApprovalGrants: projectApprovalGrantsOf(file, now),
+    projectArchives: projectArchivesOf(file),
+    kidsVisibleProjects: kidsVisibleProjectsOf(file),
   };
 }
 
@@ -1963,6 +2022,63 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     return toStatus(next, at);
   }, lock.withPermits(1));
 
+  // nondev-seam: skycot-project-put-away
+  const putAwayProject: SkycotFamily["Service"]["putAwayProject"] = Effect.fn(
+    "SkycotFamily.putAwayProject",
+  )(function* ({ projectId, childId, by }) {
+    const file = yield* requireEnabled(yield* load);
+    if (projectId.length === 0 || projectId.length > 200)
+      return yield* new FamilyError({ reason: "invalid-request" });
+    const at = yield* now;
+    const archives = [
+      ...projectArchivesOf(file).filter((entry) => entry.projectId !== projectId),
+      { projectId, childId, archivedAt: at, by },
+    ].slice(-MAX_PROJECT_ARCHIVES);
+    const next = { ...file, projectArchives: archives };
+    yield* save(next);
+    return toStatus(next, at);
+  }, lock.withPermits(1));
+
+  const bringBackProject: SkycotFamily["Service"]["bringBackProject"] = Effect.fn(
+    "SkycotFamily.bringBackProject",
+  )(function* ({ projectId, undoByChild }) {
+    const file = yield* requireEnabled(yield* load);
+    const at = yield* now;
+    const archives = projectArchivesOf(file);
+    const record = archives.find((entry) => entry.projectId === projectId);
+    if (undoByChild !== undefined) {
+      // The Undo is the child's own, for their own put-away, and short: a child can never
+      // reach further than that (anything else needs a grown-up's "yes").
+      if (
+        record === undefined ||
+        record.by !== "child" ||
+        record.childId !== undoByChild ||
+        at - record.archivedAt > PROJECT_UNDO_WINDOW_MS
+      )
+        return null;
+    }
+    const next = { ...file, projectArchives: archives.filter((e) => e.projectId !== projectId) };
+    yield* save(next);
+    return toStatus(next, at);
+  }, lock.withPermits(1));
+
+  const setKidsVisibleProject: SkycotFamily["Service"]["setKidsVisibleProject"] = Effect.fn(
+    "SkycotFamily.setKidsVisibleProject",
+  )(function* ({ projectId, visible }) {
+    const file = yield* requireEnabled(yield* load);
+    if (projectId.length === 0 || projectId.length > 200)
+      return yield* new FamilyError({ reason: "invalid-request" });
+    const others = kidsVisibleProjectsOf(file).filter((id) => id !== projectId);
+    const next = {
+      ...file,
+      kidsVisibleProjects: (visible ? [...others, projectId] : others).slice(
+        -MAX_KIDS_VISIBLE_PROJECTS,
+      ),
+    };
+    yield* save(next);
+    return toStatus(next, yield* now);
+  }, lock.withPermits(1));
+
   const assistantAllowed: SkycotFamily["Service"]["assistantAllowed"] = (driver) =>
     load.pipe(
       Effect.map(
@@ -2332,6 +2448,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     pageInternetSites,
     grantProjectApproval,
     stopProjectApproval,
+    putAwayProject,
+    bringBackProject,
+    setKidsVisibleProject,
     lock: lockSession,
     allows,
     tokenAllows,

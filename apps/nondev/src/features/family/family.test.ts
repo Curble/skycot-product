@@ -243,9 +243,36 @@ describe("the engine's answers", () => {
       pageInternet: [],
       projectApprovalGrants: [],
       rememberedStarts: [],
+      projectArchives: [],
+      kidsVisibleProjects: [],
+      developerProjects: [],
       grownUps: [],
       devices: [],
     });
+  });
+
+  it("reads put-away projects and the kids' switch, dropping anything malformed", () => {
+    const status = parseServerStatus({
+      enabled: true,
+      childName: "Ava",
+      createdAt: null,
+      attemptsLeft: 5,
+      lockedForMs: 0,
+      projectArchives: [
+        { projectId: "p1", childId: "kid", archivedAt: 5, by: "child" },
+        { projectId: "p2", childId: null, archivedAt: 6, by: "grown-up" },
+        { projectId: "p3", archivedAt: 7, by: "somebody" },
+        "nonsense",
+      ],
+      kidsVisibleProjects: ["code", 7],
+      developerProjects: ["code", "other"],
+    });
+    expect(status?.projectArchives).toEqual([
+      { projectId: "p1", childId: "kid", archivedAt: 5, by: "child" },
+      { projectId: "p2", childId: null, archivedAt: 6, by: "grown-up" },
+    ]);
+    expect(status?.kidsVisibleProjects).toEqual(["code"]);
+    expect(status?.developerProjects).toEqual(["code", "other"]);
   });
 
   it("knows a linked device only from the engine's own answer", () => {

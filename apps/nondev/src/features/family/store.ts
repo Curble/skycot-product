@@ -275,6 +275,30 @@ export function stopProjectApproval(id: string): Promise<FamilyResult<ServerFami
   return settle(familyApi.stopProjectApproval(id), applyStatus);
 }
 
+/** The three project doors below answer with a thin status, so the full one is read again. */
+async function settleThenRefresh(
+  promise: Promise<FamilyResult<ServerFamilyStatus>>,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  const result = await settle(promise);
+  if (result.ok) await refreshFamily();
+  return result;
+}
+
+export function putAwayProject(projectId: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settleThenRefresh(familyApi.putAwayProject(projectId));
+}
+
+export function bringBackProject(projectId: string): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settleThenRefresh(familyApi.bringBackProject(projectId));
+}
+
+export function setProjectForKids(
+  projectId: string,
+  visible: boolean,
+): Promise<FamilyResult<ServerFamilyStatus>> {
+  return settleThenRefresh(familyApi.setProjectForKids({ projectId, visible }));
+}
+
 export async function stopRememberedStart(id: string): Promise<FamilyResult<boolean>> {
   const result = await settle(familyApi.stopRememberedStart(id));
   if (result.ok) await refreshFamily();

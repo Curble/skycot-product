@@ -152,6 +152,11 @@ export interface ServerFamilyStatus {
   readonly pageInternet?: ReadonlyArray<PageInternetEntry>;
   readonly projectApprovalGrants?: ReadonlyArray<ProjectApprovalGrant>;
   readonly rememberedStarts?: ReadonlyArray<RememberedStartView>;
+  /** Projects put away, and the code projects a grown-up showed the kids. An older engine: none. */
+  readonly projectArchives?: ReadonlyArray<ProjectArchiveView>;
+  readonly kidsVisibleProjects?: ReadonlyArray<string>;
+  /** Code projects (hidden from the kids unless shown); only a grown-up's status carries them. */
+  readonly developerProjects?: ReadonlyArray<string>;
   /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
   readonly trustedAddOns?: boolean;
   readonly grownUps?: ReadonlyArray<FamilyGrownUp>;
@@ -164,6 +169,40 @@ export interface ServerFamilyStatus {
    * and grown-ups' devices; null when the engine does not know it yet. Never the code itself.
    */
   readonly codeLength?: number | null;
+}
+
+/** A project put away (hidden from the children), as the engine records it. */
+export interface ProjectArchiveView {
+  readonly projectId: string;
+  readonly childId: string | null;
+  readonly archivedAt: number;
+  readonly by: "child" | "grown-up";
+}
+
+function parseProjectArchives(value: unknown): ReadonlyArray<ProjectArchiveView> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null) return [];
+    const record = item as Record<string, unknown>;
+    return typeof record["projectId"] === "string" &&
+      typeof record["archivedAt"] === "number" &&
+      (record["by"] === "child" || record["by"] === "grown-up")
+      ? [
+          {
+            projectId: record["projectId"],
+            childId: typeof record["childId"] === "string" ? record["childId"] : null,
+            archivedAt: record["archivedAt"],
+            by: record["by"],
+          },
+        ]
+      : [];
+  });
+}
+
+function parseStrings(value: unknown): ReadonlyArray<string> {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 export interface RememberedStartView {
@@ -349,6 +388,9 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     pageInternet: parsePageInternet(record["pageInternet"]),
     projectApprovalGrants: parseProjectApprovalGrants(record["projectApprovalGrants"]),
     rememberedStarts: parseRememberedStarts(record["rememberedStarts"]),
+    projectArchives: parseProjectArchives(record["projectArchives"]),
+    kidsVisibleProjects: parseStrings(record["kidsVisibleProjects"]),
+    developerProjects: parseStrings(record["developerProjects"]),
     ...(typeof record["trustedAddOns"] === "boolean"
       ? { trustedAddOns: record["trustedAddOns"] }
       : {}),
@@ -459,6 +501,9 @@ export interface FamilyView {
   readonly pageInternet: ReadonlyArray<PageInternetEntry>;
   readonly projectApprovalGrants: ReadonlyArray<ProjectApprovalGrant>;
   readonly rememberedStarts: ReadonlyArray<RememberedStartView>;
+  readonly projectArchives: ReadonlyArray<ProjectArchiveView>;
+  readonly kidsVisibleProjects: ReadonlyArray<string>;
+  readonly developerProjects: ReadonlyArray<string>;
   /** Trusted add-ons (three.js, p5, …) download without a grown-up; the engine decides. */
   readonly trustedAddOns: boolean;
   readonly grownUps: ReadonlyArray<FamilyGrownUp>;
@@ -489,6 +534,9 @@ export const EMPTY_VIEW: FamilyView = {
   pageInternet: [],
   projectApprovalGrants: [],
   rememberedStarts: [],
+  projectArchives: [],
+  kidsVisibleProjects: [],
+  developerProjects: [],
   trustedAddOns: false,
   grownUps: [],
   devices: [],
@@ -571,6 +619,9 @@ export function viewFromStatus(
     pageInternet: status.enabled ? (status.pageInternet ?? []) : [],
     projectApprovalGrants: status.enabled ? (status.projectApprovalGrants ?? []) : [],
     rememberedStarts: status.enabled ? (status.rememberedStarts ?? []) : [],
+    projectArchives: status.enabled ? (status.projectArchives ?? []) : [],
+    kidsVisibleProjects: status.enabled ? (status.kidsVisibleProjects ?? []) : [],
+    developerProjects: status.enabled ? (status.developerProjects ?? []) : [],
     trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],

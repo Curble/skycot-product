@@ -235,6 +235,15 @@ export const familyApi = {
     request("POST", "/page-internet/stop", input, parseServerStatus),
   stopProjectApproval: (id: string) =>
     request("POST", "/project-approvals/stop", { id }, parseServerStatus),
+  /** A child's own project, or any project with a grown-up's yes: hidden from the children. */
+  putAwayProject: (projectId: string) =>
+    request("POST", "/projects/put-away", { projectId }, parseServerStatus),
+  /** The child's Undo (inside the engine's short window), or a grown-up's yes. */
+  bringBackProject: (projectId: string) =>
+    request("POST", "/projects/bring-back", { projectId }, parseServerStatus),
+  /** "For the kids": a grown-up shows (or hides again) a code project in the children's lists. */
+  setProjectForKids: (input: { readonly projectId: string; readonly visible: boolean }) =>
+    request("POST", "/projects/kids-visible", input, parseServerStatus),
   stopRememberedStart: (id: string) =>
     request("POST", "/remembered-starts/stop", { id }, () => true),
   /** "Trusted add-ons download by themselves": the code goes with the one request, either way. */

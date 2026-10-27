@@ -111,6 +111,8 @@ type Handler = (input: {
   readonly relay: Option.Option<SkycotRelay.SkycotRelay["Service"]>;
   readonly notes: Option.Option<SkycotFamilyNotes.SkycotFamilyNotes["Service"]>;
   readonly projectMemory: Option.Option<SkycotProjectMemory.SkycotProjectMemory["Service"]>;
+  /** The visibility service, when the server has it (a grown-up's Settings lists code projects). */
+  readonly visibility: Option.Option<SkycotFamilyVisibility.SkycotFamilyVisibility["Service"]>;
 }) => Effect.Effect<HttpServerResponse.HttpServerResponse, SkycotFamily.FamilyError, never>;
 
 const route = (
@@ -204,6 +206,7 @@ const route = (
             relay,
             notes,
             projectMemory,
+            visibility,
           }).pipe(
             Effect.catchTags({
               SkycotFamilyError: (error) => Effect.succeed(failureResponse(error)),
@@ -235,7 +238,7 @@ const statusRoute = route(
   "GET",
   "",
   AuthOrchestrationReadScope,
-  ({ family, limits, sessionId, who, projectMemory }) =>
+  ({ family, limits, sessionId, who, projectMemory, visibility }) =>
     Effect.gen(function* () {
       const status = yield* family.status;
       const grants = yield* family.openGrants({ sessionId });
@@ -257,7 +260,27 @@ const statusRoute = route(
               }),
             )
           : [];
-      return json({ ...status, ...length, grants, session, me: meOf(who), rememberedStarts });
+      // nondev-seam: skycot-project-put-away
+      const developerProjects =
+        (who.kind === "grown-up" ||
+          (who.kind === "shared" &&
+            grants.some(
+              (grant) => grant.purpose === "grownUpSession" || grant.purpose === "settings",
+            ))) &&
+        Option.isSome(visibility)
+          ? yield* Effect.suspend(() => visibility.value.developerProjectIds).pipe(
+              Effect.catchCause(() => Effect.succeed([] as ReadonlyArray<string>)),
+            )
+          : [];
+      return json({
+        ...status,
+        ...length,
+        grants,
+        session,
+        me: meOf(who),
+        rememberedStarts,
+        developerProjects,
+      });
     }),
 );
 
@@ -836,6 +859,140 @@ const stopProjectApprovalRoute = route(
           .pipe(Effect.map((status) => json(status))),
 );
 
+const NOT_YOURS = {
+  error: "forbidden",
+  message: SkycotFamilyGate.CHILD_DEVICE_MESSAGE,
+} as const;
+
+/**
+ * Whether this child owns the project: recorded as theirs, or a project SKYCOT created whose
+ * only conversations of this child's are inside it and that nobody else owns.
+ */
+// nondev-seam: skycot-project-put-away
+const childOwnsProject: (input: {
+  readonly childId: string;
+  readonly projectId: string;
+  readonly projects: Option.Option<ProjectStore.ProjectStoreV2["Service"]>;
+  readonly projections: Option.Option<ProjectionStore.ProjectionStoreV2["Service"]>;
+  readonly fileSystem: Option.Option<FileSystem.FileSystem>;
+  readonly projectMemory: Option.Option<SkycotProjectMemory.SkycotProjectMemory["Service"]>;
+  readonly view: SkycotFamilyVisibility.ChildView;
+}) => Effect.Effect<boolean> = Effect.fn("SkycotFamilyHttp.childOwnsProject")(function* (input) {
+  const owner = input.view.owners.projects[input.projectId];
+  if (owner !== undefined) return owner === input.childId;
+  if (
+    Option.isNone(input.projects) ||
+    Option.isNone(input.projections) ||
+    Option.isNone(input.fileSystem) ||
+    Option.isNone(input.projectMemory)
+  )
+    return false;
+  const projections = input.projections.value;
+  const own = Object.entries(input.view.owners.threads).filter(
+    ([, childId]) => childId === input.childId,
+  );
+  let inside = false;
+  for (const [threadId] of own) {
+    const thread = yield* projections
+      .getThread(threadId as never)
+      .pipe(Effect.orElseSucceed(() => null));
+    if (thread !== null && String(thread.projectId) === input.projectId) {
+      inside = true;
+      break;
+    }
+  }
+  if (!inside) return false;
+  const project = yield* input.projects.value
+    .get(input.projectId as never)
+    .pipe(Effect.orElseSucceed(() => Option.none()));
+  if (Option.isNone(project)) return false;
+  const real = yield* input.fileSystem.value
+    .realPath(project.value.workspaceRoot)
+    .pipe(Effect.orElseSucceed(() => null));
+  return real === null ? false : yield* input.projectMemory.value.isSkycotCreatedFolder(real);
+});
+
+/**
+ * "Put away": hides a project from the children's lists without deleting anything. A child may
+ * put away only a project that is theirs; a grown-up with the settings "yes" may put away any.
+ */
+// nondev-seam: skycot-project-put-away
+const putAwayProjectRoute = route(
+  "POST",
+  "/projects/put-away",
+  AuthOrchestrationOperateScope,
+  ({ family, body, sessionId, who, childView, projects, projections, fileSystem, projectMemory }) =>
+    Effect.gen(function* () {
+      const projectId = text(body["projectId"]);
+      if (projectId.length === 0) return json({ error: "invalid-request" }, 400);
+      if (who.kind !== "child" && (yield* family.allows({ sessionId, purpose: "settings" }))) {
+        const status = yield* family.putAwayProject({ projectId, childId: null, by: "grown-up" });
+        return json(status);
+      }
+      if (childView === null) return json(NOT_YOURS, 403);
+      const owns = yield* childOwnsProject({
+        childId: childView.childId,
+        projectId,
+        projects,
+        projections,
+        fileSystem,
+        projectMemory,
+        view: childView,
+      });
+      if (!owns) return json(NOT_YOURS, 403);
+      const status = yield* family.putAwayProject({
+        projectId,
+        childId: childView.childId,
+        by: "child",
+      });
+      return json(status);
+    }),
+);
+
+/**
+ * "Bring back": a grown-up's settings "yes" always works. A child may only take back what they
+ * themselves put away a moment ago (the Undo); a child device can never go further.
+ */
+// nondev-seam: skycot-project-put-away
+const bringBackProjectRoute = route(
+  "POST",
+  "/projects/bring-back",
+  AuthOrchestrationOperateScope,
+  ({ family, body, sessionId, who, childView }) =>
+    Effect.gen(function* () {
+      const projectId = text(body["projectId"]);
+      if (projectId.length === 0) return json({ error: "invalid-request" }, 400);
+      if (who.kind !== "child" && (yield* family.allows({ sessionId, purpose: "settings" }))) {
+        const status = yield* family.bringBackProject({ projectId });
+        return status === null ? json(NOT_YOURS, 403) : json(status);
+      }
+      if (childView === null) return json(NOT_YOURS, 403);
+      const status = yield* family.bringBackProject({
+        projectId,
+        undoByChild: childView.childId,
+      });
+      return status === null ? json(NOT_YOURS, 403) : json(status);
+    }),
+);
+
+/** "For the kids": a developer project shown to (or hidden again from) the children. Grown-ups only. */
+// nondev-seam: skycot-project-put-away
+const kidsVisibleProjectRoute = route(
+  "POST",
+  "/projects/kids-visible",
+  AuthOrchestrationOperateScope,
+  ({ family, body, sessionId, who }) =>
+    Effect.gen(function* () {
+      const projectId = text(body["projectId"]);
+      if (projectId.length === 0 || typeof body["visible"] !== "boolean")
+        return json({ error: "invalid-request" }, 400);
+      if (who.kind === "child" || !(yield* family.allows({ sessionId, purpose: "settings" })))
+        return json(NOT_YOURS, 403);
+      const status = yield* family.setKidsVisibleProject({ projectId, visible: body["visible"] });
+      return json(status);
+    }),
+);
+
 // nondev-seam: skycot-project-memory
 const stopRememberedStartRoute = route(
   "POST",
@@ -1119,6 +1276,28 @@ const pageInternetAskRoute = madeRoute(
         }),
       });
     }),
+);
+
+/**
+ * A saved fridge card, by its hash. The hash names exactly one picture (it changes with the
+ * page), so the answer can be kept for a long time; a name that is not a hash finds nothing.
+ */
+// nondev-seam: skycot-fridge-card-store
+const fridgeCardRoute = madeRoute("GET", "/fridge/card", ({ fridge, query }) =>
+  Effect.gen(function* () {
+    const svg = yield* fridge.card(query.get("hash") ?? "");
+    if (svg === null) return json({ error: "invalid-request" }, 404);
+    return HttpServerResponse.text(svg, {
+      status: 200,
+      contentType: "image/svg+xml",
+      headers: {
+        "cache-control": "private, max-age=31536000, immutable",
+        // A picture only: nothing in it may load or run, whatever it holds.
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }),
 );
 
 const fridgePageRoute = madeRoute("GET", "/fridge/page", ({ fridge, query, childView }) =>
@@ -1843,6 +2022,7 @@ export const layerMadeRoutes = Layer.mergeAll(
   pageInternetAskRoute,
   fridgePinRoute,
   fridgePageRoute,
+  fridgeCardRoute,
 );
 
 /** The profile's own routes. */
@@ -1873,6 +2053,9 @@ export const layerCore = Layer.mergeAll(
   allowPageInternetRoute,
   stopPageInternetRoute,
   stopProjectApprovalRoute,
+  putAwayProjectRoute,
+  bringBackProjectRoute,
+  kidsVisibleProjectRoute,
   stopRememberedStartRoute,
   trustedAddOnsRoute,
   lockRoute,

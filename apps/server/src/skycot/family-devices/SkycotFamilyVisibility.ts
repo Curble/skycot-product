@@ -74,6 +74,12 @@ export class SkycotFamilyVisibility extends Context.Service<
     readonly searchableThreadIds: (
       sessionId: string,
     ) => Effect.Effect<ReadonlyArray<ThreadId> | null>;
+    /**
+     * Every project whose folder is a code checkout (shown or not to the kids): Settings lists
+     * them with a "Show to the kids" switch.
+     */
+    // nondev-seam: skycot-project-put-away
+    readonly developerProjectIds: Effect.Effect<ReadonlyArray<string>>;
     /** Whether a child's device may use everything a call names. */
     readonly allows: (
       view: ChildView,
@@ -117,7 +123,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
   const questionsRoot = yield* SkycotQuestions.questionsRootOption;
 
   // Children keep their own conversations, but a code checkout is not a place of their own.
-  const grownUpProjectIds = Effect.fnUntraced(function* () {
+  const grownUpProjectIds = Effect.fnUntraced(function* (shownToKids: ReadonlySet<string>) {
     const rows = yield* projects.list().pipe(Effect.orElseSucceed(() => []));
     const ids = new Set<string>();
     const hasFile = (target: string) =>
@@ -134,6 +140,8 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
       const hasPackageFiles =
         (yield* hasFile(path.join(root, "package.json"))) ||
         (yield* hasFile(path.join(root, "pnpm-workspace.yaml")));
+      // "For the kids": a grown-up switched this developer project on for the children.
+      if (shownToKids.has(String(row.projectId))) continue;
       if (
         projectLooksGrownUp({
           isEngineFolder,
@@ -177,11 +185,18 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
           : null;
     if (childId === null) return null;
     const today = yield* limits.today;
+    // An unreadable profile hides nothing extra and shows nothing extra (the stricter default).
+    const status = yield* family.status.pipe(Effect.option);
+    const shownToKids = new Set(Option.isSome(status) ? status.value.kidsVisibleProjects : []);
+    const putAway = new Set(
+      Option.isSome(status) ? status.value.projectArchives.map((entry) => entry.projectId) : [],
+    );
     return {
       childId,
       owners: { threads: today.threads, projects: yield* projectOwners(today.projects) },
       pinned: yield* readPins(fs, pinsFile),
-      grownUpProjects: yield* grownUpProjectIds(),
+      grownUpProjects: yield* grownUpProjectIds(shownToKids),
+      archivedProjects: putAway,
       ...(who.kind === "shared" ? { sharedSession: true } : {}),
     } satisfies ChildView;
   });
@@ -235,6 +250,7 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
 
   const projectAllowed = Effect.fnUntraced(function* (view: ChildView, projectId: string) {
     if (view.grownUpProjects?.has(projectId)) return false;
+    if (view.archivedProjects?.has(projectId)) return false;
     if (view.sharedSession) return childSeesProject(view.childId, projectId, view.owners);
     if (childSeesProject(view.childId, projectId, view.owners)) return true;
     return childSeesProject(view.childId, projectId, view.owners, yield* ownThreadProjects(view));
@@ -345,8 +361,11 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
       Stream.filter((item): item is OrchestrationV2ArchivedShellStreamItem => item !== null),
     );
 
+  const developerProjectIds = Effect.map(grownUpProjectIds(new Set()), (ids) => [...ids]);
+
   return SkycotFamilyVisibility.of({
     childViewFor,
+    developerProjectIds,
     searchableThreadIds,
     allows,
     filterShellStream,

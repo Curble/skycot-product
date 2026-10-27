@@ -4,20 +4,31 @@ export const MAX_THUMBNAIL_CACHE_PAGES = 100;
 
 const svgCache = new Map<string, string>();
 
+const svgKey = (pagePath: string, contentHash: string) => `${pagePath}\n${contentHash}`;
+
+/** The picture already drawn in this run, if any (the fast path before the card files). */
+// nondev-seam: skycot-fridge-card-store
+export const peekSvgThumbnail = (pagePath: string, contentHash: string): string | null =>
+  svgCache.get(svgKey(pagePath, contentHash)) ?? null;
+
+// nondev-seam: skycot-fridge-card-store
+export function storeSvgThumbnail(pagePath: string, contentHash: string, svg: string): void {
+  svgCache.set(svgKey(pagePath, contentHash), svg);
+  if (svgCache.size > MAX_THUMBNAIL_CACHE_PAGES) {
+    svgCache.delete(svgCache.keys().next().value!);
+  }
+}
+
 // nondev-seam: skycot-q51-fridge-svg-cache
 export function cachedSvgThumbnail(
   pagePath: string,
   contentHash: string,
   create: () => string,
 ): string {
-  const key = `${pagePath}\n${contentHash}`;
-  const cached = svgCache.get(key);
-  if (cached !== undefined) return cached;
+  const cached = peekSvgThumbnail(pagePath, contentHash);
+  if (cached !== null) return cached;
   const svg = create();
-  svgCache.set(key, svg);
-  if (svgCache.size > MAX_THUMBNAIL_CACHE_PAGES) {
-    svgCache.delete(svgCache.keys().next().value!);
-  }
+  storeSvgThumbnail(pagePath, contentHash, svg);
   return svg;
 }
 

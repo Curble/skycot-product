@@ -10,6 +10,7 @@ interface ToastValue {
   readonly id: number;
   readonly message: string;
   readonly action: ToastAction | null;
+  readonly ms: number;
 }
 
 /** Long enough to read and reach for Undo; a pointer resting on the toast keeps it. */
@@ -31,8 +32,12 @@ function subscribe(listener: () => void) {
 }
 
 /** One toast at a time, like the Finder's: a new one replaces the last. */
-export function showToast(message: string, action: ToastAction | null = null): void {
-  current = { id: nextId++, message, action };
+export function showToast(
+  message: string,
+  action: ToastAction | null = null,
+  ms: number = TOAST_MS,
+): void {
+  current = { id: nextId++, message, action, ms };
   emit();
 }
 
@@ -135,7 +140,7 @@ export function ToastHost() {
   const place = useToastPlace(toast !== null);
   useEffect(() => {
     if (toast === null || held) return;
-    const timer = window.setTimeout(() => dismissToast(toast.id), TOAST_MS);
+    const timer = window.setTimeout(() => dismissToast(toast.id), toast.ms);
     return () => window.clearTimeout(timer);
   }, [toast, held]);
   return createPortal(

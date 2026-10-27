@@ -53,6 +53,7 @@ import * as SkycotFamilyVisibility from "./SkycotFamilyVisibility.ts";
 import {
   filterShellSnapshot,
   folderOwner,
+  makeShellItemFilter,
   projectLooksGrownUp,
   referencedBy,
 } from "./visibility.ts";
@@ -60,6 +61,7 @@ import {
 // nondev-seam: skycot-page-internet-approver-test
 // nondev-seam: skycot-project-approval-fingerprint-test
 // nondev-seam: skycot-approval-batches-test
+// nondev-seam: skycot-project-put-away-test
 
 describe("page ask fingerprints", () => {
   it("binds the child, conversation, page and sorted exact sites", () => {
@@ -206,6 +208,8 @@ const THREADS: ReadonlyArray<FakeThread> = [
 const PROJECTS = [
   { projectId: "project-family", workspaceRoot: "/p/family", title: "Family" },
   { projectId: "project-leo", workspaceRoot: "/p/leo", title: "Leo's games" },
+  // The engine's own folder: a code checkout, hidden from children unless a grown-up shows it.
+  { projectId: "project-code", workspaceRoot: process.cwd(), title: "Code" },
 ];
 
 const shellOf = (thread: FakeThread) =>
@@ -544,6 +548,81 @@ it.layer(NodeServices.layer)("who is who", (it) => {
     ),
   );
 
+  // nondev-seam: skycot-project-put-away-test
+  it.effect("a put-away project leaves the child's lists and calls, not the grown-up's", () =>
+    withWorld(({ family, visibility }) =>
+      Effect.gen(function* () {
+        const status = yield* family.putAwayProject({
+          projectId: "project-family",
+          childId: null,
+          by: "grown-up",
+        });
+        assert.deepEqual(
+          status.projectArchives.map((entry) => entry.projectId),
+          ["project-family"],
+        );
+        const snapshot: OrchestrationV2ShellStreamItem = {
+          kind: "snapshot",
+          snapshot: {
+            schemaVersion: 1,
+            snapshotSequence: 1,
+            threads: THREADS.map(shellOf),
+            archivedThreads: [],
+            projects: PROJECTS.map((project) => ({ id: project.projectId as ProjectId }) as never),
+          },
+        };
+        const idsFor = (sessionId: string) =>
+          Stream.runCollect(
+            visibility.filterShellStream(sessionId, Stream.fromIterable([snapshot])),
+          ).pipe(
+            Effect.map((seen) => {
+              const first = Array.from(seen)[0]!;
+              return first.kind === "snapshot"
+                ? {
+                    threads: first.snapshot.threads.map((thread) => String(thread.id)),
+                    projects: first.snapshot.projects.map((project) => String(project.id)),
+                  }
+                : null;
+            }),
+          );
+        const ava = yield* idsFor("ava-ipad");
+        assert.notInclude(ava!.projects, "project-family");
+        assert.notInclude(ava!.threads, "thread-ava");
+        assert.include((yield* idsFor("mum-phone"))!.projects, "project-family");
+        const view = (yield* visibility.childViewFor("ava-ipad"))!;
+        assert.isFalse(
+          yield* visibility.allows(
+            view,
+            { threadIds: [], projectIds: ["project-family"], folders: [] },
+            "use",
+          ),
+        );
+        yield* family.bringBackProject({ projectId: "project-family" });
+        assert.include((yield* idsFor("ava-ipad"))!.projects, "project-family");
+      }),
+    ),
+  );
+
+  // nondev-seam: skycot-project-put-away-test
+  it.effect("a code checkout stays hidden from the kids until a grown-up shows it", () =>
+    withWorld(({ family, visibility }) =>
+      Effect.gen(function* () {
+        const hidden = (yield* visibility.childViewFor("ava-ipad"))!;
+        assert.isTrue(hidden.grownUpProjects?.has("project-code"));
+        const status = yield* family.setKidsVisibleProject({
+          projectId: "project-code",
+          visible: true,
+        });
+        assert.deepEqual(status.kidsVisibleProjects, ["project-code"]);
+        const shown = (yield* visibility.childViewFor("ava-ipad"))!;
+        assert.isFalse(shown.grownUpProjects?.has("project-code") ?? false);
+        yield* family.setKidsVisibleProject({ projectId: "project-code", visible: false });
+        const again = (yield* visibility.childViewFor("ava-ipad"))!;
+        assert.isTrue(again.grownUpProjects?.has("project-code"));
+      }),
+    ),
+  );
+
   it.effect("a grown-up's phone may read, and may not send, start, change or open files", () =>
     withWorld(({ gate }) =>
       Effect.gen(function* () {
@@ -750,6 +829,50 @@ describe("who is who: pure parts", () => {
       ["a"],
     );
     assert.deepEqual(filtered.projects, []);
+  });
+
+  // nondev-seam: skycot-project-put-away-test
+  it("hides a put-away project, its conversations and its live updates from the child", () => {
+    const view = {
+      childId: "ava",
+      owners: { threads: { a: "ava", b: "ava" }, projects: { pa: "ava", pb: "ava" } },
+      pinned: new Set<string>(),
+      archivedProjects: new Set(["pa"]),
+    };
+    const filtered = filterShellSnapshot(view, {
+      schemaVersion: 1,
+      snapshotSequence: 1,
+      threads: [
+        { id: "a", projectId: "pa" },
+        { id: "b", projectId: "pb" },
+      ] as never,
+      archivedThreads: [{ id: "a", projectId: "pa" }] as never,
+      projects: [{ id: "pa" }, { id: "pb" }] as never,
+    });
+    assert.deepEqual(
+      filtered.threads.map((thread) => thread.id),
+      ["b"],
+    );
+    assert.deepEqual(filtered.archivedThreads, []);
+    assert.deepEqual(
+      filtered.projects.map((project) => project.id),
+      ["pb"],
+    );
+    const live = makeShellItemFilter();
+    assert.isNull(
+      live(view, { kind: "project.updated", sequence: 2, project: { id: "pa" } } as never),
+    );
+    assert.isNull(
+      live(view, {
+        kind: "thread.updated",
+        sequence: 3,
+        location: "active",
+        thread: { id: "a", projectId: "pa" },
+      } as never),
+    );
+    assert.isNotNull(
+      live(view, { kind: "project.updated", sequence: 4, project: { id: "pb" } } as never),
+    );
   });
 });
 
