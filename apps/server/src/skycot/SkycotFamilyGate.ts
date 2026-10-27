@@ -132,20 +132,22 @@ export const CHILD_DEVICE_CLOSED_METHODS: ReadonlySet<string> = new Set([
   "agentSessions.scan",
   "agentSessions.import",
   "server.listAcpRegistrySessions",
+  // The discovery response includes the parent's authenticated GitHub account names.
+  WS_METHODS.serverDiscoverSourceControl,
   "pullRequests.linkedThreads",
 ]);
 
 /**
- * Grown-up furniture a chosen child must not read, on their own device or on the shared Mac
- * (until a grown-up's code opens grown-up mode): the automations list and their webhook logs.
- * The source-control discovery (which names the parent's GitHub account) stays open because a
- * child's Publish step needs it after the code; the client keeps the "Who can help" page shut.
+ * Grown-up details a chosen child must not read, on their own device or on the shared Mac (until
+ * a grown-up's code opens grown-up mode): automations, webhook logs, and source-control identity.
  */
+// nondev-seam: skycot-q57-hide-source-control-identity
 export const CHILD_VIEW_CLOSED_METHODS: ReadonlySet<string> = new Set([
   WS_METHODS.scheduledTasksList,
   WS_METHODS.scheduledTasksSubscribe,
   WS_METHODS.scheduledTasksListWebhookDeliveries,
   WS_METHODS.scheduledTasksGetWebhookDelivery,
+  WS_METHODS.serverDiscoverSourceControl,
 ]);
 
 /** Calls that only read a file, where a page pinned to the fridge stays open to every child. */

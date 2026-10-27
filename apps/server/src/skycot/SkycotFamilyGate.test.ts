@@ -227,6 +227,15 @@ it.layer(NodeServices.layer)("project-cover descriptions", (it) => {
 });
 
 describe("gateNeedFor", () => {
+  // nondev-seam: skycot-q57-hide-source-control-identity-test
+  it("closes parent source-control identity to child views and devices", () => {
+    const method = WS_METHODS.serverDiscoverSourceControl;
+    assert.isTrue(SkycotFamilyGate.CHILD_VIEW_CLOSED_METHODS.has(method));
+    assert.isTrue(SkycotFamilyGate.CHILD_DEVICE_CLOSED_METHODS.has(method));
+    assert.isTrue(SkycotFamilyGate.grownUpDeviceMayCall(method));
+    assert.isNull(SkycotFamilyGate.gateNeedFor(method, {}));
+  });
+
   it("leaves ordinary work open", () => {
     for (const [method, payload] of [
       ["git.runStackedAction", { action: "commit" }],
@@ -689,8 +698,15 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         const error = yield* Effect.flip(gate.check(publish));
         assert.equal(error.requiredPermission, SkycotFamilyGate.FAMILY_PERMISSION);
         assert.equal(error.message, SkycotFamilyGate.FAMILY_REFUSAL_MESSAGE);
+        const publishRepository = {
+          sessionId: SESSION,
+          method: WS_METHODS.sourceControlPublishRepository,
+          payload: {},
+        };
+        assert.isTrue(yield* refused(gate.check(publishRepository)));
         yield* family.verify({ code: CODE, purpose: "publish", sessionId: SESSION });
         assert.isFalse(yield* refused(gate.check(publish)));
+        assert.isFalse(yield* refused(gate.check(publishRepository)));
         assert.isTrue(yield* refused(gate.check({ ...publish, sessionId: "session-2" })));
       }),
     ),
