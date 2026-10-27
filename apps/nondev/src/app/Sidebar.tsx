@@ -38,7 +38,7 @@ import {
   navigate,
   type Route,
 } from "../router";
-import { threadHref } from "../router";
+import { settingsHref, threadHref } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf, type ConversationRow } from "../state/conversations";
 import { environmentProjects, projectEnvironment } from "../state/projects";
@@ -547,6 +547,7 @@ export function AppSidebar({
               onSwitch={() => select(openChildPicker)}
               onChildSettings={sheets.openChildSettings}
               onSettings={() => select(() => navigate(SETTINGS_HREF))}
+              onHelp={() => select(() => navigate(settingsHref("help")))}
               onHandBack={() => {
                 void lockFamilyGrants();
                 endGrownUpSession();
@@ -781,6 +782,7 @@ export function ProfileMenu({
   onSwitch,
   onChildSettings,
   onSettings,
+  onHelp,
   onHandBack,
 }: {
   readonly childView: boolean;
@@ -789,6 +791,8 @@ export function ProfileMenu({
   readonly onSwitch: () => void;
   readonly onChildSettings: () => void;
   readonly onSettings: () => void;
+  /** Grown-up menu only: opens Settings › Help & feedback. */
+  readonly onHelp: () => void;
   readonly onHandBack: () => void;
 }) {
   const person = childView ? child : grownUp;
@@ -843,6 +847,14 @@ export function ProfileMenu({
                 }}
               >
                 Settings
+              </MenuItem>
+              <MenuItem
+                onSelect={() => {
+                  close();
+                  onHelp();
+                }}
+              >
+                Help
               </MenuItem>
               <MenuItem
                 onSelect={() => {

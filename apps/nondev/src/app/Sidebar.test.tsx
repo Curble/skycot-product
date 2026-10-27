@@ -33,6 +33,7 @@ describe("Sidebar identity in the child view", () => {
         onSwitch={vi.fn()}
         onChildSettings={vi.fn()}
         onSettings={vi.fn()}
+        onHelp={vi.fn()}
         onHandBack={vi.fn()}
       />,
     );

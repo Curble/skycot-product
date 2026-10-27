@@ -23,6 +23,7 @@ import { AiAssistantsPane } from "./panes/AiAssistantsPane";
 import { AppearancePane } from "./panes/AppearancePane";
 import { AutonomyPane } from "./panes/AutonomyPane";
 import { FamilyPane } from "./panes/FamilyPane";
+import { HelpPane } from "./panes/HelpPane";
 import { NotificationsPane } from "./panes/NotificationsPane";
 import { PrivacyPane } from "./panes/PrivacyPane";
 import { SharingPane } from "./panes/SharingPane";
@@ -223,6 +224,8 @@ function Pane({
       return <PrivacyPane environmentId={environmentId} />;
     case "advanced":
       return <AdvancedPane />;
+    case "help":
+      return <HelpPane environmentId={environmentId} />;
     case "about":
       return <AboutPane environmentId={environmentId} />;
   }

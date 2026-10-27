@@ -798,7 +798,8 @@ variable and still carries upstream's default.
 
 ## Child source-control identity (27 October 2026)
 
-| id                                           | file                                              | change                                                                                           | marker                                                         |
-| -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| skycot-q57-hide-source-control-identity      | `apps/server/src/skycot/SkycotFamilyGate.ts`      | Closes account discovery to a selected child and child devices while preserving grown-up access. | `// nondev-seam: skycot-q57-hide-source-control-identity`      |
-| skycot-q57-hide-source-control-identity-test | `apps/server/src/skycot/SkycotFamilyGate.test.ts` | Covers child identity closure, grown-up discovery access and publishing after the parent code.   | `// nondev-seam: skycot-q57-hide-source-control-identity-test` |
+| id                                           | file                                              | change                                                                                                                  | marker                                                         |
+| -------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| skycot-q57-hide-source-control-identity      | `apps/server/src/skycot/SkycotFamilyGate.ts`      | Closes account discovery to a selected child and child devices while preserving grown-up access.                        | `// nondev-seam: skycot-q57-hide-source-control-identity`      |
+| skycot-q57-hide-source-control-identity-test | `apps/server/src/skycot/SkycotFamilyGate.test.ts` | Covers child identity closure, grown-up discovery access and publishing after the parent code.                          | `// nondev-seam: skycot-q57-hide-source-control-identity-test` |
+| skycot-feedback-mailto                       | `apps/desktop/src/electron/ElectronShell.ts`      | Lets mailto: links open the Mail app for the grown-up's Help & feedback pane; every other non-web scheme stays blocked. |

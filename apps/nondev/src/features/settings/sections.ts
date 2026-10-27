@@ -1,6 +1,7 @@
 import {
   Bell,
   Bot,
+  HelpCircle,
   Info,
   Laptop,
   Lock,
@@ -90,6 +91,13 @@ export const SECTIONS: ReadonlyArray<SectionMeta> = [
     summary: "Developer interface",
     icon: Wrench,
     tone: "grey",
+  },
+  {
+    id: "help",
+    label: "Help & feedback",
+    summary: "Guides, or tell us something",
+    icon: HelpCircle,
+    tone: "blue",
   },
   { id: "about", label: "About", summary: "Version and credits", icon: Info, tone: "blue" },
 ];

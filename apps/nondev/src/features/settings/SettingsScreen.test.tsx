@@ -13,6 +13,7 @@ describe("Settings in the child view", () => {
     expect(html).toContain("Voice");
     expect(html).not.toContain("AI assistants");
     expect(html).not.toContain("Sharing &amp; review");
+    expect(html).not.toContain("Help &amp; feedback");
   });
 
   it("shows the grown-up sections once the parent code has opened them", () => {
@@ -21,5 +22,11 @@ describe("Settings in the child view", () => {
     expect(ids).toContain("family");
     expect(ids).toContain("assistants");
     expect(ids).not.toContain("advanced");
+  });
+
+  it("offers Help & feedback to grown-ups only", () => {
+    expect(visibleSettingsSections(true, false).map((entry) => entry.id)).toContain("help");
+    expect(visibleSettingsSections(false, false).map((entry) => entry.id)).toContain("help");
+    expect(visibleSettingsSections(true, true).map((entry) => entry.id)).not.toContain("help");
   });
 });

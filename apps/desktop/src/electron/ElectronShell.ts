@@ -14,7 +14,10 @@ import * as Electron from "electron";
 // Remote open-in-editor deep links (`vscode://vscode-remote/ssh-remote+…`,
 // `zed://ssh/<host>/<path>`, `jetbrains://gateway/ssh/environment?h=…`) must
 // reach the OS handler; every other non-web scheme stays blocked.
-const SAFE_WEB_PROTOCOLS = new Set(["http:", "https:"]);
+// nondev-seam: skycot-feedback-mailto
+// A grown-up's "Send feedback" opens the Mac's Mail app with a prefilled message (nothing is
+// sent by SKYCOT itself), so mailto: joins the web schemes allowed out.
+const SAFE_WEB_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const REMOTE_EDITOR_PROTOCOLS = new Set(
   REMOTE_CAPABLE_EDITOR_IDS.flatMap((id) => {
     const scheme = remoteSchemeForEditor(id);
