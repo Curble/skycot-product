@@ -112,39 +112,49 @@ export function createSampleTransport(
     const turns = session.chats.get(id) ?? [];
     if (turns.length > 0) {
       const items = projection.visibleTurnItems as Array<{ position: number; item: Loose }>;
-      const userTemplate = items.find((entry) => entry.item.type === "user_message")?.item;
-      const replyTemplate = items.find((entry) => entry.item.type === "assistant_message")?.item;
-      const messageTemplate = (role: string) =>
-        (projection.messages as Array<Loose>).find((m) => m.role === role);
+      // Any item of the thread can lend its bookkeeping fields (ids of the run, node and
+      // provider turn), so a thread with no earlier assistant message (the plan-waiting one)
+      // still gets a complete, finished message of the right shape.
+      const find = (type: string) => items.find((entry) => entry.item.type === type)?.item;
+      const lender = find("user_message") ?? find("assistant_message") ?? items[0]?.item ?? {};
+      const messages = projection.messages as Array<Loose>;
+      const messageLender = messages.find((m) => m.role === "user") ?? messages[0];
       let position = Math.max(0, ...items.map((entry) => entry.position));
       const add = (role: "user" | "assistant", turn: SampleChatTurn, text: string) => {
         const at = new Date(turn.at).toISOString();
         const messageId = `${turn.id}:${role}`;
-        const template = role === "user" ? userTemplate : replyTemplate;
-        const message = messageTemplate(role);
-        if (message !== undefined)
-          projection.messages.push({
-            ...clone(message),
-            id: messageId,
-            text,
-            createdAt: at,
-            updatedAt: at,
-          });
-        if (template !== undefined) {
-          const item = {
-            ...clone(template),
-            id: `${turn.id}:${role}:item`,
-            messageId,
-            text,
-            streaming: false,
-            startedAt: at,
-            completedAt: at,
-            updatedAt: at,
-          };
-          position += 1;
-          items.push({ position, item });
-          projection.turnItems.push(item);
-        }
+        const own = find(role === "user" ? "user_message" : "assistant_message");
+        const message = {
+          createdBy: role === "user" ? "user" : "agent",
+          creationSource: role === "user" ? "mobile" : "provider",
+          ...(messageLender === undefined ? {} : clone(messageLender)),
+          id: messageId,
+          threadId: projection.thread.id,
+          role,
+          text,
+          attachments: [],
+          streaming: false,
+          createdAt: at,
+          updatedAt: at,
+        };
+        messages.push(message);
+        const item = {
+          ...clone(own ?? lender),
+          id: `${turn.id}:${role}:item`,
+          type: role === "user" ? "user_message" : "assistant_message",
+          messageId,
+          text,
+          attachments: [],
+          streaming: false,
+          status: "completed",
+          startedAt: at,
+          completedAt: at,
+          updatedAt: at,
+        };
+        if (role === "user") (item as Loose).inputIntent ??= "chat";
+        position += 1;
+        items.push({ position, item });
+        projection.turnItems.push(item);
       };
       for (const turn of turns) {
         add("user", turn, turn.text);

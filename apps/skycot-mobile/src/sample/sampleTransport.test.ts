@@ -376,4 +376,37 @@ describe("the sample remembers what you do, for the life of the sample", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(socketSpy).not.toHaveBeenCalled();
   });
+
+  it("Sam's reply is the last thing drawn in every sample thread", async () => {
+    for (const make of [grownUp, child]) {
+      const transport = make();
+      const shell = await readShell(transport);
+      expect(shell.threads.length).toBeGreaterThan(0);
+      for (const thread of shell.threads) {
+        await sendMessage(transport, { threadId: thread.id, text: "hello" });
+        const projection = await readThread(transport, thread.id);
+        const entries = buildTimeline(projection, {
+          projectRoot: "/sample",
+          assistantName: "Sam",
+          childView: transport === undefined ? false : make === child,
+        });
+        expect(entries.at(-2)).toMatchObject({ kind: "me", text: "hello" });
+        expect(entries.at(-1)).toMatchObject({
+          kind: "crew",
+          text: SAMPLE_SAM_REPLY,
+          streaming: false,
+        });
+        const items = projection.visibleTurnItems;
+        expect(items.at(-1)!.item).toMatchObject({
+          type: "assistant_message",
+          status: "completed",
+          text: SAMPLE_SAM_REPLY,
+        });
+        expect(projection.messages.at(-1)).toMatchObject({
+          role: "assistant",
+          text: SAMPLE_SAM_REPLY,
+        });
+      }
+    }
+  });
 });

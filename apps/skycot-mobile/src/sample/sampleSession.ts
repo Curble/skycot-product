@@ -7,7 +7,7 @@
  */
 
 export const SAMPLE_SAM_REPLY =
-  "In the sample, Sam just says hello — link your Mac to build for real.";
+  "In the sample, Sam just says hello — link your Mac to make things for real.";
 
 export type SampleDecision = "accept" | "decline";
 
