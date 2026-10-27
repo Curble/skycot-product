@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   CHILD_PICK_MEMORY_MS,
   canReuseCurrentChild,
+  freshTabChildAction,
   bufferPickerCode,
   pickerAfterIdle,
   PICKER_IDLE_MS,
@@ -47,6 +48,31 @@ describe("the shared Mac child picker idle time", () => {
           : null,
       }),
     ).toBe(false);
+  });
+
+  it("runs the eight-hour choice on first load: restore recent, pick after expiry", () => {
+    const rememberedChildId = rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS - 1)
+      ? "ava"
+      : null;
+    expect(
+      freshTabChildAction({
+        childCount: 2,
+        currentChildId: "leo",
+        needsChoice: false,
+        rememberedChildId,
+      }),
+    ).toBe("restore");
+    const expiredChildId = rememberedChildIsFresh(1_000, 1_000 + CHILD_PICK_MEMORY_MS)
+      ? "ava"
+      : null;
+    expect(
+      freshTabChildAction({
+        childCount: 2,
+        currentChildId: "ava",
+        needsChoice: false,
+        rememberedChildId: expiredChildId,
+      }),
+    ).toBe("pick");
   });
 
   it("keeps the picker for explicit switches and multi-child choices only", () => {

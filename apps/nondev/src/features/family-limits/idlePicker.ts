@@ -76,3 +76,16 @@ export function canReuseCurrentChild(input: {
     input.currentChildId === input.rememberedChildId
   );
 }
+
+export function freshTabChildAction(input: {
+  readonly childCount: number;
+  readonly currentChildId: string | null;
+  readonly needsChoice: boolean;
+  readonly rememberedChildId: string | null;
+}): "reuse" | "restore" | "pick" {
+  if (input.childCount < 2) return input.needsChoice ? "restore" : "reuse";
+  if (input.rememberedChildId === null) return "pick";
+  return input.needsChoice || input.currentChildId !== input.rememberedChildId
+    ? "restore"
+    : "reuse";
+}

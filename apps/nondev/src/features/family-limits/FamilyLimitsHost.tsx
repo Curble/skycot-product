@@ -22,6 +22,7 @@ import {
 import {
   forgetRememberedChild,
   canReuseCurrentChild,
+  freshTabChildAction,
   pickerAfterIdle,
   PICKER_IDLE_MS,
   rememberedChild,
@@ -127,32 +128,36 @@ export function FamilyLimitsHost() {
     restoreAttempted.current = true;
     const asleep = session?.limits?.asleep === true;
     if (asleep) forgetRememberedChild();
-    if (
-      !asleep &&
-      !view.needsChoice &&
-      canReuseCurrentChild({
-        childCount: view.children.length,
-        currentChildId: view.currentChildId,
-        rememberedChildId: rememberedChild(Date.now()),
-      })
-    ) {
+    if (asleep) return;
+    const savedId = rememberedChild(Date.now());
+    const saved = view.children.find((entry) => entry.id === savedId);
+    const inheritedChildIsRecent = canReuseCurrentChild({
+      childCount: view.children.length,
+      currentChildId: view.currentChildId,
+      rememberedChildId: saved?.id ?? null,
+    });
+    const action = freshTabChildAction({
+      childCount: view.children.length,
+      currentChildId: view.currentChildId,
+      needsChoice: view.needsChoice,
+      rememberedChildId: saved?.id ?? null,
+    });
+    const restore = action === "restore" ? (saved ?? view.children[0]) : undefined;
+    if (restore) {
+      void chooseChild(restore.id).then((result) => {
+        if (result.ok) {
+          rememberChild(restore.id, Date.now());
+          rememberPicked();
+          setPicked(true);
+        }
+      });
+    } else if (action === "reuse" && (inheritedChildIsRecent || view.children.length === 1)) {
       // A fresh tab may inherit the Mac's selected child, while its session storage is empty.
       rememberPicked();
       setPicked(true);
-    }
-    if (view.needsChoice && !asleep) {
-      const saved = rememberedChild(Date.now());
-      const child = view.children.find((entry) => entry.id === saved);
-      const restore = child ?? (view.children.length === 1 ? view.children[0] : undefined);
-      if (restore) {
-        void chooseChild(restore.id).then((result) => {
-          if (result.ok) {
-            rememberChild(restore.id, Date.now());
-            rememberPicked();
-            setPicked(true);
-          }
-        });
-      }
+    } else if (view.children.length > 1) {
+      // The engine can still have yesterday's child selected when this tab has no fresh choice.
+      openChildPicker();
     }
   }, [engineKnown, session, view.children, view.me.kind, view.needsChoice]);
   // Only a change from open to closed ends it: right after the code, the session is marked a

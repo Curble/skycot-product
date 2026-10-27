@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { PRODUCT_NAME } from "../brand";
 import { IconButton } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
+import { useChildView } from "./useChildView";
 import { useShellState } from "./ShellState";
+import { conversationSearchVisible } from "./searchVisibility";
 import type { Columns } from "./useColumns";
 
 /**
@@ -26,6 +28,7 @@ export function TitleBar({
   readonly showSearch?: boolean;
 }) {
   const shell = useShellState();
+  const childView = useChildView();
   return (
     <header className="fm-titlebar">
       {columns < 3 ? (
@@ -42,7 +45,7 @@ export function TitleBar({
       </h1>
       <span className="fm-titlebar__spacer" />
       {trailing}
-      {showSearch ? (
+      {showSearch && conversationSearchVisible(childView) ? (
         <div className="fm-titlebar__search">
           <SearchField
             value={shell.search}

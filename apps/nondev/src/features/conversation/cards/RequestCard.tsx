@@ -68,6 +68,7 @@ import { useFamily, useFamilySteps } from "../../family/FamilyProvider";
 import { useChildView } from "../../../app/useChildView";
 import { grownUpAnswerLabel, type GrownUpAnswer } from "../../../plain/grownUpAnswers";
 import { useGrownUpAnswers } from "../useGrownUpAnswers";
+import { answeredQuestionNote } from "./answeredQuestion";
 
 type ApprovalItem = Extract<OrchestrationV2TurnItem, { type: "approval_request" }>;
 type QuestionItem = Extract<OrchestrationV2TurnItem, { type: "user_input_request" }>;
@@ -354,11 +355,18 @@ export function RequestCard({
   }, [pendingOnMount]);
 
   // A question the child already answered leaves the thread quietly (their answer shows as
-  // their own message). After every hook above: a card that stops rendering hooks mid-life
-  // crashes the whole window (React's hook order rule), which is what happened the moment a
-  // child pressed "Send my answer" (round 9, 27 Oct 2026).
+  // a small note). After every hook above: changing the hooks in this card mid-life crashes the
+  // whole window (React's hook order rule).
   if (childView && item.type === "user_input_request" && request?.answers !== undefined) {
-    return null;
+    const note = answeredQuestionNote(card.whatItWants, request.answers);
+    return (
+      <Bubble author="crew" full meta={shortTime(request.resolvedAt)}>
+        <div className="fm-request-answer" data-sober="">
+          <p>{note.asked}</p>
+          <p>{note.answered}</p>
+        </div>
+      </Bubble>
+    );
   }
 
   const choose = async (

@@ -39,6 +39,7 @@ import { useCrew } from "../themes/useCrew";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { useShellState } from "./ShellState";
 import { useConnected } from "./useConnection";
+import { conversationSearchVisible } from "./searchVisibility";
 import type { Columns } from "./useColumns";
 
 const GROUP_ORDER: ReadonlyArray<DateGroup> = ["Today", "Yesterday", "This week", "Earlier"];
@@ -144,7 +145,7 @@ export function ConversationList({
           <IconButton icon={SquarePen} label="New conversation" onClick={onCompose} />
         </span>
       </div>
-      {columns === 1 ? (
+      {columns === 1 && conversationSearchVisible(childView) ? (
         <div className="fm-list-column__search">
           <SearchField
             value={shell.search}

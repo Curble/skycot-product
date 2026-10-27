@@ -41,6 +41,13 @@
 .fm-preview-fullscreen .fm-fullscreen-page__enter {
   right: 98px;
 }
+.fm-preview-notice {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  left: 10px;
+  right: 210px;
+}
 .fm-fullscreen-page.is-fullscreen {
   position: fixed;
   z-index: 1000;
@@ -102,6 +109,12 @@
 }
 .fm-fullscreen-page.is-fullscreen .fm-page-internet {
   display: none;
+}
+.fm-fullscreen-page.is-fullscreen .fm-preview-notice {
+  top: max(58px, calc(env(safe-area-inset-top) + 46px));
+  right: max(12px, env(safe-area-inset-right));
+  left: auto;
+  width: min(420px, calc(100% - 24px));
 }
 .fm-sealed-fullscreen {
   display: block;
