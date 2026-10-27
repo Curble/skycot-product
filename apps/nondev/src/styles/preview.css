@@ -91,10 +91,6 @@
 .fm-fullscreen-page__exit:focus-visible {
   opacity: 1;
 }
-/* In full screen the Family notice sits below the Exit pill, never under it. */
-.fm-fullscreen-page.is-fullscreen .fm-preview__notice {
-  margin-top: 54px;
-}
 .fm-fullscreen-page__ask {
   position: absolute;
   z-index: 3;
