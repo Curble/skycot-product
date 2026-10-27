@@ -186,7 +186,8 @@ describe("the last session offer", () => {
   it("is offered once the session has been quiet a while, and never again after Got it", () => {
     window.localStorage.clear();
     expect(shouldOfferLastSession(report("s1", 10 * 60_000), Date.now())).toBe(true);
-    expect(shouldOfferLastSession(report("s2", 30_000), Date.now())).toBe(false);
+    // Seconds after the child stopped is the normal case: the parent just took the Mac over.
+    expect(shouldOfferLastSession(report("s2", 30_000), Date.now())).toBe(true);
     markLastSessionSeen("s1");
     expect(lastSessionSeen("s1")).toBe(true);
     expect(shouldOfferLastSession(report("s1", 10 * 60_000), Date.now())).toBe(false);

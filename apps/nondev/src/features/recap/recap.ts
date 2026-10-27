@@ -319,7 +319,6 @@ export function nothingBuiltSentence(
 }
 
 /** The ways a "last session" can be told apart from one still going: quiet for this long. */
-export const SESSION_QUIET_MS = 3 * 60_000;
 
 const SEEN_SESSIONS = "skycot:recap-seen-sessions";
 const SEEN_KEEP = 50;
@@ -364,7 +363,9 @@ export function shouldOfferLastSession(
   return (
     report.range === "last-session" &&
     session !== undefined &&
-    now - session.endedAt >= SESSION_QUIET_MS &&
+    // A grown-up entering the code IS the end of the child's turn: no quiet wait, or the
+    // sheet would never show in the real flow (child hands the Mac over, parent opens settings).
+    session.endedAt <= now &&
     !lastSessionSeen(session.id)
   );
 }

@@ -102,11 +102,13 @@ describe("the grown-up's last-session recap card", () => {
     expect(host.textContent).toBe("");
   });
 
-  it("stays away while the child is still working, and for other reasons for a code", async () => {
+  it("shows seconds after the child stopped (the parent just took over), not for other codes", async () => {
     fixture.fetchRecap.mockResolvedValue({ ok: true, value: report(60_000) });
     act(() => root.render(<SessionRecapHost />));
     await parentSaysYes();
-    expect(host.textContent).toBe("");
+    expect(host.textContent).toContain("Ava was planning something last time");
+    const gotIt = [...host.querySelectorAll("button")].find((b) => b.textContent === "Got it");
+    act(() => gotIt!.click());
     await parentSaysYes("approve");
     expect(fixture.fetchRecap).toHaveBeenCalledTimes(1);
   });
