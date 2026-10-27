@@ -1,24 +1,27 @@
-// "Here's what Ava made today": the end-of-session card for the grown-up. It comes up when a
-// child's session ends — inside the asleep screen at bedtime or when the day's time runs out
-// (after the parent code), and as a sheet when a parent unlocks SKYCOT with the code while a
-// child has used it today. Once dismissed it stays away for that child until tomorrow.
+// The grown-up's recap cards. "Here's what Ava made today" comes up inside the asleep screen at
+// bedtime or when the day's time runs out (after the parent code). "Here's what Ava did last
+// time" is a sheet when a grown-up opens the Family settings with the parent code and the
+// child's last work session is over; dismissing it ("Got it") keeps it away for that session.
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { CalendarDays, Printer } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { navigate, recapHref } from "../../router";
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
-import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { Mascot } from "../brand/Mascot";
 import { childLabel, type FamilyChild } from "../family/children";
 import { useFamily } from "../family/FamilyProvider";
 import { onParentYes } from "../family/store";
-import { refreshToday } from "../family-limits/store";
 import { fetchRecap } from "./api";
-import type { RecapReport } from "./recap";
+import {
+  markLastSessionSeen,
+  recapHeadline,
+  shouldOfferLastSession,
+  type RecapReport,
+} from "./recap";
 import { RecapReportView } from "./RecapReportView";
 
 const SEEN_PREFIX = "skycot:recap-seen:";
@@ -69,23 +72,29 @@ export function SessionRecapBody({
   );
 }
 
-let offered: string | null = null;
+interface Offer {
+  readonly childId: string;
+  readonly report: RecapReport;
+}
+let offered: Offer | null = null;
 const listeners = new Set<() => void>();
-function setOffered(childId: string | null) {
-  offered = childId;
+function setOffered(next: Offer | null) {
+  offered = next;
   for (const listener of listeners) listener();
 }
 
 /**
- * Mounted once (beside the asleep screen): when a parent unlocks SKYCOT with the code for the
- * Family settings (switching child, changing limits…), the child using this device has used it today, and the
- * card was not dismissed today, it shows "Here's what <child> made today".
+ * Mounted once (beside the asleep screen): when a grown-up opens the Family settings with the
+ * parent code, and the child chosen on this device has a last work session that is over and not
+ * yet dismissed, it shows "Here's what <child> did last time" once. The engine decides where
+ * a session starts and ends; it answers only after the grown-up's "yes", so a child's view never
+ * gets it (and this only runs on a parent code, never on a child's own taps).
  */
 export function SessionRecapHost() {
   const family = useFamily();
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId = environmentIds[0] ?? null;
-  const childId = useSyncExternalStore(
+  const offer = useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
       return () => {
@@ -95,52 +104,30 @@ export function SessionRecapHost() {
     () => offered,
     () => null,
   );
-  const [answer, setAnswer] = useState<{
-    readonly childId: string;
-    readonly report: RecapReport | null;
-    readonly problem: string | null;
-  } | null>(null);
   const current = family.profile.currentChildId;
 
   useEffect(
     () =>
       onParentYes((purpose) => {
         // Advanced mode leaves for the developer interface; the card would only flash.
-        if (purpose !== "settings") return;
-        if (current === null || sessionRecapSeen(current)) return;
-        void refreshToday().then((today) => {
-          const day = today?.children.find((entry) => entry.childId === current);
-          if (day && (day.limits.usedMinutes > 0 || day.limits.turns > 0)) setOffered(current);
+        if (purpose !== "settings" || current === null) return;
+        void fetchRecap(current, "last-session").then((result) => {
+          if (result.ok && shouldOfferLastSession(result.value, Date.now())) {
+            setOffered({ childId: current, report: result.value });
+          }
         });
       }),
     [current],
   );
 
-  useEffect(() => {
-    if (childId === null) return;
-    let cancelled = false;
-    void fetchRecap(childId, "session").then((result) => {
-      if (cancelled) return;
-      setAnswer(
-        result.ok
-          ? { childId, report: result.value, problem: null }
-          : { childId, report: null, problem: result.message },
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [childId]);
-
-  if (childId === null) return null;
-  const report = answer?.childId === childId ? answer.report : null;
-  const problem = answer?.childId === childId ? answer.problem : null;
+  if (offer === null) return null;
+  const { childId, report } = offer;
   const index = family.profile.children.findIndex((child) => child.id === childId);
   const child = index < 0 ? null : family.profile.children[index]!;
   if (child === null) return null;
   const name = childLabel(child, index);
   const close = () => {
-    markSessionRecapSeen(childId);
+    if (report.session) markLastSessionSeen(report.session.id);
     setOffered(null);
   };
   return (
@@ -148,7 +135,7 @@ export function SessionRecapHost() {
       open
       onClose={close}
       art={<Mascot pose="hello" size={56} decorative />}
-      title={`Here's what ${name} made today`}
+      title={recapHeadline(report, name)}
       description="For grown-ups. Kept on this Mac; nothing is emailed or uploaded."
       wide
       actions={
@@ -162,28 +149,22 @@ export function SessionRecapHost() {
           >
             See the week
           </Button>
-          <Button icon={Printer} disabled={report === null} onClick={() => window.print()}>
+          <Button icon={Printer} onClick={() => window.print()}>
             Print or save as PDF
           </Button>
           <Button variant="primary" onClick={close}>
-            Done
+            Got it
           </Button>
         </>
       }
     >
-      {problem ? (
-        <Banner tone="warning">{problem}</Banner>
-      ) : report === null ? (
-        <p className="fm-help">Putting today together…</p>
-      ) : (
-        <SessionRecapBody
-          report={report}
-          child={child}
-          name={name}
-          environmentId={environmentId}
-          hero={false}
-        />
-      )}
+      <SessionRecapBody
+        report={report}
+        child={child}
+        name={name}
+        environmentId={environmentId}
+        hero={false}
+      />
     </Sheet>
   );
 }

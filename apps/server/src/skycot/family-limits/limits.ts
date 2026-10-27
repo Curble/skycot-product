@@ -72,6 +72,60 @@ export function countMinute(day: ChildDay | undefined, now: number, timeZone: st
   return { ...current, minutes: current.minutes + 1, lastMinute: minute };
 }
 
+/**
+ * One stretch of a child using SKYCOT, for the grown-up's "last session" recap.
+ *
+ * The boundary, in plain words: a session starts the first time a child is seen active
+ * (the client's "still here" with the child on screen and touching it) and keeps growing
+ * while that same child stays active. It ends when the child stops being active (a
+ * grown-up took over, bedtime or the day's time ended it, the window closed), which shows
+ * as `endedAt` no longer moving. A new session starts when another child becomes active in
+ * between, or when more than SESSION_GAP_MS passed since this child was last active.
+ * Nothing extra is recorded at the moment of a switch or lock: the next child's first active
+ * minute (or the silence) is what closes the old session.
+ */
+export interface ChildSession {
+  readonly id: string;
+  readonly childId: string;
+  readonly startedAt: number;
+  readonly endedAt: number;
+}
+
+export const SESSION_GAP_MS = 60 * MINUTE;
+export const SESSIONS_KEEP = 100;
+/** A session counts as over once nothing has moved its end for this long. */
+export const SESSION_QUIET_MS = 3 * MINUTE;
+
+/** The list with this child active at `at`: the same list when nothing needs to change. */
+export function trackChildSession(
+  sessions: ReadonlyArray<ChildSession>,
+  childId: string,
+  at: number,
+): ReadonlyArray<ChildSession> {
+  const last = sessions.at(-1);
+  if (
+    last !== undefined &&
+    last.childId === childId &&
+    at >= last.startedAt &&
+    at - last.endedAt <= SESSION_GAP_MS
+  ) {
+    // Same stretch: only move the end when a new minute is reached, so the file isn't rewritten twice a minute.
+    if (at - last.endedAt < MINUTE) return sessions;
+    return [...sessions.slice(0, -1), { ...last, endedAt: at }];
+  }
+  return [...sessions, { id: `${childId}-${at}`, childId, startedAt: at, endedAt: at }].slice(
+    -SESSIONS_KEEP,
+  );
+}
+
+/** The newest session of a child (completed or still running), or null. */
+export function lastChildSession(
+  sessions: ReadonlyArray<ChildSession>,
+  childId: string,
+): ChildSession | null {
+  return sessions.findLast((session) => session.childId === childId) ?? null;
+}
+
 export function countTurn(day: ChildDay | undefined, now: number, timeZone: string): ChildDay {
   const counted = countMinute(day, now, timeZone);
   return { ...counted, turns: counted.turns + 1 };

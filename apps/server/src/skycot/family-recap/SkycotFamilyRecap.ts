@@ -15,6 +15,7 @@ import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as SkycotFamilyLimits from "../family-limits/SkycotFamilyLimits.ts";
 import * as SkycotFamilyGate from "../SkycotFamilyGate.ts";
+import { lastChildSession } from "../family-limits/limits.ts";
 import { buildRecap, rangeStart, type RecapRange, type RecapReport } from "./recap.ts";
 import { loadThread } from "./threads.ts";
 import * as SkycotQuestions from "../questions/SkycotQuestions.ts";
@@ -48,7 +49,18 @@ const make = Effect.gen(function* () {
       if (!snapshot.profile.children.some((child) => child.id === input.childId)) return null;
       const now = yield* Clock.currentTimeMillis;
       const timeZone = snapshot.profile.timeZone;
-      const from = rangeStart(input.range, now, timeZone);
+      // "last-session": exactly the child's latest work session (one minute of slack at the end,
+      // so the last turn's files still count). No session yet means nothing to report.
+      const session =
+        input.range === "last-session"
+          ? lastChildSession(snapshot.activity.childSessions ?? [], input.childId)
+          : null;
+      if (input.range === "last-session" && session === null) return null;
+      const window =
+        session === null
+          ? undefined
+          : { from: session.startedAt, to: Math.min(now, session.endedAt + 60_000) };
+      const from = window?.from ?? rangeStart(input.range, now, timeZone);
       const threads = [];
       for (const [threadId, childId] of Object.entries(snapshot.activity.threads)) {
         if (childId !== input.childId) continue;
@@ -77,6 +89,7 @@ const make = Effect.gen(function* () {
         timeZone,
         activity: snapshot.activity,
         threads,
+        ...(window === undefined || session === null ? {} : { window, session }),
       });
     },
   );

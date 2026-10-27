@@ -9,6 +9,9 @@ import {
   dayAt,
   evaluateLimits,
   freshDay,
+  lastChildSession,
+  SESSION_GAP_MS,
+  trackChildSession,
   type ChildDay,
 } from "./limits.ts";
 
@@ -200,5 +203,32 @@ describe("allowanceReading", () => {
     expect(
       allowanceReading({ driver: "codex", auth: { status: "authenticated" } } as never, 0),
     ).toBeNull();
+  });
+});
+
+describe("a child's work session", () => {
+  const M = 60_000;
+  it("grows while the same child stays active and writes only once a minute", () => {
+    const one = trackChildSession([], "ava", 1000 * M);
+    expect(one).toEqual([
+      { id: "ava-60000000", childId: "ava", startedAt: 1000 * M, endedAt: 1000 * M },
+    ]);
+    expect(trackChildSession(one, "ava", 1000 * M + 20_000)).toBe(one);
+    expect(trackChildSession(one, "ava", 1010 * M)[0]).toMatchObject({ endedAt: 1010 * M });
+  });
+
+  it("starts a new session after a switch to another child", () => {
+    let list = trackChildSession([], "ava", 1000 * M);
+    list = trackChildSession(list, "leo", 1005 * M);
+    list = trackChildSession(list, "ava", 1010 * M);
+    expect(list.map((session) => session.childId)).toEqual(["ava", "leo", "ava"]);
+    expect(lastChildSession(list, "leo")?.startedAt).toBe(1005 * M);
+  });
+
+  it("starts a new session after a gap of more than an hour, not at exactly an hour", () => {
+    const first = trackChildSession([], "ava", 1000 * M);
+    expect(trackChildSession(first, "ava", 1000 * M + SESSION_GAP_MS)).toHaveLength(1);
+    expect(trackChildSession(first, "ava", 1000 * M + SESSION_GAP_MS + 1)).toHaveLength(2);
+    expect(lastChildSession([], "ava")).toBeNull();
   });
 });

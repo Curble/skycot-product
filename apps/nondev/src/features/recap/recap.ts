@@ -9,7 +9,8 @@ import { grownUpSwitchLines } from "../../plain/switches";
 import { clockPhrase } from "../family-limits/limits";
 import { grownUpPlainNames } from "../family/copy";
 
-export type RecapRange = "session" | "week";
+/** "session" is today; "last-session" is the child's latest work session; "week" is seven days. */
+export type RecapRange = "session" | "last-session" | "week";
 
 export interface RecapFile {
   readonly path: string;
@@ -62,6 +63,8 @@ export interface RecapReport {
   }>;
   readonly minutes: number;
   readonly messages: number;
+  /** Only for "last-session": the work session this report is about (epoch ms). */
+  readonly session?: { readonly id: string; readonly startedAt: number; readonly endedAt: number };
   readonly made: ReadonlyArray<RecapMade>;
   readonly asks: ReadonlyArray<RecapAsk>;
   readonly grownUp: {
@@ -105,7 +108,9 @@ export function parseRecap(body: unknown): RecapReport | null {
   const record = body as Record<string, unknown>;
   const grownUp = record["grownUp"];
   return typeof record["childId"] === "string" &&
-    (record["range"] === "session" || record["range"] === "week") &&
+    (record["range"] === "session" ||
+      record["range"] === "last-session" ||
+      record["range"] === "week") &&
     Array.isArray(record["days"]) &&
     Array.isArray(record["made"]) &&
     Array.isArray(record["asks"]) &&
@@ -233,6 +238,14 @@ export function recapHeadline(
   name: string,
 ): string {
   const things = report.made.length;
+  if (report.range === "last-session") {
+    if (things === 0) {
+      return report.messages > 0
+        ? `${name} was planning something last time`
+        : `${name} didn't make anything last time`;
+    }
+    return `Here's what ${name} did last time`;
+  }
   if (report.range === "session") {
     // A plan waiting for "Build it" is activity: a child who only asked has not "made nothing".
     if (things === 0) {
@@ -273,7 +286,7 @@ export function rangeLabel(report: Pick<RecapReport, "range" | "days">): string 
   if (first === undefined || last === undefined) return "";
   const day = (date: string, options: Intl.DateTimeFormatOptions) =>
     new Date(`${date}T12:00:00Z`).toLocaleDateString("en-AU", { ...options, timeZone: "UTC" });
-  if (report.range === "session") {
+  if (report.range !== "week") {
     return day(last, { weekday: "long", day: "numeric", month: "long" });
   }
   return `${day(first, { day: "numeric", month: "short" })} – ${day(last, { day: "numeric", month: "short", year: "numeric" })}`;
@@ -303,4 +316,55 @@ export function nothingBuiltSentence(
   return report.messages > 0 || report.asks.length > 0
     ? `Nothing built yet ${span}, but ${name} has been asking Sam. A plan may be waiting for Build it.`
     : `No conversations ${span}.`;
+}
+
+/** The ways a "last session" can be told apart from one still going: quiet for this long. */
+export const SESSION_QUIET_MS = 3 * 60_000;
+
+const SEEN_SESSIONS = "skycot:recap-seen-sessions";
+const SEEN_KEEP = 50;
+
+/** Session ids a grown-up has already dismissed, newest last. Blocked storage reads as none. */
+function seenSessions(): Array<string> {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(SEEN_SESSIONS) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function lastSessionSeen(sessionId: string): boolean {
+  return seenSessions().includes(sessionId);
+}
+
+export function markLastSessionSeen(sessionId: string) {
+  try {
+    window.localStorage.setItem(
+      SEEN_SESSIONS,
+      JSON.stringify(
+        [...seenSessions().filter((id) => id !== sessionId), sessionId].slice(-SEEN_KEEP),
+      ),
+    );
+  } catch {
+    // Blocked storage: the card may offer itself again, which is harmless.
+  }
+}
+
+/**
+ * Whether a last-session report should be offered to a grown-up now: it has a session, the
+ * session is over (quiet for a few minutes, so a child still working is not interrupted),
+ * and this grown-up has not dismissed it.
+ */
+export function shouldOfferLastSession(
+  report: Pick<RecapReport, "range" | "session">,
+  now: number,
+): boolean {
+  const session = report.session;
+  return (
+    report.range === "last-session" &&
+    session !== undefined &&
+    now - session.endedAt >= SESSION_QUIET_MS &&
+    !lastSessionSeen(session.id)
+  );
 }

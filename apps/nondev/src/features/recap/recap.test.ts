@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -8,7 +9,10 @@ import {
   nothingBuiltSentence,
   parseRecap,
   recapHeadline,
+  lastSessionSeen,
+  markLastSessionSeen,
   recapOpenOn,
+  shouldOfferLastSession,
   weekBars,
 } from "./recap";
 
@@ -171,5 +175,38 @@ describe("a day with a plan but nothing built yet", () => {
     expect(recapHeadline(planning, "Lily")).toBe("Lily has been planning something today");
     expect(nothingBuiltSentence(quiet, "Lily", "today")).toBe("No conversations today.");
     expect(nothingBuiltSentence(planning, "Lily", "today")).toContain("asking Sam");
+  });
+});
+
+describe("the last session offer", () => {
+  const report = (id: string, endedAgo: number) => ({
+    range: "last-session" as const,
+    session: { id, startedAt: Date.now() - endedAgo - 600_000, endedAt: Date.now() - endedAgo },
+  });
+  it("is offered once the session has been quiet a while, and never again after Got it", () => {
+    window.localStorage.clear();
+    expect(shouldOfferLastSession(report("s1", 10 * 60_000), Date.now())).toBe(true);
+    expect(shouldOfferLastSession(report("s2", 30_000), Date.now())).toBe(false);
+    markLastSessionSeen("s1");
+    expect(lastSessionSeen("s1")).toBe(true);
+    expect(shouldOfferLastSession(report("s1", 10 * 60_000), Date.now())).toBe(false);
+    expect(shouldOfferLastSession(report("s3", 10 * 60_000), Date.now())).toBe(true);
+  });
+  it("is not offered for a report without a session, and parses and words the new range", () => {
+    expect(shouldOfferLastSession({ range: "last-session" }, Date.now())).toBe(false);
+    expect(shouldOfferLastSession({ range: "session" }, Date.now())).toBe(false);
+    expect(recapHeadline({ range: "last-session", made: [], messages: 0 }, "Ava")).toBe(
+      "Ava didn't make anything last time",
+    );
+    expect(
+      parseRecap({
+        childId: "ava",
+        range: "last-session",
+        days: [],
+        made: [],
+        asks: [],
+        grownUp: {},
+      }),
+    ).not.toBeNull();
   });
 });

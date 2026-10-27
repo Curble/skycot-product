@@ -58,7 +58,8 @@ export function RecapReportView({
   const lines = grownUpLines(report, name);
   const made = compact ? report.made.slice(0, 3) : report.made;
   const asks = compact ? report.asks.slice(0, 3) : report.asks;
-  const span = week ? "this week" : "today";
+  const last = report.range === "last-session";
+  const span = week ? "this week" : last ? "last time" : "today";
   const proud =
     report.proudOf === null
       ? null
@@ -125,7 +126,8 @@ export function RecapReportView({
               ) : null}
               <div className="fm-recap__proud-text">
                 <p>
-                  The newest thing {name} finished{week ? " this week" : " today"}, at{" "}
+                  The newest thing {name} finished
+                  {week ? " this week" : last ? " last time" : " today"}, at{" "}
                   {timeOf(proud.at, report.timeZone, week)}.
                 </p>
                 {openProud !== null ? (

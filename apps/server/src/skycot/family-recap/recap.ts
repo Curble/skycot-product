@@ -17,8 +17,12 @@ import { findPersonalDetails, personalCategories } from "@t3tools/skycot-rules/p
 
 import type { ActivitySnapshot, MoreTimeLogEntry } from "../family-limits/SkycotFamilyLimits.ts";
 
-export type RecapRange = "session" | "week";
-export const RECAP_RANGES: ReadonlyArray<RecapRange> = ["session", "week"];
+/**
+ * "session" is today; "last-session" is the child's latest work session (see
+ * `trackChildSession` in family-limits/limits.ts for where one starts and ends).
+ */
+export type RecapRange = "session" | "last-session" | "week";
+export const RECAP_RANGES: ReadonlyArray<RecapRange> = ["session", "last-session", "week"];
 
 const HOUR = 60 * 60_000;
 const ASK_CHARS = 100;
@@ -108,6 +112,8 @@ export interface RecapReport {
   readonly days: ReadonlyArray<RecapDay>;
   readonly minutes: number;
   readonly messages: number;
+  /** Only for "last-session": the work session this report is about. */
+  readonly session?: { readonly id: string; readonly startedAt: number; readonly endedAt: number };
   readonly made: ReadonlyArray<RecapMade>;
   readonly asks: ReadonlyArray<RecapAsk>;
   readonly grownUp: {
@@ -236,16 +242,20 @@ export function buildRecap(input: {
   readonly timeZone: string;
   readonly activity: ActivitySnapshot;
   readonly threads: ReadonlyArray<RecapThreadInput>;
+  /** The exact time window to report on ("last-session"); otherwise the range decides. */
+  readonly window?: { readonly from: number; readonly to: number };
+  readonly session?: { readonly id: string; readonly startedAt: number; readonly endedAt: number };
 }): RecapReport {
   const { childId, activity, timeZone, now } = input;
-  const from = rangeStart(input.range, now, timeZone);
-  const to = now;
+  const from = input.window?.from ?? rangeStart(input.range, now, timeZone);
+  const to = input.window?.to ?? now;
   const inRange = (at: number) => at >= from && at <= to;
   const mine = input.threads.filter((thread) => activity.threads[thread.threadId] === childId);
 
   const made: Array<RecapMade> = [];
   const asks: Array<RecapAsk> = [];
   let held = 0;
+  let ownMessages = 0;
   let proudOf: RecapReport["proudOf"] = null;
   for (const thread of mine) {
     const undone = new Set(
@@ -271,6 +281,7 @@ export function buildRecap(input: {
     const own = thread.messages.filter(
       (message) => message.createdBy === "user" && inRange(message.createdAt),
     );
+    ownMessages += own.length;
     held += thread.heldAt.filter(inRange).length;
     if (changes.length === 0 && own.length === 0 && !inRange(thread.createdAt)) continue;
     for (const message of own) {
@@ -334,8 +345,12 @@ export function buildRecap(input: {
     to,
     timeZone,
     days,
-    minutes: days.reduce((sum, day) => sum + day.minutes, 0),
-    messages: days.reduce((sum, day) => sum + day.turns, 0),
+    // A session is counted by its own clock, not by the day's totals it sits inside.
+    minutes: input.session
+      ? Math.max(1, Math.round((input.session.endedAt - input.session.startedAt) / 60_000))
+      : days.reduce((sum, day) => sum + day.minutes, 0),
+    messages: input.session ? ownMessages : days.reduce((sum, day) => sum + day.turns, 0),
+    ...(input.session ? { session: input.session } : {}),
     made: made.sort((a, b) => b.lastAt - a.lastAt),
     asks: asks.sort((a, b) => b.at - a.at).slice(0, ASKS_KEEP),
     grownUp: {

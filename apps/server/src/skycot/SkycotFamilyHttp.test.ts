@@ -502,6 +502,8 @@ it.layer(
       assert.equal(playable.status, 200);
       assert.include(((yield* playable.json) as { html: string }).html, 'fetch(".env.json")');
       assert.equal((yield* send("GET", `${resource.replace("week", "year")}`)).status, 400);
+      // The child's last work session is a range of its own.
+      assert.equal((yield* send("GET", `${resource.replace("week", "last-session")}`)).status, 200);
       assert.equal(
         (yield* send("GET", "/api/skycot/family/recap?childId=nobody&range=session")).status,
         400,

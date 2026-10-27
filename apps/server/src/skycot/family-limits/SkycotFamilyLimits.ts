@@ -47,9 +47,11 @@ import {
   evaluateLimits,
   type AllowanceReading,
   type ChildDay,
+  type ChildSession,
   type LimitReason,
   type LimitState,
   type MoreTime,
+  trackChildSession,
 } from "./limits.ts";
 
 export const ACTIVITY_FILE_NAME = "skycot-family-activity.json";
@@ -131,6 +133,17 @@ const ActivityFile = Schema.Struct({
   /** Optional so a file from before the recap reads as it was. */
   history: Schema.optionalKey(Schema.Record(Schema.String, Schema.Array(PastDay))),
   events: Schema.optionalKey(Schema.Array(FamilyEvent)),
+  /** A child's stretches of using SKYCOT (see `trackChildSession`). Optional for older files. */
+  childSessions: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        childId: Schema.String,
+        startedAt: Schema.Number,
+        endedAt: Schema.Number,
+      }),
+    ),
+  ),
 });
 type ActivityFile = typeof ActivityFile.Type;
 
@@ -162,6 +175,8 @@ export interface ActivitySnapshot {
   readonly history: Readonly<Record<string, ReadonlyArray<PastDay>>>;
   readonly log: ReadonlyArray<MoreTimeLogEntry>;
   readonly events: ReadonlyArray<FamilyEvent>;
+  /** Each child's stretches of using SKYCOT, oldest first. Optional so older callers read unchanged. */
+  readonly childSessions?: ReadonlyArray<ChildSession>;
   /** Turns the model fallback moved to another company. Optional so older callers read unchanged. */
   readonly switches?: ReadonlyArray<AssistantSwitchNote>;
   /** Add-ons SKYCOT added by itself (SkycotAddOnApprovals writes them). Optional, as above. */
@@ -640,8 +655,10 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
     if (input.active && child !== null) {
       const before = activity.days[child.id];
       const after = countMinute(before, at, loaded.profile.timeZone);
-      if (after !== before) {
-        activity = withDay(activity, child.id, after);
+      const kept = activity.childSessions ?? [];
+      const sessions = trackChildSession(kept, child.id, at);
+      if (after !== before || sessions !== kept) {
+        activity = { ...withDay(activity, child.id, after), childSessions: sessions };
         yield* save(activity);
       }
     }
@@ -904,6 +921,7 @@ export const makeAt = Effect.fn("SkycotFamilyLimits.make")(function* (filePath: 
         history: activity.history ?? {},
         log: activity.log,
         events: activity.events ?? [],
+        childSessions: activity.childSessions ?? [],
         switches: yield* crossSwitches(activity),
         addOns: yield* addOnNotes(activity),
       },

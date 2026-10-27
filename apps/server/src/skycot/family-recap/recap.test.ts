@@ -265,6 +265,27 @@ describe("buildRecap", () => {
     expect(week.grownUp.shield).toEqual({ "full-name": 2, school: 1 });
   });
 
+  it("reports only the window of the child's last session", () => {
+    const startedAt = at("2026-10-22T15:00:00+11:00");
+    const endedAt = at("2026-10-22T15:20:00+11:00");
+    const report = buildRecap({
+      childId: "ava",
+      range: "last-session",
+      now: NOW,
+      timeZone: MELBOURNE,
+      activity,
+      threads,
+      window: { from: startedAt, to: endedAt + 60_000 },
+      session: { id: "s1", startedAt, endedAt },
+    });
+    expect(report.session).toEqual({ id: "s1", startedAt, endedAt });
+    expect(report.minutes).toBe(20);
+    expect(report.from).toBe(startedAt);
+    // The 15:10 ask is inside; anything after 15:21 is not.
+    expect(report.asks.every((ask) => ask.at <= endedAt + 60_000)).toBe(true);
+    expect(report.asks.length).toBeGreaterThan(0);
+  });
+
   it("reports what Ava made today, and what was hidden only by its kind", () => {
     const today = buildRecap({
       childId: "ava",

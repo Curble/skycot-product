@@ -111,6 +111,36 @@ it.layer(NodeServices.layer)("SkycotFamilyLimits", (it) => {
       ),
   );
 
+  it.effect(
+    "records a work session from active heartbeats and starts a new one after an hour",
+    () =>
+      withLimits(({ family, limits }) =>
+        Effect.gen(function* () {
+          const status = yield* family.enable({
+            code: CODE,
+            childName: "Ava",
+            timeZone: MELBOURNE,
+          });
+          const ava = status.children[0]!.id;
+          yield* at("2026-10-22T16:00:00+11:00");
+          for (let beat = 0; beat < 6; beat += 1) {
+            yield* limits.heartbeat({ sessionId: SESSION, active: true });
+            yield* TestClock.adjust("1 minute");
+          }
+          // Not active: the session does not grow.
+          yield* limits.heartbeat({ sessionId: SESSION, active: false });
+          let sessions = (yield* limits.snapshot)?.activity.childSessions ?? [];
+          assert.equal(sessions.length, 1);
+          assert.equal(sessions[0]!.childId, ava);
+          assert.equal(sessions[0]!.endedAt - sessions[0]!.startedAt, 5 * 60_000);
+          yield* TestClock.adjust("90 minutes");
+          yield* limits.heartbeat({ sessionId: SESSION, active: true });
+          sessions = (yield* limits.snapshot)?.activity.childSessions ?? [];
+          assert.equal(sessions.length, 2);
+        }),
+      ),
+  );
+
   it.effect("a heartbeat that is not active counts nothing", () =>
     withLimits(({ family, limits }) =>
       Effect.gen(function* () {
