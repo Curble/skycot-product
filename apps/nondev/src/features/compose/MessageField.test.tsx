@@ -11,7 +11,12 @@ vi.mock("../voice/VoiceTyping", () => ({
 
 import { MessageField } from "./MessageField";
 
-async function mount(starterBlanks: boolean, onSend: (text: string) => void, addPictures = false) {
+async function mount(
+  starterBlanks: boolean,
+  onSend: (text: string) => void,
+  addPictures = false,
+  onAddPictures: (files: ReadonlyArray<File>) => void = () => {},
+) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div");
   document.body.append(host);
@@ -26,7 +31,7 @@ async function mount(starterBlanks: boolean, onSend: (text: string) => void, add
         placeholder="Your idea"
         canSend
         starterBlanks={starterBlanks}
-        {...(addPictures ? { onAddPictures: () => {} } : {})}
+        {...(addPictures ? { onAddPictures } : {})}
       />
     );
   }
@@ -61,6 +66,26 @@ describe("starter blanks in the message box", () => {
     const button = page.host.querySelector(".fm-composer__attach");
     expect(button?.textContent).toContain("Add a picture");
     expect(button?.getAttribute("aria-label")).toBe("Add a picture");
+  });
+
+  it("adds a pasted drawing as a picture and keeps ordinary text paste in the message", async () => {
+    const addPictures = vi.fn();
+    await using page = await mount(false, vi.fn(), true, addPictures);
+    const file = new File(["drawing"], "drawing.png", { type: "image/png" });
+    const imagePaste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(imagePaste, "clipboardData", {
+      value: {
+        items: [{ kind: "file", type: "image/png", getAsFile: () => file }],
+      },
+    });
+    await act(async () => page.field.dispatchEvent(imagePaste));
+    expect(imagePaste.defaultPrevented).toBe(true);
+    expect(addPictures).toHaveBeenCalledWith([file]);
+
+    const textPaste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(textPaste, "clipboardData", { value: { items: [] } });
+    await act(async () => page.field.dispatchEvent(textPaste));
+    expect(textPaste.defaultPrevented).toBe(false);
   });
 
   it("keeps the words, highlights a remaining blank and sends only once it is filled or removed", async () => {

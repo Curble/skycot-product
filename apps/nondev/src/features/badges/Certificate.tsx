@@ -23,16 +23,11 @@ import { firstName } from "./catalog";
 import { Mo, Sam } from "./stickers/parts";
 import { Sticker } from "./stickers/Sticker";
 import { displayTitle } from "../tidy/renamedTitles";
+import { certificateTitle } from "./certificateTitle";
 import { useBadges } from "./store";
+import { useFamilyCertificatesOn } from "../settings/localPrefs";
 
 export type CertificateKind = "first" | "tenth";
-
-const TITLE_MAX = 60;
-
-function clampTitle(title: string): string {
-  const clean = title.replace(/\s+/g, " ").trim();
-  return clean.length <= TITLE_MAX ? clean : `${clean.slice(0, TITLE_MAX - 1).trimEnd()}…`;
-}
 
 function longDate(at: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -61,17 +56,33 @@ function useWorkTitle(earned: EarnedBadge | null): string | null {
       ? undefined
       : [...rows, ...oldRows].find((row) => row.shell.id === earned.threadId)?.title;
   const title = live ?? earned.title;
-  return title ? clampTitle(displayTitle(earned.threadId, title)) : null;
+  return title ? certificateTitle(displayTitle(earned.threadId, title)) : null;
 }
 
 export function CertificateScreen({ kind }: { readonly kind: CertificateKind }) {
   const family = useFamily();
+  const certificatesOn = useFamilyCertificatesOn();
   const { book, status } = useBadges();
   const earned =
     book?.badges.find((badge) => badge.id === (kind === "first" ? "first-creation" : "ten"))
       ?.earned ?? null;
   const work = useWorkTitle(earned);
   const name = family.enabled ? firstName(family.profile.childName) : null;
+
+  if (!certificatesOn) {
+    return (
+      <div className="fm-cert-page">
+        <EmptyState art={<Mascot pose="thinking" size={72} />} title="Certificates are turned off">
+          A grown-up can turn them back on in Settings → Family.
+        </EmptyState>
+        <div className="fm-cert-page__bar">
+          <Button icon={ChevronLeft} onClick={() => navigate(STICKERS_HREF)}>
+            Sticker book
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (earned === null) {
     return (

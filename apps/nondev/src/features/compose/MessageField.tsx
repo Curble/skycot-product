@@ -13,7 +13,7 @@ import {
 import { firstBlank } from "../starters/starters";
 import { useVoiceSettings } from "../voice/browser";
 import { MicButton, useVoiceTypingControl, VoiceTypingStatus } from "../voice/VoiceTyping";
-import { PICTURE_ACCEPT, type PictureDraft } from "./pictures";
+import { PICTURE_ACCEPT, picturesFromClipboard, type PictureDraft } from "./pictures";
 
 const NO_PICTURES: ReadonlyArray<PictureDraft> = [];
 
@@ -175,6 +175,13 @@ export function MessageField({
               // Typing takes over from the microphone; what was heard stays.
               voice.cancel();
               onChange(event.currentTarget.value);
+            }}
+            onPaste={(event) => {
+              if (!onAddPictures) return;
+              const pasted = picturesFromClipboard(Array.from(event.clipboardData.items));
+              if (pasted.length === 0) return;
+              event.preventDefault();
+              onAddPictures(pasted);
             }}
             onKeyDown={onKeyDown}
           />

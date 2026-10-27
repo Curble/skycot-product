@@ -16,9 +16,11 @@ import { BADGE_COPY, earnedDate, firstName } from "./catalog";
 import { Sticker } from "./stickers/Sticker";
 import { markBadgesSeen, refreshBadges, unseenBadges, useBadges } from "./store";
 import { displayTitle } from "../tidy/renamedTitles";
+import { useFamilyCertificatesOn } from "../settings/localPrefs";
 
 export function StickerBook({ showBack }: { readonly showBack: boolean }) {
   const family = useFamily();
+  const certificatesOn = useFamilyCertificatesOn();
   const { status, book } = useBadges();
   const name = family.enabled ? firstName(family.profile.childName) : null;
   // What was new when the page opened keeps its "New!" while the page is open.
@@ -90,7 +92,7 @@ export function StickerBook({ showBack }: { readonly showBack: boolean }) {
                 ))}
               </ol>
             </section>
-            <Certificates badges={badges} />
+            {certificatesOn ? <Certificates badges={badges} /> : null}
           </>
         )}
       </div>

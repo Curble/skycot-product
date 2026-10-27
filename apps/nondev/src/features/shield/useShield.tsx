@@ -29,6 +29,7 @@ interface Pending {
   readonly messageId: MessageId;
   readonly childId: string;
   readonly pictureKeys: ReadonlyArray<string | null>;
+  readonly pictureNotice: string | null;
   readonly resolve: (outcome: ShieldOutcome) => void;
 }
 
@@ -41,6 +42,7 @@ export function useShield() {
   const clear = async (
     text: string,
     pictureData: ReadonlyArray<string> = [],
+    pictureNotice: string | null = null,
   ): Promise<ShieldOutcome> => {
     const messageId = newMessageId();
     const childId = family.profile.currentChildId ?? "solo";
@@ -53,7 +55,7 @@ export function useShield() {
     // A second Return while the card is up starts over with what is in the field now.
     pending?.resolve({ kind: "edit", dropPictures: false });
     return new Promise((resolve) =>
-      setPending({ finding, messageId, childId, pictureKeys: unknown, resolve }),
+      setPending({ finding, messageId, childId, pictureKeys: unknown, pictureNotice, resolve }),
     );
   };
 
@@ -79,6 +81,9 @@ export function useShield() {
       <ShieldCard
         key={pending.messageId}
         finding={pending.finding}
+        {...(pending.finding.hasPictures && pending.pictureNotice !== null
+          ? { pictureNotice: pending.pictureNotice }
+          : {})}
         onChoose={finish}
         onAskGrownUp={() =>
           family.requireParentCode("approve", {

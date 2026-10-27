@@ -58,6 +58,7 @@ import type { ComposerSeed } from "../starters/StarterCards";
 import { useShield, type ShieldOutcome } from "../shield";
 import { firstMessageLabels } from "./firstMessage";
 import { MessageField } from "./MessageField";
+import { picturePrivacyNotice } from "./picturePrivacy";
 import { PlanFirstSwitch } from "./PlanFirstSwitch";
 import { requestMode, usePlanFirst } from "./planFirst";
 import { usePictures } from "./usePictures";
@@ -440,6 +441,9 @@ function ComposerField({
   const preference = useDefaultAssistantPreference(environmentId);
   const modelSelection = resolveDefaultModelSelection(providers, project, preference);
   const provider = providerForSelection(providers, modelSelection);
+  const pictureNotice = picturePrivacyNotice(
+    provider ? catalogEntryFor(String(provider.driver)).brand : null,
+  );
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
   // A question has no folder until the engine makes one; no Git calls run for it.
@@ -643,6 +647,7 @@ function ComposerField({
     const cleared = await shield.clear(
       trimmed,
       pictures.pictures.map((picture) => picture.dataUrl),
+      pictureNotice,
     );
     if (cleared.kind === "edit") {
       if (cleared.dropPictures) pictures.clear();
@@ -672,9 +677,15 @@ function ComposerField({
           <Banner tone="warning">{pictures.problem}</Banner>
         </div>
       ) : wantsPicture && pictures.pictures.length === 0 ? (
-        <p className="fm-help fm-composer__hint">
-          Add a photo of your drawing with the <b>+</b> button, then press Send.
-        </p>
+        <div className="fm-help fm-composer__hint">
+          <p>
+            Add a photo of your drawing with the <b>+</b> button, then press Send.
+          </p>
+          {family.enabled ? <p>{pictureNotice}</p> : null}
+        </div>
+      ) : null}
+      {family.enabled && pictures.pictures.length > 0 ? (
+        <p className="fm-help fm-composer__hint">{pictureNotice}</p>
       ) : null}
       {shield.card}
       <MessageField

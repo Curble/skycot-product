@@ -15,6 +15,19 @@ export const MAX_PICTURES = 4;
 export const PICTURE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 const ACCEPTED: ReadonlySet<string> = new Set(PICTURE_ACCEPT.split(","));
 
+/** Images pasted into the message box use the same small, supported set as file selection. */
+export function picturesFromClipboard(
+  items: Iterable<Pick<DataTransferItem, "kind" | "type" | "getAsFile">>,
+): ReadonlyArray<File> {
+  const pictures: Array<File> = [];
+  for (const item of items) {
+    if (item.kind !== "file" || !ACCEPTED.has(item.type.toLowerCase())) continue;
+    const file = item.getAsFile();
+    if (file !== null) pictures.push(file);
+  }
+  return pictures;
+}
+
 export interface PictureDraft {
   readonly id: string;
   readonly name: string;

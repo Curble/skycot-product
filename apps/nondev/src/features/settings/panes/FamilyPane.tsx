@@ -63,6 +63,7 @@ import { changeParentCode, moveLegacyProfile } from "../../family/store";
 import { speechService } from "../../voice/browser";
 import { whereVoiceGoes } from "../../voice/copy";
 import { useFamilyVoiceTypingOff, writeFamilyVoiceTypingOff } from "../localPrefs";
+import { FamilyCertificateGroup } from "../../family/FamilyCertificateGroup";
 import { Switch } from "../../../ui/Switch";
 import { SettingsGroup } from "../SettingsGroup";
 
@@ -226,6 +227,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
       </SettingsGroup>
 
       <FamilyVoiceGroup childName={profile.childName} />
+      <FamilyCertificateGroup />
 
       {profile.me.kind === "shared" ? (
         <SettingsGroup

@@ -153,6 +153,24 @@ export function writeFamilyVoiceTypingOff(off: boolean) {
   write(FAMILY_VOICE_TYPING_KEY, off ? "off" : null);
 }
 
+// Family keeps this grown-up choice on this device. Certificates default on; switching them
+// back on is the undo. The control itself requires the parent code in Family settings.
+export const FAMILY_CERTIFICATES_KEY = "skycot:family:certificates";
+
+function familyFeatureOn(key: string): boolean {
+  return read(key) !== "off";
+}
+
+export function useFamilyCertificatesOn(): boolean {
+  return useStoredString(FAMILY_CERTIFICATES_KEY) !== "off";
+}
+export function writeFamilyCertificatesOn(on: boolean) {
+  write(FAMILY_CERTIFICATES_KEY, on ? null : "off");
+}
+export const familyFeaturePreferences = {
+  certificatesOn: () => familyFeatureOn(FAMILY_CERTIFICATES_KEY),
+};
+
 // Plan first (features/compose/planFirst.ts): this browser's choice for a grown-up. A Family
 // profile ignores it: plan first is on and locked there, and the engine holds it to that.
 export const PLAN_FIRST_KEY = "skycot:plan-first";

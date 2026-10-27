@@ -39,12 +39,14 @@ export function ShieldCard({
   busy = false,
   onChoose,
   onAskGrownUp,
+  pictureNotice,
 }: {
   readonly finding: ShieldFinding;
   readonly busy?: boolean;
   readonly onChoose: (choice: ShieldChoice) => void;
   /** Resolves true once a grown-up's parent code allowed this message as typed. */
   readonly onAskGrownUp: () => Promise<boolean>;
+  readonly pictureNotice?: string;
 }) {
   const crew = useCrew();
   const childView = useChildView();
@@ -115,7 +117,10 @@ export function ShieldCard({
               <p className="fm-shield__why">{shieldCopy.whyPrivate}</p>
             </>
           ) : (
-            <p className="fm-shield__why">{shieldCopy.photoQuestion}</p>
+            <>
+              <p className="fm-shield__why">{shieldCopy.photoQuestion}</p>
+              {pictureNotice ? <p className="fm-shield__why">{pictureNotice}</p> : null}
+            </>
           )}
         </CardBody>
         <CardFooter>
