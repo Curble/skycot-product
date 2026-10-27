@@ -482,34 +482,37 @@ function TimelineCard(props: {
       return <Bubble mine={false} text={entry.text} />;
     case "question":
       return (
-        <Card style={{ gap: 10 }}>
-          <CardHeader
-            symbol="questionmark.bubble.fill"
-            color={theme.color.accent}
-            title="Sam has a question"
-            subtitle={
-              entry.state === "waiting"
-                ? "Pick an answer"
-                : entry.state === "answered"
-                  ? "Answered"
-                  : "This one ended"
-            }
-          />
-          <Txt>{entry.question}</Txt>
-          {entry.state === "waiting" && !props.readOnly ? (
-            <View style={{ gap: 8 }}>
-              {entry.options.map((option) => (
-                <Button
-                  key={option.value}
-                  title={option.label}
-                  kind="tinted"
-                  busy={props.busy}
-                  onPress={() => props.onAnswer(entry, option.value)}
-                />
-              ))}
-            </View>
-          ) : null}
-        </Card>
+        <View style={{ gap: 8 }}>
+          <Card style={{ gap: 10 }}>
+            <CardHeader
+              symbol="questionmark.bubble.fill"
+              color={theme.color.accent}
+              title="Sam has a question"
+              subtitle={
+                entry.state === "waiting"
+                  ? "Pick an answer"
+                  : entry.state === "answered"
+                    ? "Answered"
+                    : "This one ended"
+              }
+            />
+            <Txt>{entry.question}</Txt>
+            {entry.state === "waiting" && !props.readOnly ? (
+              <View style={{ gap: 8 }}>
+                {entry.options.map((option) => (
+                  <Button
+                    key={option.value}
+                    title={option.label}
+                    kind="tinted"
+                    busy={props.busy}
+                    onPress={() => props.onAnswer(entry, option.value)}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </Card>
+          {entry.answer !== null ? <Bubble mine text={entry.answer} /> : null}
+        </View>
       );
     case "oops":
       if (entry.isRest) {

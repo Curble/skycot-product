@@ -7,6 +7,7 @@ import { MAX_PAGE_SITES } from "@t3tools/skycot-rules/page-internet";
 import {
   allowsPlayNavigation,
   fallbackPageCopy,
+  PAGE_MESSAGE_BRIDGE,
   isPageLinkMessage,
   diagnosticReport,
   diagnosticSheetCopy,
@@ -130,6 +131,30 @@ describe("the sealed page viewer", () => {
     expect(copy).toContain("default-src 'none'");
     expect(copy).toContain("script-src 'unsafe-inline'");
     expect(copy).toContain("images.example/cat.png");
+    expect(PAGE_MESSAGE_BRIDGE).toContain("window.addEventListener('message'");
+    expect(PAGE_MESSAGE_BRIDGE).toContain("d.skycot==='page-internet'");
+    expect(PAGE_MESSAGE_BRIDGE).toContain("ReactNativeWebView.postMessage");
+  });
+
+  it("explains a blocked internet attempt once in Help", () => {
+    const diagnostics = parsePageDiagnostic(
+      {
+        skycot: "diag",
+        entries: [
+          { kind: "policy", text: "img-src blocked images.example" },
+          { kind: "policy", text: "font-src blocked fonts.example" },
+        ],
+      },
+      EMPTY_PAGE_DIAGNOSTICS,
+    );
+    const copy = diagnosticSheetCopy(diagnostics, true);
+    expect(
+      copy.lines.filter((line) =>
+        line.startsWith("This page tried to get something from the internet."),
+      ),
+    ).toEqual([
+      "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
+    ]);
   });
 
   it("parses bounded diagnostics, identifies a stalled or broken page, and keeps reports private", () => {

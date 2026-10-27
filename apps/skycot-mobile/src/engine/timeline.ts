@@ -57,6 +57,7 @@ export type TimelineEntry =
       readonly questionId: string;
       readonly question: string;
       readonly options: ReadonlyArray<{ readonly label: string; readonly value: string }>;
+      readonly answer: string | null;
       readonly state: "waiting" | "answered" | "ended";
     }
   | {
@@ -233,6 +234,7 @@ export function buildTimeline(
       case "user_input_request": {
         const request = projection.runtimeRequests.find((r) => r.id === item.requestId);
         for (const question of item.questions) {
+          const answer = request?.answers?.[question.id];
           out.push({
             kind: "question",
             id: `${item.id}:${question.id}`,
@@ -243,6 +245,7 @@ export function buildTimeline(
               label: option.label,
               value: option.value ?? option.label,
             })),
+            answer: typeof answer === "string" && answer.trim().length > 0 ? answer : null,
             state:
               request?.status === "resolved"
                 ? "answered"

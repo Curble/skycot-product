@@ -110,6 +110,7 @@ export function ChildrenScreen() {
                         title="Give time"
                         kind="tinted"
                         size="small"
+                        style={{ minWidth: 96 }}
                         onPress={() => setMoreTime({ mac, child })}
                       />
                     }

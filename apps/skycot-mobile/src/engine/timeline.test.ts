@@ -65,6 +65,40 @@ describe("a conversation as SKYCOT's cards", () => {
     );
   });
 
+  it("echoes a saved answer as the child's own message", () => {
+    const projection = demoConversation("plan");
+    const question = {
+      id: "question-item",
+      position: 9,
+      item: {
+        type: "user_input_request",
+        id: "question-item",
+        requestId: "request-1",
+        questions: [
+          {
+            id: "q1",
+            header: "Colour",
+            question: "Which colour should I use?",
+            options: [{ label: "Blue", description: "Blue", value: "blue" }],
+          },
+        ],
+      },
+    } as never;
+    const entries = buildTimeline(
+      {
+        ...projection,
+        visibleTurnItems: [question],
+        runtimeRequests: [
+          { id: "request-1", status: "resolved", answers: { q1: "Blue please" } } as never,
+        ],
+      },
+      context,
+    );
+    expect(entries).toContainEqual(
+      expect.objectContaining({ kind: "question", state: "answered", answer: "Blue please" }),
+    );
+  });
+
   it("turns an allowance limit into a rest card with the return time", () => {
     const projection = demoConversation("made");
     const prior = projection.visibleTurnItems[0]!;

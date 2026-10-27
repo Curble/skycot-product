@@ -266,7 +266,7 @@ export function Row(props: {
       }}
     >
       {props.leading}
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Txt tone={props.destructive ? "red" : "label"} numberOfLines={2}>
           {props.title}
         </Txt>
