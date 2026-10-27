@@ -3268,6 +3268,9 @@ export const layer = Layer.unwrap(
               Layer.provide(AgentSessionScanner.layer),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(Layer.succeed(ServerSelfUpdate.ServerSelfUpdate, serverSelfUpdate)),
+              // nondev-seam: skycot-child-project-folder-ws (the handlers' context has no Family
+              // services of its own; the gate hands a child's new project its own folder)
+              Layer.provide(Layer.succeed(SkycotFamilyGate.SkycotFamilyGate, skycotFamilyGate)),
               // One server-lifetime service means clients share the same PR caches, and a WS
               // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
