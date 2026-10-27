@@ -133,7 +133,11 @@ export function PreviewSheet({
     if (threadId === null) return;
     window.clearTimeout(captureTimer.current);
     captureTimer.current = window.setTimeout(() => {
-      void captureMagnetPicture({ frame: frame.current, threadId, page: relativePath });
+      void captureMagnetPicture({
+        source: { kind: "frame", frame: frame.current },
+        threadId,
+        page: relativePath,
+      });
     }, CAPTURE_DELAY_MS);
   };
 

@@ -62,6 +62,7 @@ export function DesktopPreviewFrame({
   onControls,
   onNavigated,
   onOpenLink,
+  onLoaded,
 }: {
   readonly bridge: DesktopPreviewBridge;
   readonly environmentId: EnvironmentId;
@@ -72,6 +73,8 @@ export function DesktopPreviewFrame({
   readonly onNavigated: (url: string) => void;
   /** A link that asked for a new window or tab. */
   readonly onOpenLink: (url: string) => void;
+  /** The page finished loading (never an error page) in this tab. */
+  readonly onLoaded?: (tabId: string, url: string) => void;
 }) {
   const [tabId] = useState(() => `skycot-preview-${randomUUID()}`);
   const [config, setConfig] = useState<DesktopPreviewWebviewConfig | null>(null);
@@ -121,11 +124,13 @@ export function DesktopPreviewFrame({
 
   const navigated = useEffectEvent(onNavigated);
   const openLink = useEffectEvent(onOpenLink);
+  const loaded = useEffectEvent((url: string) => onLoaded?.(tabId, url));
   useEffect(
     () =>
       bridge.onStateChange((changed, state) => {
         if (changed !== tabId || state.navStatus.kind === "Idle") return;
         navigated(state.navStatus.url);
+        if (state.navStatus.kind === "Success") loaded(state.navStatus.url);
       }),
     [bridge, tabId],
   );

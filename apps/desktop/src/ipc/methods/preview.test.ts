@@ -36,8 +36,12 @@ const decodeCaptureFailure = Schema.decodeUnknownEffect(PreviewCaptureFailure);
 
 describe("preview IPC methods", () => {
   const invokeCapture = (
-    method: typeof PreviewIpc.startRecording | typeof PreviewIpc.captureScreenshot,
+    method:
+      | typeof PreviewIpc.startRecording
+      | typeof PreviewIpc.captureScreenshot
+      | typeof PreviewIpc.capturePreviewPicture,
     manager: Partial<PreviewManager.PreviewManager["Service"]>,
+    payload: object = { tabId: "capture-tab" },
   ) =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -52,7 +56,7 @@ describe("preview IPC methods", () => {
         });
         yield* ipc.handle(method);
         return yield* Effect.promise(async () =>
-          structuredClone(await listener!({ sender: { id: 7 } }, { tabId: "capture-tab" })),
+          structuredClone(await listener!({ sender: { id: 7 } }, payload)),
         );
       }).pipe(
         Effect.provideService(
@@ -65,6 +69,42 @@ describe("preview IPC methods", () => {
         }),
       ),
     );
+
+  // nondev-seam: skycot-fridge-pane-capture-test
+  effectIt.effect(
+    "pictures a preview tab in memory with a clamped width, and answers null on failure",
+    () =>
+      Effect.gen(function* () {
+        const widths: number[] = [];
+        const manager = {
+          capturePicture: (_tabId: string, maxWidth: number) => {
+            widths.push(maxWidth);
+            return Effect.succeed(new Uint8Array([1, 2, 3]));
+          },
+        };
+        const run = (payload: object) =>
+          invokeCapture(PreviewIpc.capturePreviewPicture, manager, payload);
+        expect(yield* run({ tabId: "t" })).toEqual({ pngBase64: "AQID" });
+        yield* run({ tabId: "t", maxWidth: 99999 });
+        yield* run({ tabId: "t", maxWidth: 3 });
+        expect(widths).toEqual([640, 1280, 40]);
+        const failing = yield* invokeCapture(
+          PreviewIpc.capturePreviewPicture,
+          {
+            capturePicture: (tabId: string) =>
+              Effect.fail(
+                new PreviewManager.PreviewOperationError({
+                  operation: "capturePicture.capturePage",
+                  tabId,
+                  cause: new Error("nope"),
+                }),
+              ),
+          },
+          { tabId: "t" },
+        );
+        expect(failing).toBeNull();
+      }),
+  );
 
   effectIt.effect.each([
     {

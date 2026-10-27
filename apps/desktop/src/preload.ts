@@ -374,6 +374,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.invoke(IpcChannels.PREVIEW_CANCEL_PICK_ELEMENT_CHANNEL, { tabId }),
     captureScreenshot: (tabId) =>
       ipcRenderer.invoke(IpcChannels.PREVIEW_CAPTURE_SCREENSHOT_CHANNEL, { tabId }),
+    // nondev-seam: skycot-fridge-pane-capture-preload
+    capturePicture: (tabId, maxWidth) =>
+      ipcRenderer.invoke(IpcChannels.PREVIEW_CAPTURE_PICTURE_CHANNEL, { tabId, maxWidth }),
     revealArtifact: (path) =>
       ipcRenderer.invoke(IpcChannels.PREVIEW_REVEAL_ARTIFACT_CHANNEL, { path }),
     copyArtifactToClipboard: (path) =>

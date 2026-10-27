@@ -10,6 +10,8 @@ import { refreshFridge } from "./store";
 
 /** How long a page gets to paint after its frame has loaded. */
 export const CAPTURE_DELAY_MS = 700;
+/** The same, for the Mac app's side Preview pane (a native page view that paints a little later). */
+export const PANE_CAPTURE_DELAY_MS = 1200;
 /** Longest side of the snapshot, in pixels: plenty for a magnet, small to keep. */
 export const CAPTURE_MAX_WIDTH = 640;
 
@@ -35,13 +37,22 @@ function pickItem(
   );
 }
 
+/** Where the picture comes from: the sealed frame in this window, or the Preview pane's tab. */
+export type CaptureSource =
+  | { readonly kind: "frame"; readonly frame: HTMLIFrameElement | null }
+  | { readonly kind: "tab"; readonly tabId: string };
+
 export async function captureMagnetPicture(input: {
-  readonly frame: HTMLIFrameElement | null;
+  readonly source: CaptureSource;
   readonly threadId: string;
   readonly page: string;
 }): Promise<boolean> {
   const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
-  if (!isElectron || bridge?.captureRegion === undefined || input.frame === null) return false;
+  const { source } = input;
+  if (!isElectron || bridge === undefined) return false;
+  if (source.kind === "frame" && (bridge.captureRegion === undefined || source.frame === null))
+    return false;
+  if (source.kind === "tab" && bridge.preview?.capturePicture === undefined) return false;
   let key: string | null = null;
   try {
     const listed = await callEngine("GET", `${FAMILY_API_PATH}/fridge`);
@@ -52,16 +63,23 @@ export async function captureMagnetPicture(input: {
     if (taken.has(item.contentHash)) return false;
     key = item.contentHash;
     taken.add(key);
-    if (!input.frame.isConnected) throw new Error("frame gone");
-    const box = input.frame.getBoundingClientRect();
-    const zoom = bridge.getWindowZoomFactor?.() ?? 1;
-    const shot = await bridge.captureRegion({
-      x: box.left * zoom,
-      y: box.top * zoom,
-      width: box.width * zoom,
-      height: box.height * zoom,
-      maxWidth: CAPTURE_MAX_WIDTH,
-    });
+    let shot: { readonly pngBase64: string } | null;
+    if (source.kind === "tab") {
+      shot = (await bridge.preview?.capturePicture?.(source.tabId, CAPTURE_MAX_WIDTH)) ?? null;
+    } else {
+      const frame = source.frame;
+      if (frame === null || !frame.isConnected) throw new Error("frame gone");
+      const box = frame.getBoundingClientRect();
+      const zoom = bridge.getWindowZoomFactor?.() ?? 1;
+      shot =
+        (await bridge.captureRegion?.({
+          x: box.left * zoom,
+          y: box.top * zoom,
+          width: box.width * zoom,
+          height: box.height * zoom,
+          maxWidth: CAPTURE_MAX_WIDTH,
+        })) ?? null;
+    }
     if (shot === null) throw new Error("no picture");
     const sent = await callEngine("POST", `${FAMILY_API_PATH}/fridge/picture`, {
       threadId: item.threadId,

@@ -2490,6 +2490,32 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     );
   });
 
+  // nondev-seam: skycot-fridge-pane-capture-manager
+  // A small picture of the tab as PNG bytes in memory (for a fridge magnet): nothing is written
+  // to disk. The longer side is at most `maxWidth`.
+  const capturePicture = Effect.fn("PreviewManager.capturePicture")(function* (
+    tabId: string,
+    maxWidth: number,
+  ) {
+    const wc = yield* requireWebContents(tabId);
+    const image = yield* capturePageWithRetry(
+      { operation: "capturePicture.capturePage", tabId, webContentsId: wc.id },
+      tabId,
+      wc,
+    );
+    if (image.isEmpty()) return null;
+    const size = image.getSize();
+    const scaled =
+      Math.max(size.width, size.height) > maxWidth
+        ? image.resize(
+            size.width >= size.height
+              ? { width: maxWidth, quality: "good" }
+              : { height: maxWidth, quality: "good" },
+          )
+        : image;
+    return scaled.toPNG();
+  });
+
   const captureScreenshot = Effect.fn("PreviewManager.captureScreenshot")(function* (
     tabId: string,
   ) {
@@ -3403,6 +3429,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
 
   return {
     cancelPickElement,
+    capturePicture,
     captureScreenshot,
     closeTab,
     copyArtifactToClipboard,
@@ -3659,6 +3686,11 @@ export class PreviewManager extends Context.Service<
     readonly captureScreenshot: (
       tabId: string,
     ) => Effect.Effect<DesktopPreviewScreenshotArtifact, PreviewManagerError>;
+    // nondev-seam: skycot-fridge-pane-capture-manager
+    readonly capturePicture: (
+      tabId: string,
+      maxWidth: number,
+    ) => Effect.Effect<Uint8Array | null, PreviewManagerError>;
     readonly revealArtifact: (path: string) => Effect.Effect<void, PreviewManagerError>;
     readonly copyArtifactToClipboard: (path: string) => Effect.Effect<void, PreviewManagerError>;
     readonly openPictureInPicture: (tabId: string) => Effect.Effect<void, PreviewManagerError>;
@@ -3809,6 +3841,7 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     pickElement: operations.pickElement,
     cancelPickElement: operations.cancelPickElement,
     captureScreenshot: operations.captureScreenshot,
+    capturePicture: operations.capturePicture,
     revealArtifact: operations.revealArtifact,
     copyArtifactToClipboard: operations.copyArtifactToClipboard,
     openPictureInPicture: operations.openPictureInPicture,

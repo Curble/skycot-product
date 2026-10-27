@@ -1214,6 +1214,15 @@ export interface DesktopPreviewBridge {
   captureScreenshot: (
     tabId: string,
   ) => Promise<DesktopPreviewScreenshotArtifact | PreviewCaptureFailureEncoded>;
+  /**
+   * A small PNG (base64, longer side at most `maxWidth`) of an open Preview tab, kept in memory
+   * only; null when the tab could not be captured.
+   */
+  // nondev-seam: skycot-fridge-pane-capture-contract
+  capturePicture?: (
+    tabId: string,
+    maxWidth?: number,
+  ) => Promise<{ readonly pngBase64: string } | null>;
   revealArtifact: (path: string) => Promise<void>;
   copyArtifactToClipboard: (path: string) => Promise<void>;
   pictureInPicture: {

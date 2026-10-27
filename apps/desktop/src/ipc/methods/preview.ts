@@ -394,6 +394,39 @@ const setAnnotationSendEnabled = DesktopIpc.makeIpcMethod({
   }),
 });
 
+// nondev-seam: skycot-fridge-pane-capture-ipc
+const PICTURE_MIN_WIDTH = 40;
+const PICTURE_DEFAULT_MAX_WIDTH = 640;
+const PICTURE_LIMIT_MAX_WIDTH = 1280;
+const CapturePicturePayload = Schema.Struct({
+  tabId: Schema.String,
+  maxWidth: Schema.optional(Schema.Number),
+});
+
+/**
+ * A small picture of an open Preview tab as PNG bytes in memory, for the page's fridge magnet.
+ * Nothing is written to disk; any failure answers null.
+ */
+// nondev-seam: skycot-fridge-pane-capture-ipc
+export const capturePreviewPicture = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.PREVIEW_CAPTURE_PICTURE_CHANNEL,
+  payload: CapturePicturePayload,
+  result: Schema.NullOr(Schema.Struct({ pngBase64: Schema.String })),
+  handler: Effect.fn("desktop.ipc.preview.capturePicture")(function* ({ tabId, maxWidth }) {
+    const manager = yield* PreviewManager.PreviewManager;
+    const wanted = Number.isFinite(maxWidth)
+      ? Math.round(maxWidth as number)
+      : PICTURE_DEFAULT_MAX_WIDTH;
+    const width = Math.min(Math.max(wanted, PICTURE_MIN_WIDTH), PICTURE_LIMIT_MAX_WIDTH);
+    return yield* manager.capturePicture(tabId, width).pipe(
+      Effect.map((png) =>
+        png === null ? null : { pngBase64: Buffer.from(png).toString("base64") },
+      ),
+      Effect.catch(() => Effect.succeed(null)),
+    );
+  }),
+});
+
 export const captureScreenshot = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.PREVIEW_CAPTURE_SCREENSHOT_CHANNEL,
   payload: DesktopPreviewTabInputSchema,
@@ -461,6 +494,7 @@ export const methods = [
   pickElement,
   cancelPickElement,
   captureScreenshot,
+  capturePreviewPicture,
   revealArtifact,
   copyArtifactToClipboard,
   openPictureInPicture,

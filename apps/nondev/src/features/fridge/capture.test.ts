@@ -51,9 +51,13 @@ describe("fridge picture capture", () => {
       method === "GET" ? listed([item()]) : { ok: true },
     );
     const node = frame();
-    expect(await captureMagnetPicture({ frame: node, threadId: "t1", page: "game.html" })).toBe(
-      true,
-    );
+    expect(
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: node },
+        threadId: "t1",
+        page: "game.html",
+      }),
+    ).toBe(true);
     expect(captureRegion).toHaveBeenCalledWith({
       x: 10,
       y: 20,
@@ -67,19 +71,31 @@ describe("fridge picture capture", () => {
       contentHash: "h1",
       pngBase64: "AAAA",
     });
-    expect(await captureMagnetPicture({ frame: node, threadId: "t1", page: "game.html" })).toBe(
-      false,
-    );
+    expect(
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: node },
+        threadId: "t1",
+        page: "game.html",
+      }),
+    ).toBe(false);
     expect(captureRegion).toHaveBeenCalledTimes(1);
   });
 
   it("does nothing when the magnet already has its picture or the page has no magnet", async () => {
     callEngine.mockResolvedValue(listed([item({ hasPicture: true })]));
-    expect(await captureMagnetPicture({ frame: frame(), threadId: "t1", page: "game.html" })).toBe(
-      false,
-    );
     expect(
-      await captureMagnetPicture({ frame: frame(), threadId: "other", page: "game.html" }),
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: frame() },
+        threadId: "t1",
+        page: "game.html",
+      }),
+    ).toBe(false);
+    expect(
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: frame() },
+        threadId: "other",
+        page: "game.html",
+      }),
     ).toBe(false);
     expect(captureRegion).not.toHaveBeenCalled();
   });
@@ -89,12 +105,73 @@ describe("fridge picture capture", () => {
       method === "GET" ? listed([item()]) : { ok: false },
     );
     const node = frame();
-    expect(await captureMagnetPicture({ frame: node, threadId: "t1", page: "game.html" })).toBe(
-      false,
-    );
-    expect(await captureMagnetPicture({ frame: node, threadId: "t1", page: "game.html" })).toBe(
-      false,
-    );
+    expect(
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: node },
+        threadId: "t1",
+        page: "game.html",
+      }),
+    ).toBe(false);
+    expect(
+      await captureMagnetPicture({
+        source: { kind: "frame", frame: node },
+        threadId: "t1",
+        page: "game.html",
+      }),
+    ).toBe(false);
     expect(captureRegion).toHaveBeenCalledTimes(2);
+  });
+
+  it("captures the Preview pane's tab through the preview bridge, once per version", async () => {
+    const capturePicture = vi.fn(async () => ({ pngBase64: "BBBB" }));
+    Object.defineProperty(window, "desktopBridge", {
+      value: { preview: { capturePicture } },
+      configurable: true,
+    });
+    callEngine.mockImplementation(async (method: string) =>
+      method === "GET" ? listed([item()]) : { ok: true },
+    );
+    const input = {
+      source: { kind: "tab", tabId: "tab-1" },
+      threadId: "t1",
+      page: "game.html",
+    } as const;
+    expect(await captureMagnetPicture(input)).toBe(true);
+    expect(capturePicture).toHaveBeenCalledWith("tab-1", 640);
+    expect(callEngine).toHaveBeenLastCalledWith("POST", "/api/skycot/family/fridge/picture", {
+      threadId: "t1",
+      page: "game.html",
+      contentHash: "h1",
+      pngBase64: "BBBB",
+    });
+    expect(await captureMagnetPicture(input)).toBe(false);
+    expect(capturePicture).toHaveBeenCalledTimes(1);
+    // A new version of the page (new hash) gets a fresh picture.
+    callEngine.mockImplementation(async (method: string) =>
+      method === "GET" ? listed([item({ contentHash: "h2" })]) : { ok: true },
+    );
+    expect(await captureMagnetPicture(input)).toBe(true);
+    expect(capturePicture).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing for a tab when the bridge has no picture method or it fails", async () => {
+    Object.defineProperty(window, "desktopBridge", { value: { preview: {} }, configurable: true });
+    const input = {
+      source: { kind: "tab", tabId: "tab-1" },
+      threadId: "t1",
+      page: "game.html",
+    } as const;
+    expect(await captureMagnetPicture(input)).toBe(false);
+    const capturePicture = vi.fn(async () => null);
+    Object.defineProperty(window, "desktopBridge", {
+      value: { preview: { capturePicture } },
+      configurable: true,
+    });
+    callEngine.mockImplementation(async (method: string) =>
+      method === "GET" ? listed([item()]) : { ok: true },
+    );
+    expect(await captureMagnetPicture(input)).toBe(false);
+    expect(await captureMagnetPicture(input)).toBe(false);
+    expect(capturePicture).toHaveBeenCalledTimes(2);
   });
 });

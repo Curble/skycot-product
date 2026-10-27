@@ -29,6 +29,7 @@ import { randomUUID } from "~/lib/utils";
 import { useCrew } from "../../themes/useCrew";
 import { useChildView } from "../../app/useChildView";
 import { useConversationShell } from "../../state/oldConversations";
+import { PANE_CAPTURE_DELAY_MS, captureMagnetPicture } from "../fridge/capture";
 import { previewPageUrl } from "../starters/preview";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
@@ -337,6 +338,27 @@ function PreviewPanelBody({
     controls?.navigate(frameUrl);
     setLeaving({ url, ...(answer.requestId ? { requestId: answer.requestId } : {}) });
   };
+  // The Mac app's Preview pane: once the child's own page has loaded and had a moment to paint,
+  // a small picture of that tab goes to the page's fridge magnet (the engine keeps one per
+  // version of the page; a failure is silent). Never for an error page or a page they clicked on to.
+  const captureTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(captureTimer.current), []);
+  const onLoaded = (tabId: string, url: string) => {
+    const asked = pageRequest?.path;
+    if (asked === undefined || !isLocalPreviewAddress(url)) return;
+    const base = (path: string) => path.split("/").at(-1) ?? "";
+    let loadedPath = "";
+    try {
+      loadedPath = decodeURIComponent(new URL(url).pathname);
+    } catch {
+      return;
+    }
+    if (base(loadedPath) !== base(asked)) return;
+    window.clearTimeout(captureTimer.current);
+    captureTimer.current = window.setTimeout(() => {
+      void captureMagnetPicture({ source: { kind: "tab", tabId }, threadId, page: asked });
+    }, PANE_CAPTURE_DELAY_MS);
+  };
   const onOpenLink = async (url: string) => {
     const answer = await mayLeave(url);
     if (!answer.allowed) {
@@ -422,6 +444,7 @@ function PreviewPanelBody({
               onControls={setControls}
               onNavigated={(url) => void onNavigated(url)}
               onOpenLink={(url) => void onOpenLink(url)}
+              onLoaded={onLoaded}
             />
           ) : null
         }
@@ -741,6 +764,7 @@ function RunningFrame({
   onControls,
   onNavigated,
   onOpenLink,
+  onLoaded,
 }: {
   readonly surface: NonNullable<ReturnType<typeof previewSurface>>;
   readonly url: string;
@@ -748,6 +772,7 @@ function RunningFrame({
   readonly onControls: (controls: FrameControls | null) => void;
   readonly onNavigated: (url: string) => void;
   readonly onOpenLink: (url: string) => void;
+  readonly onLoaded: (tabId: string, url: string) => void;
 }) {
   const bridge = desktopPreviewBridge();
   if (surface === "desktop" && bridge !== null) {
@@ -759,6 +784,7 @@ function RunningFrame({
         onControls={onControls}
         onNavigated={onNavigated}
         onOpenLink={onOpenLink}
+        onLoaded={onLoaded}
       />
     );
   }
