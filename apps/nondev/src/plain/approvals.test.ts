@@ -163,6 +163,20 @@ describe("child approval words", () => {
 });
 
 describe("childApprovalSentence", () => {
+  it("keeps an outside file's path in the technical details, not the child's sentence", () => {
+    const path = "/Users/ava/.claude/projects/-Users-ava-Projects-demo/memory/MEMORY.md";
+    const card = {
+      whatItWants: `The assistant wants to read a file outside your project (${path}).`,
+      technical: `Read ${path}`,
+    };
+    const sentence = childApprovalSentence(card, "Sam");
+    expect(sentence).toBe(
+      "Sam wants to read a file outside your project. This one needs a grown-up.",
+    );
+    expect(sentence).not.toContain(path);
+    expect(card.technical).toContain(path);
+  });
+
   it("explains a short node download plainly and keeps the no-project boundary", () => {
     const card = {
       whatItWants: 'The assistant wants to run "node -e fetch".',

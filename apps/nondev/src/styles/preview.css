@@ -120,6 +120,13 @@
   left: auto;
   width: min(420px, calc(100% - 24px));
 }
+.fm-fullscreen-page.is-fullscreen .fm-preview__notice {
+  position: absolute;
+  top: max(58px, calc(env(safe-area-inset-top) + 46px));
+  right: max(12px, env(safe-area-inset-right));
+  left: auto;
+  width: min(420px, calc(100% - 24px));
+}
 .fm-sealed-fullscreen {
   display: block;
   width: 100%;

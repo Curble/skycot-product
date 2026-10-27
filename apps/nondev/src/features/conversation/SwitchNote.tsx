@@ -69,6 +69,7 @@ export function SwitchNote({
   const childView = useChildView();
   // Measured when the line first shows: "until Tuesday" stays put while it is on screen.
   const [now] = useState(() => Date.now());
+  if (childView) return null;
   return (
     <Bubble author="crew" muted>
       {switchLine({

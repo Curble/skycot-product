@@ -41,6 +41,15 @@ export interface ConversationStatus {
   readonly refused?: true;
 }
 
+/** A finished build uses its checkpoint action as the one status pill. */
+export function hasReadyCheckpointPill(
+  status: ConversationStatus,
+  latestId: string | null,
+  active: boolean,
+): boolean {
+  return latestId !== null && status.kind === "ready" && !active;
+}
+
 export interface ThreadStatusOptions {
   /**
    * Set when the full projection shows the latest run ended on a refusal (the

@@ -32,6 +32,7 @@ import {
   pageFullScreenState,
   pageThing,
   pageToolbarCopy,
+  PAGE_MESSAGE_BRIDGE,
   rememberGameButtons,
   reportedSites,
   fallbackPageCopy,
@@ -349,6 +350,7 @@ export function PagePreview(props: {
         <WebView<object>
           ref={webView}
           source={{ html: play?.html ?? html!, baseUrl: "about:blank" }}
+          injectedJavaScriptBeforeContentLoaded={PAGE_MESSAGE_BRIDGE}
           javaScriptEnabled
           originWhitelist={["about:*"]}
           onShouldStartLoadWithRequest={(request) => allowsPlayNavigation(request.url)}

@@ -792,3 +792,10 @@ variable and still carries upstream's default.
 | skycot-fridge-card-mobile      | `apps/skycot-mobile/src/transport/MacTransport.ts`                  | Hands back a non-JSON answer as text so the phone can read a fridge card's SVG.                                                                     | `// nondev-seam: skycot-fridge-card-mobile`      |
 | skycot-fridge-card-mobile      | `apps/skycot-mobile/src/family/api.ts`                              | Fetches a fridge card by hash as SVG text and refuses anything that is not an SVG.                                                                  | `// nondev-seam: skycot-fridge-card-mobile`      |
 | skycot-fridge-card-mobile-test | `apps/skycot-mobile/src/family/api.test.ts`                         | Covers cardHash parsing and the text-only card fetch on the phone.                                                                                  | `// nondev-seam: skycot-fridge-card-mobile-test` |
+
+## Child source-control identity (27 October 2026)
+
+| id                                           | file                                              | change                                                                                           | marker                                                         |
+| -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| skycot-q57-hide-source-control-identity      | `apps/server/src/skycot/SkycotFamilyGate.ts`      | Closes account discovery to a selected child and child devices while preserving grown-up access. | `// nondev-seam: skycot-q57-hide-source-control-identity`      |
+| skycot-q57-hide-source-control-identity-test | `apps/server/src/skycot/SkycotFamilyGate.test.ts` | Covers child identity closure, grown-up discovery access and publishing after the parent code.   | `// nondev-seam: skycot-q57-hide-source-control-identity-test` |

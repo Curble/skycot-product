@@ -2,7 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 
-import { asksForReply, conversationPreview, describeThreadStatus, saysRefused } from "./status";
+import {
+  asksForReply,
+  conversationPreview,
+  describeThreadStatus,
+  hasReadyCheckpointPill,
+  saysRefused,
+} from "./status";
 
 function shell(fields: {
   readonly runStatus?: string;
@@ -52,6 +58,18 @@ describe("asksForReply", () => {
         "Is this right? I checked. Then I fixed it. Then I tested it. All good now. Everything works.",
       ),
     ).toBe(false);
+  });
+});
+
+describe("the finished-build status pill", () => {
+  it("uses one checkpoint pill only when the latest build is ready to inspect", () => {
+    const ready = {
+      ...describeThreadStatus(shell({ runStatus: "completed" })),
+      kind: "ready" as const,
+    };
+    expect(hasReadyCheckpointPill(ready, "checkpoint-1", false)).toBe(true);
+    expect(hasReadyCheckpointPill(ready, null, false)).toBe(false);
+    expect(hasReadyCheckpointPill(ready, "checkpoint-1", true)).toBe(false);
   });
 });
 

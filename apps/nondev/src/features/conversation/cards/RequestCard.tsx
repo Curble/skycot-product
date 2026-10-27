@@ -549,14 +549,16 @@ export function RequestCard({
                 <Banner tone="warning">{problem}</Banner>
               </div>
             ) : null}
-            <Disclosure>
-              {decision?.decidedBy === "policy" ? (
-                <p className="fm-details__empty">Decision: {decision.label}.</p>
-              ) : null}
-              <pre className="fm-details__pre">
-                <code>{card.technical}</code>
-              </pre>
-            </Disclosure>
+            {childView && grownUp !== null ? null : (
+              <Disclosure>
+                {decision?.decidedBy === "policy" ? (
+                  <p className="fm-details__empty">Decision: {decision.label}.</p>
+                ) : null}
+                <pre className="fm-details__pre">
+                  <code>{card.technical}</code>
+                </pre>
+              </Disclosure>
+            )}
           </CardBody>
           {decided || item.type !== "approval_request" ? null : family.profile.me.kind ===
             "grown-up" ? (

@@ -169,6 +169,10 @@ export function fallbackPageCopy(html: string): string {
   return withHeadStart(html, helpers);
 }
 
+/** Older pages post reports to their parent window; forward only policy reports to the app. */
+export const PAGE_MESSAGE_BRIDGE =
+  "(function(){window.addEventListener('message',function(e){try{var d=e.data;if(typeof d==='string')d=JSON.parse(d);if(d&&d.skycot==='page-internet'&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(d))}catch(_){}})})();true;";
+
 /**
  * Where the play viewer may navigate: only its own document (about:blank / about:srcdoc).
  * A game's pictures and sounds (data:, blob:) load without navigating; a page that moves to a
@@ -332,9 +336,9 @@ export function diagnosticSheetCopy(
         `A picture or sound couldn't be found: ${entry.text.replace(/^(?:img|audio|video|source):\s*/iu, "") || `${thing} file`}`,
       );
     else if (entry.kind === "policy") {
-      lines.push(
-        "This page tried to get something from the internet. A grown-up can allow it on the Mac.",
-      );
+      const internetLine =
+        "This page tried to get something from the internet. A grown-up can allow it on the Mac.";
+      if (!lines.includes(internetLine)) lines.push(internetLine);
     } else if (entry.kind === "error" || entry.kind === "rejection")
       lines.push(`Something in the ${thing}'s code went wrong.`);
     else lines.push(`The ${thing} showed a warning: ${entry.text}`);
