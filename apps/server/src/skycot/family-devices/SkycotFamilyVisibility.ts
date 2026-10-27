@@ -331,6 +331,30 @@ export const shellStreamFor = <E, R>(
     ),
   );
 
+/**
+ * The shell subscription's input for this session: a child's view (own device, or the shared
+ * Mac with a child chosen) always starts from a full list, never from the cursor the client
+ * kept. A resumed subscription only replays changes, so a list cached under another child
+ * would stay as it was; a fresh snapshot, filtered for this child, replaces it.
+ */
+export const shellInputFor = <I extends { readonly afterSequence?: number }>(
+  sessionId: string,
+  input: I,
+): Effect.Effect<I> =>
+  Effect.serviceOption(SkycotFamilyVisibility).pipe(
+    Effect.flatMap((service) =>
+      Option.isNone(service) || input.afterSequence === undefined
+        ? Effect.succeed(input)
+        : service.value.childViewFor(sessionId).pipe(
+            Effect.map((view) => {
+              if (view === null) return input;
+              const { afterSequence: _cursor, ...rest } = input;
+              return rest as I;
+            }),
+          ),
+    ),
+  );
+
 /** The archived list's twin of `shellStreamFor`. */
 export const archivedStreamFor = <E, R>(
   sessionId: string,

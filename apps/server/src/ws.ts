@@ -2040,10 +2040,15 @@ export const layerWsRpc = (
             Stream.unwrap(subscribeOrchestrationV2ArchivedShell()),
           ),
         [ORCHESTRATION_V2_WS_METHODS.subscribeShell]: (input) =>
-          // nondev-seam: skycot-family-visibility (a child's own device gets only its own work)
+          // nondev-seam: skycot-family-visibility (a child's own device gets only its own work;
+          // a child's view starts from a full list, not the client's cursor)
           SkycotFamilyVisibility.shellStreamFor(
             currentSessionId,
-            Stream.unwrap(subscribeOrchestrationV2Shell(input)),
+            Stream.unwrap(
+              SkycotFamilyVisibility.shellInputFor(currentSessionId, input).pipe(
+                Effect.flatMap((shellInput) => subscribeOrchestrationV2Shell(shellInput)),
+              ),
+            ),
           ),
         [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: (input) =>
           Stream.unwrap(
