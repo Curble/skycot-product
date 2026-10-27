@@ -8,6 +8,7 @@ import {
   BookOpen,
   Bell,
   Blocks,
+  ChevronDown,
   ChevronsUpDown,
   CheckCircle2,
   CircleAlert,
@@ -713,9 +714,10 @@ export function ChildTabs({
           <li>
             <button
               type="button"
-              className={`fm-child-tab${projectsOpen ? " fm-child-tab--selected" : ""}`}
+              className={`fm-child-tab${projectsOpen ? " fm-child-tab--open" : ""}`}
               data-tone="purple"
               aria-expanded={projectsOpen}
+              aria-label="Projects"
               onClick={onToggleProjects}
             >
               <span className="fm-child-tab__tile" aria-hidden>
@@ -725,6 +727,7 @@ export function ChildTabs({
                 <span className="fm-child-tab__label">Projects</span>
                 <span className="fm-child-tab__sub">Where your makes live</span>
               </span>
+              <ChevronDown className="fm-child-tab__chev" size={18} aria-hidden />
             </button>
           </li>
         ) : null}

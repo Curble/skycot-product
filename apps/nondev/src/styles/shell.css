@@ -1089,9 +1089,10 @@ html.dark .fm-standalone__foot {
   min-width: 0;
 }
 .fm-child-tab__label {
-  font-size: calc(16px * var(--fm-text-scale));
+  font-size: calc(15px * var(--fm-text-scale));
   font-weight: 600;
   line-height: 1.1;
+  white-space: nowrap;
 }
 .fm-child-tab__sub {
   font-size: calc(11.5px * var(--fm-text-scale));
@@ -1198,8 +1199,27 @@ html.dark .fm-standalone__foot {
   height: 5px;
   background: var(--fm-accent);
 }
+/* The name tag's menu fits inside the column (the column scrolls, so it cannot spill out). */
 .fm-sidebar__footer .fm-popover {
-  min-width: 236px;
+  min-width: 0;
+  width: calc(100% - 6px);
+  max-width: none;
+  left: 3px;
+}
+.fm-sidebar__footer-row {
+  position: relative;
+}
+/* The Projects tab is a drawer, not a place: open shows a nudge and a turned chevron, never tape. */
+.fm-child-tab--open {
+  transform: translateX(6px) !important;
+}
+.fm-child-tab__chev {
+  margin-left: auto;
+  color: var(--fm-label-3);
+  transition: transform 150ms ease;
+}
+.fm-child-tab--open .fm-child-tab__chev {
+  transform: rotate(180deg);
 }
 .fm-menu-item--apart {
   margin-top: 2px;
