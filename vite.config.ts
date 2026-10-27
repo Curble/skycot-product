@@ -5,7 +5,7 @@ import * as NodeURL from "node:url";
 const DOM_TEST_ENVIRONMENT_ALLOWLIST: Array<string> = [];
 // nondev-seam: beta6-dom-tests
 const NONDEV_DOM_TESTS = [
-  "apps/nondev/src/features/{compose/MessageField,conversation/WorkingCard,journey/BuildJourney}.test.tsx",
+  "apps/nondev/src/features/{compose/MessageField,conversation/WorkingCard,journey/BuildJourney,fridge/cards}.test.tsx",
 ];
 
 const RESTRICTED_IMPORT_PATHS = [

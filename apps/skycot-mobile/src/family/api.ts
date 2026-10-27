@@ -17,6 +17,7 @@ import {
   type PendingRequest,
 } from "../../../nondev/src/features/family/people";
 import { parseGrownUpAnswers, type GrownUpAnswer } from "../../../nondev/src/plain/grownUpAnswers";
+import { parseMagnetCard } from "../../../nondev/src/features/fridge/cardText";
 import { parseFridge, type FridgeItem } from "../../../nondev/src/features/fridge/fridge";
 import {
   parseLimitState,
@@ -284,6 +285,25 @@ export const familyApi = {
       { method: "GET", path: `${FAMILY_API_PATH}/fridge/page`, query: { threadId, page } },
       (body) => (typeof record(body).html === "string" ? (record(body).html as string) : null),
     ),
+  // nondev-seam: skycot-fridge-card-mobile
+  /**
+   * The picture card for a fridge page, as SVG text (never run: it is only ever drawn as a
+   * picture). Null when the Mac has no card by that name or sent something else.
+   */
+  fridgeCard: async (transport: MacTransport, hash: string): Promise<string | null> => {
+    try {
+      const answer = await transport.request({
+        method: "GET",
+        path: `${FAMILY_API_PATH}/fridge/card`,
+        query: { hash },
+      });
+      return answer.status === 200 && typeof answer.text === "string"
+        ? parseMagnetCard(answer.text)
+        : null;
+    } catch {
+      return null;
+    }
+  },
   // nondev-seam: skycot-mobile-family-api
   fridgePlay: async (transport: MacTransport, threadId: string, page: string) => {
     try {

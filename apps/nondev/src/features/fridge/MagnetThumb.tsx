@@ -3,10 +3,27 @@
 // it". The engine sends the page with its own stylesheets and pictures already inside it
 // (`/api/skycot/family/fridge/page`), because the frame may not load anything, not even from
 // SKYCOT. It is read only once the magnet scrolls into view, so a full fridge stays light.
+// When the engine has drawn a picture card for the page (`cardHash`), that static picture is
+// shown instead; if it cannot be read, or the page takes over five seconds, the magnet shows
+// its kind's icon rather than "Getting it ready…" for ever.
+import { CircleHelp, FileText, Gamepad2, Gift, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useOfflinePreviewDocument } from "../starters/preview";
+import { cardImageSource } from "./cardText";
+import { readMagnetCard, type MagnetCard } from "./cards";
+import { fridgeIcon } from "./fridge";
 import { readMagnetPage, type MagnetPage } from "./pages";
+
+/** How long "Getting it ready…" may stay before the kind's icon takes its place. */
+export const READY_TIMEOUT_MS = 5000;
+
+const KIND_ICONS: Record<ReturnType<typeof fridgeIcon>, LucideIcon> = {
+  "questionmark.square.fill": CircleHelp,
+  "gift.fill": Gift,
+  "gamecontroller.fill": Gamepad2,
+  "doc.richtext.fill": FileText,
+};
 
 export function MagnetThumb({
   threadId,
@@ -14,6 +31,7 @@ export function MagnetThumb({
   version,
   title,
   thumbnailSvg,
+  cardHash,
 }: {
   readonly threadId: string;
   readonly page: string;
@@ -21,6 +39,8 @@ export function MagnetThumb({
   readonly version: number | string;
   readonly title: string;
   readonly thumbnailSvg?: string;
+  /** The engine's picture card for this page; a different hash is a different card. */
+  readonly cardHash?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
@@ -28,6 +48,11 @@ export function MagnetThumb({
     null,
   );
   const key = `${threadId}\n${page}\n${version}`;
+  const [card, setCard] = useState<{
+    readonly hash: string;
+    readonly card: MagnetCard;
+  } | null>(null);
+  const [slowKey, setSlowKey] = useState<string | null>(null);
   useEffect(() => {
     const node = ref.current;
     if (node === null || seen) return;
@@ -41,7 +66,22 @@ export function MagnetThumb({
     return () => observer.disconnect();
   }, [seen]);
   useEffect(() => {
-    if (!seen || thumbnailSvg) return;
+    if (!seen || !cardHash) return;
+    let live = true;
+    void readMagnetCard(cardHash).then((result) => {
+      if (live) setCard({ hash: cardHash, card: result });
+    });
+    return () => {
+      live = false;
+    };
+  }, [seen, cardHash]);
+  const cardAnswer = cardHash !== undefined && card?.hash === cardHash ? card.card : null;
+  // Without a card, or once it could not be read, the page itself is drawn as before.
+  const cardWaiting = cardHash !== undefined && cardAnswer === null;
+  const useCard = cardAnswer?.kind === "card";
+  const drawPage = !useCard && !cardWaiting;
+  useEffect(() => {
+    if (!seen || thumbnailSvg || !drawPage) return;
     let live = true;
     void readMagnetPage({ threadId, page, version }).then((result) => {
       if (live) setLoaded({ key, page: result });
@@ -49,12 +89,26 @@ export function MagnetThumb({
     return () => {
       live = false;
     };
-  }, [seen, key, threadId, page, version, thumbnailSvg]);
+  }, [seen, key, threadId, page, version, thumbnailSvg, drawPage]);
   const current = loaded?.key === key ? loaded.page : null;
   const sealedDocument = useOfflinePreviewDocument(current?.kind === "page" ? current.html : "");
+  const waiting = !useCard && !thumbnailSvg && current?.kind !== "page" && current?.kind !== "gone";
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => setSlowKey(key), READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [waiting, key]);
+  const KindIcon = KIND_ICONS[fridgeIcon(title, page)];
   return (
     <div ref={ref} className="fm-magnet__thumb" aria-hidden>
-      {thumbnailSvg ? (
+      {useCard ? (
+        <img
+          className="fm-magnet__frame"
+          alt=""
+          loading="lazy"
+          src={cardImageSource(cardAnswer.svg)}
+        />
+      ) : thumbnailSvg ? (
         <img
           className="fm-magnet__frame"
           alt=""
@@ -73,7 +127,13 @@ export function MagnetThumb({
         />
       ) : (
         <span className="fm-magnet__placeholder">
-          {current?.kind === "gone" ? "This one isn't here now" : "Getting it ready…"}
+          {current?.kind === "gone" ? (
+            "This one isn't here now"
+          ) : slowKey === key ? (
+            <KindIcon size={32} aria-hidden data-kind-icon="" />
+          ) : (
+            "Getting it ready…"
+          )}
         </span>
       )}
     </div>

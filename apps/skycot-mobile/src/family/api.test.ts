@@ -1,5 +1,6 @@
+// nondev-seam: skycot-fridge-card-mobile-test
 // nondev-seam: skycot-mobile-family-api-test
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { familyApi, parseFridgePlay, parsePageInternetAsk } from "./api";
 import type { MacTransport } from "../transport/MacTransport";
@@ -99,5 +100,43 @@ describe("page internet ask response", () => {
   it("rejects a malformed or unnamespaced id", () => {
     expect(parsePageInternetAsk({ ask: { id: "request-1", expiresAt: 123 } })).toBeNull();
     expect(parsePageInternetAsk({ ask: null })).toBeNull();
+  });
+});
+
+describe("fridge picture cards on the phone", () => {
+  it("keeps the cardHash the Mac sends and leaves it out for an older Mac", async () => {
+    const item = { threadId: "t", page: "index.html", cwd: "/p", madeAt: 1, pinnedAt: null };
+    const transport = {
+      request: async () => ({
+        status: 200,
+        json: {
+          items: [
+            { ...item, cardHash: "abc" },
+            { ...item, threadId: "old" },
+          ],
+        },
+      }),
+    } as MacTransport;
+    const answer = await familyApi.fridge(transport);
+    expect(answer.ok && answer.value.map((entry) => entry.cardHash)).toEqual(["abc", undefined]);
+  });
+
+  it("fetches a card as text and refuses anything that is not an SVG", async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>boom()</script></svg>';
+    const ask = vi.fn(async () => ({ status: 200, json: null, text: svg }));
+    await expect(
+      familyApi.fridgeCard({ request: ask } as unknown as MacTransport, "h1"),
+    ).resolves.toBe(svg);
+    expect(ask).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/api/skycot/family/fridge/card",
+      query: { hash: "h1" },
+    });
+    const html = { request: async () => ({ status: 200, json: null, text: "<html></html>" }) };
+    await expect(familyApi.fridgeCard(html as unknown as MacTransport, "h2")).resolves.toBeNull();
+    const missing = { request: async () => ({ status: 404, json: { error: "x" } }) };
+    await expect(
+      familyApi.fridgeCard(missing as unknown as MacTransport, "h3"),
+    ).resolves.toBeNull();
   });
 });

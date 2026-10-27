@@ -29,6 +29,9 @@ export interface MacResponse {
   readonly status: number;
   /** The parsed JSON body, or null when there was none. */
   readonly json: unknown;
+  // nondev-seam: skycot-fridge-card-mobile
+  /** The body as text, only when it was not JSON (a fridge card is an SVG picture). */
+  readonly text?: string;
 }
 
 /** A WebSocket the engine's command channel runs over, as `effect/socket` wants it. */
@@ -147,7 +150,11 @@ function fetchTransport(route: FetchRoute): MacTransport {
         json = null;
       }
     }
-    return { status: response.status, json };
+    return {
+      status: response.status,
+      json,
+      ...(json === null && answer.length > 0 ? { text: answer } : {}),
+    };
   };
 
   return {
