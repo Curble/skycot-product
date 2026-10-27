@@ -121,7 +121,7 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 9px;
-  background: #fff;
+  background: var(--fm-bg-card);
   border: 1px solid var(--fm-sep-2);
 }
 /* The page at a quarter of its size: laid out at 4x the box, then scaled down. */
@@ -152,7 +152,8 @@
 .fm-magnet__calm {
   display: block;
   height: 100%;
-  background: #f4f4f6;
+  /* The theme's card colour, so a waiting tile never flashes white on the dark Workshop paper. */
+  background: var(--fm-bg-card);
 }
 .fm-magnet__placeholder {
   display: grid;
