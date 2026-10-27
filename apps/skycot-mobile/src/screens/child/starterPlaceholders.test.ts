@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { readStarterMarker } from "@t3tools/skycot-rules/starter";
 
 import {
-  replaceSelectedStarterText,
+  updateStarterDraft,
   selectStarterPlaceholder,
   starterPlaceholders,
 } from "./starterPlaceholders";
@@ -45,10 +45,18 @@ describe("starter placeholders", () => {
     let draft = { text: original, selection: { start: 0, end: 0 } };
     const recipient = starterPlaceholders(draft.text)[0]!;
     draft = selectStarterPlaceholder(draft.text, recipient.start, recipient.end);
-    draft = replaceSelectedStarterText(draft.text, draft.selection, "for my Nan");
+    draft = updateStarterDraft(
+      draft.text,
+      draft.selection,
+      draft.text.slice(0, recipient.start) + "for my Nan" + draft.text.slice(recipient.end),
+    );
     const age = starterPlaceholders(draft.text)[0]!;
     draft = selectStarterPlaceholder(draft.text, age.start, age.end);
-    draft = replaceSelectedStarterText(draft.text, draft.selection, "70");
+    draft = updateStarterDraft(
+      draft.text,
+      draft.selection,
+      draft.text.slice(0, age.start) + "70" + draft.text.slice(age.end),
+    );
 
     const sent = starterMessageText(draft.text, { starterId: starter.id, text: original });
     expect(visibleMessageText(sent)).toBe(draft.text);

@@ -50,6 +50,15 @@ export type TimelineEntry =
       readonly state: "waiting" | "allowed" | "declined" | "ended";
     }
   | {
+      readonly kind: "question";
+      readonly id: string;
+      readonly requestId: string;
+      readonly questionId: string;
+      readonly question: string;
+      readonly options: ReadonlyArray<{ readonly label: string; readonly value: string }>;
+      readonly state: "waiting" | "answered" | "ended";
+    }
+  | {
       readonly kind: "changed";
       readonly id: string;
       readonly headline: string;
@@ -65,6 +74,8 @@ export type TimelineEntry =
       readonly id: string;
       readonly text: string;
       readonly retryText: string | null;
+      readonly isRest: boolean;
+      readonly restUntil: string | null;
     };
 
 const LIVE_RUN = new Set(["preparing", "starting", "running", "waiting"]);
@@ -202,6 +213,29 @@ export function buildTimeline(
         });
         break;
       }
+      case "user_input_request": {
+        const request = projection.runtimeRequests.find((r) => r.id === item.requestId);
+        for (const question of item.questions) {
+          out.push({
+            kind: "question",
+            id: `${item.id}:${question.id}`,
+            requestId: item.requestId,
+            questionId: question.id,
+            question: question.question,
+            options: question.options.map((option) => ({
+              label: option.label,
+              value: option.value ?? option.label,
+            })),
+            state:
+              request?.status === "resolved"
+                ? "answered"
+                : request?.status === "pending"
+                  ? "waiting"
+                  : "ended",
+          });
+        }
+        break;
+      }
       case "checkpoint": {
         if (item.files.length === 0) break;
         const checkpoint = projection.checkpoints.find((c) => c.id === item.checkpointId);
@@ -241,8 +275,10 @@ export function buildTimeline(
           out.push({
             kind: "oops",
             id: item.id,
-            text: reason,
+            text: item.failure.class === "usage_limit" ? "Sam needs a short rest." : reason,
             retryText: previousMessage?.type === "user_message" ? previousMessage.text : null,
+            isRest: item.failure.class === "usage_limit",
+            restUntil: item.failure.class === "usage_limit" ? (item.failure.resetAt ?? null) : null,
           });
         }
         break;

@@ -311,7 +311,7 @@ export function Shell(props: {
       <View style={{ flex: 1, backgroundColor: theme.color.background }}>
         <Tabs.Host
           navStateRequest={{ selectedScreenKey: selected, baseProvenance: provenance }}
-          tabBarHidden={(depths[selected] ?? 0) > 0}
+          tabBarHidden={fullScreen || (depths[selected] ?? 0) > 0}
           ios={{
             tabBarControllerMode: "tabBar",
             tabBarMinimizeBehavior: "never",
@@ -352,6 +352,8 @@ export function Shell(props: {
                 }
                 section={section}
                 screens={props.screens}
+                onToggleFullScreen={toggleFullScreen}
+                fullScreen={fullScreen}
                 {...(props.headerRight ? { headerRight: props.headerRight } : {})}
               />
             </Tabs.Screen>

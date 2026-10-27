@@ -32,6 +32,7 @@ import { formatDayDivider } from "./status";
 import { SwitchNote, useAssistantSwitches, useEnvironmentProviders } from "./SwitchNote";
 import { WorkingCard } from "./WorkingCard";
 import { useChildView } from "../../app/useChildView";
+import { isAllowanceRestRun } from "./restCopy";
 
 export {
   getTimelineRenderer,
@@ -148,6 +149,7 @@ export function Timeline({
   );
   const renderEntry = (entry: TimelineEntry) => {
     if (entry.kind === "work") {
+      if (childView && isAllowanceRestRun(entry.runId, items)) return null;
       return (
         <div key={entry.key} className="fm-stream__item">
           <WorkingCard

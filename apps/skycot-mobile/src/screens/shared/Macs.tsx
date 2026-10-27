@@ -57,7 +57,7 @@ export function MacsScreen() {
             : null,
           links.macs.some((mac) => mac.relayRecord !== null)
             ? "SKYCOT Relay reaches the Mac from anywhere, sealed on this device so the relay can't read it. At home, the Mac's own address works too."
-            : "This device reaches the Mac on your home Wi-Fi or Tailscale. To reach it from anywhere, turn on Away from home in the Mac's Settings › Family, then link again.",
+            : "This device reaches the Mac on your home Wi-Fi or secure connection. To reach it from anywhere, turn on Away from home in the Mac's Settings › Family, then link again.",
         ]
           .filter(Boolean)
           .join(" ")}

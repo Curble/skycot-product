@@ -85,7 +85,7 @@ const config: ExpoConfig = {
   platforms: ["ios"],
   scheme: variant.scheme,
   version: process.env.SKYCOT_MOBILE_VERSION ?? "0.1.0",
-  orientation: "portrait",
+  orientation: "default",
   icon: ICONS.light,
   userInterfaceStyle: "automatic",
   // No over-the-air updates: the app only ever runs the code Apple reviewed.
@@ -109,7 +109,11 @@ const config: ExpoConfig = {
       // has a photo-copy function, so Apple's scan requires the sentence (upload error 90683).
       NSPhotoLibraryUsageDescription:
         "SKYCOT never looks through your photos. It only opens a picture you choose to share.",
-      UISupportedInterfaceOrientations: ["UIInterfaceOrientationPortrait"],
+      UISupportedInterfaceOrientations: [
+        "UIInterfaceOrientationPortrait",
+        "UIInterfaceOrientationLandscapeLeft",
+        "UIInterfaceOrientationLandscapeRight",
+      ],
       "UISupportedInterfaceOrientations~ipad": [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationPortraitUpsideDown",

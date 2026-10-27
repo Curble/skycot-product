@@ -12,7 +12,12 @@ import { clockPhrase, todaySummary } from "../../../../nondev/src/features/famil
 import { grownUpSwitchLines } from "../../../../nondev/src/plain/switches";
 import type { StackRoutes } from "../../app/routes";
 import { useGrownUp } from "../../app/grownup/GrownUpContext";
-import { conversationRows, relativeTime, stateLabel } from "../../data/conversations";
+import {
+  childProjectTitle,
+  conversationRows,
+  relativeTime,
+  stateLabel,
+} from "../../data/conversations";
 import { useCodeLength, useMacData } from "../../data/MacData";
 import { familyApi, type MoreTimeKind } from "../../family/api";
 import { useLinks, type Mac } from "../../links/store";
@@ -227,7 +232,7 @@ export function ChildConversationsScreen() {
           <Row
             key={row.key}
             title={row.thread.title}
-            subtitle={`${row.projectTitle} · ${stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt)}`}
+            subtitle={`${childProjectTitle(row.project?.title, row.mac.macName)} · ${stateLabel(row.state, BUILDER_NAME) ?? relativeTime(row.updatedAt)}`}
             chevron
             onPress={() =>
               navigation.navigate("Conversation", {
@@ -235,6 +240,7 @@ export function ChildConversationsScreen() {
                 threadId: row.thread.id,
                 title: row.thread.title,
                 readOnly: true,
+                childId: route.params.childId,
               })
             }
           />

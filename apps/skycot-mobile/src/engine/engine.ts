@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q47-question-answer
 /**
  * What the app reads from and asks of a Mac's engine, in T3's own shapes.
  *
@@ -215,6 +216,25 @@ export function respondToRequest(
       threadId: ThreadId.make(input.threadId),
       requestId: RuntimeRequestId.make(input.requestId),
       decision: input.decision,
+    }),
+  );
+}
+
+export function answerQuestion(
+  transport: MacTransport,
+  input: {
+    readonly threadId: string;
+    readonly requestId: string;
+    readonly answers: Readonly<Record<string, string>>;
+  },
+): Promise<unknown> {
+  return withMacRpc(transport, (client) =>
+    client[ORCHESTRATION_V2_WS_METHODS.dispatchCommand]({
+      type: "runtime-request.respond",
+      commandId: command(),
+      threadId: ThreadId.make(input.threadId),
+      requestId: RuntimeRequestId.make(input.requestId),
+      answers: input.answers,
     }),
   );
 }

@@ -325,9 +325,6 @@ export function WatchBridgeProvider(props: { readonly children: ReactNode }) {
         return;
       }
       told.current = new Set(live.map((request) => request.id));
-      if (testSetting("skycotTestQuiet") === null) {
-        void SkycotWatch.requestNotifications().catch(() => false);
-      }
       return;
     }
     for (const request of live) {

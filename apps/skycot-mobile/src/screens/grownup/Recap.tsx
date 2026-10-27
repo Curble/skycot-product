@@ -18,7 +18,12 @@ import {
   weekBars,
   type RecapRange,
 } from "../../../../nondev/src/features/recap/recap";
-import { compactMinutes, mobileMadeSummary } from "./recapCopy";
+import {
+  compactMinutes,
+  mobileGrownUpLines,
+  mobileMadeSummary,
+  mobileSwitchSummary,
+} from "./recapCopy";
 import { childLabel } from "../../../../nondev/src/features/family/children";
 import { friendlyTitle } from "../../../../nondev/src/plain/titles";
 import type { StackRoutes } from "../../app/routes";
@@ -152,20 +157,24 @@ export function RecapScreen() {
             {value.asks.length === 0 ? <Txt tone="label2">No messages.</Txt> : null}
             {value.asks.slice(0, 12).map((ask, index) => (
               <Txt key={`${ask.threadId}:${index}`} variant="subheadline">
-                {`“${askLine(ask)}”`}
+                {askLine(ask)}
               </Txt>
             ))}
           </Card>
           <Card style={{ gap: 6 }}>
             <Txt variant="headline">What needed a grown-up</Txt>
-            {grownUpLines(value).length === 0 ? (
+            {mobileGrownUpLines(grownUpLines(value)).length === 0 &&
+            mobileSwitchSummary(value.grownUp.switches?.length ?? 0) === null ? (
               <Txt tone="label2">Nothing needed a grown-up.</Txt>
             ) : null}
-            {grownUpLines(value).map((line, index) => (
+            {mobileGrownUpLines(grownUpLines(value)).map((line, index) => (
               <Txt key={index} variant="subheadline">
                 {`• ${line}`}
               </Txt>
             ))}
+            {mobileSwitchSummary(value.grownUp.switches?.length ?? 0) !== null ? (
+              <Txt variant="subheadline">{`• ${mobileSwitchSummary(value.grownUp.switches?.length ?? 0)}`}</Txt>
+            ) : null}
           </Card>
         </View>
       ) : null}

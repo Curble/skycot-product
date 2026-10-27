@@ -20,7 +20,17 @@ export function replaceSelectedStarterText(
   replacement: string,
 ): StarterDraft {
   const nextText = text.slice(0, selection.start) + replacement + text.slice(selection.end);
-  const caret = selection.start + replacement.length;
+  return updateStarterDraft(text, selection, nextText);
+}
+
+export function updateStarterDraft(
+  previousText: string,
+  selection: StarterDraft["selection"],
+  nextText: string,
+): StarterDraft {
+  const replaced = selection.end - selection.start;
+  const inserted = nextText.length - (previousText.length - replaced);
+  const caret = Math.max(0, Math.min(nextText.length, selection.start + inserted));
   return { text: nextText, selection: { start: caret, end: caret } };
 }
 

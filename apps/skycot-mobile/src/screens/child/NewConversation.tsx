@@ -37,9 +37,10 @@ import { titleFrom } from "./titles";
 import {
   selectStarterPlaceholder,
   starterPlaceholders,
+  updateStarterDraft,
   type StarterDraft,
 } from "./starterPlaceholders";
-import { shouldShowDestinationPicker } from "./destinationPicker";
+import { shouldShowDestinationPicker, shouldStartFreshPage } from "./destinationPicker";
 
 type Target = { readonly macId: string; readonly projectId: string | null };
 
@@ -109,10 +110,9 @@ export function NewConversationScreen() {
     setBusy(true);
     setProblem(null);
     try {
-      const projectId =
-        target.projectId === null || (projects.length > 0 && makeNewPage)
-          ? (await openQuestions(mac.transport)).projectId
-          : target.projectId;
+      const projectId = shouldStartFreshPage(target.projectId !== null, makeNewPage)
+        ? (await openQuestions(mac.transport)).projectId
+        : target.projectId!;
       const { threadId } = await startConversation(mac.transport, {
         projectId,
         title:
@@ -205,12 +205,10 @@ export function NewConversationScreen() {
                 selection={selection}
                 onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
                 onChangeText={(value) => {
-                  setText(value);
+                  const next = updateStarterDraft(text, selection, value);
+                  setText(next.text);
                   setShieldShown(false);
-                  setSelection((current) => {
-                    const caret = Math.min(current.start, value.length);
-                    return { start: caret, end: caret };
-                  });
+                  setSelection(next.selection);
                 }}
                 multiline
                 autoFocus={starter === null}
@@ -246,9 +244,11 @@ export function NewConversationScreen() {
                 </Txt>
                 {voiceAllowed ? (
                   <VoiceButton
-                    onWords={(words) =>
-                      setText((current) => (current ? `${current} ${words}` : words))
-                    }
+                    onWords={(words) => {
+                      const next = text ? `${text} ${words}` : words;
+                      setText(next);
+                      setSelection({ start: next.length, end: next.length });
+                    }}
                   />
                 ) : null}
               </View>
@@ -275,7 +275,7 @@ export function NewConversationScreen() {
                 ))}
               </View>
             ) : null}
-            {target?.projectId !== null && projects.length > 0 ? (
+            {target !== null && target.projectId !== null && projects.length > 0 ? (
               <Card style={{ gap: 8 }}>
                 <Txt variant="subheadline" weight="600">
                   What should Sam do?

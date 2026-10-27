@@ -22,7 +22,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { familyApi } from "../../family/api";
 import { childRequestWaitingCopy } from "./childRequestCopy";
-import { respondToRequest, sendMessage, stopConversation, undoTo } from "../../engine/engine";
+import {
+  answerQuestion,
+  respondToRequest,
+  sendMessage,
+  stopConversation,
+  undoTo,
+} from "../../engine/engine";
 import { buildTimeline, isWorking, type TimelineEntry } from "../../engine/timeline";
 import { useThread } from "../../data/hooks";
 import { useCodeLength } from "../../data/MacData";
@@ -107,7 +113,11 @@ export function ConversationView(props: {
     [projection],
   );
   const working = projection !== null && isWorking(projection);
-  const waitingAsk = timeline.some((entry) => entry.kind === "ask" && entry.state === "waiting");
+  const waitingAsk = timeline.some(
+    (entry) =>
+      ((entry.kind === "ask" || entry.kind === "question") && entry.state === "waiting") ||
+      (entry.kind === "oops" && entry.isRest),
+  );
   const lastPlan = timeline.findLast((entry) => entry.kind === "plan");
 
   useEffect(() => {
@@ -177,6 +187,17 @@ export function ConversationView(props: {
     );
   };
 
+  const answer = async (entry: Extract<TimelineEntry, { kind: "question" }>, value: string) => {
+    if (props.readOnly) return;
+    await run(entry.id, () =>
+      answerQuestion(props.mac.transport, {
+        threadId: props.threadId,
+        requestId: entry.requestId,
+        answers: { [entry.questionId]: value },
+      }),
+    );
+  };
+
   if (projection === null) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.color.background, justifyContent: "center" }}>
@@ -234,6 +255,7 @@ export function ConversationView(props: {
                 input.current?.focus();
               }}
               onAllow={allow}
+              onAnswer={answer}
               onDecline={(ask) =>
                 run(ask.id, () =>
                   respondToRequest(props.mac.transport, {
@@ -419,6 +441,7 @@ function TimelineCard(props: {
   readonly onBuild: (planId: string) => void;
   readonly onChangePlan: () => void;
   readonly onAllow: (entry: Extract<TimelineEntry, { kind: "ask" }>) => void;
+  readonly onAnswer: (entry: Extract<TimelineEntry, { kind: "question" }>, value: string) => void;
   readonly onDecline: (entry: Extract<TimelineEntry, { kind: "ask" }>) => void;
   readonly onUndo: (target: { readonly scopeId: string; readonly checkpointId: string }) => void;
   readonly onOpenPage: (() => void) | undefined;
@@ -431,7 +454,61 @@ function TimelineCard(props: {
       return <Bubble mine text={entry.text} />;
     case "crew":
       return <Bubble mine={false} text={entry.text} />;
+    case "question":
+      return (
+        <Card style={{ gap: 10 }}>
+          <CardHeader
+            symbol="questionmark.bubble.fill"
+            color={theme.color.accent}
+            title="Sam has a question"
+            subtitle={entry.state === "waiting" ? "Pick an answer" : "Answered"}
+          />
+          <Txt>{entry.question}</Txt>
+          {entry.state === "waiting" && !props.readOnly ? (
+            <View style={{ gap: 8 }}>
+              {entry.options.map((option) => (
+                <Button
+                  key={option.value}
+                  title={option.label}
+                  kind="tinted"
+                  busy={props.busy}
+                  onPress={() => props.onAnswer(entry, option.value)}
+                />
+              ))}
+            </View>
+          ) : entry.state === "answered" ? (
+            <Txt variant="footnote" tone="label2">
+              Answered
+            </Txt>
+          ) : null}
+        </Card>
+      );
     case "oops":
+      if (entry.isRest) {
+        const returnTime =
+          entry.restUntil === null
+            ? null
+            : new Date(entry.restUntil).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              });
+        return (
+          <Card style={{ gap: 8 }}>
+            <CardHeader
+              symbol="moon.zzz.fill"
+              color={theme.color.label2}
+              title="Sam needs a short rest"
+              subtitle="Your work is saved."
+            />
+            <Txt>
+              {returnTime === null
+                ? "Sam will be back after a rest."
+                : `Sam can come back around ${returnTime}.`}
+            </Txt>
+            <Txt tone="label2">You could draw what you want to make while Sam rests.</Txt>
+          </Card>
+        );
+      }
       return (
         <Banner
           tone="warning"

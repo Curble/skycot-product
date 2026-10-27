@@ -1,5 +1,6 @@
 // What the two parties say: your blue bubbles, the Crew's grey bubbles with
 // light Markdown, and the red-tinted "something went wrong" note.
+// nondev-seam: skycot-iphone-q47-mac-rest-card
 import type { EnvironmentId, OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { CircleAlert, MousePointerClick } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
@@ -19,6 +20,7 @@ import { imagesOf, SentPictures } from "./SentPictures";
 import { shortTime } from "./time";
 import { useChildView } from "../../../app/useChildView";
 import { childErrors } from "../../../plain/copy";
+import { restCopy } from "../restCopy";
 
 type UserMessage = Extract<OrchestrationV2TurnItem, { type: "user_message" }>;
 type AssistantMessage = Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>;
@@ -144,6 +146,7 @@ function FailureNote({
       : retry
         ? `Trying again (attempt ${retry.attempt}).`
         : null;
+  const restLines = childRest ? restCopy(item.failure.resetAt ?? null) : [];
   return (
     <Bubble author="crew" full meta={shortTime(item.updatedAt)}>
       {childRest ? null : (
@@ -163,19 +166,22 @@ function FailureNote({
             title={
               childView
                 ? item.failure.class === "usage_limit"
-                  ? childErrors.needsRest
+                  ? "Sam needs a short rest"
                   : childErrors.gotStuck
                 : narration.headline
             }
             subtitle={childView ? undefined : (retryLine ?? undefined)}
           />
           <CardBody>
+            {childRest ? restLines.map((line) => <p key={line}>{line}</p>) : null}
             {!childView && narration.detail ? <p>{narration.detail}</p> : null}
-            <Disclosure>
-              <pre className="fm-details__pre">
-                <code>{narration.technical}</code>
-              </pre>
-            </Disclosure>
+            {!childView ? (
+              <Disclosure>
+                <pre className="fm-details__pre">
+                  <code>{narration.technical}</code>
+                </pre>
+              </Disclosure>
+            ) : null}
           </CardBody>
         </Card>
       </div>

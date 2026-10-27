@@ -1,7 +1,7 @@
 // nondev-seam: skycot-iphone-q39-about-copy-test
 import { describe, expect, it } from "vite-plus/test";
 
-import { CHILD_ABOUT_COPY } from "./aboutCopy";
+import { CHILD_ABOUT_COPY, GROWN_UP_PRIVACY_COPY } from "./aboutCopy";
 
 describe("About SKYCOT for a child", () => {
   it("explains Sam and privacy in short, kind words", () => {
@@ -10,5 +10,11 @@ describe("About SKYCOT for a child", () => {
     expect(CHILD_ABOUT_COPY.privacy).toContain("stays on your family's Mac");
     expect(CHILD_ABOUT_COPY).not.toHaveProperty("ask");
     expect(JSON.stringify(CHILD_ABOUT_COPY)).not.toMatch(/tailscale|licen[cs]e|tracking/iu);
+  });
+
+  it("explains Do Not Track in plain phone words", () => {
+    expect(GROWN_UP_PRIVACY_COPY).toContain("If your phone asks sites not to track you");
+    expect(GROWN_UP_PRIVACY_COPY).toContain("we don't count it");
+    expect(GROWN_UP_PRIVACY_COPY).not.toMatch(/Do Not Track|Global Privacy Control/iu);
   });
 });

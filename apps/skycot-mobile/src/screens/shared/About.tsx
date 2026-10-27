@@ -9,7 +9,7 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useOptionalChild } from "../../app/child/ChildContext";
-import { CHILD_ABOUT_COPY } from "./aboutCopy";
+import { CHILD_ABOUT_COPY, GROWN_UP_PRIVACY_COPY } from "./aboutCopy";
 import { MIT_LICENCE_T3_CODE, NOT_AFFILIATED } from "../../legal/licences";
 import { Mascot, Row, Section, Sheet, Txt } from "../../ui/kit";
 
@@ -39,7 +39,7 @@ export function AboutContent() {
           A friendly place to build with Sam.
         </Txt>
       </View>
-      <Section footer="Your family's work stays on your Mac. SKYCOT has no account or ads. Each day, we count app update checks and relay connections without names or account details. Totals reset daily. Update counts stop when updates are turned off or when Do Not Track or Global Privacy Control is on.">
+      <Section footer={GROWN_UP_PRIVACY_COPY}>
         <Row title="Made by" detail="Curble Pty Ltd" />
         <Row title="Copyright" subtitle="© 2026 Curble Pty Ltd, trading as SKYCOT." />
       </Section>

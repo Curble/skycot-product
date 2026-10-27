@@ -13,6 +13,7 @@ import {
   GAME_KEY_SCRIPTS,
   gameButtonsForPage,
   pageHasOwnGameControls,
+  pageThing,
   pageLooksWrong,
   pageToolbarCopy,
   playableCopy,
@@ -233,19 +234,24 @@ describe("the sealed page viewer", () => {
   });
 
   it("recognizes labelled game controls and keeps viewer actions clear", () => {
+    expect(pageThing("birthday-card.html")).toBe("card");
+    expect(pageThing("my-game.html")).toBe("game");
+    expect(pageThing("school-poster.html")).toBe("page");
     expect(
       pageHasOwnGameControls('<button aria-label="Move left">←</button><button>KICK</button>'),
     ).toBe(true);
     expect(pageHasOwnGameControls("<button>Open settings</button>")).toBe(false);
     expect(pageToolbarCopy(true, false)).toEqual({
       done: "Done",
-      fullScreen: "Full screen",
-      extraButtons: "Extra buttons",
+      fullScreen: "Full",
+      extraButtons: "More",
+      help: "Help",
     });
     expect(pageToolbarCopy(false, true)).toEqual({
       done: "Back",
-      fullScreen: "Exit full screen",
-      extraButtons: "Extra buttons",
+      fullScreen: "Exit",
+      extraButtons: "More",
+      help: "Help",
     });
   });
 });

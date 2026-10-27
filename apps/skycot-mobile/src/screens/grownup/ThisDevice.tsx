@@ -30,7 +30,7 @@ import {
 } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
 import { useWatch } from "../../watch/WatchBridge";
-import { faceIdRowAction } from "./faceIdRow";
+import { faceIdRowAction, faceIdRowSubtitle } from "./faceIdRow";
 
 /** What the Apple Watch row says, from what WatchConnectivity knows. */
 export function watchRowSubtitle(input: {
@@ -51,19 +51,6 @@ export function watchRowSubtitle(input: {
 /** The Face ID row's title: what it does once it is on. */
 export function faceIdRowTitle(label: string, everywhere: boolean): string {
   return everywhere ? `${label} says yes` : `Use ${label} to say yes`;
-}
-
-/** The Face ID row's subtitle, from what this iPhone and the linked Macs know. */
-export function faceIdRowSubtitle(input: {
-  readonly label: string;
-  readonly available: boolean;
-  readonly everywhere: boolean;
-}): string {
-  if (input.everywhere) return "Allow once asks for it each time, for that one request.";
-  if (!input.available) {
-    return `Turn on ${input.label} for this iPhone in Settings to use it here. For now, the parent code says yes.`;
-  }
-  return "Set it up once with the parent code.";
 }
 
 export function ThisDeviceScreen() {

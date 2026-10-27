@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
-import { Platform, Pressable, ScrollView, View } from "react-native";
+import { Platform, Pressable, ScrollView, StatusBar, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -29,6 +29,7 @@ import {
   type PlayNoticeKind,
   pageAskWaitingCopy,
   pageHasOwnGameControls,
+  pageThing,
   pageToolbarCopy,
   rememberGameButtons,
   reportedSites,
@@ -78,6 +79,7 @@ export function PagePreview(props: {
   const pageKey = `${props.mac.macId}:${props.threadId}:${props.page}`;
   const [gameButtons, setGameButtons] = useState(() => gameButtonsForPage(pageKey));
   const toolbarCopy = pageToolbarCopy(props.childView, fullScreen);
+  const thing = pageThing(props.page);
   const currentSitesKey = [...sites].sort().join(",");
 
   const loadPage = useCallback(async () => {
@@ -198,6 +200,7 @@ export function PagePreview(props: {
       ? { ...engineResponse.diag, reason: engineResponse.reason, needs: engineResponse.needs }
       : undefined,
     device,
+    thing,
   );
   const build =
     Constants.expoConfig?.ios?.buildNumber ?? Constants.expoConfig?.version ?? "unknown";
@@ -224,7 +227,7 @@ export function PagePreview(props: {
   const shownSites = sites.filter((site) => !hiddenSites.includes(site));
   const allowedPage = play?.page ?? null;
   const noticeCopy =
-    notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts, device);
+    notice === null ? null : playNoticeCopy(notice, props.childView, noticeHosts, device, thing);
   return (
     <View
       style={{
@@ -234,6 +237,7 @@ export function PagePreview(props: {
         paddingTop: fullScreen ? 0 : insets.top,
       }}
     >
+      <StatusBar hidden={fullScreen} />
       <View
         style={{
           minHeight: 48,
@@ -263,6 +267,7 @@ export function PagePreview(props: {
         >
           <ToolbarButton
             label={toolbarCopy.fullScreen}
+            accessibilityLabel={fullScreen ? "Exit full screen" : "Full screen"}
             symbol={
               fullScreen
                 ? "arrow.down.right.and.arrow.up.left"
@@ -296,7 +301,8 @@ export function PagePreview(props: {
           wrong ||
           (engineResponse?.reason !== null && engineResponse?.reason !== undefined) ? (
             <ToolbarButton
-              label={props.childView ? "Not working?" : "Why isn't it working?"}
+              label={toolbarCopy.help}
+              accessibilityLabel={props.childView ? "Not working?" : "Why isn't it working?"}
               onPress={() => setDiagnosticsOpen(true)}
             />
           ) : null}
@@ -457,7 +463,7 @@ export function PagePreview(props: {
                   void Clipboard.setStringAsync(report).then(() => setReportCopied(true));
                 }}
               />
-              {props.onTellSam ? (
+              {props.onTellSam && noticeCopy?.tellSam === null ? (
                 <Button
                   title="Tell Sam"
                   kind="plain"
@@ -523,6 +529,7 @@ export function PagePreview(props: {
 
 function ToolbarButton(props: {
   readonly label: string;
+  readonly accessibilityLabel?: string;
   readonly symbol?:
     | "chevron.left"
     | "arrow.up.left.and.arrow.down.right"
@@ -533,7 +540,7 @@ function ToolbarButton(props: {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={props.label}
+      accessibilityLabel={props.accessibilityLabel ?? props.label}
       onPress={props.onPress}
       hitSlop={8}
       style={{

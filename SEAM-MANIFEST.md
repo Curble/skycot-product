@@ -571,14 +571,14 @@ variable and still carries upstream's default.
 
 ## iOS 17 minimum (26 October 2026)
 
-| id                               | file                                                                       | change                                                              | marker                                                 |
-| -------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
-| skycot-ios17-deployment-target   | `apps/skycot-mobile/app.config.ts`                                         | Sets the app and widget deployment minimum to iOS 17.               | `// nondev-seam: skycot-ios17-deployment-target`       |
-| skycot-device-key-ios17-target   | `apps/skycot-mobile/modules/skycot-device-key/ios/SkycotDeviceKey.podspec` | Keeps the Face ID native module available from iOS 17.              | `# nondev-seam: skycot-device-key-ios17-target`        |
-| skycot-speech-ios17-target       | `apps/skycot-mobile/modules/skycot-speech/ios/SkycotSpeech.podspec`        | Keeps the on-device speech native module available from iOS 17.     | `# nondev-seam: skycot-speech-ios17-target`            |
-| skycot-watch-module-ios17-target | `apps/skycot-mobile/modules/skycot-watch/ios/SkycotWatch.podspec`          | Keeps the WatchConnectivity iPhone module available from iOS 17.    | `# nondev-seam: skycot-watch-module-ios17-target`      |
-| skycot-watchos10-target          | `apps/skycot-mobile/plugins/withSkycotWatch.cjs`                           | Uses watchOS 10 so the companion Watch app can pair with iOS 17.    | `// nondev-seam: skycot-watchos10-target`              |
-| skycot-app-store-ios17-minimum   | `docs/legal/app-store/01-app-store-listing.md`                             | Records iOS/iPadOS 17 and watchOS 10 minimums in the listing draft. | `<!-- nondev-seam: skycot-app-store-ios17-minimum -->` |
+| id                               | file                                                                       | change                                                                                                | marker                                                 |
+| -------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| skycot-ios17-deployment-target   | `apps/skycot-mobile/app.config.ts`                                         | Sets the app and widget deployment minimum to iOS 17 and allows landscape for the full-screen viewer. | `// nondev-seam: skycot-ios17-deployment-target`       |
+| skycot-device-key-ios17-target   | `apps/skycot-mobile/modules/skycot-device-key/ios/SkycotDeviceKey.podspec` | Keeps the Face ID native module available from iOS 17.                                                | `# nondev-seam: skycot-device-key-ios17-target`        |
+| skycot-speech-ios17-target       | `apps/skycot-mobile/modules/skycot-speech/ios/SkycotSpeech.podspec`        | Keeps the on-device speech native module available from iOS 17.                                       | `# nondev-seam: skycot-speech-ios17-target`            |
+| skycot-watch-module-ios17-target | `apps/skycot-mobile/modules/skycot-watch/ios/SkycotWatch.podspec`          | Keeps the WatchConnectivity iPhone module available from iOS 17.                                      | `# nondev-seam: skycot-watch-module-ios17-target`      |
+| skycot-watchos10-target          | `apps/skycot-mobile/plugins/withSkycotWatch.cjs`                           | Uses watchOS 10 so the companion Watch app can pair with iOS 17.                                      | `// nondev-seam: skycot-watchos10-target`              |
+| skycot-app-store-ios17-minimum   | `docs/legal/app-store/01-app-store-listing.md`                             | Records iOS/iPadOS 17 and watchOS 10 minimums in the listing draft.                                   | `<!-- nondev-seam: skycot-app-store-ios17-minimum -->` |
 
 ## Page internet asks (26 October 2026)
 
@@ -717,3 +717,13 @@ variable and still carries upstream's default.
 | skycot-alternate-write-hold-test          | `apps/server/src/skycot/SkycotPolicyReactor.test.ts` | Checks an outside write stays held when Sam switches from a file edit to a shell command.               | `// nondev-seam: skycot-alternate-write-hold-test`          |
 | skycot-child-project-folder-ws-test       | `apps/server/src/ws.test.ts`                         | Calls the WebSocket project creation handler as the selected child and checks the child questions path. | `// nondev-seam: skycot-child-project-folder-ws-test`       |
 | skycot-child-project-folder-ws-rpc-schema | `packages/contracts/src/rpc.ts`                      | Exposes the project creation RPC schema so the handler path can be tested directly.                     | `// nondev-seam: skycot-child-project-folder-ws-rpc-schema` |
+
+## iPhone round 3 (27 October 2026)
+
+| id                                     | file                                                             | change                                                                                  | marker                                                   |
+| -------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| skycot-iphone-q47-question-answer      | `apps/skycot-mobile/src/engine/engine.ts`                        | Lets a child answer Sam's provider question using the engine's question response route. | `// nondev-seam: skycot-iphone-q47-question-answer`      |
+| skycot-iphone-q47-notification-consent | `apps/skycot-mobile/src/push/PushRegistration.tsx`               | Keeps push registration from triggering an unexplained notification prompt at launch.   | `// nondev-seam: skycot-iphone-q47-notification-consent` |
+| skycot-iphone-q47-mac-rest-card        | `apps/nondev/src/features/conversation/cards/MessageBubbles.tsx` | Gives children a calm rest card with the known return time and no developer details.    | `// nondev-seam: skycot-iphone-q47-mac-rest-card`        |
+| skycot-iphone-q47-mac-rest-copy        | `apps/nondev/src/features/conversation/restCopy.ts`              | Formats the return time and a simple thing to do while Sam rests.                       | `// nondev-seam: skycot-iphone-q47-mac-rest-copy`        |
+| skycot-iphone-q47-mac-rest-copy-test   | `apps/nondev/src/features/conversation/restCopy.test.ts`         | Checks rest card wording with and without an engine reset time.                         | `// nondev-seam: skycot-iphone-q47-mac-rest-copy-test`   |

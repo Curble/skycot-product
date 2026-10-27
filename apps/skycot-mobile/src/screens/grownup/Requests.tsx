@@ -42,7 +42,8 @@ import {
   haptic,
 } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
-import { requestCountSentence } from "./requestsCopy";
+import { NOTIFICATION_INTRO, requestCountSentence } from "./requestsCopy";
+import { SkycotWatch } from "../../../modules/skycot-watch";
 
 export function ageOf(createdAt: number, now: number = Date.now()): string {
   const minutes = Math.floor((now - createdAt) / 60_000);
@@ -484,6 +485,9 @@ function RequestCard(props: {
 
 export function RequestsScreen() {
   const grownUp = useGrownUp();
+  const [notificationPrompt, setNotificationPrompt] = useState<"ready" | "enabled" | "off">(
+    "ready",
+  );
   const live = grownUp.waiting.filter((waiting) => !waiting.request.lapsed);
   const count = live.length;
   const liveKeys = live.map((waiting) => `${waiting.mac.macId}:${waiting.request.requestId}`);
@@ -504,6 +508,23 @@ export function RequestsScreen() {
           {countSentence(count) ? <Txt tone="label2">{countSentence(count)}</Txt> : null}
         </View>
       </View>
+      {notificationPrompt !== "enabled" ? (
+        <Card style={{ marginHorizontal: 16, marginTop: 14, gap: 8 }}>
+          <Txt variant="headline">{NOTIFICATION_INTRO.title}</Txt>
+          <Txt tone="label2">{NOTIFICATION_INTRO.message}</Txt>
+          {notificationPrompt === "off" ? (
+            <Txt tone="label2">You can turn alerts on in this iPhone's Settings.</Txt>
+          ) : null}
+          <Button
+            title={notificationPrompt === "off" ? "Try alerts again" : NOTIFICATION_INTRO.button}
+            onPress={() => {
+              void SkycotWatch?.requestNotifications()
+                .then((enabled) => setNotificationPrompt(enabled ? "enabled" : "off"))
+                .catch(() => setNotificationPrompt("off"));
+            }}
+          />
+        </Card>
+      ) : null}
       {!grownUp.loaded ? (
         <Spinner />
       ) : grownUp.waiting.length === 0 && grownUp.notes.length === 0 ? (

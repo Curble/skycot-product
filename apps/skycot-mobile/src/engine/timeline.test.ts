@@ -13,6 +13,64 @@ describe("a conversation as SKYCOT's cards", () => {
     expect(entries[1]).toMatchObject({ kind: "plan", state: "ready" });
   });
 
+  it("shows a provider question and its answer choices as a child card", () => {
+    const projection = demoConversation("plan");
+    const question = {
+      ...(projection.turnItems[0] as never),
+      id: "question-item",
+      position: 9,
+      item: {
+        type: "user_input_request",
+        id: "question-item",
+        requestId: "request-1",
+        questions: [
+          {
+            id: "q1",
+            header: "Colour",
+            question: "Which colour should I use?",
+            options: [
+              { label: "Blue", description: "Blue", value: "blue" },
+              { label: "Green", description: "Green", value: "green" },
+            ],
+          },
+        ],
+      },
+    } as never;
+    const entries = buildTimeline({ ...projection, visibleTurnItems: [question] }, context);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        kind: "question",
+        question: "Which colour should I use?",
+        options: [
+          { label: "Blue", value: "blue" },
+          { label: "Green", value: "green" },
+        ],
+      }),
+    );
+  });
+
+  it("turns an allowance limit into a rest card with the return time", () => {
+    const projection = demoConversation("made");
+    const prior = projection.visibleTurnItems[0]!;
+    const error = {
+      position: 10,
+      item: {
+        ...prior.item,
+        type: "error",
+        id: "limit-error",
+        failure: { class: "usage_limit", resetAt: "2026-10-27T10:00:00.000Z" },
+      },
+    } as never;
+    expect(buildTimeline({ ...projection, visibleTurnItems: [error] }, context)).toContainEqual(
+      expect.objectContaining({
+        kind: "oops",
+        text: "Sam needs a short rest.",
+        isRest: true,
+        restUntil: "2026-10-27T10:00:00.000Z",
+      }),
+    );
+  });
+
   it("holds an install for a grown-up, and lets the child answer an ordinary read", () => {
     const projection = demoConversation("ask");
     expect(isWorking(projection)).toBe(true);

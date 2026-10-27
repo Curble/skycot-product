@@ -28,9 +28,16 @@ export function gameButtonsForPage(key: string, hasOwnControls = false): boolean
 export function pageToolbarCopy(childView: boolean, fullScreen: boolean) {
   return {
     done: childView ? "Done" : "Back",
-    fullScreen: fullScreen ? "Exit full screen" : "Full screen",
-    extraButtons: "Extra buttons",
+    fullScreen: fullScreen ? "Exit" : "Full",
+    extraButtons: "More",
+    help: "Help",
   } as const;
+}
+
+export function pageThing(page: string): "game" | "card" | "page" {
+  if (/card|birthday/iu.test(page)) return "card";
+  if (/game|play|bounce/iu.test(page)) return "game";
+  return "page";
 }
 
 export const GAME_KEY_SCRIPTS = {
@@ -83,6 +90,7 @@ export function playNoticeCopy(
   childView: boolean,
   hosts: ReadonlyArray<string> = [],
   device = "iPad",
+  thing: "game" | "card" | "page" = "game",
 ): {
   readonly title: string;
   readonly message: string;
@@ -92,26 +100,26 @@ export function playNoticeCopy(
 } {
   if (kind === "engine-update")
     return {
-      title: "This game can't play here yet",
+      title: `This ${thing} can't play here yet`,
       message: childView
-        ? "This game needs a newer SKYCOT on the Mac to play here. Ask a grown-up to update it. You're seeing a picture of the game."
-        : "This game needs a newer SKYCOT on the Mac to play here. You're seeing a picture of the game.",
+        ? `This ${thing} needs a newer SKYCOT on the Mac to play here. Ask a grown-up to update it. You're seeing a picture of the ${thing}.`
+        : `This ${thing} needs a newer SKYCOT on the Mac to play here. You're seeing a picture of the ${thing}.`,
       grownUp: childView ? null : "Update SKYCOT on the Mac (Settings > About).",
       tellSamLabel: null,
       tellSam: null,
     };
   if (kind === "remote-script")
     return {
-      title: "This game can't play here yet",
-      message: `This game uses a tool from the internet (${hosts.length > 0 ? hosts.join(", ") : "a website"}), which can't run on this ${device}. It works on the Mac. Ask Sam to make it work without the internet.`,
+      title: `This ${thing} can't play here yet`,
+      message: `This ${thing} uses a tool from the internet (${hosts.length > 0 ? hosts.join(", ") : "a website"}), which can't run on this ${device}. It works on the Mac. Ask Sam to make it work without the internet.`,
       grownUp: null,
       tellSamLabel: "Tell Sam",
-      tellSam: `Please make my game work without loading anything from the internet, so it plays on this ${device}.`,
+      tellSam: `Please make my ${thing} work without loading anything from the internet, so it plays on this ${device}.`,
     };
   if (kind === "too-big")
     return {
-      title: "This game can't play here yet",
-      message: `This game is too big to play on this ${device}. You're seeing a picture of the game.`,
+      title: `This ${thing} can't play here yet`,
+      message: `This ${thing} is too big to play on this ${device}. You're seeing a picture of the ${thing}.`,
       grownUp: childView
         ? null
         : "The Mac could not pack this page within the playable size limit.",
@@ -119,8 +127,8 @@ export function playNoticeCopy(
       tellSam: null,
     };
   return {
-    title: "This game can't play here yet",
-    message: `A part of this game is missing, so it can't play on this ${device}. You're seeing a picture of the game.`,
+    title: `This ${thing} can't play here yet`,
+    message: `A part of this ${thing} is missing, so it can't play on this ${device}. You're seeing a picture of the ${thing}.`,
     grownUp: childView
       ? null
       : "Keep the game's modules inside the project folder, then try again.",
@@ -280,6 +288,7 @@ export function diagnosticSheetCopy(
   childView: boolean,
   engine?: FridgePlayDiag,
   device = "iPad",
+  thing: "game" | "card" | "page" = "game",
 ): {
   readonly headline: string;
   readonly lines: ReadonlyArray<string>;
@@ -293,34 +302,36 @@ export function diagnosticSheetCopy(
       `This ${device}'s web engine is older (${device === "iPad" ? "iPadOS" : "iOS"} ${facts.ios}).`,
     );
   for (const file of engine?.missingFiles.slice(0, 3) ?? [])
-    lines.push(`A game file is missing: ${safeFileName(file)}`);
+    lines.push(`A ${thing} file is missing: ${safeFileName(file)}`);
   for (const entry of diagnostics.entries.slice(-4)) {
     if (entry.kind === "load")
       lines.push(
-        `A picture or sound couldn't be found: ${entry.text.replace(/^(?:img|audio|video|source):\s*/iu, "") || "game file"}`,
+        `A picture or sound couldn't be found: ${entry.text.replace(/^(?:img|audio|video|source):\s*/iu, "") || `${thing} file`}`,
       );
     else if (entry.kind === "policy") {
       const host = /\bblocked ([\w.-]+)/iu.exec(entry.text)?.[1];
-      lines.push(`The ${device} stopped the game from using ${host ?? "something it needed"}.`);
+      lines.push(`The ${device} stopped the ${thing} from using ${host ?? "something it needed"}.`);
     } else if (entry.kind === "error" || entry.kind === "rejection")
-      lines.push("Something in the game's code went wrong.");
-    else lines.push(`The game showed a warning: ${entry.text}`);
+      lines.push(`Something in the ${thing}'s code went wrong.`);
+    else lines.push(`The ${thing} showed a warning: ${entry.text}`);
   }
-  if (facts.blank === true) lines.push(`The game page looks empty on this ${device}.`);
+  if (facts.blank === true) lines.push(`The ${thing} looks empty on this ${device}.`);
   const running = (facts.frames ?? 0) > 0 && facts.blank !== true;
   if (running)
     lines.splice(
       0,
       lines.length,
-      `The game is running on this ${device}. Tell Sam what you'd like changed.`,
+      `Your ${thing} is running on this ${device}. Tell Sam what you'd like changed.`,
     );
   while (lines.length < 3) {
     const fallback = running
-      ? ["You can keep playing.", "Tell Sam what you'd like to be different."][lines.length - 1]!
+      ? [`You can keep using your ${thing}.`, "Tell Sam what you'd like to be different."][
+          lines.length - 1
+        ]!
       : [
-          `The game copy opened on this ${device}.`,
+          `The ${thing} opened on this ${device}.`,
           "A grown-up can copy these clues to help fix it.",
-          `The game did not start moving on this ${device}.`,
+          `The ${thing} did not start on this ${device}.`,
         ][lines.length]!;
     lines.push(fallback);
   }
@@ -330,11 +341,13 @@ export function diagnosticSheetCopy(
     running
       ? "one small thing needs changing"
       : firstProblem?.kind === "error" || firstProblem?.kind === "rejection"
-        ? "something in the game's code went wrong"
+        ? `something in the ${thing}'s code went wrong`
         : (firstProblem?.text ?? engine?.missingFiles[0] ?? "it did not start")
   ).slice(0, 100);
   return {
-    headline: running ? "Is something not working?" : `This game hit a problem on this ${device}`,
+    headline: running
+      ? "Is something not working?"
+      : `This ${thing} hit a problem on this ${device}`,
     lines: shown,
     grownUpLines: childView
       ? []
@@ -344,8 +357,8 @@ export function diagnosticSheetCopy(
           ...diagnostics.entries.slice(-2).map((entry) => `${entry.kind}: ${entry.text}`),
         ],
     tellSam: running
-      ? `My game is running on this ${device}, but ${shortError}. Please change that.`
-      : `My game doesn't work on this ${device}: ${shortError}. Please fix it.`,
+      ? `My ${thing} is running on this ${device}, but ${shortError}. Please change that.`
+      : `My ${thing} doesn't work on this ${device}: ${shortError}. Please fix it.`,
   };
 }
 

@@ -14,6 +14,7 @@ export type StackRoutes = {
     readonly threadId: string;
     readonly title: string;
     readonly readOnly?: boolean;
+    readonly childId?: string;
     readonly initialDraft?: string;
   };
   NewConversation: { readonly starterId?: string; readonly question?: boolean };

@@ -1,3 +1,4 @@
+// nondev-seam: skycot-iphone-q47-notification-consent
 /**
  * Real notifications when SKYCOT is closed: "SKYCOT needs a grown-up" on a grown-up's phone
  * (and their Apple Watch, which iOS forwards it to) and "Sam has finished" on a child's device.
@@ -20,7 +21,6 @@ import type { RelayHome } from "@t3tools/skycot-relay/client/home";
 
 import { SkycotWatch } from "../../modules/skycot-watch";
 import { useLinks } from "../links/store";
-import { testSetting } from "../watch/WatchBridge";
 import {
   homesToRegister,
   parseRegistered,
@@ -91,9 +91,6 @@ export function PushRegistration(): null {
       // A child's device asks here; a grown-up's phone asks once its requests have loaded
       // (WatchBridge), so the question comes with the requests on the screen. Asking twice is
       // harmless: iOS asks the person once.
-      if (mode === "child" && testSetting("skycotTestQuiet") === null) {
-        await native.requestNotifications().catch(() => false);
-      }
       const token = await native.registerForPush().catch(() => null);
       if (token === null) return;
       const before = parseRegistered(
