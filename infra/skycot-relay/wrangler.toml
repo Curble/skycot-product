@@ -39,4 +39,4 @@ APNS_BUNDLE_ID = "com.skycot.app.ios"
 #   DAILY_SALT_SECRET
 
 [observability]
-enabled = true
+enabled = false
