@@ -853,6 +853,13 @@ it.layer(
       assert.isTrue(asks.json["children"][1].askEachStep);
       const sneaky = yield* post("/look", { look: "classic", askEachStep: false });
       assert.isTrue(sneaky.json["children"][1].askEachStep);
+      // The reading level a grown-up picks is saved (it was silently dropped before 27 Oct 2026).
+      const level = yield* post("/children/update", {
+        childId: leo,
+        patch: { readingLevel: "little-makers" },
+      });
+      assert.equal(level.status, 200, JSON.stringify(level.json));
+      assert.equal(level.json["children"][1].readingLevel, "little-makers");
 
       const wrong = yield* post("/more-time", { childId: leo, kind: "extra15", code: "000000" });
       assert.equal(wrong.json["error"], "wrong-code");

@@ -556,6 +556,9 @@ const childInput = (value: unknown): SkycotFamily.ChildInput => {
     ...("voice" in input ? { voice: input["voice"] } : {}),
     ...("limits" in input ? { limits: input["limits"] } : {}),
     ...("askEachStep" in input ? { askEachStep: input["askEachStep"] } : {}),
+    // The reading level the grown-up picked: dropped here until 27 Oct 2026, so every child
+    // stayed on the default however often it was saved (first-run rounds 2 and 3).
+    ...("readingLevel" in input ? { readingLevel: input["readingLevel"] } : {}),
   };
 };
 
