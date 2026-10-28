@@ -72,6 +72,7 @@ import {
   type FamilyEvaluation,
   type ProjectApprovalCover,
 } from "@t3tools/skycot-rules/family";
+import { childMayStartInProject } from "@t3tools/skycot-rules/people";
 import { describeMatches } from "@t3tools/skycot-rules/rules";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import {
@@ -1259,10 +1260,20 @@ const make = Effect.gen(function* () {
       READ_ONLY_METHODS.has(input.method) ? "read" : "use",
     );
     const startsIn = newThreadProject(input.method, input.payload);
-    if (allowed && (startsIn === null || (yield* childMayStartIn(view.childId, startsIn)))) return;
+    // Seeing is not starting: new work begins only in the child's own or an unowned project, on
+    // every session kind, even where they may open a conversation of their own.
+    const theirsToStart =
+      startsIn === null || childMayStartInProject(view.childId, startsIn, view.owners);
+    if (
+      allowed &&
+      theirsToStart &&
+      (startsIn === null || (yield* childMayStartIn(view.childId, startsIn)))
+    ) {
+      return;
+    }
     yield* Effect.logInfo("skycot-family.device-refused", {
       method: input.method,
-      why: allowed ? "not-their-questions" : "not-theirs",
+      why: !allowed ? "not-theirs" : !theirsToStart ? "not-their-project" : "not-their-questions",
     });
     return yield* deviceRefusal(CHILD_DEVICE_MESSAGE);
   });

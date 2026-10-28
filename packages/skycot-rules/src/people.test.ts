@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   biometryWords,
+  childMayStartInProject,
   childSeesProject,
   childSeesThread,
   cleanName,
@@ -44,6 +45,14 @@ describe("who is who", () => {
     expect(childSeesProject("ava", "project-family", owners)).toBe(true);
     expect(childSeesProject("ava", "project-leo", owners)).toBe(false);
     // Unless the child has a conversation of their own in it.
+    expect(childSeesProject("ava", "project-leo", owners, new Set(["project-leo"]))).toBe(true);
+  });
+
+  it("a child starts new work only in their own or an unowned project, even with a thread in a sibling's", () => {
+    expect(childMayStartInProject("ava", "project-ava", owners)).toBe(true);
+    expect(childMayStartInProject("ava", "project-family", owners)).toBe(true);
+    expect(childMayStartInProject("ava", "project-leo", owners)).toBe(false);
+    // Seeing it through their own thread does not let them start there.
     expect(childSeesProject("ava", "project-leo", owners, new Set(["project-leo"]))).toBe(true);
   });
 

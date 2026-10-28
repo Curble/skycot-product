@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { projectsChildMayStartIn } from "../family-limits/order";
 import {
   composeTargetFor,
   makeProjectOffer,
@@ -42,6 +43,24 @@ describe("where a new conversation goes", () => {
       kind: "project",
       project: newest,
     });
+  });
+
+  it("ignores a remembered sibling's project, because the child's candidates never hold it", () => {
+    const owners: Record<string, string> = { games: "ava", site: "leo" };
+    const candidates = projectsChildMayStartIn(
+      [questions, games, site],
+      (p) => p.id,
+      owners,
+      "ava",
+    );
+    const aimed = target({
+      projects: candidates,
+      chosen: `${ENV}:site`,
+      preferredKey: `${ENV}:site`,
+      last: { environmentId: ENV, projectId: "site" },
+      defaultToNewest: true,
+    });
+    expect(aimed).toEqual({ kind: "project", project: games });
   });
 
   it("follows the person's pick in the box, then the sidebar, then the last one used", () => {

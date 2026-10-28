@@ -205,6 +205,8 @@ const THREADS: ReadonlyArray<FakeThread> = [
   { id: "thread-leo", projectId: "project-family", worktreePath: "/w/leo-1" },
   { id: "thread-leo-pinned", projectId: "project-leo", worktreePath: "/w/leo-2" },
   { id: "thread-old", projectId: "project-family", worktreePath: "/w/old" },
+  // Ava's own conversation inside Leo's project (a grown-up started it with Ava switched in).
+  { id: "thread-ava-in-leo", projectId: "project-leo", worktreePath: null },
 ];
 const PROJECTS = [
   { projectId: "project-family", workspaceRoot: "/p/family", title: "Family" },
@@ -326,6 +328,7 @@ const withWorld = <A, E, R>(
         yield* limits.choose({ sessionId: "mac-ava", childId: avaId, grownUp: false });
         yield* limits.choose({ sessionId: "mac-leo", childId: leoId, grownUp: false });
         yield* limits.recordStart({ sessionId: "mac-ava", threadId: "thread-ava" });
+        yield* limits.recordStart({ sessionId: "mac-ava", threadId: "thread-ava-in-leo" });
         yield* limits.recordStart({ sessionId: "mac-leo", threadId: "thread-leo" });
         yield* limits.recordStart({ sessionId: "mac-leo", threadId: "thread-leo-pinned" });
         yield* limits.recordStart({ sessionId: "mac-leo", projectId: "project-leo" });
@@ -516,6 +519,42 @@ it.layer(NodeServices.layer)("who is who", (it) => {
       ),
   );
 
+  it.effect(
+    "a child may open their own conversation in a sibling's project but never start new work there",
+    () =>
+      withWorld(({ gate }) =>
+        Effect.gen(function* () {
+          for (const session of ["ava-ipad", "mac-ava"]) {
+            // Opening and continuing the one they own stays allowed.
+            yield* gate.check(
+              call(session, ORCHESTRATION_V2_WS_METHODS.subscribeThread, {
+                threadId: "thread-ava-in-leo",
+              }),
+            );
+            // A new conversation beside it in Leo's project is refused.
+            assert.isTrue(
+              yield* refused(
+                gate.check(
+                  call(session, ORCHESTRATION_V2_WS_METHODS.launchThread, {
+                    projectId: "project-leo",
+                    threadId: "thread-new",
+                  }),
+                ),
+              ),
+              session,
+            );
+            // The family's shared project is still open for new work.
+            yield* gate.check(
+              call(session, ORCHESTRATION_V2_WS_METHODS.launchThread, {
+                projectId: "project-family",
+                threadId: "thread-new-2",
+              }),
+            );
+          }
+        }),
+      ),
+  );
+
   it.effect("a child's iPad gets its own conversations and projects in the live list", () =>
     withWorld(({ visibility }) =>
       Effect.gen(function* () {
@@ -544,11 +583,11 @@ it.layer(NodeServices.layer)("who is who", (it) => {
         if (first.kind === "snapshot") {
           assert.deepEqual(
             first.snapshot.threads.map((thread) => thread.id),
-            ["thread-ava"],
+            ["thread-ava", "thread-ava-in-leo"],
           );
           assert.deepEqual(
             first.snapshot.projects.map((project) => project.id),
-            ["project-family"],
+            ["project-family", "project-leo"],
           );
         }
         assert.equal(list[1]!.kind === "thread.updated" ? list[1]!.thread.id : "", "thread-ava");

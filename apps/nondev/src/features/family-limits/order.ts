@@ -45,6 +45,23 @@ export function projectsForChild<P>(
 }
 
 /**
+ * Projects a child may START new work in: ones the engine records for them, or that nobody owns.
+ * Never a sibling's, even where the child has a conversation of their own (seeing is not starting).
+ */
+export function projectsChildMayStartIn<P>(
+  projects: ReadonlyArray<P>,
+  projectIdOf: (project: P) => string,
+  owners: Readonly<Record<string, string>>,
+  childId: string | null,
+): ReadonlyArray<P> {
+  if (childId === null) return [];
+  return projects.filter((project) => {
+    const owner = owners[projectIdOf(project)];
+    return owner === undefined || owner === childId;
+  });
+}
+
+/**
  * Conversations the engine has not said who started, among `rows`. A brand-new one is the
  * usual case: the engine records its child as it starts, but this device's copy of who
  * started what was read earlier, so it asks again rather than filing it under someone else.

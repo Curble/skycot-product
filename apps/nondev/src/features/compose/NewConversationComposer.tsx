@@ -13,7 +13,6 @@ import { CrewName } from "../../themes/CrewName";
 import { useCrew } from "../../themes/useCrew";
 import { navigate, threadHref } from "../../router";
 import { environmentProjects, projectEnvironment } from "../../state/projects";
-import { conversationRowsAtom } from "../../state/conversations";
 import {
   readAutonomy,
   useLastProject,
@@ -41,7 +40,7 @@ import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
-import { projectsForChild, rowsForChild } from "../family-limits/order";
+import { projectsChildMayStartIn } from "../family-limits/order";
 import { noteStartedHere, useLimits } from "../family-limits/store";
 import { familyApi } from "../family/api"; // nondev-seam: skycot-project-memory
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
@@ -97,7 +96,6 @@ export function NewConversationComposer({
   readonly seed?: ComposerSeed | null;
 }) {
   const projects = useAtomValue(environmentProjects.projectsAtom);
-  const conversations = useAtomValue(conversationRowsAtom);
   const lastProject = useLastProject();
   const columns = useColumns();
   const connected = useConnected();
@@ -151,17 +149,7 @@ export function NewConversationComposer({
   const questionsAvailable =
     Boolean(config?.scratchWorkspaceRoot) && environmentIds[0] !== undefined;
   const childProjects = childView
-    ? projectsForChild(
-        projects,
-        (candidate) => candidate.id,
-        today.projects,
-        childId,
-        new Set(
-          rowsForChild(conversations, (row) => row.shell.id, today.threads, childId).map(
-            (row) => row.shell.projectId,
-          ),
-        ),
-      )
+    ? projectsChildMayStartIn(projects, (candidate) => candidate.id, today.projects, childId)
     : projects;
   const ownProjects = realProjects(childProjects);
   const questionsProject = childProjects.find((candidate) => isQuestionsProject(candidate)) ?? null;

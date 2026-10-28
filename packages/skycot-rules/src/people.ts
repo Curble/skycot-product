@@ -202,6 +202,20 @@ export function childSeesProject(
   return owner === undefined || owner === childId || projectsWithOwnThreads.has(projectId);
 }
 
+/**
+ * Whether a child may START new work in a project: only one they own, or one nobody owns.
+ * Seeing is not starting: a conversation of their own inside a sibling's project lets them open
+ * that conversation, never begin another beside it. Same on every session kind.
+ */
+export function childMayStartInProject(
+  childId: string,
+  projectId: string,
+  owners: Owners,
+): boolean {
+  const owner = owners.projects[projectId];
+  return owner === undefined || owner === childId;
+}
+
 /** Plain English for a device's kind, for lists ("Ava's iPad · Child's device"). */
 export function deviceKindLabel(kind: DeviceKind): string {
   return kind === "child" ? "Child's device" : "Grown-up's device";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { projectsForChild, rowsForChild } from "./order";
+import { projectsChildMayStartIn, projectsForChild, rowsForChild } from "./order";
 
 describe("child work visibility", () => {
   it("shows only the selected child's conversations", () => {
@@ -30,5 +30,15 @@ describe("child work visibility", () => {
         new Set(["ava"]),
       ),
     ).toEqual([{ id: "leo" }, { id: "ava" }]);
+  });
+
+  it("starts new work only in the child's own or an unowned project, never a sibling's", () => {
+    const projects = [{ id: "family" }, { id: "leo" }, { id: "ava" }];
+    const owners = { leo: "leo", ava: "ava" };
+    expect(projectsChildMayStartIn(projects, (project) => project.id, owners, "leo")).toEqual([
+      { id: "family" },
+      { id: "leo" },
+    ]);
+    expect(projectsChildMayStartIn(projects, (project) => project.id, owners, null)).toEqual([]);
   });
 });
