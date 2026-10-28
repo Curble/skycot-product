@@ -3,7 +3,7 @@ title = "SKYCOT gitleaks config"
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "Vendored code, tests, fixtures, lockfile and QA notes"
 paths = [
   '''^\.repos/''',
@@ -13,3 +13,36 @@ paths = [
   '''^docs/qa/''',
   '''(^|/)pnpm-lock\.yaml$''',
 ]
+
+# Reviewed non-secrets (28 Oct 2026). Each entry is limited to one file AND one rule, so a real
+# secret of any other kind in the same file would still be caught. Replaces the old .gitleaksignore
+# fingerprint list, which broke whenever commit hashes changed.
+[[allowlists]]
+description = "run-family-e2e.ts: test key generated at run time"
+targetRules = ["private-key"]
+paths = ['''^infra/skycot-relay/e2e/run-family-e2e\.ts$''']
+
+[[allowlists]]
+description = "apply-brand.ts: upstream's publishable Clerk key (public by design, used to detect and strip it)"
+targetRules = ["generic-api-key"]
+paths = ['''^nondev/scripts/apply-brand\.ts$''']
+
+[[allowlists]]
+description = "keybindings.ts: key-combination strings, not keys"
+targetRules = ["generic-api-key"]
+paths = ['''^packages/shared/src/keybindings\.ts$''']
+
+[[allowlists]]
+description = "pnpm-workspace.yaml: dependency catalog entry"
+targetRules = ["generic-api-key"]
+paths = ['''^pnpm-workspace\.yaml$''']
+
+[[allowlists]]
+description = ".env.example: upstream's publishable Clerk key placeholder (public by design)"
+targetRules = ["generic-api-key"]
+paths = ['''^\.env\.example$''']
+
+[[allowlists]]
+description = "BootstrapCredentialService.ts: a constant name, not a credential"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/server/src/auth/Layers/BootstrapCredentialService\.ts$''']

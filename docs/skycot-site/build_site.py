@@ -8,6 +8,7 @@
 import os, html, json, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)) + "/"
 OUT = HERE + "draft/"
+os.makedirs(OUT, exist_ok=True)
 BRAND = os.path.normpath(HERE + "../../nondev/brand/assets") + "/"
 LICENSE = open(os.path.normpath(HERE + "../../LICENSE"), encoding="utf-8").read().strip()
 LICENSE_APACHE = open(os.path.normpath(HERE + "../../LICENSE-APACHE"), encoding="utf-8").read().strip()
@@ -1014,13 +1015,13 @@ for src in ["web/favicon-day.svg", "web/favicon-dusk.svg", "web/mask-icon.svg", 
 shutil.copyfile(BRAND + "web/favicon.ico", OUT + "favicon.ico")
 shutil.copyfile(BRAND + "web/apple-touch-icon-day.png", OUT + "apple-touch-icon.png")
 # og.png (and /opengraph-image, which redirects to it) keeps working for old links; pages point at og-day.png.
-shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "og.png")
+shutil.copyfile(HERE + "assets/skycot-og-beta.png", OUT + "og.png")
 # The beta share card (23 October 2026): a new file name so X, LinkedIn and others fetch it fresh.
-shutil.copyfile(HERE + "../marketing/launch/skycot-og-beta.png", OUT + "assets/brand/og-beta.png")
+shutil.copyfile(HERE + "assets/skycot-og-beta.png", OUT + "assets/brand/og-beta.png")
 # The 30-second promo plays in the home page's hero. Only its poster ships with the site; the video is
 # served from downloads.skycot.com/media/ because Pages ignores partial requests, which Safari needs.
 os.makedirs(OUT + "assets/video", exist_ok=True)
-shutil.copyfile(HERE + "../marketing/launch/video/poster-hero.jpg", OUT + "assets/video/poster-hero.jpg")
+shutil.copyfile(HERE + "assets/poster-hero.jpg", OUT + "assets/video/poster-hero.jpg")
 # A manifest cannot change with the time of day, so installed icons stay day (brand guide section 9).
 MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "The family-friendly AI developer.",
             "start_url": "/", "display": "minimal-ui", "background_color": "#ffffff", "theme_color": "#0071e3",
