@@ -104,7 +104,7 @@ export default defineConfig({
     ],
   },
   staged: {
-    "*": "vp fmt --no-error-on-unmatched-pattern",
+    "*": ["vp fmt --no-error-on-unmatched-pattern", "node scripts/gitleaks-staged.mjs"],
   },
   fmt: {
     ignorePatterns: [

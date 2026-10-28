@@ -59,7 +59,7 @@ describe("plainFirstLine", () => {
 
 describe("linkHost", () => {
   it("names the site for web links and nothing for the rest", () => {
-    expect(linkHost("https://www.littleferncafe.com.au/menu")).toBe("littleferncafe.com.au");
+    expect(linkHost("https://www.littleferncafe.example/menu")).toBe("littleferncafe.example");
     expect(linkHost("mailto:hi@example.com")).toBeNull();
     expect(linkHost("javascript:alert(1)")).toBeNull();
     expect(linkHost("not a url")).toBeNull();
@@ -72,9 +72,9 @@ describe("renderInline links", () => {
     expect(html).toContain("click me done");
     expect(html).not.toContain("<a");
     const link = renderToStaticMarkup(
-      <>{renderInline("[Menu](https://littleferncafe.com.au/menu)")}</>,
+      <>{renderInline("[Menu](https://littleferncafe.example/menu)")}</>,
     );
-    expect(link).toContain('href="https://littleferncafe.com.au/menu"');
-    expect(link).toContain("littleferncafe.com.au");
+    expect(link).toContain('href="https://littleferncafe.example/menu"');
+    expect(link).toContain("littleferncafe.example");
   });
 });

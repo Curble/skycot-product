@@ -1,0 +1,15 @@
+title = "SKYCOT gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored code, tests, fixtures, lockfile and QA notes"
+paths = [
+  '''^\.repos/''',
+  '''\.test\.ts$''',
+  '''\.test\.tsx$''',
+  '''(^|/)fixtures/''',
+  '''^docs/qa/''',
+  '''(^|/)pnpm-lock\.yaml$''',
+]

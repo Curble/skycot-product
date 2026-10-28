@@ -46,3 +46,43 @@ node_modules/
 
 # pnpm content-addressable store; never belongs in the repo.
 .pnpm-store/
+
+# --- secrets & credentials: never commit, anywhere in the tree ---
+**/.dev.vars
+**/.wrangler/
+**/.npmrc
+**/.netrc
+*.p8
+*.p12
+*.pfx
+*.pem
+*.key
+*.cer
+*.crt
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+*.jks
+*.keystore
+AuthKey_*.p8
+google-services.json
+GoogleService-Info.plist
+**/secrets/
+# runtime data that can hold session tokens, codes or family content
+**/.t3/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.har
+**/playwright/.auth/
+**/storage-state*.json
+server-runtime.json
+skycot-family.json
+skycot-update-unlock.json
+parent-code.txt
+infra/skycot-relay/e2e/runs/
+# keep the examples
+!.env.example
+!**/*.example

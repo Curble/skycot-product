@@ -46,7 +46,7 @@ describe("asksForReply", () => {
   });
 
   it("stays quiet for a finished report", () => {
-    expect(asksForReply("Done. The footer now shows bookings@littleferncafe.com.au.")).toBe(false);
+    expect(asksForReply("Done. The footer now shows bookings@littleferncafe.example.")).toBe(false);
     expect(asksForReply("- added the page\n- linked it from the nav")).toBe(false);
     expect(asksForReply("")).toBe(false);
   });

@@ -423,10 +423,7 @@ describe("SkycotPolicyReactor", () => {
     Effect.gen(function* () {
       const outside = yield* run(
         {
-          items: [
-            approvalItem("command"),
-            commandItem("cat /Users/me/t3code-nondev/AGENTS.md"),
-          ],
+          items: [approvalItem("command"), commandItem("cat /Users/me/t3code-nondev/AGENTS.md")],
         },
         requestEvent(request("command")),
       );
