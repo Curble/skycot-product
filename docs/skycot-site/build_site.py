@@ -336,6 +336,7 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 
 SITE = "https://skycot.com"
 LAST_UPDATED = "28 October 2026"
+TERMS_UPDATED = "29 October 2026"
 H1 = "The family-friendly AI developer."
 LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
         "Plain English, on your own Mac, with the AI you already pay for.")
@@ -895,7 +896,7 @@ write("privacy.html", head("Privacy · SKYCOT", "How SKYCOT handles your informa
 TERMS = f'''{nav(True)}
 <main class="doc"><div class="narrow">
   <h1>Terms of use</h1>
-  <p class="meta">Last updated {LAST_UPDATED} · beta</p>
+  <p class="meta">Last updated {TERMS_UPDATED} · beta</p>
   <p>These terms cover the SKYCOT app and the skycot.com website, made by Curble Pty Ltd ("we", "us"), Melbourne, Australia. By installing or using SKYCOT you agree to them. If you use SKYCOT for a business, you agree to them on its behalf and confirm you are allowed to. Plain-English summaries appear in italics and are not part of the terms.</p>
 
   <h2>1. What SKYCOT is</h2>
@@ -915,7 +916,7 @@ TERMS = f'''{nav(True)}
   <p>Do not use SKYCOT to break the law or anyone's rights; to access systems or data you are not entitled to; to spread malicious software or attack other systems; to harass, deceive or defraud anyone; to get around the terms, limits or safeguards of the assistants you connect; or to claim that an assistant's output was made or endorsed by us. Do not remove or alter the open-source and copyright notices in the app.</p>
 
   <h2>6. Licence to use SKYCOT</h2>
-  <p>SKYCOT is based on T3 Code, © T3 Tools Inc., licensed under the MIT licence; that licence continues to apply to that code and is reproduced in the app and on our <a href="/open-source">open source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. Our own additions are licensed to you for your use of SKYCOT under these terms during the beta. The SKYCOT name and marks are ours and are not covered by the MIT licence. <em>Summary: the engine is open source; the SKYCOT name is ours.</em></p>
+  <p>SKYCOT is based on T3 Code by T3 Tools Inc., which is licensed under the MIT licence; that licence continues to apply to that code. Curble's own additions are licensed under the Apache License 2.0. Both licences are reproduced in the app and on our <a href="/open-source">open-source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. The SKYCOT name, logo and mascot are not licensed. <em>Summary: the code is open source under MIT and Apache 2.0; the SKYCOT name is ours.</em></p>
 
   <h2>7. Price</h2>
   <p>SKYCOT is free during the beta. You pay your AI provider, and anyone else whose service you use with SKYCOT, under their own terms. If we introduce a price, we will show it before it applies, and you will not be charged unless you agree to it.</p>
