@@ -119,15 +119,21 @@ export function buildPlan(c) {
 
 /** What to do for the website once the feed is live. Printed, never run. */
 export function siteBumpCommands(c) {
+  const site = "/Users/me/skycot-site-product";
   return [
     `cd ${c.repo}`,
-    `# 1. point docs/skycot-site/build_site.py at ${c.version}, then rebuild the product site:`,
-    `python3 docs/skycot-site/build_site.py`,
-    `scripts/build-outside-icloud.sh`,
-    `# 2. deploy to the preview first, check it, then main (see docs/nondev/RELEASE.md):`,
-    `wrangler pages deploy --project-name <product-site> --branch preview <built public dir>`,
-    `node scripts/verify-site.mjs   # update it for ${c.version} first`,
-    `# 3. record it: DEPLOYMENT.md, and tag + push the release commit`,
+    `# 1. bump the version in the site sources (three files), then build the draft:`,
+    `sed -i '' 's/nondev\\.${c.previous.split(".")[2]}/nondev.${c.version.split(".")[2]}/g' docs/skycot-site/build_site.py docs/skycot-site/home.html ${site}/scripts/verify-site.mjs`,
+    `(cd docs/skycot-site && python3 build_site.py)`,
+    `# 2. copy the draft into the site repo (never --delete) and build outside iCloud:`,
+    `rsync -a docs/skycot-site/draft/ ${site}/public/`,
+    `OUT=$(cd ${site} && sh scripts/build-outside-icloud.sh)`,
+    `# 3. preview, verify, then production, verify:`,
+    `(cd "$OUT/.." && npx wrangler@latest pages deploy out --project-name skycot-site --branch product-site)`,
+    `(cd ${site} && node scripts/verify-site.mjs https://<preview id>.skycot-site.pages.dev)`,
+    `(cd "$OUT/.." && npx wrangler@latest pages deploy out --project-name skycot-site --branch main)`,
+    `(cd ${site} && CHECK_REDIRECTS=1 node scripts/verify-site.mjs https://skycot.com)`,
+    `# 4. record it: ${site}/DEPLOYMENT.md (deploy id + rollback id), commit both repos, tag v${c.version} and push`,
   ];
 }
 
