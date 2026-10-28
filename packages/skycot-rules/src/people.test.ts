@@ -56,6 +56,24 @@ describe("who is who", () => {
     expect(childSeesProject("ava", "project-leo", owners, new Set(["project-leo"]))).toBe(true);
   });
 
+  it("start rights: own, unowned and unknown projects open; a sibling's and another child's shut", () => {
+    const table: ReadonlyArray<readonly [string, string, boolean]> = [
+      ["ava", "project-ava", true],
+      ["leo", "project-ava", false],
+      ["ava", "project-leo", false],
+      ["leo", "project-leo", true],
+      ["ava", "project-family", true],
+      ["ava", "project-never-heard-of", true],
+    ];
+    for (const [child, project, expected] of table) {
+      expect(childMayStartInProject(child, project, owners), `${child} in ${project}`).toBe(
+        expected,
+      );
+    }
+    // No owner records at all: nothing is anyone's, so every project is open.
+    expect(childMayStartInProject("ava", "project-leo", { threads: {}, projects: {} })).toBe(true);
+  });
+
   it("a grown-up's device may only accept or decline", () => {
     expect(isApproverDecision("accept")).toBe(true);
     expect(isApproverDecision("decline")).toBe(true);

@@ -53,6 +53,48 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
     );
   });
 
+  describe("the welcome file on disk", () => {
+    it.effect("is a tiny file beside the profile and reads back across a restart", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const welcomePath = path.join(path.dirname(filePath), SkycotFamily.WELCOME_FILE_NAME);
+          assert.isFalse(yield* fs.exists(welcomePath));
+          yield* family.setWelcome("skipped");
+          assert.deepEqual(JSON.parse(yield* fs.readFileString(welcomePath)), {
+            welcome: "skipped",
+          });
+          // A second service over the same folder is the engine after a restart.
+          const again = yield* Effect.provide(
+            SkycotFamily.SkycotFamily,
+            SkycotFamily.layerAt(filePath),
+          );
+          assert.equal((yield* again.status).welcome, "skipped");
+          yield* again.setWelcome("done");
+          assert.deepEqual(JSON.parse(yield* fs.readFileString(welcomePath)), { welcome: "done" });
+          assert.equal((yield* family.status).welcome, "done");
+        }),
+      ),
+    );
+
+    it.effect("reads an unreadable or unknown file as never shown, never as an error", () =>
+      withFamily((family, filePath) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const welcomePath = path.join(path.dirname(filePath), SkycotFamily.WELCOME_FILE_NAME);
+          for (const raw of ["not json", '{"welcome":"later"}', "{}", ""]) {
+            yield* fs.writeFileString(welcomePath, raw);
+            assert.isNull((yield* family.status).welcome, raw);
+          }
+          yield* fs.writeFileString(welcomePath, '{"welcome":null}');
+          assert.isNull((yield* family.status).welcome);
+        }),
+      ),
+    );
+  });
+
   describe("turning on and off", () => {
     it.effect("starts off, turns on with a name and never exposes the hash", () =>
       withFamily((family, filePath) =>

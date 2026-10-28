@@ -53,6 +53,7 @@ import * as SkycotFamily from "./SkycotFamily.ts";
 import * as SkycotFamilyGate from "./SkycotFamilyGate.ts";
 import * as SkycotFamilyHttp from "./SkycotFamilyHttp.ts";
 import * as SkycotProjectMemory from "./SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory-http-test
+import { childMayStartInProject } from "@t3tools/skycot-rules/people";
 import * as SkycotFamilyIdentity from "./family-devices/SkycotFamilyIdentity.ts";
 import * as SkycotFamilyVisibility from "./family-devices/SkycotFamilyVisibility.ts";
 import { SWITCH_FILE_NAME, makeSwitchStore } from "./model-fallback/switchLog.ts";
@@ -148,6 +149,13 @@ const makeClient = Effect.fn("SkycotFamilyHttpTest.makeClient")(function* () {
             : null,
         ),
       allows: () => Effect.succeed(true),
+      // The real rule over a fixed project list: Ava's own and the unowned one, never Bea's.
+      startIn: (view) =>
+        Effect.succeed(
+          ["ava-project", "bea-project", "shared-project"].filter((id) =>
+            childMayStartInProject(view.childId, id, view.owners),
+          ),
+        ),
       filterShellStream: (_sessionId, stream) => stream,
       filterArchivedStream: (_sessionId, stream) => stream,
     }),
@@ -1058,6 +1066,61 @@ it.layer(
       yield* send("POST", "/api/skycot/family/welcome", { body: { state: "done" } });
       assert.equal(yield* read(), "done");
     }),
+  );
+
+  it.effect("tells a child where new work may start, and never names a sibling's project", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const child = yield* send("GET", "/api/skycot/family/today", {
+        headers: { authorization: CHILD_BEARER },
+      });
+      assert.equal(child.status, 200);
+      const text = JSON.stringify(yield* child.json);
+      const body = JSON.parse(text) as Record<string, any>;
+      assert.deepEqual(body["startIn"], ["ava-project", "shared-project"]);
+      assert.notInclude(text, "bea-project");
+      // The grown-up's view is the whole family's day and carries no start list.
+      const parent = (yield* (yield* send("GET", "/api/skycot/family/today")).json) as Record<
+        string,
+        any
+      >;
+      assert.notProperty(parent, "startIn");
+    }),
+  );
+
+  it.effect(
+    "grown-up mode proven by the header alone approves, renews and prepares an update",
+    () =>
+      Effect.gen(function* () {
+        const { send } = yield* makeClient();
+        yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: null } });
+        const unlock = yield* send("POST", "/api/skycot/family/verify", {
+          body: { code: CODE, purpose: "settings" },
+        });
+        const body = (yield* unlock.json) as { token: string; sessionToken?: string };
+        const header = { [SkycotFamily.UNLOCK_HEADER_NAME]: body.sessionToken ?? body.token };
+        const approve = { requestId: "request-1", scope: "once" };
+        // No cookie and no header: refused, even though the device itself is signed in.
+        for (const path of ["renew", "approve-session", "prepare-update"]) {
+          const refused = yield* send("POST", `/api/skycot/family/${path}`, { body: approve });
+          assert.equal(refused.status, 403, path);
+        }
+        for (const path of ["renew", "approve-session", "prepare-update"]) {
+          const accepted = yield* send("POST", `/api/skycot/family/${path}`, {
+            headers: header,
+            body: approve,
+          });
+          assert.equal(accepted.status, 200, path);
+        }
+        // A child's device is refused whatever it carries.
+        for (const path of ["renew", "approve-session", "prepare-update"]) {
+          const refused = yield* send("POST", `/api/skycot/family/${path}`, {
+            headers: { ...header, authorization: CHILD_BEARER },
+            body: approve,
+          });
+          assert.equal(refused.status, 403, path);
+        }
+      }),
   );
 
   it.effect("a child session cannot answer a page request for this page or its project", () =>

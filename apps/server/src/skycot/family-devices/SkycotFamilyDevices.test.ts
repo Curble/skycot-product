@@ -572,6 +572,23 @@ it.layer(NodeServices.layer)("who is who", (it) => {
       ),
   );
 
+  it.effect(
+    "a grown-up at the shared Mac (no child chosen) may start new work in any child's project",
+    () =>
+      withWorld(({ gate }) =>
+        Effect.gen(function* () {
+          for (const projectId of ["project-leo", "project-family"]) {
+            yield* gate.check(
+              call("mac-grown-up", ORCHESTRATION_V2_WS_METHODS.launchThread, {
+                projectId,
+                threadId: `thread-mum-${projectId}`,
+              }),
+            );
+          }
+        }),
+      ),
+  );
+
   it.effect("a child's iPad gets its own conversations and projects in the live list", () =>
     withWorld(({ visibility }) =>
       Effect.gen(function* () {
