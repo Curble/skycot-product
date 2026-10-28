@@ -157,7 +157,8 @@ function ownNotices(): OwnNotice[] {
     {
       name: "T3 Code (upstream project)",
       license: "MIT",
-      sourceUrl: "https://github.com/pingdotgg/t3code",
+      // No link on purpose: the phone app carries none of T3's addresses (t3-address-guard).
+      sourceUrl: null,
       text: read("LICENSE"),
     },
   ];
