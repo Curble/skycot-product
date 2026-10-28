@@ -75,6 +75,29 @@ describe("the shared Mac child picker idle time", () => {
     ).toBe("pick");
   });
 
+  it("never restores a child over a window a grown-up has just unlocked", () => {
+    // The engine's session arrives a beat after the code; without this the picker came back over
+    // grown-up mode and the code had to be typed twice (packaged beta 35).
+    expect(
+      freshTabChildAction({
+        childCount: 2,
+        currentChildId: null,
+        needsChoice: true,
+        rememberedChildId: null,
+        grownUpMarked: true,
+      }),
+    ).toBe("grown-up");
+    expect(
+      freshTabChildAction({
+        childCount: 2,
+        currentChildId: null,
+        needsChoice: true,
+        rememberedChildId: null,
+        grownUpMarked: false,
+      }),
+    ).toBe("pick");
+  });
+
   it("keeps the picker for explicit switches and multi-child choices only", () => {
     const single = {
       shared: true,

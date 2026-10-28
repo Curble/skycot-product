@@ -19,6 +19,7 @@ import {
   endGrownUpSession,
   grownUpSessionFor,
   grownUpSessionStep,
+  readGrownUpSessionId,
   useGrownUpSessionId,
 } from "../family/grownUpSession";
 import {
@@ -143,9 +144,14 @@ export function FamilyLimitsHost() {
       currentChildId: view.currentChildId,
       needsChoice: view.needsChoice,
       rememberedChildId: saved?.id ?? null,
+      grownUpMarked: readGrownUpSessionId() !== null,
     });
     const restore = action === "restore" ? (saved ?? view.children[0]) : undefined;
-    if (restore) {
+    if (action === "grown-up") {
+      // The grown-up picked themselves and gave the code; the child is chosen at Done or Switch.
+      rememberPicked();
+      setPicked(true);
+    } else if (restore) {
       void chooseChild(restore.id).then((result) => {
         if (result.ok) {
           rememberChild(restore.id, Date.now());

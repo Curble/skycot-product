@@ -1275,6 +1275,15 @@ const childDevicesOnly = (devices: ReadonlyArray<FamilyDevice> | undefined) =>
 const liveGrants = (grants: ReadonlyArray<Grant>, now: number) =>
   grants.filter((grant) => grant.expiresAt > now);
 
+/** The device's grown-up grant that runs longest (one per device since beta 36). */
+const latestGrownUpGrant = (grants: ReadonlyArray<Grant>, sessionId: string) =>
+  grants
+    .filter((grant) => grant.sessionId === sessionId && grant.purpose === "grownUpSession")
+    .reduce<Grant | undefined>(
+      (best, grant) => (best === undefined || grant.expiresAt > best.expiresAt ? grant : best),
+      undefined,
+    );
+
 const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -1464,8 +1473,22 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
         : {}),
       expiresAt,
     };
-    const grants = [...liveGrants(cleared.grants, at), grant];
-    if (input.purpose !== "approve" && input.purpose !== "update") {
+    // A second code on the same device replaces its open grants for the same purpose instead of
+    // stacking a new pair each time: with two grown-up grants the renew moved one while the
+    // client watched the other, so "Stay" looked dead and grown-up mode ended early.
+    const opensSession = input.purpose !== "approve" && input.purpose !== "update";
+    const grants = [
+      ...liveGrants(cleared.grants, at).filter(
+        (open) =>
+          open.sessionId !== input.sessionId ||
+          !(
+            (open.purpose === input.purpose && input.purpose !== "approve") ||
+            (opensSession && open.purpose === "grownUpSession")
+          ),
+      ),
+      grant,
+    ];
+    if (opensSession) {
       grants.push({
         sessionId: input.sessionId,
         purpose: "grownUpSession",
@@ -1501,9 +1524,9 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const file = yield* requireEnabled(yield* load);
     const at = yield* now;
     const live = liveGrants(file.grants, at);
-    const current = live.find(
-      (grant) => grant.sessionId === input.sessionId && grant.purpose === "grownUpSession",
-    );
+    // Older profile files can still hold more than one grown-up grant for a device: renew the one
+    // that runs longest, which is the one the client shows.
+    const current = latestGrownUpGrant(live, input.sessionId);
     if (current === undefined || current.expiresAt <= at) {
       return yield* new FamilyError({ reason: "invalid-request" });
     }
@@ -1577,9 +1600,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     const file = yield* requireEnabled(yield* load);
     const at = yield* now;
     const live = liveGrants(file.grants, at);
-    const current = live.find(
-      (grant) => grant.sessionId === input.sessionId && grant.purpose === "grownUpSession",
-    );
+    const current = latestGrownUpGrant(live, input.sessionId);
     if (
       current === undefined ||
       current.expiresAt <= at ||
@@ -2205,9 +2226,16 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       const file = yield* load;
       if (file === null || !file.enabled) return [];
       const at = yield* now;
-      return liveGrants(file.grants, at)
-        .filter((grant) => grant.sessionId === input.sessionId && grant.purpose !== "approve")
-        .map((grant) => ({ purpose: grant.purpose, remainingMs: grant.expiresAt - at }));
+      // One entry per purpose, the one that runs longest: the client keeps the last entry it
+      // sees per purpose, so duplicates in an older file must not hide the live one.
+      const longest = new Map<FamilyPurpose, number>();
+      for (const grant of liveGrants(file.grants, at)) {
+        if (grant.sessionId !== input.sessionId || grant.purpose === "approve") continue;
+        const remainingMs = grant.expiresAt - at;
+        if ((longest.get(grant.purpose) ?? 0) < remainingMs)
+          longest.set(grant.purpose, remainingMs);
+      }
+      return [...longest].map(([purpose, remainingMs]) => ({ purpose, remainingMs }));
     },
   );
 

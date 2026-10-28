@@ -82,7 +82,12 @@ export function freshTabChildAction(input: {
   readonly currentChildId: string | null;
   readonly needsChoice: boolean;
   readonly rememberedChildId: string | null;
-}): "reuse" | "restore" | "pick" {
+  /** A grown-up has already proven their code on this window: it is theirs, not a child's. */
+  readonly grownUpMarked?: boolean;
+}): "reuse" | "restore" | "pick" | "grown-up" {
+  // The engine's session can arrive a beat after the grown-up's code (the unlock itself asks for
+  // it): choosing a child then would put "Who's using SKYCOT?" back over grown-up mode.
+  if (input.grownUpMarked === true) return "grown-up";
   if (input.childCount < 2) return input.needsChoice ? "restore" : "reuse";
   if (input.rememberedChildId === null) return "pick";
   return input.needsChoice || input.currentChildId !== input.rememberedChildId

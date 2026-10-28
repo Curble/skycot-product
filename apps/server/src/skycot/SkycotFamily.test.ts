@@ -596,6 +596,34 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
         ),
     );
 
+    it.effect("a second code on the same device replaces its grants instead of stacking them", () =>
+      withFamily((family) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          yield* TestClock.adjust(3 * 60_000);
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          const open = yield* family.openGrants({ sessionId: SESSION });
+          assert.deepEqual(open.map((g) => g.purpose).sort(), ["grownUpSession", "settings"]);
+          assert.equal(open.find((g) => g.purpose === "grownUpSession")?.remainingMs, 15 * 60_000);
+          // The renew moves the one grant the client shows.
+          yield* TestClock.adjust(14 * 60_000);
+          const renewed = yield* family.renew({ sessionId: SESSION });
+          assert.equal(
+            (yield* family.openGrants({ sessionId: SESSION })).find(
+              (g) => g.purpose === "grownUpSession",
+            )?.remainingMs,
+            15 * 60_000,
+          );
+          assert.isTrue(yield* family.tokenBelongsToSession(renewed.token, SESSION));
+          // Another device's grants are untouched by the replacement.
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: "other" });
+          yield* family.verify({ code: CODE, purpose: "settings", sessionId: SESSION });
+          assert.equal((yield* family.openGrants({ sessionId: "other" })).length, 2);
+        }),
+      ),
+    );
+
     it.effect("renewal refuses a missing, expired, or different session and lock ends it", () =>
       withFamily((family) =>
         Effect.gen(function* () {
