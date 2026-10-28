@@ -1,0 +1,14 @@
+# gitleaks baseline (28 Oct 2026): each line is a reviewed finding that is NOT a secret.
+# keybindings.ts: key-combination strings; .env.example and apply-brand.ts: upstream's PUBLISHABLE Clerk key
+# (public by design, used to detect and strip it); run-family-e2e.ts: a test key generated at run time;
+# pnpm-workspace.yaml: a catalog entry; BootstrapCredentialService.ts: a constant, not a credential.
+# Add a line only after the finding has been read and classified. Format: commit:file:rule:line
+2a157afb0314feabeb5d633966500d76718d7ade:nondev/scripts/apply-brand.ts:generic-api-key:62
+4a07c1ca9d9033ef35161a1ffbea44d0418ca2bf:.env.example:generic-api-key:11
+4a07c1ca9d9033ef35161a1ffbea44d0418ca2bf:.env.example:generic-api-key:9
+55e062d3c2dcd302408d9a9e4f9fa1318e557d36:infra/skycot-relay/e2e/run-family-e2e.ts:private-key:142
+719a76ca1dbf5490f1aa33ffb9966301e02be9a9:packages/shared/src/keybindings.ts:generic-api-key:43
+9130d932f4ddb8abab595b7d12553b46a11c7b22:packages/shared/src/keybindings.ts:generic-api-key:54
+9130d932f4ddb8abab595b7d12553b46a11c7b22:packages/shared/src/keybindings.ts:generic-api-key:55
+b7559c467803f923e59a287c112b4c92b96e15c7:apps/server/src/auth/Layers/BootstrapCredentialService.ts:generic-api-key:33
+f2d5fc91e3030e5c3956fdadc13e1eaa25bcabe3:pnpm-workspace.yaml:generic-api-key:29
