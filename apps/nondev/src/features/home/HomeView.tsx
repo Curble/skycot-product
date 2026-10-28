@@ -21,7 +21,8 @@ import { mascotCopy } from "../brand/mascotCopy";
 import { NewConversationComposer } from "../compose/NewConversationComposer";
 import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
-import { seedFor, StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
+import { StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
+import { useStarterPick } from "../starters/StepPickerSheet";
 import { homeTip } from "./tip";
 import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 import { greeting as greetingForHour } from "./greeting";
@@ -54,6 +55,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
       : (family.profile.grownUps.find((person) => person.id === grownUpId)?.name ?? null);
   const { kids } = useStarters();
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const starterPick = useStarterPick(setSeed);
 
   const active = homeRows(
     rows,
@@ -121,16 +123,8 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               </p>
             </div>
           </div>
-          <StarterCards
-            onPick={(starter) => {
-              setSeed(seedFor(starter));
-              // The file picker only opens inside the tap itself (browsers require a user
-              // gesture), so "Draw it, then build it" clicks the composer's picture input here.
-              if (starter.kind === "picture") {
-                document.querySelector<HTMLInputElement>(".fm-composer__file")?.click();
-              }
-            }}
-          />
+          <StarterCards onPick={starterPick.pick} />
+          {starterPick.sheet}
           <div className="fm-home__grid">
             <div className="fm-home__main">
               <Card

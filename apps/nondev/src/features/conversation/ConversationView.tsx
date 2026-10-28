@@ -69,7 +69,8 @@ import { useEnsureInteractionMode } from "../compose/turnMode";
 import { useMadePage } from "../review/madePage";
 import { useOpenIt } from "../starters/PreviewSheet";
 import { firstBlank, stillFromStarter } from "../starters/starters";
-import { seedFor, StarterCards, type ComposerSeed } from "../starters/StarterCards";
+import { StarterCards, type ComposerSeed } from "../starters/StarterCards";
+import { useStarterPick } from "../starters/StepPickerSheet";
 import { useStartNote } from "../compose/startNotes";
 import {
   PublishButton,
@@ -350,6 +351,7 @@ export function ConversationView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [makeProjectOpen, setMakeProjectOpen] = useState(false);
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
+  const starterPick = useStarterPick(setSeed);
   const [sendingMessage, setSendingMessage] = useState<{ id: string; text: string } | null>(null);
   useEffect(() => {
     if (
@@ -556,16 +558,8 @@ export function ConversationView({
             {emptyConversationHint(crewName, planFirst.on)}
           </EmptyState>
           <div className="fm-stream__starters">
-            <StarterCards
-              compact
-              disabled={!canOperate}
-              onPick={(starter) => {
-                setSeed(seedFor(starter));
-                if (starter.kind === "picture") {
-                  document.querySelector<HTMLInputElement>(".fm-composer__file")?.click();
-                }
-              }}
-            />
+            <StarterCards compact disabled={!canOperate} onPick={starterPick.pick} />
+            {starterPick.sheet}
           </div>
         </div>
       ) : (
