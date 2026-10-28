@@ -86,3 +86,6 @@ infra/skycot-relay/e2e/runs/
 # keep the examples
 !.env.example
 !**/*.example
+
+# Release gate scripts live in a folder named release/
+!nondev/scripts/release/

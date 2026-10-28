@@ -11,6 +11,15 @@ export function isNightlyDesktopVersion(version: string): boolean {
   return PRERELEASE_VERSION_PATTERN.test(version);
 }
 
+// nondev-seam: skycot-update-staging-match
+/**
+ * Whether a version the feed offers belongs to the selected channel. Staging takes whatever its own
+ * `staging-mac.yml` lists (that file is the gate); the other channels also match by version shape.
+ */
+export function updateMatchesChannel(channel: DesktopUpdateChannel, version: string): boolean {
+  return channel === "staging" || resolveDefaultDesktopUpdateChannel(version) === channel;
+}
+
 export function resolveDefaultDesktopUpdateChannel(appVersion: string): DesktopUpdateChannel {
   return NIGHTLY_VERSION_PATTERN.test(appVersion) ? "nightly" : "latest";
 }

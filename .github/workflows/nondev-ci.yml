@@ -53,7 +53,7 @@ jobs:
         uses: ./.github/actions/setup-ci-deps
 
       - name: Test fork tooling
-        run: node --test nondev/scripts/*.test.ts
+        run: node --test nondev/scripts/*.test.ts nondev/scripts/release/*.test.mjs
 
       - name: Check seams against SEAM-MANIFEST.md
         run: node nondev/scripts/check-seams.ts --strict

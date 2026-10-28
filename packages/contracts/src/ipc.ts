@@ -77,7 +77,11 @@ export type DesktopUpdateStatus =
 
 export type DesktopRuntimeArch = "arm64" | "x64" | "other";
 export type DesktopTheme = "light" | "dark" | "system";
-export type DesktopUpdateChannel = "latest" | "nightly";
+// nondev-seam: skycot-update-staging-contract
+// "staging" reads `staging-mac.yml`: a release goes there first so the update-hop gate can prove the
+// N-1 -> N restart on a packaged app before `latest-mac.yml` switches. Never the default; only
+// `setUpdateChannel` selects it.
+export type DesktopUpdateChannel = "latest" | "nightly" | "staging";
 export type DesktopAppStageLabel = "Alpha" | "Beta" | "Dev" | "Nightly";
 
 export const DesktopUpdateStatusSchema = Schema.Literals([
@@ -92,7 +96,7 @@ export const DesktopUpdateStatusSchema = Schema.Literals([
 ]);
 export const DesktopRuntimeArchSchema = Schema.Literals(["arm64", "x64", "other"]);
 export const DesktopThemeSchema = Schema.Literals(["light", "dark", "system"]);
-export const DesktopUpdateChannelSchema = Schema.Literals(["latest", "nightly"]);
+export const DesktopUpdateChannelSchema = Schema.Literals(["latest", "nightly", "staging"]);
 export const DesktopAppStageLabelSchema = Schema.Literals(["Alpha", "Beta", "Dev", "Nightly"]);
 
 export interface DesktopAppBranding {
