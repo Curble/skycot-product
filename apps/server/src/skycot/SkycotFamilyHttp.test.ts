@@ -441,6 +441,48 @@ it.layer(
     }),
   );
 
+  it.effect("grown-up mode is proven by the unlock header too (the Mac app sends no cookie)", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: null } });
+      const unlock = yield* send("POST", "/api/skycot/family/verify", {
+        body: { code: CODE, purpose: "settings" },
+      });
+      const body = (yield* unlock.json) as { token: string; sessionToken?: string };
+      const proof = body.sessionToken ?? body.token;
+      const cookieHeader = unlock.headers["set-cookie"];
+      const cookie = (Array.isArray(cookieHeader) ? cookieHeader[0]! : String(cookieHeader)).split(
+        ";",
+      )[0]!;
+      const header = { [SkycotFamily.UNLOCK_HEADER_NAME]: proof };
+      // Nothing at all, or a wrong header: still refused.
+      for (const path of ["renew", "prepare-update"]) {
+        assert.equal((yield* send("POST", `/api/skycot/family/${path}`, { body: {} })).status, 403);
+        assert.equal(
+          (yield* send("POST", `/api/skycot/family/${path}`, {
+            headers: { [SkycotFamily.UNLOCK_HEADER_NAME]: "not-a-token" },
+            body: {},
+          })).status,
+          403,
+        );
+      }
+      assert.equal(
+        (yield* send("POST", "/api/skycot/family/renew", { headers: header, body: {} })).status,
+        200,
+      );
+      assert.equal(
+        (yield* send("POST", "/api/skycot/family/prepare-update", { headers: header, body: {} }))
+          .status,
+        200,
+      );
+      // The cookie still works on its own.
+      assert.equal(
+        (yield* send("POST", "/api/skycot/family/renew", { headers: { cookie }, body: {} })).status,
+        200,
+      );
+    }),
+  );
+
   // nondev-seam: skycot-q42-remembered-command-test
   it.effect("shows remembered start commands to grown-ups only", () =>
     Effect.gen(function* () {

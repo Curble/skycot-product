@@ -193,6 +193,8 @@ export const GRANT_TTL_MS: Readonly<Record<FamilyPurpose, number>> = {
 export const GROWN_UP_SESSION_MAX_MS = 2 * 60 * 60_000;
 
 export const UNLOCK_COOKIE_NAME = "skycot_family_unlock";
+/** The same proof as the cookie, for pages on another origin (the Mac app) that cannot send it. */
+export const UNLOCK_HEADER_NAME = "x-skycot-family-unlock";
 
 // nondev-seam: skycot-grown-up-session-grants
 const Grant = Schema.Struct({

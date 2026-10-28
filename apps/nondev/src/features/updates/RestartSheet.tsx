@@ -16,6 +16,7 @@ import { updatesApi } from "./api";
 import { installDownloadedUpdate, useDesktopUpdateState } from "./store";
 import { plainReleaseNotes, readyVersion, runningWarning } from "./updates";
 
+export const COULD_NOT_CONFIRM = `${PRODUCT_NAME} couldn't confirm grown-up mode. Enter the parent code to restart.`;
 const COULD_NOT_RESTART = `${PRODUCT_NAME} couldn't restart just now. Try again in a moment.`;
 
 /** How many conversations the crew is working on right now (a restart pauses them). */
@@ -52,14 +53,21 @@ export function RestartSheet({
   const restart = async () => {
     setProblem(null);
     // The code sheet comes first, so this one does not say "Restarting…" behind it.
-    if (family.enabled && !(await family.requireParentCode("restartToUpdate"))) return;
+    if (family.enabled && !(await family.requireParentCode("restartToUpdate"))) {
+      // Never silent: say what is needed (grown-up mode, then the code sheet, both came up empty).
+      setProblem(COULD_NOT_CONFIRM);
+      return;
+    }
     setBusy(true);
     try {
       let allowed = await updatesApi.allowRestart(version);
       if (!allowed.ok && allowed.reason === "forbidden") {
         // The profile was turned on elsewhere since this window last looked.
         await refreshFamily();
-        if (!(await family.requireParentCode("restartToUpdate"))) return;
+        if (!(await family.requireParentCode("restartToUpdate"))) {
+          setProblem(COULD_NOT_CONFIRM);
+          return;
+        }
         allowed = await updatesApi.allowRestart(version);
       }
       if (!allowed.ok) {

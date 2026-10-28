@@ -125,10 +125,17 @@ function makeApi(
       const grownUp =
         view.me.kind === "shared" &&
         grownUpSessionFor(readGrownUpSessionId(), view, Date.now()) !== null;
+      // A grown-up-mode shortcut that fails (the engine would not confirm it) is never the end:
+      // the ordinary parent-code sheet comes up instead of nothing happening.
+      const askForCode = () => (open === null ? Promise.resolve(false) : open({ action, options }));
       if (grownUp && action === "approve" && options.requestId) {
-        return approveInGrownUpSession(options.requestId, options.scope);
+        return approveInGrownUpSession(options.requestId, options.scope).then((ok) =>
+          ok ? true : askForCode(),
+        );
       }
-      if (grownUp && action === "restartToUpdate") return prepareUpdateInGrownUpSession();
+      if (grownUp && action === "restartToUpdate") {
+        return prepareUpdateInGrownUpSession().then((ok) => (ok ? true : askForCode()));
+      }
       if (grownUp && familyGrantOpen(view, action, Date.now())) {
         void renewGrownUpSession();
         return Promise.resolve(true);

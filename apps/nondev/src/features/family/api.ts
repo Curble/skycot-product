@@ -4,6 +4,7 @@
 import { readDesktopPrimaryBearerToken } from "~/environments/primary/desktopAuth";
 import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target";
 
+import { readUnlockProof } from "./unlockProof";
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
 import type { ChildAvatar, ChildLimits, ChildVoice, ReadingLevel } from "./children";
 import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
@@ -36,6 +37,9 @@ export async function callEngine(
     const token = await readDesktopPrimaryBearerToken();
     if (token) headers["authorization"] = `Bearer ${token}`;
   }
+  // The engine's own origin only (resolved above): never a relay or third-party address.
+  const proof = readUnlockProof();
+  if (proof !== null) headers["x-skycot-family-unlock"] = proof;
   return fetch(url, {
     method,
     headers,

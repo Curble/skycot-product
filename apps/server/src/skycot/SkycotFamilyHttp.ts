@@ -386,6 +386,19 @@ const verifyRoute = route(
     }),
 );
 
+/**
+ * The grown-up proof a request carries: the header when there is one (the Mac app's page is on
+ * another origin from the engine, so the browser never sends it the cookie), else the cookie.
+ */
+export function unlockTokenFrom(request: {
+  readonly headers: Record<string, string | undefined>;
+  readonly cookies: Record<string, string | undefined>;
+}): string | undefined {
+  const header = request.headers[SkycotFamily.UNLOCK_HEADER_NAME];
+  if (typeof header === "string" && header.length > 0) return header;
+  return request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
+}
+
 // nondev-seam: skycot-grown-up-session-routes
 const renewRoute = route(
   "POST",
@@ -399,7 +412,7 @@ const renewRoute = route(
           403,
         );
       }
-      const cookie = request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
+      const cookie = unlockTokenFrom(request);
       if (!(yield* family.tokenBelongsToSession(cookie, sessionId))) {
         return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
       }
@@ -422,7 +435,7 @@ const approveSessionRoute = route(
           403,
         );
       }
-      const cookie = request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME];
+      const cookie = unlockTokenFrom(request);
       if (!(yield* family.tokenBelongsToSession(cookie, sessionId))) {
         return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
       }
@@ -447,12 +460,7 @@ const prepareUpdateRoute = route(
           403,
         );
       }
-      if (
-        !(yield* family.tokenBelongsToSession(
-          request.cookies[SkycotFamily.UNLOCK_COOKIE_NAME],
-          sessionId,
-        ))
-      ) {
+      if (!(yield* family.tokenBelongsToSession(unlockTokenFrom(request), sessionId))) {
         return json({ error: "forbidden", message: "Grown-up mode has ended." }, 403);
       }
       const unlock = yield* family.prepareUpdate({ sessionId });

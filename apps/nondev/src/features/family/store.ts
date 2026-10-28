@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 
 import { familyApi, type ChildPatch, type FamilyResult, type UnlockToken } from "./api";
 import type { ChildAvatar } from "./children";
+import { forgetUnlockProof, keepUnlockProof } from "./unlockProof";
 import { writeOnboardingState } from "../settings/localPrefs";
 import {
   EMPTY_VIEW,
@@ -121,6 +122,7 @@ export function enableFamily(input: {
 /** Turning off forgets everything on the engine, the child's name included. */
 export function disableFamily(code: string): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.disable({ code }), (status) => {
+    forgetUnlockProof();
     writeStorage(FAMILY_KEY, null);
     applyStatus(status);
   });
@@ -211,7 +213,11 @@ export function tryParentCode(
       ...(requestId === undefined ? {} : { requestId }),
       ...(options?.scope === undefined ? {} : { scope: options.scope }),
     }),
-    () => {
+    (unlock) => {
+      // Mirrors the engine's cookie: every code but a one-off approve/update yes opens grown-up mode.
+      if (purpose !== "approve" && purpose !== "update") {
+        keepUnlockProof(unlock.sessionToken ?? unlock.token);
+      }
       setView({ ...view, attemptsLeft: 5, lockedUntil: null });
       // The engine says how long the new "yes" lasts.
       void refreshFamily();
@@ -222,7 +228,9 @@ export function tryParentCode(
 }
 
 export async function renewGrownUpSession(): Promise<boolean> {
-  const result = await settle(familyApi.renew(), () => undefined);
+  const result = await settle(familyApi.renew(), (unlock) =>
+    keepUnlockProof(unlock.sessionToken ?? unlock.token),
+  );
   if (!result.ok) return false;
   await refreshFamily();
   return true;
@@ -237,7 +245,9 @@ export async function approveInGrownUpSession(
 }
 
 export async function prepareUpdateInGrownUpSession(): Promise<boolean> {
-  const result = await settle(familyApi.prepareUpdate(), () => undefined);
+  const result = await settle(familyApi.prepareUpdate(), (unlock) =>
+    keepUnlockProof(unlock.sessionToken ?? unlock.token),
+  );
   if (!result.ok) return false;
   await refreshFamily();
   return true;
@@ -324,6 +334,7 @@ export function stopAllowingAssistant(driver: string): Promise<FamilyResult<Serv
 /** Ends this device's grants (a parent leaving Advanced mode). */
 export async function lockFamilyGrants(): Promise<FamilyResult<ServerFamilyStatus>> {
   const result = await settle(familyApi.lock(), applyStatus);
+  forgetUnlockProof();
   if (result.ok) {
     setView({ ...view, openUntil: {} });
     await refreshFamily();

@@ -7,6 +7,7 @@ export const browserApiCorsAllowedHeaders = [
   "traceparent",
   "content-type",
   "dpop",
+  "x-skycot-family-unlock",
   ORCHESTRATION_PROTOCOL_HEADER,
 ] as const;
 

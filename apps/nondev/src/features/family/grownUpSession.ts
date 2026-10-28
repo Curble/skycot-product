@@ -4,6 +4,7 @@
 // picker comes back. The engine stays the authority: every grown-up action still checks the grant.
 import { useSyncExternalStore } from "react";
 
+import { forgetUnlockProof } from "./unlockProof";
 import { grownUpSettingsOpen, type FamilyView } from "./family";
 
 const KEY = "skycot:family:grown-up";
@@ -56,6 +57,7 @@ export function clearGrownUpReturnChild() {
 }
 
 export function endGrownUpSession() {
+  forgetUnlockProof();
   try {
     window.sessionStorage.removeItem(KEY);
   } catch {
