@@ -120,10 +120,11 @@ export function buildPlan(c) {
 /** What to do for the website once the feed is live. Printed, never run. */
 export function siteBumpCommands(c) {
   const site = "/Users/me/skycot-site-product";
+  const beta = (v) => (/-nondev\.(\d+)\.beta$/.exec(v) ?? [])[1] ?? v;
   return [
     `cd ${c.repo}`,
     `# 1. bump the version in the site sources (three files), then build the draft:`,
-    `sed -i '' 's/nondev\\.${c.previousVersion.split(".")[2]}/nondev.${c.version.split(".")[2]}/g' docs/skycot-site/build_site.py docs/skycot-site/home.html ${site}/scripts/verify-site.mjs`,
+    `sed -i '' 's/nondev\\.${beta(c.previousVersion)}\\.beta/nondev.${beta(c.version)}.beta/g' docs/skycot-site/build_site.py docs/skycot-site/home.html ${site}/scripts/verify-site.mjs`,
     `(cd docs/skycot-site && python3 build_site.py)`,
     `# 2. copy the draft into the site repo (never --delete) and build outside iCloud:`,
     `rsync -a docs/skycot-site/draft/ ${site}/public/`,
