@@ -196,6 +196,7 @@ describe("useStarterPick", () => {
     expect(setSeed).toHaveBeenCalledTimes(1);
     expect(setSeed.mock.calls[0]![0].starterId).toBe("game");
     expect(setSeed.mock.calls[0]![0].text).toContain("play in the page: snake.");
+    expect(setSeed.mock.calls[0]![0].sendNow).toBe(true);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
@@ -204,6 +205,7 @@ describe("useStarterPick", () => {
     await mount(<Probe setSeed={setSeed} />);
     await click("Surprise me");
     expect(setSeed).toHaveBeenCalledTimes(1);
+    expect(setSeed.mock.calls[0]![0].sendNow).toBeUndefined();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     await act(async () => root!.unmount());
     state.level = "makers";
@@ -213,6 +215,7 @@ describe("useStarterPick", () => {
     await click("Make a game");
     expect(again).toHaveBeenCalledTimes(1);
     expect(again.mock.calls[0]![0].text).toContain("[");
+    expect(again.mock.calls[0]![0].sendNow).toBeUndefined();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });

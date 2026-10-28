@@ -324,9 +324,8 @@ function Dots({ total, index }: { readonly total: number; readonly index: number
 /**
  * Card taps, for Home and an empty conversation. A Little maker's card with [blanks] opens
  * the step picker; every other tap fills the box as before. `sheet` goes in the screen.
- * Make it! fills the box with the finished sentence and closes the picker (the composer
- * then shows its usual "now press Send" state): sending belongs to two different composers
- * and is left to them.
+ * Make it! hands over the finished sentence with `sendNow` and closes the picker; the two
+ * composers then send it exactly as if Send were pressed (and keep it in the box if refused).
  */
 export function useStarterPick(setSeed: (seed: ComposerSeed) => void): {
   readonly pick: (starter: Starter) => void;
@@ -358,7 +357,7 @@ export function useStarterPick(setSeed: (seed: ComposerSeed) => void): {
         starter={open}
         onClose={() => setOpen(null)}
         onMake={(text) => {
-          setSeed({ ...seedFor(open), text });
+          setSeed({ ...seedFor(open), text, sendNow: true });
           setOpen(null);
         }}
       />

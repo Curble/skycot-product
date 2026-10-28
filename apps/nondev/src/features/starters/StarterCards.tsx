@@ -50,6 +50,8 @@ export interface ComposerSeed {
   readonly text: string;
   readonly starterId: string;
   readonly wantsPicture: boolean;
+  /** Make it! on the step picker: the composer sends this seed straight away, once. */
+  readonly sendNow?: boolean;
 }
 
 export function seedFor(starter: Starter): ComposerSeed {

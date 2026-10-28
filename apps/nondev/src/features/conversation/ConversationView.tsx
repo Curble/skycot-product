@@ -1082,6 +1082,17 @@ function ReplyComposer({
     await deliver(message, active);
   };
 
+  // Make it! (step picker): send the seed's words exactly like pressing Send, once per seed.
+  const sentSeed = useRef<ComposerSeed | null>(null);
+  useEffect(() => {
+    if (appliedSeed === null || appliedSeed.sendNow !== true || sentSeed.current === appliedSeed) {
+      return;
+    }
+    if (!ready || sending || !hasContent || text !== appliedSeed.text || seedSent) return;
+    sentSeed.current = appliedSeed;
+    void send();
+  });
+
   const [appliedJourneyNote, setAppliedJourneyNote] = useState<string | null>(null);
   if (journeyNote !== appliedJourneyNote) {
     setAppliedJourneyNote(journeyNote);

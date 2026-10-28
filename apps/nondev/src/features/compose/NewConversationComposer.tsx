@@ -660,6 +660,15 @@ function ComposerField({
     });
   };
 
+  // Make it! (step picker): send the seed's words exactly like pressing Send, once per seed.
+  const sentSeed = useRef<ComposerSeed | null>(null);
+  useEffect(() => {
+    if (seed === null || seed.sendNow !== true || sentSeed.current === seed) return;
+    if (!ready || sending || trimmed.length === 0 || text !== seed.text) return;
+    sentSeed.current = seed;
+    void sendCleared();
+  });
+
   const placeholder = !connected
     ? "Waiting for your Mac to reconnect…"
     : !canOperate
