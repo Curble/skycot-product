@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "SKYCOT for iPhone and iPad: one app that becomes a child's device or a grown-up's phone when it is linked at the family's Mac. A SKYCOT-only fork of apps/mobile (T3 Code, MIT); see README.md.",
+  "license": "Apache-2.0",
   "main": "index.ts",
   "scripts": {
     "start": "APP_VARIANT=development expo start --port 8081",

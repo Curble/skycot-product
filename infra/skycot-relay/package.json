@@ -2,6 +2,7 @@
   "name": "skycot-relay",
   "private": true,
   "description": "SKYCOT Relay: a small Cloudflare Worker that passes sealed messages between a family's devices and their home Mac, and sends content-free notifications through Apple. No accounts, no database, no stored conversations.",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local",

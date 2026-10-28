@@ -106,7 +106,7 @@ export function AboutPane({ environmentId }: { readonly environmentId: Environme
       </SettingsGroup>
       <SettingsGroup
         title="Credits"
-        footer={`${PRODUCT_NAME} is a plain-language interface built on ${UPSTREAM_NAME}, an open-source project by T3 Tools Inc. The engine, the provider connectors and the developer interface (${ADVANCED_MODE_LABEL}) are ${UPSTREAM_NAME}'s. "T3" and "${UPSTREAM_NAME}" are names of T3 Tools Inc.; ${PRODUCT_NAME} is not affiliated with or endorsed by them.`}
+        footer={`${PRODUCT_NAME} is a plain-language interface built on ${UPSTREAM_NAME}, an open-source project by T3 Tools Inc. The engine, the provider connectors and the developer interface (${ADVANCED_MODE_LABEL}) are ${UPSTREAM_NAME}'s. "T3" and "${UPSTREAM_NAME}" are names of T3 Tools Inc.; ${PRODUCT_NAME} is not affiliated with or endorsed by them. ${PRODUCT_NAME}'s own additions: Apache License 2.0 (LICENSING.md in the source).`}
       >
         <ListRow
           leading={<StepBadge state="todo" icon={Scale} />}

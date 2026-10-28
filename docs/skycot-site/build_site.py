@@ -10,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)) + "/"
 OUT = HERE + "draft/"
 BRAND = os.path.normpath(HERE + "../../nondev/brand/assets") + "/"
 LICENSE = open(os.path.normpath(HERE + "../../LICENSE"), encoding="utf-8").read().strip()
+LICENSE_APACHE = open(os.path.normpath(HERE + "../../LICENSE-APACHE"), encoding="utf-8").read().strip()
 # Day/dusk rule (brand guide section 2), inlined in every page's <head> so it runs before first paint.
 DAYLIGHT = open(HERE + "daylight.js", encoding="utf-8").read().strip()
 
@@ -784,7 +785,7 @@ def home_body():
     <details><summary>What if it breaks something?</summary><p>SKYCOT works in a private copy of your project and keeps a version for every change, so you can step back like Time Machine. The hard rules mean deleting, putting live and spending money always ask first, in every mode.</p></details>
     <details><summary>Does voice typing send my child's voice anywhere?</summary><p>Voice typing starts off for every child, and a grown-up turns it on with the parent code. SKYCOT never records or keeps audio; it uses the browser's own speech service. In Safari that is Apple's dictation, which on recent Macs can stay on the Mac. In Chrome it is Google's, and in Edge Microsoft's, so the voice goes to that company under its terms. SKYCOT tells you which applies before you switch it on, and recommends Safari for children. Reading replies aloud uses the Mac's own voices, so nothing leaves the Mac.</p></details>
     <details><summary>Can I get at the developer tools?</summary><p>Yes. Advanced mode is a switch at the bottom of the sidebar. It opens the full developer interface SKYCOT is built on (T3 Code's) in the same window: every panel, terminal and setting, nothing removed. Flip it back and the plain-language view returns. In a Family profile the switch is hidden and opening it needs the parent code.</p></details>
-    <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
+    <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. What we added is open too, under the Apache License 2.0. The SKYCOT name, logo and characters are trademarks of Curble Pty Ltd and are not covered by either licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
     <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
   </div>
@@ -960,10 +961,15 @@ OSS = f'''{nav()}
   <p>Reproduced in full, as the licence requires, from the LICENSE file that ships with SKYCOT:</p>
   <pre class="licence">{html.escape(LICENSE)}</pre>
 
+  <h2>The Apache License 2.0 (SKYCOT's own additions)</h2>
+  <p>What Curble Pty Ltd wrote for SKYCOT is licensed under the Apache License, Version 2.0, reproduced in full from the LICENSE-APACHE file that ships with SKYCOT:</p>
+  <pre class="licence">{html.escape(LICENSE_APACHE)}</pre>
+
   <h2>What this means for you</h2>
   <ul>
     <li>The licence notice above ships inside every copy of SKYCOT (in the installer and under Settings → About → Open-source licences) and must stay there.</li>
-    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions, and the SKYCOT name, are © 2026 Curble Pty Ltd (trading as SKYCOT); see the <a href="/terms">terms of use</a>. Whether our additions will also be published under an open licence is a decision still to be made and will be announced here.</li>
+    <li>The MIT licence applies to the T3 Code portions. SKYCOT's own additions are © 2026 Curble Pty Ltd (trading as SKYCOT) and are licensed under the Apache License 2.0, shown in full above. Which files are under which licence is explained in LICENSING.md in the source.</li>
+    <li>The SKYCOT name, logo and characters are trademarks of Curble Pty Ltd and are not covered by either licence.</li>
     <li>SKYCOT does not ship T3 Code's release pipeline, install scripts or telemetry configuration; our builds are published by Curble Pty Ltd from our own repository.</li>
   </ul>
 

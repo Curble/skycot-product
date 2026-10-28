@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'A P-256 signing key in the Secure Enclave that signs only after Face ID or Touch ID, for saying yes to a child\'s request.'
   s.author         = 'Curble Pty Ltd'
   s.homepage       = 'https://www.skycot.com'
-  s.license        = { :type => 'Proprietary', :text => 'Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT.' }
+  s.license        = { :type => 'Apache-2.0', :file => '../../../../../LICENSE-APACHE' }
   # nondev-seam: skycot-device-key-ios17-target
   s.platforms      = { :ios => '17.0' }
   s.source         = { :path => '.' }

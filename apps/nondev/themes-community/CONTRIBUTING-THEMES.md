@@ -54,3 +54,14 @@ do not change any other file in the same pull request.
 - Keep the crew names kind and short. They appear in sentences like "Sam needs
   your OK".
 - Themes carry your `author` name only if you want it there.
+
+## Licence and ownership
+
+- By opening a pull request you offer your theme under the **Apache License 2.0**
+  (the same licence as the rest of SKYCOT's own work; see `LICENSING.md`).
+- You confirm that you made the theme yourself, or that you have the right to
+  share it, and that it is yours to give.
+- A theme must not use third-party names: no brand, product, game, film or
+  character names in the `id`, `name`, `description` or crew names, and no
+  imitation of someone else's look under their name.
+- The SKYCOT name, logo and characters are not licensed to you by contributing.

@@ -2,6 +2,7 @@
   "name": "@t3tools/skycot-rules",
   "private": true,
   "description": "SKYCOT hard rules: the one rule table the server policy and the plain client both evaluate. Pure TypeScript, no runtime dependencies, Hermes-safe.",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     "./rules": {

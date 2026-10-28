@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'WatchConnectivity between the SKYCOT iPhone app and its Watch app, and the notifications the Watch can answer.'
   s.author         = 'Curble Pty Ltd'
   s.homepage       = 'https://www.skycot.com'
-  s.license        = { :type => 'Proprietary', :text => 'Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT.' }
+  s.license        = { :type => 'Apache-2.0', :file => '../../../../../LICENSE-APACHE' }
   # nondev-seam: skycot-watch-module-ios17-target
   s.platforms      = { :ios => '17.0' }
   s.source         = { :path => '.' }

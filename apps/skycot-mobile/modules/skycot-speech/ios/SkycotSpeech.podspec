@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Turns speech into words with Apple Speech, on this device only.'
   s.author         = 'Curble Pty Ltd'
   s.homepage       = 'https://www.skycot.com'
-  s.license        = { :type => 'Proprietary', :text => 'Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT.' }
+  s.license        = { :type => 'Apache-2.0', :file => '../../../../../LICENSE-APACHE' }
   # nondev-seam: skycot-speech-ios17-target
   s.platforms      = { :ios => '17.0' }
   s.source         = { :path => '.' }

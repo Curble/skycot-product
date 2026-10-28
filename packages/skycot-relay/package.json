@@ -2,6 +2,7 @@
   "name": "@t3tools/skycot-relay",
   "private": true,
   "description": "SKYCOT Relay protocol, shared by the relay Worker, the Mac's engine and every linked device: the sealed tunnel (Noise IK), relay passes, the link in the QR code, and the device-side transport. Pure TypeScript on audited pure-JS crypto (noble), so it runs in Workers, Node, browsers and React Native.",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     "./encoding": {

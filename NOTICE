@@ -2,6 +2,13 @@ SKYCOT
 Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT, Melbourne, Australia
 https://www.skycot.com
 
+SKYCOT's own additions are licensed under the Apache License, Version 2.0 (see
+LICENSE-APACHE). Portions derived from T3 Code remain under the MIT License (see
+LICENSE). Which parts are which is explained in LICENSING.md.
+
+The SKYCOT name, logo and characters (the cloud and the crew) are trademarks and
+copyright of Curble Pty Ltd. They are not licensed under either licence.
+
 SKYCOT is based on T3 Code.
 
     T3 Code
