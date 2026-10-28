@@ -982,6 +982,42 @@ it.layer(
     }),
   );
 
+  it.effect("remembers how the welcome ended, for any grown-up device but never a child's", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const read = () =>
+        send("GET", "/api/skycot/family").pipe(
+          Effect.flatMap((response) => response.json),
+          Effect.map((json) => (json as Record<string, any>)["welcome"]),
+        );
+      assert.isNull(yield* read());
+
+      const childTry = yield* send("POST", "/api/skycot/family/welcome", {
+        headers: { authorization: CHILD_BEARER },
+        body: { state: "done" },
+      });
+      assert.equal(childTry.status, 403);
+      const nonsense = yield* send("POST", "/api/skycot/family/welcome", {
+        body: { state: "maybe" },
+      });
+      assert.equal(nonsense.status, 400);
+      assert.isNull(yield* read());
+
+      const skipped = yield* send("POST", "/api/skycot/family/welcome", {
+        body: { state: "skipped" },
+      });
+      assert.equal(skipped.status, 200);
+      assert.equal(((yield* skipped.json) as Record<string, any>)["welcome"], "skipped");
+      assert.equal(yield* read(), "skipped");
+
+      // Turning the profile on, and the answer to the welcome, are separate facts.
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: "Ava" } });
+      assert.equal(yield* read(), "skipped");
+      yield* send("POST", "/api/skycot/family/welcome", { body: { state: "done" } });
+      assert.equal(yield* read(), "done");
+    }),
+  );
+
   it.effect("a child session cannot answer a page request for this page or its project", () =>
     Effect.gen(function* () {
       const { send } = yield* makeClient();

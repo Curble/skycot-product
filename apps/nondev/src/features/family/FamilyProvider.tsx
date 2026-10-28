@@ -49,6 +49,7 @@ import {
   readFamilyView,
   refreshFamily,
   renewGrownUpSession,
+  setWelcome,
   tryParentCode,
   useFamilyView,
 } from "./store";
@@ -67,6 +68,8 @@ export interface FamilyApi {
   /** On for the UI: the engine says so, or a browser-only profile is waiting to move. */
   readonly enabled: boolean;
   readonly isLocked: (action: FamilyAction) => boolean;
+  /** Records how the first-run welcome ended (the engine holds it). Resolves false if it failed. */
+  readonly setWelcome: (state: "done" | "skipped") => Promise<boolean>;
   /** Resolves true at once when the action is not locked; otherwise after the sheet. */
   readonly requireParentCode: (
     action: FamilyAction,
@@ -114,6 +117,7 @@ function makeApi(
     profile: view,
     enabled: familyOn(view),
     isLocked: (action) => isFamilyLocked(view, action),
+    setWelcome: (state) => setWelcome(state).then((result) => result.ok),
     requireParentCode: (action, options = {}) => {
       if (options.code !== undefined) {
         return attemptFor(action, options)(options.code).then((result) => result.ok);

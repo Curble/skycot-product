@@ -25,7 +25,6 @@ import { MakesScreen } from "./features/home/MakesScreen";
 import { FilesScreen } from "./features/files/FilesScreen";
 import { BadgeHost, CertificateScreen, StickerBook } from "./features/badges";
 import { PeopleScreen } from "./features/people/PeopleScreen";
-import { useOnboardingState } from "./features/settings/localPrefs";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { HOME_HREF, navigate, useRoute, type Route } from "./router";
 import { HomeRoute } from "./routes/Home";
@@ -136,77 +135,78 @@ export function App() {
       <WhoIsWho>
         <HandBackHome />
         <SidebarSheetsHost>
-          <AppShell route={route}>
-            <OnboardingGate route={route} />
-            {(() => {
-              switch (route.name) {
-                case "home":
-                case "new":
-                case "pair":
-                case "welcome":
-                  return <HomeRoute showBack={route.name === "new" && columns === 1} />;
-                case "settings":
-                  return <SettingsScreen section={route.section} />;
-                case "recap":
-                  return <SettingsScreen section="family" recapChildId={route.childId} />;
-                case "makes":
-                  return <MakesScreen showBack={columns === 1} />;
-                case "fridge":
-                  return <FridgeScreen />;
-                case "files":
-                  return (
-                    <FilesScreen
-                      key={`${route.projectId}:${route.threadId ?? ""}`}
-                      environmentId={route.environmentId}
-                      projectId={route.projectId}
-                      threadId={route.threadId}
-                    />
-                  );
-                case "stickers":
-                  return <StickerBook showBack={columns === 1} />;
-                case "certificate":
-                  return <CertificateScreen kind={route.kind} />;
-                case "thread":
-                  return (
-                    <ThreadRoute
-                      environmentId={route.environmentId}
-                      threadId={route.threadId}
-                      showBack={columns === 1}
-                    />
-                  );
-                case "automations":
-                  return (
-                    <GrownUpOnly route={route}>
-                      <AutomationsScreen />
-                    </GrownUpOnly>
-                  );
-                case "people":
-                  return (
-                    <GrownUpOnly route={route}>
-                      <PeopleScreen />
-                    </GrownUpOnly>
-                  );
-                case "not-found":
-                  return (
-                    <StandalonePage>
-                      <span className="fm-standalone__art">
-                        <Mascot pose="thinking" size={88} />
-                      </span>
-                      {/* An h2: the title bar already carries the page's h1. */}
-                      <h2 className="fm-standalone__title">There's nothing here</h2>
-                      <p className="fm-standalone__text">
-                        That link doesn't go anywhere in {PRODUCT_NAME}.
-                      </p>
-                      <div className="fm-standalone__actions">
-                        <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
-                          Go home
-                        </Button>
-                      </div>
-                    </StandalonePage>
-                  );
-              }
-            })()}
-          </AppShell>
+          <ShellOrWelcome route={route}>
+            <AppShell route={route}>
+              {(() => {
+                switch (route.name) {
+                  case "home":
+                  case "new":
+                  case "pair":
+                  case "welcome":
+                    return <HomeRoute showBack={route.name === "new" && columns === 1} />;
+                  case "settings":
+                    return <SettingsScreen section={route.section} />;
+                  case "recap":
+                    return <SettingsScreen section="family" recapChildId={route.childId} />;
+                  case "makes":
+                    return <MakesScreen showBack={columns === 1} />;
+                  case "fridge":
+                    return <FridgeScreen />;
+                  case "files":
+                    return (
+                      <FilesScreen
+                        key={`${route.projectId}:${route.threadId ?? ""}`}
+                        environmentId={route.environmentId}
+                        projectId={route.projectId}
+                        threadId={route.threadId}
+                      />
+                    );
+                  case "stickers":
+                    return <StickerBook showBack={columns === 1} />;
+                  case "certificate":
+                    return <CertificateScreen kind={route.kind} />;
+                  case "thread":
+                    return (
+                      <ThreadRoute
+                        environmentId={route.environmentId}
+                        threadId={route.threadId}
+                        showBack={columns === 1}
+                      />
+                    );
+                  case "automations":
+                    return (
+                      <GrownUpOnly route={route}>
+                        <AutomationsScreen />
+                      </GrownUpOnly>
+                    );
+                  case "people":
+                    return (
+                      <GrownUpOnly route={route}>
+                        <PeopleScreen />
+                      </GrownUpOnly>
+                    );
+                  case "not-found":
+                    return (
+                      <StandalonePage>
+                        <span className="fm-standalone__art">
+                          <Mascot pose="thinking" size={88} />
+                        </span>
+                        {/* An h2: the title bar already carries the page's h1. */}
+                        <h2 className="fm-standalone__title">There's nothing here</h2>
+                        <p className="fm-standalone__text">
+                          That link doesn't go anywhere in {PRODUCT_NAME}.
+                        </p>
+                        <div className="fm-standalone__actions">
+                          <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
+                            Go home
+                          </Button>
+                        </div>
+                      </StandalonePage>
+                    );
+                }
+              })()}
+            </AppShell>
+          </ShellOrWelcome>
           <FamilyLimitsHost />
           <BadgeHost />
         </SidebarSheetsHost>
@@ -276,13 +276,21 @@ const EMPTY_PROVIDERS_ATOM = Atom.make<ReadonlyArray<ServerProvider> | null>(nul
 );
 
 /**
- * First-run onboarding, shown over the shell until it is finished or skipped in this browser
- * (`shouldShowOnboarding`), or whenever the person opens `#/welcome`. While the Family profile
- * is on, `#/welcome` asks for the parent code first, however it was reached (QA FK-09: typing
- * the address skipped the code the Settings row asked for). Dismissed state lives in this
- * browser; Settings can reopen it.
+ * The welcome owns the window while it is open: it is rendered instead of the shell, and the
+ * shell mounts when it closes. It opens on a first run (the engine says the welcome was never
+ * finished or skipped and the Family profile is off, `shouldShowOnboarding`), or whenever the
+ * person opens `#/welcome`. While the Family profile is on, `#/welcome` asks for the parent
+ * code first, however it was reached (QA FK-09: typing the address skipped the code the
+ * Settings row asked for). Whether the first run is over lives in the Mac's SKYCOT data, never
+ * in this browser.
  */
-function OnboardingGate({ route }: { readonly route: Route }) {
+function ShellOrWelcome({
+  route,
+  children,
+}: {
+  readonly route: Route;
+  readonly children: React.ReactNode;
+}) {
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const environmentId: EnvironmentId | null = environmentIds[0] ?? null;
   const providers = useAtomValue(
@@ -290,17 +298,18 @@ function OnboardingGate({ route }: { readonly route: Route }) {
       ? EMPTY_PROVIDERS_ATOM
       : serverEnvironment.providersValueAtom(environmentId),
   );
-  const state = useOnboardingState();
   const family = useFamily();
   const familyKnown = family.profile.source === "engine";
   const onWelcome = route.name === "welcome";
-  // Judged on the engine's first answer: a parent finishing the Family step mid-sheet must not
-  // close the sheet under them. (State adjusted while rendering, as React suggests for this.)
+  // Judged on the engine's first answer: a parent finishing the Family step mid-welcome must not
+  // close it under them. (State adjusted while rendering, as React suggests for this.)
   const [familyAtStart, setFamilyAtStart] = useState<boolean | null>(null);
   if (familyAtStart === null && familyKnown) setFamilyAtStart(family.enabled);
   // `#/welcome` is decided once per visit, so the profile turning on inside it asks nothing.
   const [welcome, setWelcome] = useState<"unknown" | "open" | "closed">("unknown");
   if (!onWelcome && welcome !== "unknown") setWelcome("unknown");
+  // A first run that has ended in this window stays closed even if the engine could not save it.
+  const [ended, setEnded] = useState(false);
   const entry = welcomeEntry(familyKnown, family.isLocked("rerunOnboarding"));
   if (onWelcome && welcome === "unknown" && entry === "open") setWelcome("open");
   const needsCode = onWelcome && welcome === "unknown" && entry === "ask";
@@ -314,16 +323,21 @@ function OnboardingGate({ route }: { readonly route: Route }) {
       if (!ok) navigate(HOME_HREF);
     });
   }, [needsCode, family]);
-  // No local "dismissed" flag: closing the sheet writes the stored state and
-  // leaves `#/welcome`, and both of those already make `show` false.
   const show = onWelcome
     ? welcome === "open"
-    : shouldShowOnboarding(route, providers, state, familyAtStart);
-  if (!show || environmentId === null) return null;
+    : !ended &&
+      shouldShowOnboarding(
+        route,
+        providers,
+        familyKnown ? family.profile.welcome : null,
+        familyAtStart,
+      );
+  if (!show || environmentId === null) return <>{children}</>;
   return (
     <OnboardingSheet
       environmentId={environmentId}
       onClose={() => {
+        setEnded(true);
         if (route.name === "welcome") navigate(HOME_HREF);
       }}
     />

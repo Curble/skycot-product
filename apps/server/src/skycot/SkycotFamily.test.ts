@@ -30,6 +30,29 @@ const withFamily = <A, E, R>(
 const failureOf = <A>(effect: Effect.Effect<A, SkycotFamily.FamilyError>) => Effect.flip(effect);
 
 it.layer(NodeServices.layer)("SkycotFamily", (it) => {
+  describe("the first-run welcome", () => {
+    it.effect(
+      "is remembered beside the profile and survives it being turned on, re-coded and off",
+      () =>
+        withFamily((family) =>
+          Effect.gen(function* () {
+            assert.isNull((yield* family.status).welcome);
+            assert.equal((yield* family.setWelcome("skipped")).welcome, "skipped");
+            assert.equal((yield* family.status).welcome, "skipped");
+            const on = yield* family.enable({ code: CODE, childName: "Ava" });
+            assert.equal(on.welcome, "skipped");
+            yield* family.changeCode({ oldCode: CODE, newCode: "135790" });
+            assert.equal((yield* family.status).welcome, "skipped");
+            assert.equal((yield* family.setWelcome("done")).welcome, "done");
+            const off = yield* family.disable({ code: "135790" });
+            assert.isFalse(off.enabled);
+            assert.equal(off.welcome, "done");
+            assert.equal((yield* family.status).welcome, "done");
+          }),
+        ),
+    );
+  });
+
   describe("turning on and off", () => {
     it.effect("starts off, turns on with a name and never exposes the hash", () =>
       withFamily((family, filePath) =>
@@ -53,6 +76,7 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
               projectApprovalGrants: [],
               projectArchives: [],
               kidsVisibleProjects: [],
+              welcome: null,
             },
           );
           const status = yield* family.enable({ code: CODE, childName: "  Ava  " });

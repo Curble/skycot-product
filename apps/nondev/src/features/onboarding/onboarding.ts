@@ -4,27 +4,36 @@ import type { Route } from "../../router";
 import { draftFor, patchFor } from "../family/ChildEditorSheet";
 import type { ChildPatch } from "../family/api";
 import type { ReadingLevel } from "../family/children";
-import type { OnboardingState } from "../settings/localPrefs";
+import { familyOn, type FamilyView, type Welcome } from "../family/family";
 
 /**
- * First run: the welcome steps open until the person finishes or skips them in this browser,
- * whether or not an assistant is already signed in, because the first step ("Who is this
- * for?") is where a parent turns the Family profile on (QA FK-08). Nothing is decided until
- * the engine has answered for both the assistants and the profile (`null`), and a browser
- * opened on a Mac whose Family profile is already on skips them: the parent set it up, and a
- * child should not be offered the set-up. `#/welcome` is handled by the caller (it asks for
- * the parent code while the profile is on).
+ * First run is a fact about this Mac's SKYCOT data, not this browser: the welcome steps open
+ * until the engine says they were finished or skipped (`welcome`), whether or not an assistant
+ * is already signed in, because the first step ("Who is this for?") is where a parent turns the
+ * Family profile on (QA FK-08). Nothing is decided until the engine has answered for both the
+ * assistants and the profile (`null`), and a Mac whose Family profile is already on skips them:
+ * the parent set it up, and a child should not be offered the set-up. `#/welcome` is handled
+ * by the caller (it asks for the parent code while the profile is on).
  */
 export function shouldShowOnboarding(
   route: Route,
   providers: ReadonlyArray<ServerProvider> | null,
-  state: OnboardingState,
+  welcome: Welcome,
   familyEnabled: boolean | null,
 ): boolean {
   if (route.name === "welcome") return true;
-  if (state !== null) return false;
   if (providers === null || familyEnabled === null) return false;
-  return !familyEnabled;
+  return welcome === null && !familyEnabled;
+}
+
+/**
+ * The card on Home that offers the family set-up after "Skip for now": until a profile exists,
+ * and only on the engine's say-so (the first-paint cache never decides).
+ */
+export function showsFamilySetupCard(
+  profile: Pick<FamilyView, "welcome" | "source" | "enabled" | "legacy">,
+): boolean {
+  return profile.source === "engine" && profile.welcome === "skipped" && !familyOn(profile);
 }
 
 /**

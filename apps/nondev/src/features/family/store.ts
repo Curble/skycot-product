@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 
 import { familyApi, type ChildPatch, type FamilyResult, type UnlockToken } from "./api";
 import type { ChildAvatar } from "./children";
+import { writeOnboardingState } from "../settings/localPrefs";
 import {
   EMPTY_VIEW,
   FAMILY_CACHE_KEY,
@@ -146,6 +147,17 @@ export function updateChild(childId: string, patch: ChildPatch) {
 
 export function removeChild(childId: string) {
   return settle(familyApi.removeChild({ childId }), applyStatus);
+}
+
+/**
+ * Records how the first-run welcome ended on this Mac (the engine keeps it). The browser's own
+ * flag is only kept as a cache for what reads it before the engine answers.
+ */
+export function setWelcome(state: "done" | "skipped") {
+  return settle(familyApi.welcome({ state }), (status) => {
+    writeOnboardingState(state);
+    applyStatus(status);
+  });
 }
 
 /** The child's own look and text size (no code: picking a look is open to children). */

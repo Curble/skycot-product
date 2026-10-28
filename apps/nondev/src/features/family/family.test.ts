@@ -336,6 +336,31 @@ describe("the engine's answers", () => {
     expect(parseCachedView(serializeCachedView(known), false).codeLength).toBeNull();
   });
 
+  it("reads how the welcome ended from the engine, on or off, and never from the cache", () => {
+    const base = {
+      enabled: false,
+      childName: null,
+      children: [],
+      timeZone: null,
+      createdAt: null,
+      attemptsLeft: 5,
+      lockedForMs: 0,
+    };
+    expect(viewFromStatus(parseServerStatus(base)!, T0, false).welcome).toBeNull();
+    const skipped = viewFromStatus(parseServerStatus({ ...base, welcome: "skipped" })!, T0, false);
+    expect(skipped.welcome).toBe("skipped");
+    expect(skipped.source).toBe("engine");
+    // An answer without it keeps what was known; an odd value is ignored.
+    expect(viewFromStatus(parseServerStatus(base)!, T0, false, skipped).welcome).toBe("skipped");
+    expect(parseServerStatus({ ...base, welcome: "later" })).not.toHaveProperty("welcome");
+    expect(
+      viewFromStatus(parseServerStatus({ ...base, welcome: "done" })!, T0, false, skipped).welcome,
+    ).toBe("done");
+    // Never in the first-paint cache.
+    expect(serializeCachedView(skipped)).not.toContain("welcome");
+    expect(parseCachedView(serializeCachedView(skipped), false).welcome).toBeNull();
+  });
+
   it("takes the code on its last digit only when the length is known", () => {
     expect(codeComplete("1234", 4)).toBe(true);
     expect(codeComplete("123", 4)).toBe(false);

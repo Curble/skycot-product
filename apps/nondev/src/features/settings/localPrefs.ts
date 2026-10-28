@@ -50,19 +50,11 @@ export function useStoredString(key: string): string | null {
   );
 }
 
+// A cache only: the engine holds whether the welcome was finished or skipped (family `welcome`).
+// Kept so themes/store.ts can tell a first launch from a later one before the engine answers.
 export const ONBOARDING_KEY = "skycot:onboarding";
-export type OnboardingState = "done" | "skipped" | null;
-
-export function readOnboardingState(): OnboardingState {
-  const raw = read(ONBOARDING_KEY);
-  return raw === "done" || raw === "skipped" ? raw : null;
-}
-export function writeOnboardingState(state: OnboardingState) {
+export function writeOnboardingState(state: "done" | "skipped" | null) {
   write(ONBOARDING_KEY, state);
-}
-export function useOnboardingState(): OnboardingState {
-  const raw = useStoredString(ONBOARDING_KEY);
-  return raw === "done" || raw === "skipped" ? raw : null;
 }
 
 // The "hands-off timer" preference was removed (SEC-02): nothing on the server ever read it,

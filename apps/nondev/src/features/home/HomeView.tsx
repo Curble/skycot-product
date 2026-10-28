@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import { ChevronLeft, ListTodo, Sparkles } from "lucide-react";
+import { ChevronLeft, ListTodo, Sparkles, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
-import { HOME_HREF, navigate, threadHref } from "../../router";
+import { HOME_HREF, navigate, threadHref, WELCOME_HREF } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
 import { familyCopy } from "../family/copy";
@@ -12,8 +12,8 @@ import { useFamily } from "../family/FamilyProvider";
 import { useChildView } from "../../app/useChildView";
 import { askWhoStarted, useLimits } from "../family-limits/store";
 import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
-import { IconButton } from "../../ui/Button";
-import { Card, CardBody, CardHeader } from "../../ui/Card";
+import { Button, IconButton } from "../../ui/Button";
+import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
 import { List, ListRow } from "../../ui/ListRow";
 import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
@@ -23,6 +23,7 @@ import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
 import { useStarterPick } from "../starters/StepPickerSheet";
+import { showsFamilySetupCard } from "../onboarding/onboarding";
 import { homeTip } from "./tip";
 import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 import { greeting as greetingForHour } from "./greeting";
@@ -92,6 +93,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
               />
             </div>
           ) : null}
+          {showsFamilySetupCard(family.profile) ? <FamilySetupCard /> : null}
           <div className="fm-home__hello">
             <Mascot pose="hello" size={72} decorative />
             <div>
@@ -188,6 +190,30 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
       </div>
       <NewConversationComposer preferredProjectKey={shell.projectKey} seed={seed} />
     </>
+  );
+}
+
+/** After "Skip for now": one calm offer to set SKYCOT up for a family, until a profile exists. */
+function FamilySetupCard() {
+  const crew = useCrew();
+  const family = useFamily();
+  return (
+    <Card label="Set SKYCOT up for your family">
+      <CardHeader
+        icon={Users}
+        tone="blue"
+        title="Set SKYCOT up for your family"
+        subtitle={`A parent code, a name for each child, and ${crew.builder.name} explains things their way.`}
+      />
+      <CardFooter>
+        <Button variant="primary" onClick={() => navigate(WELCOME_HREF)}>
+          Set up
+        </Button>
+        <Button variant="quiet" onClick={() => void family.setWelcome("done")}>
+          I'm using SKYCOT myself
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 

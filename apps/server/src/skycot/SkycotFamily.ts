@@ -540,7 +540,28 @@ export interface FamilyStatus {
   readonly projectArchives: ReadonlyArray<ProjectArchive>;
   /** Developer projects a grown-up chose to show the children. */
   readonly kidsVisibleProjects: ReadonlyArray<string>;
+  /**
+   * Whether the first-run welcome was finished ("done"), skipped ("skipped") or never shown
+   * (null). A fact about this Mac's SKYCOT data, kept beside the profile file so it survives the
+   * profile being turned on, off or re-coded.
+   */
+  readonly welcome: WelcomeState;
 }
+
+/** How the first-run welcome ended on this Mac; null while it never has. */
+export type WelcomeState = "done" | "skipped" | null;
+
+export const WELCOME_FILE_NAME = "welcome.json";
+
+const WelcomeFile = Schema.Struct({
+  welcome: Schema.NullOr(Schema.Literals(["done", "skipped"])),
+});
+const decodeWelcomeFile = Schema.decodeUnknownOption(Schema.fromJsonString(WelcomeFile));
+const encodeWelcomeFile = Schema.encodeEffect(Schema.fromJsonString(WelcomeFile));
+const decodeWelcome = (raw: string): WelcomeState => {
+  const decoded = decodeWelcomeFile(raw);
+  return decoded._tag === "Some" ? decoded.value.welcome : null;
+};
 
 const projectArchivesOf = (
   file: Pick<FamilyFile, "projectArchives"> | null,
@@ -710,6 +731,8 @@ export class SkycotFamily extends Context.Service<
       readonly childId: string;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     readonly setTimeZone: (timeZone: string) => Effect.Effect<FamilyStatus, FamilyError>;
+    /** Records how the first-run welcome ended. Needs no profile; survives every profile change. */
+    readonly setWelcome: (state: "done" | "skipped") => Effect.Effect<FamilyStatus, FamilyError>;
     /**
      * One code attempt for a one-off parent action (more time tonight) that leaves no grant
      * behind. Counts towards the same five tries.
@@ -1032,7 +1055,7 @@ export function familyTimeZone(file: Pick<FamilyFile, "timeZone"> | null): strin
   return file?.timeZone ? knownTimeZone(file.timeZone) : engineTimeZone();
 }
 
-function toStatus(file: FamilyFile | null, now: number): FamilyStatus {
+function toStatusBase(file: FamilyFile | null, now: number): Omit<FamilyStatus, "welcome"> {
   if (file === null || !file.enabled) {
     return {
       enabled: false,
@@ -1261,7 +1284,19 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
 
   // Unreadable or missing means "off": a corrupt file must never lock the parent out of
   // their own Mac, and deleting the file is the documented last-resort reset.
-  const load = Effect.gen(function* () {
+  const welcomePath = path.join(path.dirname(filePath), WELCOME_FILE_NAME);
+  let welcomeNow: WelcomeState = null;
+  const toStatus = (file: FamilyFile | null, now: number): FamilyStatus => ({
+    ...toStatusBase(file, now),
+    welcome: welcomeNow,
+  });
+  // Read each time (a tiny file): the status always carries what is on disk.
+  const loadWelcome = Effect.gen(function* () {
+    const raw = yield* fs.readFileString(welcomePath).pipe(Effect.orElseSucceed(() => ""));
+    welcomeNow = decodeWelcome(raw);
+  });
+
+  const loadProfile = Effect.gen(function* () {
     const info = yield* fs.stat(filePath).pipe(Effect.orElseSucceed(() => null));
     if (info === null) {
       yield* Ref.set(cache, { stamp: "missing", file: null });
@@ -1276,6 +1311,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     yield* Ref.set(cache, { stamp, file });
     return file;
   });
+  const load = loadWelcome.pipe(Effect.andThen(loadProfile));
 
   const save = Effect.fn("SkycotFamily.save")(
     function* (file: FamilyFile | null) {
@@ -1692,6 +1728,23 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       const next: FamilyFile = { ...file, timeZone: zone };
       yield* save(next);
       return toStatus(next, yield* now);
+    },
+    lock.withPermits(1),
+  );
+
+  const setWelcome: SkycotFamily["Service"]["setWelcome"] = Effect.fn("SkycotFamily.setWelcome")(
+    function* (state) {
+      const file = yield* load;
+      yield* Effect.gen(function* () {
+        yield* fs.makeDirectory(path.dirname(welcomePath), { recursive: true });
+        const temp = `${welcomePath}.${hex(NodeCrypto.randomBytes(6))}.tmp`;
+        yield* fs.writeFileString(temp, `${yield* encodeWelcomeFile({ welcome: state })}\n`, {
+          mode: 0o600,
+        });
+        yield* fs.rename(temp, welcomePath);
+      }).pipe(Effect.mapError((cause) => new FamilyError({ reason: "storage", cause })));
+      welcomeNow = state;
+      return toStatus(file, yield* now);
     },
     lock.withPermits(1),
   );
@@ -2434,6 +2487,7 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
     updateChild,
     removeChild,
     setTimeZone,
+    setWelcome,
     checkCode,
     allowAssistant,
     stopAllowingAssistant,

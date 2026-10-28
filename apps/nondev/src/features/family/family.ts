@@ -129,6 +129,9 @@ export interface OpenGrant {
   readonly remainingMs: number;
 }
 
+/** How the first-run welcome ended on this Mac: finished, skipped, or never shown yet. */
+export type Welcome = "done" | "skipped" | null;
+
 /** `GET /api/skycot/family`, as the engine sends it. Never the hash. */
 export interface ServerFamilyStatus {
   readonly enabled: boolean;
@@ -155,6 +158,8 @@ export interface ServerFamilyStatus {
   /** Projects put away, and the code projects a grown-up showed the kids. An older engine: none. */
   readonly projectArchives?: ReadonlyArray<ProjectArchiveView>;
   readonly kidsVisibleProjects?: ReadonlyArray<string>;
+  /** How the first-run welcome ended on this Mac. An engine from before it sends none. */
+  readonly welcome?: Welcome;
   /** Code projects (hidden from the kids unless shown); only a grown-up's status carries them. */
   readonly developerProjects?: ReadonlyArray<string>;
   /** "Trusted add-ons download by themselves". An engine from before it sends none (off). */
@@ -390,6 +395,11 @@ export function parseServerStatus(body: unknown): ServerFamilyStatus | null {
     rememberedStarts: parseRememberedStarts(record["rememberedStarts"]),
     projectArchives: parseProjectArchives(record["projectArchives"]),
     kidsVisibleProjects: parseStrings(record["kidsVisibleProjects"]),
+    ...(record["welcome"] === "done" ||
+    record["welcome"] === "skipped" ||
+    record["welcome"] === null
+      ? { welcome: record["welcome"] }
+      : {}),
     developerProjects: parseStrings(record["developerProjects"]),
     ...(typeof record["trustedAddOns"] === "boolean"
       ? { trustedAddOns: record["trustedAddOns"] }
@@ -515,6 +525,12 @@ export interface FamilyView {
    * the code box then tries the code on its last digit. Null: the box waits for its button.
    */
   readonly codeLength: number | null;
+  /**
+   * How the first-run welcome ended on this Mac, from the engine's data (not this browser).
+   * Null both when it never ended and while only the first-paint cache is known: judge it only
+   * once `source` is "engine".
+   */
+  readonly welcome: Welcome;
 }
 
 export const EMPTY_VIEW: FamilyView = {
@@ -542,6 +558,7 @@ export const EMPTY_VIEW: FamilyView = {
   devices: [],
   me: SHARED_ME,
   codeLength: null,
+  welcome: null,
 };
 
 /**
@@ -591,6 +608,7 @@ export function viewFromStatus(
   previous: Pick<FamilyView, "openUntil" | "currentChildId"> & {
     readonly me?: FamilyMe;
     readonly codeLength?: number | null;
+    readonly welcome?: Welcome;
   } = EMPTY_VIEW,
 ): FamilyView {
   const choice = currentChildOf(status.children, status.session, previous.currentChildId);
@@ -625,6 +643,8 @@ export function viewFromStatus(
     trustedAddOns: status.enabled && status.trustedAddOns === true,
     grownUps: status.enabled ? (status.grownUps ?? []) : [],
     devices: status.enabled ? (status.devices ?? []) : [],
+    // The welcome is a fact about the Mac's data, on or off: an answer without it keeps what was known.
+    welcome: status.welcome === undefined ? (previous.welcome ?? null) : status.welcome,
     // Answers other than the status read carry no `me`: keep what was known.
     me: status.me ?? previous.me ?? SHARED_ME,
     // Answers that leave the length out keep what was known; a profile turned off has none.

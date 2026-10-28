@@ -34,7 +34,6 @@ import { Button } from "../../ui/Button";
 import { List, ListExtra, ListRow } from "../../ui/ListRow";
 import { Pill } from "../../ui/Pill";
 import { SegmentedControl } from "../../ui/SegmentedControl";
-import { Sheet } from "../../ui/Sheet";
 import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
 import { StepBadge } from "../../ui/StepBadge";
@@ -95,7 +94,7 @@ import {
   type Audience,
   type OnboardingStep,
 } from "./onboarding";
-import { readOnboardingState, writeOnboardingState } from "../settings/localPrefs";
+import { WelcomePage } from "./WelcomePage";
 import {
   PROVIDER_CATALOG,
   anyProviderReady,
@@ -206,19 +205,23 @@ export function OnboardingSheet({
     markSetupOpen(true);
     return () => markSetupOpen(false);
   }, []);
-  const finish = (state: "done" | "skipped") => {
-    writeOnboardingState(state);
+  // The Mac's data remembers how the welcome ended. If that fails the welcome still closes (with
+  // a note in the console) and simply shows again next time.
+  const remember = async (state: "done" | "skipped") => {
+    const ok = await family.setWelcome(state).catch(() => false);
+    if (!ok) console.warn("SKYCOT could not save how the welcome ended.");
+  };
+  const finish = async (state: "done" | "skipped") => {
+    // Running the steps again and skipping must not turn an earlier "done" into "skipped".
+    await remember(state === "skipped" && family.profile.welcome === "done" ? "done" : state);
     onClose();
     navigate(HOME_HREF);
   };
-  const linkPhone = () => {
-    writeOnboardingState("done");
+  const linkPhone = async () => {
+    await remember("done");
     onClose();
     navigate(settingsHref("family"));
   };
-  // Escape and the backdrop cancel: they never turn an earlier "done" into
-  // "skipped", and a first run that is cancelled simply stays skippable.
-  const cancel = () => finish(readOnboardingState() === "done" ? "done" : "skipped");
   const continueStep = async () => {
     if (step === "family" && childPath && !family.enabled) {
       setFinishing(true);
@@ -294,7 +297,7 @@ export function OnboardingSheet({
     if (childPath && handOver) {
       // The same steps as "Done — hand back" in the grown-up menu. The first child is already
       // chosen above, so the picker stays shut and they land on their own Home.
-      writeOnboardingState("done");
+      await remember("done");
       onClose();
       handBack(
         {
@@ -307,7 +310,7 @@ export function OnboardingSheet({
       );
       return;
     }
-    finish("done");
+    await finish("done");
   };
   // The child just set up is the one using SKYCOT here; the grown-up note appears only while
   // a grown-up session is really open (see setupLanding).
@@ -326,22 +329,12 @@ export function OnboardingSheet({
   };
 
   return (
-    <Sheet
-      open
-      onClose={cancel}
-      icon={meta.icon}
-      {...(step === "who"
-        ? { art: <Mascot pose="hello" size={64} /> }
-        : step === "done"
-          ? { art: <Mascot pose="yay" size={64} /> }
-          : {})}
-      iconTone={step === "autonomy" ? "orange" : step === "family" ? "grey" : "blue"}
+    <WelcomePage
+      art={<Mascot pose={step === "done" ? "yay" : "hello"} size={step === "who" ? 96 : 72} />}
       title={meta.title}
       description={
         step === "autonomy" && childPath ? FAMILY_AUTONOMY_DESCRIPTION : meta.description
       }
-      wide
-      dismissOnBackdrop={false}
       sober={step === "family"}
       actions={
         <>
@@ -367,7 +360,7 @@ export function OnboardingSheet({
                   setSkipWarning(true);
                   return;
                 }
-                finish("skipped");
+                void finish("skipped");
               }}
             >
               {skipWarning ? "Skip without protection" : "Skip for now"}
@@ -442,14 +435,14 @@ export function OnboardingSheet({
       {step === "done" ? (
         <DoneStep
           environmentId={environmentId}
-          {...(childPath ? { onLinkPhone: linkPhone } : {})}
+          {...(childPath ? { onLinkPhone: () => void linkPhone() } : {})}
           {...(childPath
             ? { familyFor: family.profile.childName ?? (draft.childName.trim() || null) }
             : {})}
         />
       ) : null}
       {childPath ? <p className="fm-help">{familyCopy.privacyLine}</p> : null}
-    </Sheet>
+    </WelcomePage>
   );
 }
 

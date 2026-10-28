@@ -180,6 +180,8 @@ export const familyApi = {
     request("POST", "/children/update", { ...input, timeZone: browserZone() }, parseServerStatus),
   removeChild: (input: { readonly childId: string }) =>
     request("POST", "/children/remove", input, parseServerStatus),
+  welcome: (input: { readonly state: "done" | "skipped" }) =>
+    request("POST", "/welcome", input, parseServerStatus),
   look: (input: { readonly look?: string; readonly largerText?: boolean }) =>
     request("POST", "/look", input, parseServerStatus),
   choose: (input: { readonly childId: string }) =>

@@ -1,0 +1,85 @@
+/* ---------------------------------------------------------------------------
+   Welcome: the first-run steps as a page that owns the window. Tokens only (from
+   styles/apple.css), so the Workshop paper, the calm looks and dark mode all follow.
+   --------------------------------------------------------------------------- */
+.fm-welcome {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--fm-bg-window);
+  background-image: radial-gradient(var(--fm-paper-dot) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--fm-label);
+}
+.fm-welcome__column {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 0;
+  outline: none;
+}
+.fm-welcome__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.fm-welcome__art {
+  display: grid;
+  place-items: center;
+}
+.fm-welcome__title {
+  margin: 0;
+  font-family: var(--fm-font-label);
+  font-size: calc(26px * var(--fm-text-scale));
+  font-weight: 700;
+  line-height: 1.2;
+}
+.fm-welcome__description {
+  margin: 0;
+  max-width: 560px;
+  font-size: calc(14px * var(--fm-text-scale));
+  line-height: 1.45;
+  color: var(--fm-label-2);
+}
+.fm-welcome__body {
+  flex: 1 1 auto;
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-welcome__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 24px -24px 0;
+  padding: 14px 24px calc(14px + env(safe-area-inset-bottom));
+  background: var(--fm-bg-window);
+  border-top: 0.5px solid var(--fm-sep);
+}
+.fm-welcome__actions .fm-btn {
+  min-width: 90px;
+}
+html[data-flavour-labels="handwritten"] .fm-welcome__title {
+  font-size: calc(32px * var(--fm-text-scale));
+  font-weight: 400;
+}
+html[data-flavour-labels="handwritten"] [data-sober] .fm-welcome__title {
+  font-family: var(--fm-font);
+}
+@media (max-width: 699px) {
+  .fm-welcome__column {
+    padding: 24px 16px 0;
+  }
+  .fm-welcome__actions {
+    margin: 20px -16px 0;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

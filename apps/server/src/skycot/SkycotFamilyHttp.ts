@@ -604,6 +604,31 @@ const lookRoute = route(
     }),
 );
 
+/**
+ * How the first-run welcome ended on this Mac ("done" or "skipped"). Not a child's to answer, so a
+ * child's own device is refused; any other signed-in client may record it (it changes nothing
+ * about what SKYCOT allows).
+ */
+const welcomeRoute = route(
+  "POST",
+  "/welcome",
+  AuthOrchestrationOperateScope,
+  ({ family, body, who }) =>
+    Effect.gen(function* () {
+      if (who.kind === "child") {
+        return json(
+          { error: "forbidden", message: "A child device cannot change the set-up." },
+          403,
+        );
+      }
+      const state = body["state"];
+      if (state !== "done" && state !== "skipped") {
+        return json({ error: "invalid-request", message: "Say done or skipped." }, 400);
+      }
+      return json(yield* family.setWelcome(state));
+    }),
+);
+
 const limitRefusal = (refusal: SkycotFamilyLimits.FamilyLimitRefusal) =>
   json(
     {
@@ -2134,6 +2159,7 @@ export const layerCore = Layer.mergeAll(
   updateChildRoute,
   removeChildRoute,
   lookRoute,
+  welcomeRoute,
   chooseRoute,
   heartbeatRoute,
   todayRoute,

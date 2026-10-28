@@ -22,6 +22,7 @@ import {
   projectsSummary,
   setupLanding,
   shouldShowOnboarding,
+  showsFamilySetupCard,
   welcomeEntry,
 } from "./onboarding";
 
@@ -69,11 +70,12 @@ describe("canContinue", () => {
 
 describe("shouldShowOnboarding", () => {
   const ready = [{ status: "ready" }] as never;
-  it("shows on the welcome route regardless of state", () => {
+  it("shows on the welcome route regardless of what the engine remembers", () => {
     expect(shouldShowOnboarding({ name: "welcome" }, [], "done", true)).toBe(true);
   });
-  it("stays hidden once done or skipped, and until the engine has answered", () => {
+  it("stays hidden once the engine says done or skipped, and until it has answered", () => {
     expect(shouldShowOnboarding({ name: "home" }, [], "skipped", false)).toBe(false);
+    expect(shouldShowOnboarding({ name: "home" }, [], "done", false)).toBe(false);
     expect(shouldShowOnboarding({ name: "home" }, null, null, false)).toBe(false);
     expect(shouldShowOnboarding({ name: "home" }, [], null, null)).toBe(false);
     expect(shouldShowOnboarding({ name: "home" }, [], null, false)).toBe(true);
@@ -82,8 +84,22 @@ describe("shouldShowOnboarding", () => {
   it("shows on first run even when an assistant is already signed in", () => {
     expect(shouldShowOnboarding({ name: "home" }, ready, null, false)).toBe(true);
   });
-  it("is not offered to a new browser once the Family profile is on", () => {
+  it("is not offered once the Family profile is on", () => {
     expect(shouldShowOnboarding({ name: "home" }, ready, null, true)).toBe(false);
+  });
+});
+
+describe("showsFamilySetupCard", () => {
+  const base = { welcome: "skipped", source: "engine", enabled: false, legacy: false } as const;
+  it("offers the set-up after a skip, until a profile exists", () => {
+    expect(showsFamilySetupCard(base)).toBe(true);
+    expect(showsFamilySetupCard({ ...base, enabled: true })).toBe(false);
+    expect(showsFamilySetupCard({ ...base, legacy: true })).toBe(false);
+  });
+  it("says nothing after done or before the welcome ran, or on the first-paint cache", () => {
+    expect(showsFamilySetupCard({ ...base, welcome: "done" })).toBe(false);
+    expect(showsFamilySetupCard({ ...base, welcome: null })).toBe(false);
+    expect(showsFamilySetupCard({ ...base, source: "cache" })).toBe(false);
   });
 });
 
