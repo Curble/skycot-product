@@ -29,7 +29,7 @@ namespace_id = "7301"
 simple = { limit = 30, period = 60 }
 
 [vars]
-# The iOS app's bundle id. Empty: notifications stay off. The APNs key (Key ID [REMOVED], made
+# The iOS app's bundle id. Empty: notifications stay off. The APNs key (made
 # 24 October 2026) is Production-only and topic-specific (com.skycot.app.ios and its Watch app), so
 # TestFlight and App Store builds get pushes; development builds ("SKYCOT Dev") do not.
 APNS_BUNDLE_ID = "com.skycot.app.ios"
