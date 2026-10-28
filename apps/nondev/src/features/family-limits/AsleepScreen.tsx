@@ -29,6 +29,7 @@ import {
   type MoreTimeAnswer,
 } from "./moreTimeAnswer";
 import { useChildView } from "../../app/useChildView";
+import { grownUpPhonesLinked, moreTimeWays } from "./moreTimeWays";
 
 type Kind = "extra15" | "extra30" | "endBedtime";
 
@@ -52,6 +53,19 @@ export function AsleepScreen({
   useModal(ref, { open: true, onClose: () => setAsking(null), initialFocus: "body" });
   const copy = asleepCopy(state, child.limits, child.name, now, timeZone);
   const childView = useChildView();
+  const view = useFamilyView();
+  const ways = moreTimeWays({
+    me: view.me,
+    grownUpPhonesLinked: grownUpPhonesLinked(view.grownUps, view.devices),
+    childView,
+  });
+  // With both ways on offer the child first picks one; with one way it opens straight away.
+  const [way, setWay] = useState<"code" | "phone" | null>(null);
+  const chosen = ways.length === 1 ? ways[0]! : way;
+  const closeTime = () => {
+    setAsking(null);
+    setWay(null);
+  };
 
   return createPortal(
     <div
@@ -74,14 +88,27 @@ export function AsleepScreen({
           {copy.body}
         </p>
         {asking === "time" ? (
-          childView ? (
-            <AskMoreTimePanel onCancel={() => setAsking(null)} />
-          ) : (
+          chosen === "phone" ? (
+            <AskMoreTimePanel onCancel={closeTime} />
+          ) : chosen === "code" ? (
             <MoreTimePanel
               child={child}
               bedtime={state.reason === "bedtime"}
-              onCancel={() => setAsking(null)}
+              onCancel={closeTime}
             />
+          ) : (
+            <div className="fm-asleep__grownup">
+              <p className="fm-asleep__grownup-lead">Who can give you more time?</p>
+              <div className="fm-asleep__actions">
+                <Button variant="primary" autoFocus onClick={() => setWay("code")}>
+                  A grown-up is here
+                </Button>
+                <Button onClick={() => setWay("phone")}>Ask on their phone</Button>
+                <Button variant="plain" onClick={closeTime}>
+                  Go back
+                </Button>
+              </div>
+            </div>
           )
         ) : asking === "recap" ? (
           <TodayPanel child={child} onDone={() => setAsking(null)} />
