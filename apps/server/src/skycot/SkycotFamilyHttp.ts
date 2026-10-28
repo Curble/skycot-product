@@ -659,21 +659,25 @@ const heartbeatRoute = route(
 );
 
 /** Every child's day (Settings › Family) and who started which conversation. */
-const todayRoute = route("GET", "/today", AuthOrchestrationReadScope, ({ limits, childView }) =>
-  limits.today.pipe(
-    Effect.map((today) =>
-      json(
-        childView === null
-          ? today
-          : {
-              ...today,
-              // A child's own device learns who started their own work only.
-              threads: ownOnly(today.threads, childView.childId),
-              projects: ownOnly(today.projects, childView.childId),
-            },
-      ),
-    ),
-  ),
+const todayRoute = route(
+  "GET",
+  "/today",
+  AuthOrchestrationReadScope,
+  ({ limits, childView, visibility }) =>
+    Effect.gen(function* () {
+      const today = yield* limits.today;
+      if (childView === null) return json(today);
+      // `startIn`: where this child may start new work. The engine owns that rule; the device
+      // obeys it without being told which sibling owns what.
+      const startIn = Option.isSome(visibility) ? yield* visibility.value.startIn(childView) : null;
+      return json({
+        ...today,
+        // A child's own device learns who started their own work only.
+        threads: ownOnly(today.threads, childView.childId),
+        projects: ownOnly(today.projects, childView.childId),
+        ...(startIn === null ? {} : { startIn }),
+      });
+    }),
 );
 
 const ownOnly = (owners: Readonly<Record<string, string>>, childId: string) =>

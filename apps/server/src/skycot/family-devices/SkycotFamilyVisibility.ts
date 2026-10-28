@@ -35,7 +35,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 
-import { childSeesProject } from "@t3tools/skycot-rules/people";
+import { childMayStartInProject, childSeesProject } from "@t3tools/skycot-rules/people";
 import { questionsSpaceOwners } from "@t3tools/skycot-rules/questions";
 
 import * as ServerConfig from "../../config.ts";
@@ -86,6 +86,12 @@ export class SkycotFamilyVisibility extends Context.Service<
       referenced: Referenced,
       mode: VisibilityMode,
     ) => Effect.Effect<boolean>;
+    /**
+     * The project ids this child may START new work in: the ones they may use and own or nobody
+     * owns (the gate's rule, with Questions-space owners read from their folders). The client
+     * obeys this list instead of guessing from owner maps it is not allowed to see in full.
+     */
+    readonly startIn: (view: ChildView) => Effect.Effect<ReadonlyArray<string>>;
     /** The shell's live list, as this session may see it. */
     readonly filterShellStream: <E, R>(
       sessionId: string,
@@ -361,11 +367,25 @@ const makeAt = Effect.fn("SkycotFamilyVisibility.make")(function* (pinsFile: str
       Stream.filter((item): item is OrchestrationV2ArchivedShellStreamItem => item !== null),
     );
 
+  const startIn: SkycotFamilyVisibility["Service"]["startIn"] = Effect.fn(
+    "SkycotFamilyVisibility.startIn",
+  )(function* (view) {
+    const rows = yield* projects.list().pipe(Effect.orElseSucceed(() => []));
+    const ids: string[] = [];
+    for (const row of rows) {
+      const id = String(row.projectId);
+      if (!childMayStartInProject(view.childId, id, view.owners)) continue;
+      if (yield* projectAllowed(view, id)) ids.push(id);
+    }
+    return ids;
+  });
+
   const developerProjectIds = Effect.map(grownUpProjectIds(new Set()), (ids) => [...ids]);
 
   return SkycotFamilyVisibility.of({
     childViewFor,
     developerProjectIds,
+    startIn,
     searchableThreadIds,
     allows,
     filterShellStream,

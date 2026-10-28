@@ -46,6 +46,8 @@ export interface FamilyToday {
   /** Who started each conversation, by thread id. */
   readonly threads: Readonly<Record<string, string>>;
   readonly projects: Readonly<Record<string, string>>;
+  /** Project ids the engine says this child may start new work in; older engines leave it out. */
+  readonly startIn?: ReadonlyArray<string>;
 }
 
 const EMPTY_TODAY: FamilyToday = { children: [], threads: {}, projects: {} };
@@ -97,6 +99,11 @@ export function parseToday(body: unknown): FamilyToday | null {
     }),
     threads: stringMap(input["threads"]),
     projects: stringMap(input["projects"]),
+    ...(Array.isArray(input["startIn"])
+      ? {
+          startIn: input["startIn"].filter((id: unknown): id is string => typeof id === "string"),
+        }
+      : {}),
   };
 }
 

@@ -40,7 +40,7 @@ import { enabledEnvironmentIdsAtom } from "../../state/catalog";
 import { FamilyAutonomyLock } from "../family/FamilyLock";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { isNotTheirsMessage, returnHomeFromOwnershipRefusal } from "../family/ownership";
-import { projectsChildMayStartIn } from "../family-limits/order";
+import { startableProjects } from "../family-limits/order";
 import { noteStartedHere, useLimits } from "../family-limits/store";
 import { familyApi } from "../family/api"; // nondev-seam: skycot-project-memory
 import { describeAutonomyLevel, hardRulesStatement } from "../../plain/autonomy";
@@ -149,7 +149,7 @@ export function NewConversationComposer({
   const questionsAvailable =
     Boolean(config?.scratchWorkspaceRoot) && environmentIds[0] !== undefined;
   const childProjects = childView
-    ? projectsChildMayStartIn(projects, (candidate) => candidate.id, today.projects, childId)
+    ? startableProjects(projects, (candidate) => candidate.id, today, childId)
     : projects;
   const ownProjects = realProjects(childProjects);
   const questionsProject = childProjects.find((candidate) => isQuestionsProject(candidate)) ?? null;

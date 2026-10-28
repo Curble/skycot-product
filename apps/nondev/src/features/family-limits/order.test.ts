@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { projectsChildMayStartIn, projectsForChild, rowsForChild } from "./order";
+import {
+  projectsChildMayStartIn,
+  projectsForChild,
+  rowsForChild,
+  startableProjects,
+} from "./order";
 
 describe("child work visibility", () => {
   it("shows only the selected child's conversations", () => {
@@ -40,5 +45,18 @@ describe("child work visibility", () => {
       { id: "leo" },
     ]);
     expect(projectsChildMayStartIn(projects, (project) => project.id, owners, null)).toEqual([]);
+  });
+
+  it("obeys the engine's startIn list, and falls back to the owner map without it", () => {
+    const projects = [{ id: "family" }, { id: "leo" }, { id: "ava" }];
+    const idOf = (project: { id: string }) => project.id;
+    // The child's owner map is own-only, so the sibling's project looks unowned here.
+    const today = { projects: { leo: "leo" } };
+    expect(
+      startableProjects(projects, idOf, { ...today, startIn: ["family", "leo"] }, "leo"),
+    ).toEqual([{ id: "family" }, { id: "leo" }]);
+    expect(startableProjects(projects, idOf, { ...today, startIn: [] }, "leo")).toEqual([]);
+    expect(startableProjects(projects, idOf, today, "leo")).toEqual(projects);
+    expect(startableProjects(projects, idOf, { ...today, startIn: ["leo"] }, null)).toEqual([]);
   });
 });

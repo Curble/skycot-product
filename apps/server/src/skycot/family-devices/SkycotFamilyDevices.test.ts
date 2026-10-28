@@ -555,6 +555,23 @@ it.layer(NodeServices.layer)("who is who", (it) => {
       ),
   );
 
+  it.effect(
+    "tells a child where new work may start: the family's and their own, not a sibling's",
+    () =>
+      withWorld(({ visibility }) =>
+        Effect.gen(function* () {
+          const view = (yield* visibility.childViewFor("ava-ipad"))!;
+          // Ava has a conversation inside Leo's project, so she can see it, but not start in it.
+          assert.deepEqual([...(yield* visibility.startIn(view))].toSorted(), ["project-family"]);
+          const leoView = (yield* visibility.childViewFor("mac-leo"))!;
+          assert.deepEqual([...(yield* visibility.startIn(leoView))].toSorted(), [
+            "project-family",
+            "project-leo",
+          ]);
+        }),
+      ),
+  );
+
   it.effect("a child's iPad gets its own conversations and projects in the live list", () =>
     withWorld(({ visibility }) =>
       Effect.gen(function* () {

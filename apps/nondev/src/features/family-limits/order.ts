@@ -62,6 +62,28 @@ export function projectsChildMayStartIn<P>(
 }
 
 /**
+ * The projects a child's message box may aim at. The engine's own list (`startIn`) wins, since
+ * only it knows every owner; an older engine without it falls back to the owner map we hold.
+ */
+export function startableProjects<P>(
+  projects: ReadonlyArray<P>,
+  projectIdOf: (project: P) => string,
+  today: {
+    readonly projects: Readonly<Record<string, string>>;
+    readonly startIn?: ReadonlyArray<string> | undefined;
+  },
+  childId: string | null,
+): ReadonlyArray<P> {
+  if (childId === null) return [];
+  const { startIn } = today;
+  if (Array.isArray(startIn)) {
+    const allowed = new Set<string>(startIn);
+    return projects.filter((project) => allowed.has(projectIdOf(project)));
+  }
+  return projectsChildMayStartIn(projects, projectIdOf, today.projects, childId);
+}
+
+/**
  * Conversations the engine has not said who started, among `rows`. A brand-new one is the
  * usual case: the engine records its child as it starts, but this device's copy of who
  * started what was read earlier, so it asks again rather than filing it under someone else.
