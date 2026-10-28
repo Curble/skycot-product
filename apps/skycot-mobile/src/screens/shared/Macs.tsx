@@ -15,6 +15,7 @@ import { useLinks, type Mac } from "../../links/store";
 import { AboutSheet } from "./About";
 import { Page, ParentCodeSheet, Row, RowIcon, Section } from "../../ui/kit";
 import { AboutContent } from "./About";
+import { OpenSourceLicencesSheet } from "./OpenSourceLicences";
 import { useTheme } from "../../ui/theme";
 import { ScanSheet, TypeCodeSheet } from "../link/LinkSheets";
 
@@ -30,7 +31,7 @@ export function MacsScreen() {
   const theme = useTheme();
   const links = useLinks();
   const { byMac } = useMacData();
-  const [sheet, setSheet] = useState<"scan" | "type" | "about" | null>(null);
+  const [sheet, setSheet] = useState<"scan" | "type" | "about" | "licences" | null>(null);
   const [forgetting, setForgetting] = useState<Mac | null>(null);
   const deep = useDeepLink("link");
   const [prefill, setPrefill] = useState<typeof deep.link>(null);
@@ -105,6 +106,12 @@ export function MacsScreen() {
           chevron
           onPress={() => setSheet("about")}
         />
+        <Row
+          leading={<RowIcon name="doc.text" color="#8E8E93" />}
+          title="Open-source licences"
+          chevron
+          onPress={() => setSheet("licences")}
+        />
       </Section>
       <ScanSheet
         visible={sheet === "scan"}
@@ -119,6 +126,7 @@ export function MacsScreen() {
         onLinked={() => setSheet(null)}
       />
       <AboutSheet visible={sheet === "about"} onClose={() => setSheet(null)} />
+      <OpenSourceLicencesSheet visible={sheet === "licences"} onClose={() => setSheet(null)} />
       <ParentCodeSheet
         visible={forgetting !== null}
         title="Forget this Mac?"

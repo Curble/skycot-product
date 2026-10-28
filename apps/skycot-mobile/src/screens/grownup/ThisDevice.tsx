@@ -29,6 +29,7 @@ import {
   haptic,
 } from "../../ui/kit";
 import { useTheme } from "../../ui/theme";
+import { OpenSourceLicencesSheet } from "../shared/OpenSourceLicences";
 import { useWatch } from "../../watch/WatchBridge";
 import { faceIdRowAction, faceIdRowSubtitle } from "./faceIdRow";
 
@@ -64,6 +65,7 @@ export function ThisDeviceScreen() {
   const [settingUpFaceId, setSettingUpFaceId] = useState(false);
   const [faceIdProblem, setFaceIdProblem] = useState<string | null>(null);
   const [faceIdBusy, setFaceIdBusy] = useState(false);
+  const [licences, setLicences] = useState(false);
   const [locked, setLocked] = useState(false);
   const [locking, setLocking] = useState(false);
   const [unlinking, setUnlinking] = useState<Mac | null>(null);
@@ -236,6 +238,12 @@ export function ThisDeviceScreen() {
           chevron
           onPress={() => navigation.navigate("About")}
         />
+        <Row
+          leading={<RowIcon name="doc.text" color={theme.color.accent} />}
+          title="Open-source licences"
+          chevron
+          onPress={() => setLicences(true)}
+        />
         {grownUp.macs.map((mac) => (
           <Row
             key={`unlink:${mac.macId}`}
@@ -306,6 +314,7 @@ export function ThisDeviceScreen() {
         />
         <Button title="Keep it" kind="grey" onPress={() => setUnlinking(null)} />
       </Sheet>
+      <OpenSourceLicencesSheet visible={licences} onClose={() => setLicences(false)} />
     </Page>
   );
 }

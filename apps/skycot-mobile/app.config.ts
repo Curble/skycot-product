@@ -105,10 +105,11 @@ const config: ExpoConfig = {
     entitlements: { "aps-environment": variant.apsEnvironment },
     infoPlist: {
       CFBundleDisplayName: variant.appName,
-      // SKYCOT never asks for the photo library; Expo's file-system module (part of expo itself)
-      // has a photo-copy function, so Apple's scan requires the sentence (upload error 90683).
+      // SKYCOT has no call site for the photo library (audited 29 Oct 2026, C11). The sentence stays
+      // only because Expo's file-system module (part of expo itself) has a photo-copy function, so
+      // Apple's scan requires it (upload error 90683). It says plainly that SKYCOT does not use it.
       NSPhotoLibraryUsageDescription:
-        "SKYCOT never looks through your photos. It only opens a picture you choose to share.",
+        "SKYCOT does not use your photos and never looks through them. Apple asks every app that includes this toolkit to say so.",
       UISupportedInterfaceOrientations: [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationLandscapeLeft",
@@ -124,15 +125,14 @@ const config: ExpoConfig = {
       // address the app opens is one a grown-up linked at the Mac (see src/transport).
       NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true },
       NSLocalNetworkUsageDescription:
-        "SKYCOT finds and talks to your family's Mac on your home Wi-Fi.",
+        "SKYCOT talks to your family's Mac over your home Wi-Fi, so you can see and guide what your child is building. It does not scan for other devices.",
       NSSpeechRecognitionUsageDescription:
-        "Lets you talk instead of type. Your voice is turned into words on this device and is never sent anywhere.",
-      NSMicrophoneUsageDescription:
-        "Lets you talk instead of type, when a grown-up has turned talking on.",
+        "SKYCOT turns your child's spoken idea into words on this device, so they can say it instead of typing it. The words are not sent to Apple or anyone else.",
       NSSupportsLiveActivities: true,
       // Face ID to say yes on a grown-up's phone (modules/skycot-device-key): the Secure Enclave
       // key signs a yes only after Face ID, so iOS asks once whether SKYCOT may use it.
-      NSFaceIDUsageDescription: "SKYCOT uses Face ID so only you can say yes to a request.",
+      NSFaceIDUsageDescription:
+        "SKYCOT uses Face ID so only you can say yes to your child's request. Your face is checked by iPhone and never reaches SKYCOT.",
       // Export compliance (24 October 2026): Mark answered App Store Connect's questions for builds
       // 2 and 3 (standard encryption in addition to Apple's — the relay's Noise tunnel — and not
       // distributed in France), and Apple then said the build needs no encryption documentation and
@@ -157,8 +157,13 @@ const config: ExpoConfig = {
     [
       "expo-camera",
       {
-        cameraPermission: "SKYCOT uses the camera to scan the code on your family's Mac.",
-        microphonePermission: false,
+        cameraPermission:
+          "SKYCOT uses the camera only to scan the code shown on your family's Mac. Nothing is recorded or saved.",
+        // The microphone sentence lives here, not in infoPlist: this plugin writes
+        // NSMicrophoneUsageDescription itself, and `false` made it delete the key, so the
+        // speech button (modules/skycot-speech) would have had no sentence to show (C11, 29 Oct).
+        microphonePermission:
+          "SKYCOT uses the microphone so your child can say their idea out loud instead of typing it, when a grown-up has turned talking on. Nothing is recorded or kept.",
         barcodeScannerEnabled: true,
         recordAudioAndroid: false,
       },

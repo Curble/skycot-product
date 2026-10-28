@@ -14,11 +14,13 @@ import { SAMPLE_ABOUT_TEXT, SAMPLE_ABOUT_TITLE } from "../../sample/sampleCopy";
 import { CHILD_ABOUT_COPY, GROWN_UP_PRIVACY_COPY } from "./aboutCopy";
 import { MIT_LICENCE_T3_CODE, NOT_AFFILIATED } from "../../legal/licences";
 import { Mascot, Row, Section, Sheet, Txt } from "../../ui/kit";
+import { OpenSourceLicencesSheet } from "./OpenSourceLicences";
 
 export function AboutContent() {
   const child = useOptionalChild();
   const sample = useLinks().sample !== null;
   const [licence, setLicence] = useState(false);
+  const [notices, setNotices] = useState(false);
   const version = Constants.expoConfig?.version ?? "0.1.0";
   const sampleNote = sample ? (
     <View style={{ gap: 4, padding: 16 }}>
@@ -65,6 +67,10 @@ export function AboutContent() {
         />
         <Row title="The MIT licence" chevron onPress={() => setLicence(true)} />
       </Section>
+      <Section>
+        <Row title="Open-source licences" chevron onPress={() => setNotices(true)} />
+      </Section>
+      <OpenSourceLicencesSheet visible={notices} onClose={() => setNotices(false)} />
       <Sheet
         visible={licence}
         title="MIT licence"

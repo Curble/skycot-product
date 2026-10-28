@@ -10,6 +10,7 @@
     "config:dev": "APP_VARIANT=development expo config",
     "config:prod": "APP_VARIANT=production expo config",
     "prebuild:ios": "EXPO_NO_GIT_STATUS=1 expo prebuild --clean --platform ios --no-install",
+    "licences:generate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-open-source-notices.ts",
     "test": "vp test run",
     "typecheck": "tsc-rs --noEmit"
   },
