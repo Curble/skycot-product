@@ -8,6 +8,7 @@ import { useSyncExternalStore } from "react";
 
 import { familyApi, request } from "../family/api";
 import { grownUpSessionFor, readGrownUpSessionId } from "../family/grownUpSession";
+import { handoffUnlockProof } from "../family/unlockProof";
 
 import { isSetupOpen } from "../onboarding/onboarding";
 import { applySession, readFamilyView } from "../family/store";
@@ -197,8 +198,11 @@ export function startFreshWindow(
   win: { readonly location: { hash: string; reload: () => void } } = window,
   mark: () => void = markFreshStart,
   hash: string | null = HOME_HREF,
+  parkProof: () => void = () => void handoffUnlockProof(),
 ): void {
   if (hash !== null) win.location.hash = hash;
+  // The reload would drop the grown-up's in-memory proof; park it for the one boot that follows.
+  parkProof();
   mark();
   win.location.reload();
 }
