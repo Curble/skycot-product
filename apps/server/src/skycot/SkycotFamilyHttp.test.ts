@@ -859,6 +859,7 @@ it.layer(
           childName: "Chris",
           child: {
             readingLevel: "little-makers",
+            buildHelp: "builder",
             look: "workshop",
             largerText: false,
             askEachStep: true,
@@ -871,6 +872,7 @@ it.layer(
         children: ReadonlyArray<{
           name: string | null;
           readingLevel: string;
+          buildHelp?: string | null;
           look: string;
           largerText: boolean;
           askEachStep: boolean;
@@ -882,6 +884,7 @@ it.layer(
       assert.equal(chris.readingLevel, "little-makers");
       assert.equal(chris.largerText, false);
       assert.equal(chris.askEachStep, true);
+      assert.equal(chris.buildHelp, "builder");
     }),
   );
 
@@ -890,10 +893,16 @@ it.layer(
       const { send } = yield* makeClient();
       yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: "Ava" } });
       const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
-        children: ReadonlyArray<{ name: string | null; readingLevel: string }>;
+        children: ReadonlyArray<{
+          name: string | null;
+          readingLevel: string;
+          buildHelp?: string | null;
+        }>;
       };
       assert.equal(status.children[0]!.name, "Ava");
       assert.equal(status.children[0]!.readingLevel, "makers");
+      // Nothing chosen: the child follows the age band.
+      assert.isUndefined(status.children[0]!.buildHelp);
     }),
   );
 

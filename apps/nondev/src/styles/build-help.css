@@ -20,6 +20,15 @@
   --fm-bh-line: color-mix(in srgb, var(--fm-label) 16%, transparent);
   padding: 4px 0 2px;
 }
+/* The shared dots, Back button and typed-answer box (starters-picker.css) read these. */
+.fm-words,
+.fm-builder {
+  --fm-picker-fill: var(--fm-bh-fill);
+  --fm-picker-line: var(--fm-bh-line);
+}
+.fm-sheet__title:focus {
+  outline: none;
+}
 .fm-words__stage,
 .fm-builder__stage {
   display: grid;
@@ -54,7 +63,7 @@
   outline-offset: 2px;
 }
 .fm-bh__remember {
-  margin: 0;
+  margin: 10px 0 12px;
   color: var(--fm-label-2);
   font-size: 16px;
   text-align: center;
@@ -66,7 +75,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin: 0;
-  padding: 0;
+  padding: 14px 4px 8px;
   list-style: none;
 }
 .fm-bh__paths > li {
@@ -424,9 +433,17 @@
   color: var(--fm-label-2);
   font-size: 15px;
 }
-.fm-builder .fm-btn,
-.fm-words .fm-btn {
-  min-height: 48px;
+.fm-words .fm-picker__next .fm-btn {
+  min-height: 52px;
+  min-width: 140px;
+  font-size: 18px;
+}
+.fm-words .fm-picker__final-actions .fm-btn,
+.fm-builder .fm-picker__final-actions .fm-btn,
+.fm-builder__bar .fm-btn {
+  min-height: 56px;
+  min-width: 160px;
+  font-size: 20px;
 }
 
 /* Workshop and other sketch themes: taped paper, hard shadows, handwriting. */
