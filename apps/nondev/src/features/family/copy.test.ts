@@ -4,6 +4,7 @@ import brand from "../../../../../nondev/brand.json";
 import { CLI_NAME, PRODUCT_NAME } from "../../brand";
 import {
   actionReason,
+  childDeviceLinkNote,
   approvalScopeCopy,
   codeChangeWarning,
   codeChangedNotice,
@@ -82,5 +83,13 @@ describe("how a child's steps are described (Family)", () => {
     expect(does).toMatch(/familiar add-ons download without another stop/);
     expect(does).toMatch(/Build it/);
     expect(does).toMatch(/asked before each step/);
+  });
+});
+
+describe("childDeviceLinkNote", () => {
+  it("tells a grown-up in one sentence-pair that the phone app is for grown-ups", () => {
+    expect(childDeviceLinkNote).toContain("is for grown-ups");
+    expect(childDeviceLinkNote).toContain("keeps making things on this Mac");
+    expect(childDeviceLinkNote).not.toMatch(/for kids/iu);
   });
 });

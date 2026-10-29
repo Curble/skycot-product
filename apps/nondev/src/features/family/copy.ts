@@ -5,6 +5,13 @@ import type { FamilyAction } from "./family";
 
 export const FAMILY_LABEL = "Family profile";
 
+/**
+ * Shown in the "Link a phone or iPad" sheet when a child is picked. Version 1 of the phone app is
+ * a grown-up companion (29 Oct 2026); the link still works, so a child's device only shows a note.
+ */
+export const childDeviceLinkNote =
+  "This version of SKYCOT on iPhone and iPad is for grown-ups. A device linked as a child's shows a short note, and the child keeps making things on this Mac.";
+
 export const familyCopy = {
   title: FAMILY_LABEL,
   summary: "A safer setup for a child",

@@ -20,6 +20,8 @@ import { AppState } from "react-native";
 import type { RelayHome } from "@t3tools/skycot-relay/client/home";
 
 import { SkycotWatch } from "../../modules/skycot-watch";
+import { mayRegisterForPush } from "../app/childMode";
+import { CHILD_MODE_ENABLED } from "../app/childModeFlag";
 import { useLinks } from "../links/store";
 import {
   homesToRegister,
@@ -86,7 +88,8 @@ export function PushRegistration(): null {
 
   useEffect(() => {
     const native = SkycotWatch;
-    if (native === null || !ready || mode === "unlinked" || homes.length === 0) return;
+    if (native === null || !ready || homes.length === 0) return;
+    if (!mayRegisterForPush(mode, CHILD_MODE_ENABLED)) return;
     // One pass at a time, so the same token is never handed to a Mac twice at once.
     running.current = running.current.then(async () => {
       // A child's device asks here; a grown-up's phone asks once its requests have loaded

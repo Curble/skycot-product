@@ -1,31 +1,28 @@
 /**
  * SKYCOT for iPhone and iPad. One app: until a grown-up links it at the family's Mac it only
- * says how; once linked, the Mac's link decides whether it is a child's device (child mode,
- * Workshop look) or a grown-up's phone (grown-up mode). There is no account and no cloud.
+ * says how; once linked, the Mac's link decides whether it is a grown-up's phone (grown-up
+ * mode) or a child's device. Version 1 is a grown-up companion: child mode (Workshop look) is
+ * behind the SKYCOT_MOBILE_CHILD_MODE build flag, off for store builds, and a child's device
+ * shows a friendly note instead. There is no account and no cloud.
  */
-import { StatusBar, View } from "react-native";
+import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { ChildApp } from "./app/child/ChildApp";
-import { ChildProvider, useChild } from "./app/child/ChildContext";
+import { rootChoice } from "./app/childMode";
+import { CHILD_MODE_ENABLED } from "./app/childModeFlag";
 import { GrownUpApp } from "./app/grownup/GrownUpApp";
 import { MacDataProvider, useMacData } from "./data/MacData";
 import { FaceIdProvider } from "./faceid/FaceIdProvider";
 import { DeepLinkProvider } from "./links/deepLinks";
 import { LinksProvider, useLinks } from "./links/store";
 import { WelcomeScreen } from "./screens/link/WelcomeScreen";
+import { ChildDeviceNote } from "./screens/shared/ChildDeviceNote";
 import { SignedOut } from "./screens/shared/SignedOut";
 import { Spinner } from "./ui/kit";
 import { SampleFrame } from "./sample/SampleBanner";
 import { PushRegistration } from "./push/PushRegistration";
 import { WatchBridgeProvider } from "./watch/WatchBridge";
-import { ThemeProvider, lookForChild, useTheme } from "./ui/theme";
-
-function ChildLook(props: { readonly children: React.ReactNode }) {
-  const child = useChild();
-  const look = lookForChild(child.macs.map(child.childOn).find((entry) => entry !== null)?.look);
-  return <ThemeProvider look={look}>{props.children}</ThemeProvider>;
-}
+import { ThemeProvider, useTheme } from "./ui/theme";
 
 function Bar() {
   const theme = useTheme();
@@ -34,7 +31,7 @@ function Bar() {
 
 function Root() {
   const links = useLinks();
-  const { byMac, touched } = useMacData();
+  const { byMac } = useMacData();
   if (!links.ready) return <Spinner />;
   if (links.mode === "unlinked") {
     return (
@@ -53,32 +50,28 @@ function Root() {
       </ThemeProvider>
     );
   }
-  if (links.mode === "child") {
+  const choice = rootChoice(links.mode, CHILD_MODE_ENABLED);
+  if (choice === "child-note") {
     return (
-      <ChildProvider>
-        <ChildLook>
-          <Bar />
-          <TouchArea onTouch={touched}>
-            <ChildApp />
-          </TouchArea>
-        </ChildLook>
-      </ChildProvider>
+      <ThemeProvider look="apple">
+        <Bar />
+        <ChildDeviceNote macs={links.macs} />
+      </ThemeProvider>
     );
+  }
+  if (choice === "child") {
+    // Loaded only when child mode is built in, so a grown-up-only build never starts the speech
+    // module or any child screen.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ChildRoot = (require("./app/child/ChildRoot") as typeof import("./app/child/ChildRoot"))
+      .default;
+    return <ChildRoot />;
   }
   return (
     <ThemeProvider look="apple">
       <Bar />
       <GrownUpApp />
     </ThemeProvider>
-  );
-}
-
-/** Notes a touch for the heartbeat (today's minutes count active use only, as on the Mac). */
-function TouchArea(props: { readonly onTouch: () => void; readonly children: React.ReactNode }) {
-  return (
-    <View style={{ flex: 1 }} onTouchStart={props.onTouch}>
-      {props.children}
-    </View>
   );
 }
 

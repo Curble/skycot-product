@@ -50,6 +50,25 @@ const VARIANT_CONFIG = {
 
 const variant = VARIANT_CONFIG[APP_VARIANT];
 
+/**
+ * Child mode (a child's own linked device, voice typing, fridge, stickers) is deferred, not
+ * deleted: version 1 of the phone app is a grown-up companion (decision 29 Oct 2026). It is
+ * built in only when SKYCOT_MOBILE_CHILD_MODE is 1/true/on. Store and TestFlight builds
+ * (production) leave it unset, so it is OFF. The `development` variant defaults to ON for
+ * internal testing only; SKYCOT_MOBILE_CHILD_MODE=0 turns it off there too. When it is OFF the
+ * speech and microphone purpose strings are not written into Info.plist at all.
+ */
+export function childModeBuilt(
+  env: Readonly<Record<string, string | undefined>>,
+  appVariant: AppVariant,
+): boolean {
+  const raw = env.SKYCOT_MOBILE_CHILD_MODE?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return appVariant === "development";
+  return raw === "1" || raw === "true" || raw === "on";
+}
+
+const CHILD_MODE = childModeBuilt(process.env, APP_VARIANT);
+
 const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
   "expo-widgets",
   {
@@ -126,8 +145,13 @@ const config: ExpoConfig = {
       NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true },
       NSLocalNetworkUsageDescription:
         "SKYCOT talks to your family's Mac over your home Wi-Fi, so you can see and guide what your child is building. It does not scan for other devices.",
-      NSSpeechRecognitionUsageDescription:
-        "SKYCOT turns your child's spoken idea into words on this device, so they can say it instead of typing it. The words are not sent to Apple or anyone else.",
+      // Voice typing belongs to child mode: the sentence exists only when that is built in.
+      ...(CHILD_MODE
+        ? {
+            NSSpeechRecognitionUsageDescription:
+              "SKYCOT turns your child's spoken idea into words on this device, so they can say it instead of typing it. The words are not sent to Apple or anyone else.",
+          }
+        : {}),
       NSSupportsLiveActivities: true,
       // Face ID to say yes on a grown-up's phone (modules/skycot-device-key): the Secure Enclave
       // key signs a yes only after Face ID, so iOS asks once whether SKYCOT may use it.
@@ -162,8 +186,11 @@ const config: ExpoConfig = {
         // The microphone sentence lives here, not in infoPlist: this plugin writes
         // NSMicrophoneUsageDescription itself, and `false` made it delete the key, so the
         // speech button (modules/skycot-speech) would have had no sentence to show (C11, 29 Oct).
-        microphonePermission:
-          "SKYCOT uses the microphone so your child can say their idea out loud instead of typing it, when a grown-up has turned talking on. Nothing is recorded or kept.",
+        // Child mode only. `false` makes the plugin leave NSMicrophoneUsageDescription out, which
+        // is right when no screen can start the microphone (version 1, grown-up mode).
+        microphonePermission: CHILD_MODE
+          ? "SKYCOT uses the microphone so your child can say their idea out loud instead of typing it, when a grown-up has turned talking on. Nothing is recorded or kept."
+          : false,
         barcodeScannerEnabled: true,
         recordAudioAndroid: false,
       },
@@ -193,6 +220,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+    childMode: CHILD_MODE,
     upstreamCredit: "Based on T3 Code (MIT) by T3 Tools Inc.",
     copyright: "Copyright © 2026 Curble Pty Ltd, trading as SKYCOT.",
   },

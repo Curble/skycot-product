@@ -26,6 +26,7 @@ import { familyApi } from "./api";
 import { AVATAR_CHARACTERS, CHARACTER_NAMES } from "./characters";
 import { ChildAvatar } from "./ChildAvatar";
 import { AVATAR_POSES, childLabel, POSE_NAMES, type ChildAvatar as Avatar } from "./children";
+import { childDeviceLinkNote } from "./copy";
 import { useFamily } from "./FamilyProvider";
 import {
   grownUpLabel,
@@ -615,6 +616,7 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
           onChange={(event) => setName(event.currentTarget.value)}
         />
         {chosen ? <p className="fm-help">{deviceKindSummary(chosen.kind)}</p> : null}
+        {chosen?.kind === "child" ? <p className="fm-help">{childDeviceLinkNote}</p> : null}
         {problem ? <Banner tone="warning">{problem}</Banner> : null}
       </div>
     </Sheet>

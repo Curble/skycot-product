@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useDeepLink } from "../../links/deepLinks";
 import { useLinks } from "../../links/store";
+import { CHILD_MODE_ENABLED } from "../../app/childModeFlag";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -62,7 +63,14 @@ export function WelcomeScreen(props: { readonly onLinked?: (outcome: LinkOutcome
             }}
           >
             <Step n={1} text="On the Mac, open SKYCOT › Settings › Family › Phones and iPads." />
-            <Step n={2} text="Choose Link…, then who this device is for: a child, or a grown-up." />
+            <Step
+              n={2}
+              text={
+                CHILD_MODE_ENABLED
+                  ? "Choose Link…, then who this device is for: a child, or a grown-up."
+                  : "Choose Link…, then pick yourself, as a grown-up."
+              }
+            />
             <Step n={3} text="Scan the QR code it shows, or type its twelve-letter code." />
           </View>
           <Button title="Scan the code" icon="qrcode.viewfinder" onPress={() => setSheet("scan")} />

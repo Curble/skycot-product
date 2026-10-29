@@ -168,3 +168,7 @@ App Store Connect app record for `com.skycot.app.ios` (and `.dev` for TestFlight
 and an APNs key (shared with the relay), the associated domain for passkeys, and the signing set-up
 for team `3F72LCWGG2`, and the Watch app's id `com.skycot.app.ios.watchkitapp` (signed with the
 same team; App Attest for the Watch's key is optional, later). None of this was done here.
+
+## Build flag: child mode (SKYCOT_MOBILE_CHILD_MODE)
+
+Version 1 is a grown-up companion. Child mode is built in only when `SKYCOT_MOBILE_CHILD_MODE=1`. It is OFF for `production` (App Store, TestFlight) and ON by default for `APP_VARIANT=development` (internal testing; set `SKYCOT_MOBILE_CHILD_MODE=0` to test the grown-up-only build). With it off, the speech and microphone purpose strings are not in Info.plist. See `docs/nondev/autopilot/briefs/2026-10-29-phone-grown-up-only.md`.
