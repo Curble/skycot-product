@@ -21,6 +21,10 @@ import { shortTime } from "./time";
 import { useChildView } from "../../../app/useChildView";
 import { childErrors } from "../../../plain/copy";
 import { restCopy } from "../restCopy";
+import { Button } from "../../../ui/Button";
+import { useState } from "react";
+import { useDecisionDispatcher } from "./dispatch";
+import { retryTextFor } from "./retryText";
 
 type UserMessage = Extract<OrchestrationV2TurnItem, { type: "user_message" }>;
 type AssistantMessage = Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>;
@@ -140,6 +144,23 @@ function FailureNote({
   const childView = useChildView();
   const childRest = childView && item.failure.class === "usage_limit";
   const retry = item.retry;
+  // A real "Try again" for the child: it sends their last message again.
+  const dispatch = useDecisionDispatcher({
+    environmentId: context.environmentId,
+    threadId: context.threadId,
+    shell: context.shell,
+  });
+  const [trying, setTrying] = useState(false);
+  const [retryProblem, setRetryProblem] = useState<string | null>(null);
+  const retryText = childView && !childRest ? retryTextFor(context.items, context.index) : null;
+  const tryAgain = async () => {
+    if (retryText === null || trying) return;
+    setTrying(true);
+    setRetryProblem(null);
+    const problem = await dispatch({ type: "send-message", text: retryText }, { text: retryText });
+    setTrying(false);
+    if (problem !== null) setRetryProblem(problem);
+  };
   const retryLine =
     retry && retry.maxAttempts !== null
       ? `Trying again (attempt ${retry.attempt} of ${retry.maxAttempts}).`
@@ -181,6 +202,12 @@ function FailureNote({
                   <code>{narration.technical}</code>
                 </pre>
               </Disclosure>
+            ) : null}
+            {retryProblem !== null ? <p>{retryProblem}</p> : null}
+            {retryText !== null ? (
+              <Button variant="primary" onClick={() => void tryAgain()} disabled={trying}>
+                Try again
+              </Button>
             ) : null}
           </CardBody>
         </Card>

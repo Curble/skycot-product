@@ -466,6 +466,73 @@ it.effect("keeps a named project and reports why when Git cannot commit", () =>
   ),
 );
 
+const withSkycotPolicy = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const saved = process.env.T3CODE_SKYCOT_POLICY;
+      process.env.T3CODE_SKYCOT_POLICY = "1";
+      return saved;
+    }),
+    () => effect,
+    (saved) =>
+      Effect.sync(() => {
+        if (saved === undefined) delete process.env.T3CODE_SKYCOT_POLICY;
+        else process.env.T3CODE_SKYCOT_POLICY = saved;
+      }),
+  );
+
+it.effect("SKYCOT commits a starter project with a fallback identity when the Mac has none", () =>
+  withScratch(({ baseDir }) =>
+    withGitEnv(
+      {},
+      withSkycotPolicy(
+        Effect.gen(function* () {
+          const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
+          const fileSystem = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* fileSystem.writeFileString(
+            path.join(baseDir, "no-identity.gitconfig"),
+            "[user]\n\tuseConfigOnly = true\n",
+          );
+          process.env.GIT_CONFIG_GLOBAL = path.join(baseDir, "no-identity.gitconfig");
+
+          const result = yield* folders.createNamedProject({ name: "My first project" });
+
+          assert.isUndefined(result.commitError);
+          assert.equal(
+            yield* gitOutput(result.workspaceRoot, ["log", "-1", "--format=%an <%ae>"]),
+            "SKYCOT <skycot@localhost>",
+          );
+          // Nothing is written to anyone's Git config.
+          assert.equal(
+            yield* fileSystem.readFileString(path.join(baseDir, "no-identity.gitconfig")),
+            "[user]\n\tuseConfigOnly = true\n",
+          );
+        }),
+      ),
+    ),
+  ),
+);
+
+it.effect("SKYCOT keeps the identity a Mac already has", () =>
+  withScratch(() =>
+    withGitEnv(
+      TEST_IDENTITY,
+      withSkycotPolicy(
+        Effect.gen(function* () {
+          const folders = yield* ManagedProjectFolders.ManagedProjectFolders;
+          const result = yield* folders.createNamedProject({ name: "Has Identity" });
+          assert.isUndefined(result.commitError);
+          assert.equal(
+            yield* gitOutput(result.workspaceRoot, ["log", "-1", "--format=%an <%ae>"]),
+            "Test <test@test.com>",
+          );
+        }),
+      ),
+    ),
+  ),
+);
+
 it.effect("keeps a folder that another project owns when the create conflicts", () =>
   withScratch(({ baseDir }) =>
     withGitEnv(

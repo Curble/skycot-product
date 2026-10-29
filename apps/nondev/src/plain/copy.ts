@@ -220,7 +220,7 @@ export const errors = {
 
 export const childErrors = {
   needsRest: "Sam needs a short rest. Your work is safe. You can look at your page while you wait.",
-  gotStuck: "Sam got stuck. Press Try again.",
+  gotStuck: "Sam got stuck. Press Try again. If it keeps happening, ask a grown-up.",
   allowance: "Sam needs a short rest. Your work is safe. You can look at your page while you wait.",
   connection: "SKYCOT can't wake up right now. Ask a grown-up to check the Mac is on.",
 } as const;

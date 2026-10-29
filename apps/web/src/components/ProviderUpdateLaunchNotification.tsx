@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { DownloadIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { APP_BASE_NAME } from "~/branding"; // nondev-seam: skycot-no-provider-update-prompt
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { useEnvironments } from "~/state/environments";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
@@ -15,6 +16,7 @@ import {
   localEnvironmentUpdateNotificationKey,
 } from "./ProviderUpdateLaunchNotification.logic";
 import { ProviderUpdatePrimaryNotification } from "./ProviderUpdatePrimaryNotification";
+import { shouldShowProviderUpdatePrompt } from "./skycotProviderUpdatePrompt";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 
 function useHasLocalSecondaryEnvironment(): boolean {
@@ -25,6 +27,15 @@ function useHasLocalSecondaryEnvironment(): boolean {
 }
 
 export function ProviderUpdateLaunchNotification() {
+  // nondev-seam: skycot-no-provider-update-prompt
+  // SKYCOT installs and updates approved add-ons through its own family flow, so a parent never
+  // sees a vendor "Updates Available" pop-up. Settings > Providers still updates by hand.
+  // The brand is fixed for the life of the build, so the hook order never changes.
+  if (!shouldShowProviderUpdatePrompt(APP_BASE_NAME)) return null;
+  return <ProviderUpdateLaunchPrompt />;
+}
+
+function ProviderUpdateLaunchPrompt() {
   const hasLocalSecondary = useHasLocalSecondaryEnvironment();
 
   return hasLocalSecondary ? (

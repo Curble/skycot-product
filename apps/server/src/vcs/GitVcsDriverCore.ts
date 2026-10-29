@@ -49,6 +49,7 @@ import {
   parseRemoteRefWithRemoteNames,
 } from "../git/remoteRefs.ts";
 import * as ServerConfig from "../config.ts";
+import { fallbackIdentityArgs } from "../skycot/gitIdentity.ts"; // nondev-seam: skycot-git-identity
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const gitProcesses = Semaphore.makeUnsafe(8);
@@ -2453,7 +2454,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     if (options?.stage !== undefined) {
       yield* stageCommitChanges(cwd, options.stage.filePaths);
     }
-    const args = ["commit", "-m", subject];
+    // nondev-seam: skycot-git-identity
+    const identity = yield* fallbackIdentityArgs((probe) =>
+      executeGit("GitVcsDriver.commit.identity", cwd, probe, { allowNonZeroExit: true }).pipe(
+        Effect.map((result) => ({ exitCode: Number(result.exitCode), stdout: result.stdout })),
+      ),
+    );
+    const args = [...identity, "commit", "-m", subject];
     const trimmedBody = body.trim();
     if (trimmedBody.length > 0) {
       args.push("-m", trimmedBody);

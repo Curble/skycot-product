@@ -26,6 +26,7 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectService from "./ProjectService.ts";
 import * as SkycotQuestions from "../skycot/questions/SkycotQuestions.ts"; // nondev-seam: skycot-questions-history
 import * as SkycotProjectMemory from "../skycot/SkycotProjectMemory.ts"; // nondev-seam: skycot-project-memory
+import { fallbackIdentityArgs } from "../skycot/gitIdentity.ts"; // nondev-seam: skycot-git-identity
 
 export class ScratchUnavailableError extends Schema.TaggedError<ScratchUnavailableError>()(
   "ScratchUnavailableError",
@@ -430,11 +431,25 @@ const make = Effect.gen(function* () {
       args: ["add", "--force", "--", "README.md", "assets/icon.svg"],
       timeoutMs: 10_000,
     });
+    // nondev-seam: skycot-git-identity
+    const identity = yield* fallbackIdentityArgs((args) =>
+      git
+        .execute({
+          operation: "ManagedProjectFolders.identity",
+          cwd,
+          args,
+          allowNonZeroExit: true,
+          timeoutMs: 10_000,
+        })
+        .pipe(
+          Effect.map((result) => ({ exitCode: Number(result.exitCode), stdout: result.stdout })),
+        ),
+    );
     return yield* git
       .execute({
         operation: "ManagedProjectFolders.commit",
         cwd,
-        args: ["commit", "--message", "Initial commit"],
+        args: [...identity, "commit", "--message", "Initial commit"],
         allowNonZeroExit: true,
         timeoutMs: 30_000,
       })
