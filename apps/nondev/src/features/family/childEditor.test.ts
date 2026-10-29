@@ -17,6 +17,17 @@ describe("the child editor", () => {
     expect(draft.avatar).toEqual({ kind: "initial", color: "sun" });
     expect(draft.bedtimeOn).toBe(false);
     expect(draft.readingLevel).toBe("makers");
+    expect(draft.buildHelp).toBeNull();
+  });
+
+  it("saves the build-help start: a level, or null to match the age band", () => {
+    const child = parseChild({ id: "a", name: "Ava", buildHelp: "builder" })!;
+    expect(child.buildHelp).toBe("builder");
+    expect(parseChild({ id: "a", buildHelp: "everything" })?.buildHelp).toBeNull();
+    expect(parseChild({ id: "a" })?.buildHelp).toBeNull();
+    expect(draftFor(child, 0).buildHelp).toBe("builder");
+    expect(patchFor(draftFor(child, 0)).buildHelp).toBe("builder");
+    expect(patchFor({ ...draftFor(child, 0), buildHelp: null }).buildHelp).toBeNull();
   });
 
   it("saves exactly what the sheet shows", () => {

@@ -32,9 +32,11 @@ import {
   DEFAULT_READING_LEVEL,
   POSE_NAMES,
   type ChildAvatar as Avatar,
+  type BuildHelp,
   type FamilyChild,
   type ReadingLevel,
 } from "./children";
+import { BUILD_HELP_INFO } from "../starters/buildHelp";
 import { addChild, removeChild, updateChild } from "./store";
 
 export interface ChildDraft {
@@ -53,6 +55,8 @@ export interface ChildDraft {
   /** "Ask [child] before each step": off by default (safe steps run by themselves). */
   readonly askEachStep: boolean;
   readonly readingLevel: ReadingLevel;
+  /** Where build help starts; null follows the age band. */
+  readonly buildHelp: BuildHelp | null;
 }
 
 export function draftFor(child: FamilyChild | null, siblings: number): ChildDraft {
@@ -76,6 +80,7 @@ export function draftFor(child: FamilyChild | null, siblings: number): ChildDraf
     keepAllowancePercent: limits.keepAllowancePercent,
     askEachStep: child?.askEachStep ?? false,
     readingLevel: child?.readingLevel ?? DEFAULT_READING_LEVEL,
+    buildHelp: child?.buildHelp ?? null,
   };
 }
 
@@ -95,6 +100,7 @@ export function patchFor(draft: ChildDraft): ChildPatch {
     },
     askEachStep: draft.askEachStep,
     readingLevel: draft.readingLevel,
+    buildHelp: draft.buildHelp,
   };
 }
 
@@ -355,6 +361,46 @@ export function ChildEditorSheet({
             </select>
           </label>
         </section>
+        <section className="fm-child-editor__section">
+          <h3>Build help starts at</h3>
+          <div
+            className="fm-child-editor__levels"
+            role="radiogroup"
+            aria-label={`Build help starts at, for ${who}`}
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={draft.buildHelp === null}
+              className="fm-child-editor__level"
+              onClick={() => change({ buildHelp: null })}
+            >
+              <b>Match their age band</b>
+              <small>
+                Starts where {who}&apos;s age band suggests, until {who} picks a way.
+              </small>
+            </button>
+            {BUILD_HELP_INFO.map((info) => (
+              <button
+                key={info.level}
+                type="button"
+                role="radio"
+                aria-checked={draft.buildHelp === info.level}
+                className="fm-child-editor__level"
+                onClick={() => change({ buildHelp: info.level })}
+              >
+                <b>{info.name}</b>
+                <small>{info.grownUpLine}</small>
+              </button>
+            ))}
+          </div>
+          <p className="fm-help">
+            The first time {who} taps a card they pick a way from three cards; this decides which
+            one says &ldquo;Good start&rdquo;. Sam is never told about this setting. It only changes
+            what the picker looks like.
+          </p>
+        </section>
+
         <section className="fm-child-editor__section">
           <h3>Steps</h3>
           <div className="fm-child-editor__row">

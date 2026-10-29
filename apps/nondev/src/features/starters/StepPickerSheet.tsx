@@ -1,24 +1,16 @@
-// The step picker: what a "Little maker" gets when they tap a starter card that has
-// [blanks]. One big question at a time with eight picture tiles, plus two cards that are
+// The step picker, the Pictures level of build help: what a child on Pictures (a Little maker
+// by default) gets when they tap a starter card that has [blanks]. One big question at a time with eight picture tiles, plus two cards that are
 // always there: "Surprise me" (a dice that picks a tile) and "Type it" (a keyboard for their
 // own words). At the end they see the finished sentence and press "Make it!". Nothing is sent
 // from here: Make it! hands the sentence to the composer exactly as a tap on a card does.
 import { ArrowLeft, Dices, Keyboard } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { useCrew } from "../../themes/useCrew";
-import { useFamily } from "../family/FamilyProvider";
-import {
-  choicesFor,
-  fillBlanks,
-  hasPicker,
-  pickRandom,
-  shownLabel,
-  type BlankChoices,
-} from "./choices";
-import { seedFor, type ComposerSeed } from "./StarterCards";
+import { choicesFor, fillBlanks, pickRandom, shownLabel, type BlankChoices } from "./choices";
+import { ChangeHowButton, SamArt, TypeMyselfLink } from "./BuildHelpParts";
 import type { Starter } from "./starters";
 
 /** How long a chosen tile stays in view before the next question slides in. */
@@ -36,11 +28,17 @@ export function StepPickerSheet({
   starter,
   onClose,
   onMake,
+  onChangeHow,
+  onTypeMyself,
   random = Math.random,
 }: {
   readonly starter: Starter;
   readonly onClose: () => void;
   readonly onMake: (text: string) => void;
+  /** Reopens the three-card chooser; the header shows "Change how I build" when given. */
+  readonly onChangeHow?: () => void;
+  /** Skips the picker; the foot shows "Just type it myself" when given. */
+  readonly onTypeMyself?: () => void;
   /** Injectable so the dice is testable; returns [0, 1). */
   readonly random?: () => number;
 }) {
@@ -112,7 +110,9 @@ export function StepPickerSheet({
         wide
         onClose={onClose}
         title={`Here's what ${crewName} will make`}
-        initialFocus="first"
+        art={onChangeHow ? <SamArt /> : undefined}
+        initialFocus="title"
+        headerAction={onChangeHow ? <ChangeHowButton onClick={onChangeHow} /> : undefined}
         actions={
           <Button variant="quiet" onClick={onClose}>
             Close
@@ -144,6 +144,7 @@ export function StepPickerSheet({
                 Change my mind
               </Button>
             </div>
+            {onTypeMyself ? <TypeMyselfLink onClick={onTypeMyself} /> : null}
           </div>
         </div>
       </Sheet>
@@ -187,7 +188,9 @@ export function StepPickerSheet({
       wide
       onClose={onClose}
       title={step.question}
-      initialFocus="first"
+      art={onChangeHow ? <SamArt /> : undefined}
+      initialFocus="title"
+      headerAction={onChangeHow ? <ChangeHowButton onClick={onChangeHow} /> : undefined}
       actions={
         <Button variant="quiet" onClick={onClose}>
           Close
@@ -295,6 +298,7 @@ export function StepPickerSheet({
               </Button>
             </div>
           ) : null}
+          {onTypeMyself ? <TypeMyselfLink onClick={onTypeMyself} /> : null}
         </div>
       </div>
     </Sheet>
@@ -319,48 +323,4 @@ function Dots({ total, index }: { readonly total: number; readonly index: number
       ))}
     </div>
   );
-}
-
-/**
- * Card taps, for Home and an empty conversation. A Little maker's card with [blanks] opens
- * the step picker; every other tap fills the box as before. `sheet` goes in the screen.
- * Make it! hands over the finished sentence with `sendNow` and closes the picker; the two
- * composers then send it exactly as if Send were pressed (and keep it in the box if refused).
- */
-export function useStarterPick(setSeed: (seed: ComposerSeed) => void): {
-  readonly pick: (starter: Starter) => void;
-  readonly sheet: ReactNode;
-} {
-  const family = useFamily();
-  const child = family.profile.children.find((entry) => entry.id === family.profile.currentChildId);
-  const little = child?.readingLevel === "little-makers";
-  const [open, setOpen] = useState<Starter | null>(null);
-  const pick = (starter: Starter) => {
-    const askPicture = () => {
-      // The file picker only opens inside the tap itself (a browser needs a user gesture).
-      if (starter.kind === "picture") {
-        document.querySelector<HTMLInputElement>(".fm-composer__file")?.click();
-      }
-    };
-    if (little && starter.audience === "kids" && hasPicker(starter.id)) {
-      askPicture();
-      setOpen(starter);
-      return;
-    }
-    setSeed(seedFor(starter));
-    askPicture();
-  };
-  const sheet =
-    open === null ? null : (
-      <StepPickerSheet
-        key={open.id}
-        starter={open}
-        onClose={() => setOpen(null)}
-        onMake={(text) => {
-          setSeed({ ...seedFor(open), text, sendNow: true });
-          setOpen(null);
-        }}
-      />
-    );
-  return { pick, sheet };
 }

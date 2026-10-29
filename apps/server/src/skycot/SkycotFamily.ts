@@ -240,6 +240,15 @@ export const READING_LEVELS = ["little-makers", "makers", "big-makers"] as const
 export type ReadingLevel = (typeof READING_LEVELS)[number];
 export const DEFAULT_READING_LEVEL: ReadingLevel = "makers";
 
+/**
+ * How much help the child gets building from a starter card: "pictures" (tap a picture),
+ * "words" (tap word chips, the sentence builds as they go) or "builder" (pick the parts, then
+ * edit the whole sentence). Missing or null means "follow the age band" (`readingLevel`).
+ * It only changes what the picker looks like; the assistant is never told about it.
+ */
+export const BUILD_HELP_LEVELS = ["pictures", "words", "builder"] as const;
+export type BuildHelp = (typeof BUILD_HELP_LEVELS)[number];
+
 const Child = Schema.Struct({
   id: Schema.String,
   name: Schema.NullOr(Schema.String),
@@ -257,6 +266,8 @@ const Child = Schema.Struct({
    */
   askEachStep: Schema.optionalKey(Schema.Boolean),
   readingLevel: Schema.optionalKey(Schema.Literals(READING_LEVELS)),
+  /** Where build help starts for this child; null or missing follows the age band. */
+  buildHelp: Schema.optionalKey(Schema.NullOr(Schema.Literals(BUILD_HELP_LEVELS))),
   createdAt: Schema.String,
 });
 export type FamilyChild = typeof Child.Type;
@@ -595,6 +606,8 @@ export interface ChildInput {
   readonly limits?: unknown;
   readonly askEachStep?: unknown;
   readonly readingLevel?: unknown;
+  /** One of `BUILD_HELP_LEVELS`, or null to follow the age band; anything else keeps the old value. */
+  readonly buildHelp?: unknown;
 }
 
 export type FamilyFailureReason =
@@ -1232,7 +1245,20 @@ export function applyChildInput(child: FamilyChild, input: ChildInput): FamilyCh
     readingLevel: (READING_LEVELS as ReadonlyArray<unknown>).includes(input.readingLevel)
       ? (input.readingLevel as ReadingLevel)
       : (child.readingLevel ?? DEFAULT_READING_LEVEL),
+    ...cleanBuildHelp(input.buildHelp, child.buildHelp),
   };
+}
+
+/** The `buildHelp` field to merge in: a valid level, null (follow the age band), or no change. */
+function cleanBuildHelp(
+  value: unknown,
+  previous: BuildHelp | null | undefined,
+): { readonly buildHelp?: BuildHelp | null } {
+  if (value === null) return { buildHelp: null };
+  if ((BUILD_HELP_LEVELS as ReadonlyArray<unknown>).includes(value)) {
+    return { buildHelp: value as BuildHelp };
+  }
+  return previous === undefined ? {} : { buildHelp: previous };
 }
 
 function newChild(input: ChildInput, siblings: number, createdAt: string): FamilyChild {

@@ -21,7 +21,9 @@ interface SheetProps {
   readonly note?: ReactNode;
   readonly wide?: boolean;
   /** Where focus lands on open. "body" focuses the sheet itself so no button is pre-chosen. */
-  readonly initialFocus?: "body" | "first";
+  readonly initialFocus?: "body" | "first" | "title";
+  /** A control at the right of the header (a level switch, say), beside the title. */
+  readonly headerAction?: ReactNode;
   readonly dismissOnBackdrop?: boolean;
   /** A risk moment (undo, go live): playful themes switch their decoration off inside. */
   readonly sober?: boolean;
@@ -46,6 +48,7 @@ export function Sheet({
   note,
   wide = false,
   initialFocus = "body",
+  headerAction,
   dismissOnBackdrop = true,
   sober = false,
 }: SheetProps) {
@@ -88,7 +91,7 @@ export function Sheet({
             </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h2 id={titleId} className="fm-sheet__title">
+            <h2 id={titleId} className="fm-sheet__title" tabIndex={-1} data-modal-title>
               {title}
             </h2>
             {description ? (
@@ -97,6 +100,7 @@ export function Sheet({
               </p>
             ) : null}
           </div>
+          {headerAction ? <div className="fm-sheet__header-action">{headerAction}</div> : null}
         </div>
         {children ? <div className="fm-sheet__body">{children}</div> : null}
         {actions ? <div className="fm-sheet__actions">{actions}</div> : null}

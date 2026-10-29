@@ -572,6 +572,7 @@ const childInput = (value: unknown): SkycotFamily.ChildInput => {
     // The reading level the grown-up picked: dropped here until 27 Oct 2026, so every child
     // stayed on the default however often it was saved (first-run rounds 2 and 3).
     ...("readingLevel" in input ? { readingLevel: input["readingLevel"] } : {}),
+    ...("buildHelp" in input ? { buildHelp: input["buildHelp"] } : {}),
   };
 };
 
@@ -612,6 +613,37 @@ const lookRoute = route(
         ...(typeof body["largerText"] === "boolean" ? { largerText: body["largerText"] } : {}),
       };
       return json(yield* family.updateChild({ childId: session.childId, patch }));
+    }),
+);
+
+/**
+ * The child's own build-help level (Pictures, Words or Builder), from the chooser on a starter
+ * card. Like the look it needs no code and only ever touches the child using SKYCOT on this
+ * device, never another child; null means "follow my age band". It changes what the picker
+ * looks like and nothing about what SKYCOT allows, and the assistant is never told.
+ */
+const buildHelpRoute = route(
+  "POST",
+  "/build-help",
+  AuthOrchestrationOperateScope,
+  ({ family, limits, body, sessionId }) =>
+    Effect.gen(function* () {
+      const level = body["buildHelp"];
+      if (
+        level !== null &&
+        !(SkycotFamily.BUILD_HELP_LEVELS as ReadonlyArray<unknown>).includes(level)
+      ) {
+        return json(
+          { error: "invalid-request", message: "Pick pictures, words, builder or null." },
+          400,
+        );
+      }
+      const session = yield* limits.forSession({ sessionId });
+      if (session.childId === null)
+        return json({ error: "invalid-request", message: "Choose who's using SKYCOT first." }, 409);
+      return json(
+        yield* family.updateChild({ childId: session.childId, patch: { buildHelp: level } }),
+      );
     }),
 );
 
@@ -2170,6 +2202,7 @@ export const layerCore = Layer.mergeAll(
   updateChildRoute,
   removeChildRoute,
   lookRoute,
+  buildHelpRoute,
   welcomeRoute,
   chooseRoute,
   heartbeatRoute,

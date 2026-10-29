@@ -1017,6 +1017,23 @@ it.layer(
       assert.equal(level.status, 200, JSON.stringify(level.json));
       assert.equal(level.json["children"][1].readingLevel, "little-makers");
 
+      // The child's own build-help level needs no code and only touches the child using this
+      // device; a bad value is refused and null goes back to following the age band.
+      const help = yield* post("/build-help", { buildHelp: "builder" });
+      assert.equal(help.status, 200, JSON.stringify(help.json));
+      assert.equal(help.json["children"][1].buildHelp, "builder");
+      assert.isUndefined(help.json["children"][0].buildHelp);
+      const helpBad = yield* post("/build-help", { buildHelp: "everything" });
+      assert.equal(helpBad.status, 400);
+      const helpBack = yield* post("/build-help", { buildHelp: null });
+      assert.isNull(helpBack.json["children"][1].buildHelp);
+      // A grown-up can set it for a child from the editor too.
+      const helpParent = yield* post("/children/update", {
+        childId: leo,
+        patch: { buildHelp: "words" },
+      });
+      assert.equal(helpParent.json["children"][1].buildHelp, "words");
+
       const wrong = yield* post("/more-time", { childId: leo, kind: "extra15", code: "000000" });
       assert.equal(wrong.json["error"], "wrong-code");
       const more = yield* post("/more-time", { childId: leo, kind: "extra30", code: CODE });

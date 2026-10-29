@@ -21,6 +21,7 @@ const child: FamilyChild = {
   limits: { bedtime: null, dailyMinutes: null, dailyTurns: null, keepAllowancePercent: null },
   askEachStep: false,
   readingLevel: "makers",
+  buildHelp: null,
 };
 
 describe("Sidebar identity in the child view", () => {

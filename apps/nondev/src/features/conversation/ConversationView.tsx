@@ -70,7 +70,7 @@ import { useMadePage } from "../review/madePage";
 import { useOpenIt } from "../starters/PreviewSheet";
 import { firstBlank, stillFromStarter } from "../starters/starters";
 import { StarterCards, type ComposerSeed } from "../starters/StarterCards";
-import { useStarterPick } from "../starters/StepPickerSheet";
+import { useStarterPick } from "../starters/BuildHelpSheet";
 import { useStartNote } from "../compose/startNotes";
 import {
   PublishButton,

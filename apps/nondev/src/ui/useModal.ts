@@ -38,8 +38,11 @@ export function useModal(
   }: {
     readonly open: boolean;
     readonly onClose: () => void;
-    /** "body" focuses the modal itself so no button is pre-chosen. */
-    readonly initialFocus?: "body" | "first";
+    /**
+     * "body" focuses the modal itself so no button is pre-chosen; "title" focuses its heading
+     * (the element marked `data-modal-title`) so a screen reader starts at the top.
+     */
+    readonly initialFocus?: "body" | "first" | "title";
   },
 ) {
   // Who to hand focus back to. Recorded before React commits the DOM, because a
@@ -62,6 +65,8 @@ export function useModal(
     document.body.style.overflow = "hidden";
     if (initialFocus === "first") {
       (element.querySelector<HTMLElement>(FOCUSABLE) ?? element).focus();
+    } else if (initialFocus === "title") {
+      (element.querySelector<HTMLElement>("[data-modal-title]") ?? element).focus();
     } else {
       element.focus();
     }

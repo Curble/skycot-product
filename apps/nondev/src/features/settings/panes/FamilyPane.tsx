@@ -23,6 +23,7 @@ import { Pill } from "../../../ui/Pill";
 import { StepBadge } from "../../../ui/StepBadge";
 import { TextField } from "../../../ui/TextField";
 import { readingBandLine } from "./readingBandLine";
+import { buildHelpLine } from "../../starters/buildHelp";
 import { ChildAvatar } from "../../family/ChildAvatar";
 import { ChildEditorSheet } from "../../family/ChildEditorSheet";
 import {
@@ -631,6 +632,9 @@ function ChildCard({
         {readingBandLine(child.readingLevel) !== null ? (
           <span className="fm-child-card__line">{readingBandLine(child.readingLevel)}</span>
         ) : null}
+        <span className="fm-child-card__line">
+          {buildHelpLine(child.buildHelp, child.readingLevel)}
+        </span>
         <span className="fm-child-card__line">{limitsSummary(child.limits)}</span>
         <span className="fm-child-card__line">
           Voice typing {child.voice.typing ? "on" : "off"} · read aloud{" "}

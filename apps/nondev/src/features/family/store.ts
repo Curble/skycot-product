@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 import { familyApi, type ChildPatch, type FamilyResult, type UnlockToken } from "./api";
-import type { ChildAvatar } from "./children";
+import type { BuildHelp, ChildAvatar } from "./children";
 import { forgetUnlockProof, keepUnlockProof } from "./unlockProof";
 import { writeOnboardingState } from "../settings/localPrefs";
 import {
@@ -166,6 +166,14 @@ export function setWelcome(state: "done" | "skipped") {
 /** The child's own look and text size (no code: picking a look is open to children). */
 export function saveOwnLook(input: { readonly look?: string; readonly largerText?: boolean }) {
   return settle(familyApi.look(input), applyStatus);
+}
+
+/**
+ * The child's own build-help level, from the chooser on a starter card (no code: it only changes
+ * what the picker looks like, and the engine only ever saves it for the child on this device).
+ */
+export function saveOwnBuildHelp(buildHelp: BuildHelp | null) {
+  return settle(familyApi.buildHelp({ buildHelp }), applyStatus);
 }
 
 /** The engine's answer about who is using this device, from a choice or a heartbeat. */

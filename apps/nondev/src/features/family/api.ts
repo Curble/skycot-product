@@ -6,7 +6,7 @@ import { resolvePrimaryEnvironmentHttpUrl } from "~/environments/primary/target"
 
 import { readUnlockProof } from "./unlockProof";
 import { parseSessionLimits, type SessionLimits } from "../family-limits/limits";
-import type { ChildAvatar, ChildLimits, ChildVoice, ReadingLevel } from "./children";
+import type { BuildHelp, ChildAvatar, ChildLimits, ChildVoice, ReadingLevel } from "./children";
 import { parseDeviceLink, parseDeviceRows, parsePendingRequests, type DeviceKind } from "./people";
 import { parseRelayStatus } from "./relay";
 import {
@@ -108,6 +108,8 @@ export interface ChildPatch {
   readonly limits?: Partial<ChildLimits>;
   readonly askEachStep?: boolean;
   readonly readingLevel?: ReadingLevel;
+  /** A level, or null to follow the age band. */
+  readonly buildHelp?: BuildHelp | null;
 }
 
 function parseAdded(body: unknown) {
@@ -192,6 +194,8 @@ export const familyApi = {
     request("POST", "/welcome", input, parseServerStatus),
   look: (input: { readonly look?: string; readonly largerText?: boolean }) =>
     request("POST", "/look", input, parseServerStatus),
+  buildHelp: (input: { readonly buildHelp: BuildHelp | null }) =>
+    request("POST", "/build-help", input, parseServerStatus),
   choose: (input: { readonly childId: string }) =>
     request("POST", "/choose", input, parseSessionLimits),
   heartbeat: (input: { readonly active: boolean }) =>

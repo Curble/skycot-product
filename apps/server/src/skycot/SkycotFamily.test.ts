@@ -884,6 +884,23 @@ it.layer(NodeServices.layer)("SkycotFamily", (it) => {
           assert.deepEqual(changed.avatar, leo.avatar);
           assert.equal(changed.readingLevel, "little-makers");
 
+          // Build help: missing means "follow the age band"; a level is kept, a bad value
+          // leaves it alone, and null goes back to following the band.
+          assert.isUndefined(changed.buildHelp);
+          const words = yield* family.updateChild({ childId, patch: { buildHelp: "words" } });
+          assert.equal(words.children.find((child) => child.id === childId)!.buildHelp, "words");
+          const bad = yield* family.updateChild({
+            childId,
+            patch: { buildHelp: "nonsense", name: "Leo" },
+          });
+          assert.equal(bad.children.find((child) => child.id === childId)!.buildHelp, "words");
+          const follow = yield* family.updateChild({ childId, patch: { buildHelp: null } });
+          assert.isNull(follow.children.find((child) => child.id === childId)!.buildHelp);
+          assert.equal(
+            follow.children.find((child) => child.id === childId)!.readingLevel,
+            "little-makers",
+          );
+
           const removed = yield* family.removeChild({ childId });
           assert.deepEqual(
             removed.children.map((child) => child.id),

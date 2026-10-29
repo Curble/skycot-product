@@ -603,6 +603,7 @@ describe("Ask before each step", () => {
       limits: { bedtime: null, dailyMinutes: null, dailyTurns: null, keepAllowancePercent: null },
       askEachStep,
       readingLevel: "makers",
+      buildHelp: null,
     }) as const;
   it("follows the child using SKYCOT here, and is off while the profile is off", () => {
     const children = [child("ava", false), child("leo", true)];

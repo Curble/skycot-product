@@ -3,22 +3,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-const state = vi.hoisted(() => ({ level: "little-makers" as string }));
 vi.mock("../../themes/useCrew", () => ({
   useCrew: () => ({ named: true, playful: true, builder: { name: "Sam" } }),
 }));
-vi.mock("../family/FamilyProvider", () => ({
-  useFamily: () => ({
-    enabled: true,
-    profile: {
-      currentChildId: "kid",
-      children: [{ id: "kid", readingLevel: state.level }],
-    },
-  }),
-}));
 
 import { choicesFor } from "./choices";
-import { StepPickerSheet, useStarterPick } from "./StepPickerSheet";
+import { StepPickerSheet } from "./StepPickerSheet";
 import { KID_STARTERS } from "./starters";
 
 const find = (id: string) => KID_STARTERS.find((starter) => starter.id === id)!;
@@ -39,7 +29,6 @@ afterEach(async () => {
   document.body.innerHTML = "";
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  state.level = "little-makers";
 });
 
 const button = (name: string) =>
@@ -169,53 +158,27 @@ describe("step picker sheet", () => {
   });
 });
 
-function Probe({ setSeed }: { setSeed: (seed: { text: string; starterId: string }) => void }) {
-  const { pick, sheet } = useStarterPick(setSeed as never);
-  return (
-    <>
-      {KID_STARTERS.map((starter) => (
-        <button key={starter.id} type="button" data-card={starter.id} onClick={() => pick(starter)}>
-          {starter.title}
-        </button>
-      ))}
-      {sheet}
-    </>
-  );
-}
-
-describe("useStarterPick", () => {
-  it("opens the picker for a Little maker's card with blanks and fills the box on Make it!", async () => {
-    const setSeed = vi.fn();
-    await mount(<Probe setSeed={setSeed} />);
-    await click("Make a game");
-    expect(setSeed).not.toHaveBeenCalled();
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    await click("Snake");
-    await settle();
-    await click("Make it!");
-    expect(setSeed).toHaveBeenCalledTimes(1);
-    expect(setSeed.mock.calls[0]![0].starterId).toBe("game");
-    expect(setSeed.mock.calls[0]![0].text).toContain("play in the page: snake.");
-    expect(setSeed.mock.calls[0]![0].sendNow).toBe(true);
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
+describe("step picker sheet, inside build help", () => {
+  it("shows Change how I build and Just type it myself when given, and they call back", async () => {
+    const onChangeHow = vi.fn();
+    const onTypeMyself = vi.fn();
+    await mount(
+      <StepPickerSheet
+        starter={find("game")}
+        onClose={() => {}}
+        onMake={() => {}}
+        onChangeHow={onChangeHow}
+        onTypeMyself={onTypeMyself}
+      />,
+    );
+    await click("Change how I build");
+    expect(onChangeHow).toHaveBeenCalledTimes(1);
+    await click("Just type it myself");
+    expect(onTypeMyself).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps today's behaviour for Surprise me, and for other reading levels", async () => {
-    const setSeed = vi.fn();
-    await mount(<Probe setSeed={setSeed} />);
-    await click("Surprise me");
-    expect(setSeed).toHaveBeenCalledTimes(1);
-    expect(setSeed.mock.calls[0]![0].sendNow).toBeUndefined();
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-    await act(async () => root!.unmount());
-    state.level = "makers";
-    const again = vi.fn();
-    root = createRoot(document.getElementById("root")!);
-    await act(async () => root!.render(<Probe setSeed={again} />));
-    await click("Make a game");
-    expect(again).toHaveBeenCalledTimes(1);
-    expect(again.mock.calls[0]![0].text).toContain("[");
-    expect(again.mock.calls[0]![0].sendNow).toBeUndefined();
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  it("puts focus on the sheet title when it opens", async () => {
+    await mount(<StepPickerSheet starter={find("game")} onClose={() => {}} onMake={() => {}} />);
+    expect(document.activeElement).toBe(document.querySelector(".fm-sheet__title"));
   });
 });

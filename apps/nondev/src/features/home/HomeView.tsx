@@ -22,7 +22,7 @@ import { NewConversationComposer } from "../compose/NewConversationComposer";
 import { usePlanFirst } from "../compose/planFirst";
 import { FridgeHomeTile } from "../fridge/FridgeHomeTile";
 import { StarterCards, useStarters, type ComposerSeed } from "../starters/StarterCards";
-import { useStarterPick } from "../starters/StepPickerSheet";
+import { useStarterPick } from "../starters/BuildHelpSheet";
 import { showsFamilySetupCard } from "../onboarding/onboarding";
 import { homeTip } from "./tip";
 import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";

@@ -50,6 +50,10 @@ export const READING_BANDS: ReadonlyArray<{
 ];
 export const DEFAULT_READING_LEVEL: ReadingLevel = "makers";
 
+/** How much help a child gets building from a starter card (features/starters/buildHelp.ts). */
+export const BUILD_HELP_LEVELS = ["pictures", "words", "builder"] as const;
+export type BuildHelp = (typeof BUILD_HELP_LEVELS)[number];
+
 export interface FamilyChild {
   readonly id: string;
   readonly name: string | null;
@@ -65,6 +69,8 @@ export interface FamilyChild {
    */
   readonly askEachStep: boolean;
   readonly readingLevel: ReadingLevel;
+  /** Where build help starts for this child; null follows the age band (`readingLevel`). */
+  readonly buildHelp: BuildHelp | null;
 }
 
 export const NO_LIMITS: ChildLimits = {
@@ -140,6 +146,9 @@ export function parseChild(value: unknown): FamilyChild | null {
     readingLevel: (READING_LEVELS as ReadonlyArray<unknown>).includes(input["readingLevel"])
       ? (input["readingLevel"] as ReadingLevel)
       : DEFAULT_READING_LEVEL,
+    buildHelp: (BUILD_HELP_LEVELS as ReadonlyArray<unknown>).includes(input["buildHelp"])
+      ? (input["buildHelp"] as BuildHelp)
+      : null,
   };
 }
 
