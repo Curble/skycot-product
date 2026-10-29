@@ -183,3 +183,21 @@ export function markSetupOpen(open: boolean): void {
 export function isSetupOpen(): boolean {
   return setupOpenNow;
 }
+
+/**
+ * What the set-up already knows about the first child before that child exists: sent with the
+ * "turn on" request so the engine writes the child once, with the band the grown-up picked.
+ * Only the band (how simply Sam explains), never an age. Older engines ignore this and the
+ * wizard then falls back to saving it afterwards (`firstChildNeedsLevel`).
+ */
+export function firstChildSettings(readingLevel: ReadingLevel): ChildPatch {
+  return { readingLevel };
+}
+
+/** True when the child just set up does not carry the band picked in the wizard. */
+export function firstChildNeedsLevel(
+  child: { readonly readingLevel?: ReadingLevel } | undefined,
+  picked: ReadingLevel,
+): boolean {
+  return child === undefined || child.readingLevel !== picked;
+}

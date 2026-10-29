@@ -176,8 +176,12 @@ export const familyApi = {
       return Array.isArray(notes) ? notes : null;
     }),
   status: () => request("GET", "", undefined, parseServerStatus),
-  enable: (input: { readonly code: string; readonly childName: string | null }) =>
-    request("POST", "/enable", { ...input, timeZone: browserZone() }, parseServerStatus),
+  enable: (input: {
+    readonly code: string;
+    readonly childName: string | null;
+    /** The first child's reading level and other settings, saved in the same write as the profile. */
+    readonly child?: ChildPatch;
+  }) => request("POST", "/enable", { ...input, timeZone: browserZone() }, parseServerStatus),
   addChild: (child: ChildPatch) =>
     request("POST", "/children/add", { child, timeZone: browserZone() }, parseAdded),
   updateChild: (input: { readonly childId: string; readonly patch: ChildPatch }) =>

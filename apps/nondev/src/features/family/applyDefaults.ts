@@ -7,6 +7,7 @@ import { writeAutonomy } from "../../state/preferences";
 import { SAFE_DEFAULT_RUNTIME_MODE, useWriteServerDefaultRuntimeMode } from "../../state/autonomy";
 import { hasChosenTheme, setActiveTheme } from "../../themes/store";
 import { writeTextSize } from "../settings/localPrefs";
+import type { ChildPatch } from "./api";
 import { enableFamily } from "./store";
 
 export const FAMILY_THEME_ID = "workshop";
@@ -14,7 +15,11 @@ export const FAMILY_THEME_ID = "workshop";
 /** Resolves null once the engine keeps the profile, or the sentence saying why it could not. */
 export function useEnableFamilyWithDefaults(
   environmentId: EnvironmentId,
-): (input: { readonly childName: string | null; readonly code: string }) => Promise<string | null> {
+): (input: {
+  readonly childName: string | null;
+  readonly code: string;
+  readonly child?: ChildPatch;
+}) => Promise<string | null> {
   const writeServerMode = useWriteServerDefaultRuntimeMode(environmentId);
   return async (input) => {
     const result = await enableFamily(input);

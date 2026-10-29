@@ -111,6 +111,7 @@ export function refreshFamily(): Promise<FamilyResult<ServerFamilyStatus>> {
 export function enableFamily(input: {
   readonly childName: string | null;
   readonly code: string;
+  readonly child?: ChildPatch;
 }): Promise<FamilyResult<ServerFamilyStatus>> {
   return settle(familyApi.enable(input), (status) => {
     // The engine has it now; the browser-only copy would only confuse the next visit.

@@ -335,6 +335,9 @@ const enableRoute = route(
         code: text(body["code"]),
         childName: nullableText(body["childName"]),
         timeZone: nullableText(body["timeZone"]),
+        // The first child's reading level and other settings, chosen in the set-up before the
+        // child existed. Older clients leave this out and get the defaults, as before.
+        ...("child" in body ? { child: childInput(body["child"]) } : {}),
       });
       yield* pinSafeDefault;
       return json({ ...status, ...(yield* codeLengthFor(family, who)) });

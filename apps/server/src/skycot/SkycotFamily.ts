@@ -689,6 +689,11 @@ export class SkycotFamily extends Context.Service<
       readonly childName: string | null;
       /** The parent's browser zone, for bedtimes; the engine's own when left out. */
       readonly timeZone?: string | null | undefined;
+      /**
+       * The first child's other settings (reading level, look, avatar, limits...) chosen before
+       * the child existed, written in the same save as the profile. `childName` wins for the name.
+       */
+      readonly child?: ChildInput | undefined;
     }) => Effect.Effect<FamilyStatus, FamilyError>;
     /** One code attempt; on success records a grant for this session and returns its token. */
     readonly verify: (input: VerifyInput) => Effect.Effect<UnlockToken, FamilyError>;
@@ -1433,7 +1438,18 @@ const makeAt = Effect.fn("SkycotFamily.make")(function* (filePath: string) {
       tokenSecret: hex(NodeCrypto.randomBytes(32)),
       grants: [],
       timeZone: input.timeZone ? knownTimeZone(input.timeZone) : null,
-      children: [newChild({ name: input.childName }, 0, createdAt)],
+      children: [
+        newChild(
+          {
+            ...input.child,
+            ...(input.childName !== null || input.child?.name === undefined
+              ? { name: input.childName }
+              : {}),
+          },
+          0,
+          createdAt,
+        ),
+      ],
       // The person setting the profile up is its first grown-up.
       grownUps: [newGrownUp({}, 0, createdAt)],
       devices: [],

@@ -849,6 +849,54 @@ it.layer(
       }),
   );
 
+  // Wizard bug (29 Oct 2026): the band picked before the first child existed was dropped.
+  it.effect("turning the profile on keeps the first child's band and settings", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      const on = yield* send("POST", "/api/skycot/family/enable", {
+        body: {
+          code: CODE,
+          childName: "Chris",
+          child: {
+            readingLevel: "little-makers",
+            look: "workshop",
+            largerText: false,
+            askEachStep: true,
+            avatar: { kind: "initial", color: "blue" },
+          },
+        },
+      });
+      assert.equal(on.status, 200);
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        children: ReadonlyArray<{
+          name: string | null;
+          readingLevel: string;
+          look: string;
+          largerText: boolean;
+          askEachStep: boolean;
+        }>;
+      };
+      assert.lengthOf(status.children, 1);
+      const chris = status.children[0]!;
+      assert.equal(chris.name, "Chris");
+      assert.equal(chris.readingLevel, "little-makers");
+      assert.equal(chris.largerText, false);
+      assert.equal(chris.askEachStep, true);
+    }),
+  );
+
+  it.effect("an older client that sends no child still gets the default band", () =>
+    Effect.gen(function* () {
+      const { send } = yield* makeClient();
+      yield* send("POST", "/api/skycot/family/enable", { body: { code: CODE, childName: "Ava" } });
+      const status = (yield* (yield* send("GET", "/api/skycot/family")).json) as {
+        children: ReadonlyArray<{ name: string | null; readingLevel: string }>;
+      };
+      assert.equal(status.children[0]!.name, "Ava");
+      assert.equal(status.children[0]!.readingLevel, "makers");
+    }),
+  );
+
   // QA FK-10: the child could rename themselves without the code.
   it.effect("renames the child only after a grown-up's yes", () =>
     Effect.gen(function* () {

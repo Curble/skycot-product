@@ -2,6 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { vi } from "vite-plus/test";
 
+import familyApiSource from "../family/api.ts?raw";
+import familyStoreSource from "../family/store.ts?raw";
 import onboardingSheetSource from "./OnboardingSheet.tsx?raw";
 import pictureStepSource from "./PictureStep.tsx?raw";
 import familySetupFormSource from "../family/FamilySetupForm.tsx?raw";
@@ -13,6 +15,8 @@ import { mascotCopy } from "../brand/mascotCopy";
 import { familyAgeTermsNote } from "../family/assistantAllowance";
 import {
   addSibling,
+  firstChildNeedsLevel,
+  firstChildSettings,
   handOverLabel,
   siblingPatch,
   canContinue,
@@ -226,5 +230,25 @@ describe("plain family words in set-up and the Family screen", () => {
       familyAgeTermsNote(),
     ].filter((value): value is string => typeof value === "string");
     expect(lines.filter((text) => BANNED.test(text))).toEqual([]);
+  });
+});
+
+describe("the first child's band in the set-up", () => {
+  it("is sent with the request that turns the profile on", () => {
+    expect(firstChildSettings("little-makers")).toEqual({ readingLevel: "little-makers" });
+    expect(onboardingSheetSource).toContain("child: firstChildSettings(readingLevel)");
+  });
+
+  it("is saved afterwards only when the child came back without it", () => {
+    expect(firstChildNeedsLevel({ readingLevel: "little-makers" }, "little-makers")).toBe(false);
+    expect(firstChildNeedsLevel({ readingLevel: "makers" }, "little-makers")).toBe(true);
+    expect(firstChildNeedsLevel(undefined, "makers")).toBe(true);
+  });
+
+  it("goes through the wire as the engine's child field", () => {
+    // The client sends the whole input (code, name and child) in one /enable request.
+    expect(familyApiSource).toContain("readonly child?: ChildPatch;");
+    expect(familyApiSource).toContain('request("POST", "/enable", { ...input, timeZone');
+    expect(familyStoreSource).toContain("readonly child?: ChildPatch;");
   });
 });

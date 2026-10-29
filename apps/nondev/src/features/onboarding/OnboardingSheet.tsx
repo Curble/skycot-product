@@ -87,6 +87,8 @@ import {
   handOverLabel,
   markSetupOpen,
   onboardingProgress,
+  firstChildNeedsLevel,
+  firstChildSettings,
   onboardingSteps,
   projectsSummary,
   READING_BANDS,
@@ -228,7 +230,11 @@ export function OnboardingSheet({
       setProblem(null);
       // The grown-up setting this up is the one using SKYCOT, so "Who's using SKYCOT?" waits.
       markPickedThisWindow();
-      const failure = await enableFamily({ childName: draft.childName, code: draft.code });
+      const failure = await enableFamily({
+        childName: draft.childName,
+        code: draft.code,
+        child: firstChildSettings(readingLevel),
+      });
       setFinishing(false);
       if (failure !== null) {
         setProblem(failure);
@@ -246,7 +252,8 @@ export function OnboardingSheet({
       // The child just set up is who Done hands back to.
       if (opened.ok && grownUp !== undefined)
         startGrownUpSession(grownUp.id, justSetUp?.id ?? null);
-      if (opened.ok && readingLevel !== DEFAULT_READING_LEVEL) {
+      // The engine took the band with the profile; only an older engine leaves it to save here.
+      if (opened.ok && firstChildNeedsLevel(justSetUp, readingLevel)) {
         const saved =
           justSetUp === undefined
             ? ({ ok: false } as const)
@@ -269,7 +276,11 @@ export function OnboardingSheet({
     if (childPath && !family.enabled && setupReady(draft)) {
       setFinishing(true);
       setProblem(null);
-      const failure = await enableFamily({ childName: draft.childName, code: draft.code });
+      const failure = await enableFamily({
+        childName: draft.childName,
+        code: draft.code,
+        child: firstChildSettings(readingLevel),
+      });
       setFinishing(false);
       // The engine keeps the profile; if it could not, say so and stay here rather than
       // finish with a child path that protects nothing.
