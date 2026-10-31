@@ -300,6 +300,18 @@ export function startsFreshProject(input: {
   return childView && seed !== null && chosenKey === null && stillFromStarter(seed.text, text);
 }
 
+/**
+ * The sidebar's project selection after a card made a new project. A selection outranks the
+ * "newest project" default in the compose chip, so one left on the old project would keep the
+ * chip there; it follows the new project, and no selection stays no selection.
+ */
+export function selectionAfterFreshProject(
+  selected: string | null,
+  made: { readonly environmentId: string; readonly projectId: string },
+): string | null {
+  return selected === null ? null : `${made.environmentId}:${made.projectId}`;
+}
+
 /** A new project's name from its card ("A birthday card" -> "Birthday card"), never a repeat. */
 export function freshProjectName(cardTitle: string, taken: ReadonlyArray<string>): string {
   const plain = cardTitle

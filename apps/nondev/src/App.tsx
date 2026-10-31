@@ -44,7 +44,6 @@ import {
 import { startFreshWindow } from "./features/family-limits/store";
 import { landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
 import { Button } from "./ui/Button";
-import { showToast } from "./ui/Toast";
 
 type GateState = Awaited<ReturnType<typeof resolveInitialServerAuthGateState>>;
 
@@ -186,23 +185,7 @@ export function App() {
                       </GrownUpOnly>
                     );
                   case "not-found":
-                    return (
-                      <StandalonePage>
-                        <span className="fm-standalone__art">
-                          <Mascot pose="thinking" size={88} />
-                        </span>
-                        {/* An h2: the title bar already carries the page's h1. */}
-                        <h2 className="fm-standalone__title">There's nothing here</h2>
-                        <p className="fm-standalone__text">
-                          That link doesn't go anywhere in {PRODUCT_NAME}.
-                        </p>
-                        <div className="fm-standalone__actions">
-                          <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
-                            Go home
-                          </Button>
-                        </div>
-                      </StandalonePage>
-                    );
+                    return <NothingHere />;
                 }
               })()}
             </AppShell>
@@ -215,9 +198,29 @@ export function App() {
   );
 }
 
+/** The page for an address that goes nowhere (for a child, also every grown-up-only address). */
+function NothingHere() {
+  return (
+    <StandalonePage>
+      <span className="fm-standalone__art">
+        <Mascot pose="thinking" size={88} />
+      </span>
+      {/* An h2: the title bar already carries the page's h1. */}
+      <h2 className="fm-standalone__title">There's nothing here</h2>
+      <p className="fm-standalone__text">That link doesn't go anywhere in {PRODUCT_NAME}.</p>
+      <div className="fm-standalone__actions">
+        <Button variant="primary" onClick={() => navigate(HOME_HREF)}>
+          Go home
+        </Button>
+      </div>
+    </StandalonePage>
+  );
+}
+
 /**
- * A child who types a grown-up page's address lands Home with a kind note; the page's own
- * component never mounts for them, so nothing behind it is asked for.
+ * A child who types a grown-up page's address gets the same "There's nothing here" page as any
+ * unknown address, never a redirect and never a hint the page exists; the page's own component
+ * never mounts for them, so nothing behind it is asked for.
  */
 function GrownUpOnly({
   route,
@@ -230,12 +233,8 @@ function GrownUpOnly({
   // Until the engine has said whether the Family profile is on, the page stays unmounted.
   const known = useFamily().profile.source === "engine";
   const verdict = routeForViewer(route, childView);
-  useEffect(() => {
-    if (verdict.allowed) return;
-    showToast(verdict.note);
-    navigate(HOME_HREF);
-  }, [verdict.allowed]);
-  return known && verdict.allowed ? <>{children}</> : null;
+  if (!known) return null;
+  return verdict.allowed ? <>{children}</> : <NothingHere />;
 }
 
 /** When the grown-up's turn on the shared Mac ends, the child lands on Home, never on the grown-up page left open. */

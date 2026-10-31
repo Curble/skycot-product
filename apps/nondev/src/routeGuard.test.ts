@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { FOR_GROWN_UPS_NOTE, landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
+import { landsHomeAfterGrownUp, routeForViewer } from "./routeGuard";
 import { parseRoute } from "./router";
 
 describe("routeForViewer", () => {
-  it("sends a child away from Who can help and Automations by address", () => {
+  it("shows a child no page for Who can help or Automations (App renders the nothing-here page, no redirect)", () => {
     for (const hash of ["#/people", "#/automations"]) {
-      expect(routeForViewer(parseRoute(hash), true)).toEqual({
-        allowed: false,
-        note: FOR_GROWN_UPS_NOTE,
-      });
+      expect(routeForViewer(parseRoute(hash), true)).toEqual({ allowed: false });
     }
   });
 

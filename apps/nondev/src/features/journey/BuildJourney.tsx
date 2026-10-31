@@ -85,7 +85,7 @@ export function BuildJourney({
   }, [latestRunId, chosen]);
   const word = chosen === null ? null : wordFor(chosen, level);
   const [known, setKnown] = useState(() => (child ? readKnownWords(child.id) : []));
-  // The question belongs to the child until they answer, even if the build finishes first.
+  // The question is optional: it is shown while the build runs and dropped when it finishes.
   const [questionStep, setQuestionStep] = useState(journey.now);
   const [answer, setAnswer] = useState<(typeof explanation.answers)[number] | null>(null);
   const [lastStep, setLastStep] = useState(journey.now);
@@ -169,45 +169,48 @@ export function BuildJourney({
           <p className="fm-journey__fact">{lookBackFor(reviewStep, journey.facts)}</p>
         ) : null}
       </section>
-      <section className="fm-journey__think">
-        <h3>Your turn to think</h3>
-        <small className="fm-journey__optional">Just for fun — nothing to answer here.</small>
-        {answer ? (
-          <>
-            <p role="status">{answer.reply}</p>
-            {answer.tellSam && onTellSam ? (
-              <button
-                className="fm-journey__tell"
-                type="button"
-                onClick={() => onTellSam(answer.say)}
-              >
-                Tell {childName}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="fm-journey__again"
-              onClick={() => {
-                setAnswer(null);
-                setQuestionStep(journey.now);
-              }}
-            >
-              {questionStep === journey.now ? "Choose another answer" : "Next question"}
-            </button>
-          </>
-        ) : (
-          <>
-            <p>{thinking.question}</p>
-            <div className="fm-journey__answers">
-              {thinking.answers.map((choice) => (
-                <button type="button" key={choice.label} onClick={() => setAnswer(choice)}>
-                  {choice.label}
+      {/* Just for fun, so it never lingers: once the build is done the card goes. */}
+      {finished ? null : (
+        <section className="fm-journey__think" aria-label="Just for fun">
+          <h3>Your turn to think</h3>
+          <small className="fm-journey__optional">Just for fun — nothing to answer here.</small>
+          {answer ? (
+            <>
+              <p role="status">{answer.reply}</p>
+              {answer.tellSam && onTellSam ? (
+                <button
+                  className="fm-journey__tell"
+                  type="button"
+                  onClick={() => onTellSam(answer.say)}
+                >
+                  Tell {childName}
                 </button>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+              ) : null}
+              <button
+                type="button"
+                className="fm-journey__again"
+                onClick={() => {
+                  setAnswer(null);
+                  setQuestionStep(journey.now);
+                }}
+              >
+                {questionStep === journey.now ? "Choose another answer" : "Next question"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p>{thinking.question}</p>
+              <div className="fm-journey__answers">
+                {thinking.answers.map((choice) => (
+                  <button type="button" key={choice.label} onClick={() => setAnswer(choice)}>
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
       {word !== null && chosen !== null ? (
         <section className="fm-journey__word">
           <div>

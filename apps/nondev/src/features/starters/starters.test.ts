@@ -14,6 +14,7 @@ import {
   firstBlank,
   freshProjectName,
   pickSurprise,
+  selectionAfterFreshProject,
   starterMessageText,
   starterPrompt,
   startersFor,
@@ -167,6 +168,12 @@ describe("a starter card starts a project of its own", () => {
     expect(startsFreshProject({ childView: false, seed, text: seed.text, chosenKey: null })).toBe(
       false,
     );
+  });
+
+  it("moves a sidebar selection to the new project so the chip follows, and leaves none alone", () => {
+    const made = { environmentId: "e", projectId: "new" };
+    expect(selectionAfterFreshProject("e:old", made)).toBe("e:new");
+    expect(selectionAfterFreshProject(null, made)).toBeNull();
   });
 
   it("names the project from the card and never repeats a name", () => {

@@ -106,18 +106,17 @@ describe("Build Journey notebook", () => {
     expect(onTellSam).toHaveBeenCalledWith("Can you fix the bug?");
     await page.unmount();
   });
-  it("keeps an unanswered question through Finish, then offers the next question", async () => {
+  it("drops the optional question once the build is finished, and never styles it as required", async () => {
     const early = { ...projection, turnItems: projection.turnItems.slice(0, 1) };
     const page = await mount(<BuildJourney projection={early} elapsedMs={0} />);
-    const question = page.host.querySelector(".fm-journey__think p")?.textContent;
+    expect(page.host.querySelector(".fm-journey__think")).not.toBeNull();
+    expect(page.host.querySelector(".fm-journey__optional")?.textContent).toContain("Just for fun");
+    expect(
+      page.host.querySelector(".fm-journey__think input, .fm-journey__think textarea"),
+    ).toBeNull();
     await page.rerender(<BuildJourney projection={projection} elapsedMs={30_000} finished />);
     expect(page.host.textContent).toContain("Sam has finished!");
-    expect(page.host.querySelector(".fm-journey__think p")?.textContent).toBe(question);
-    await page.click(".fm-journey__answers button");
-    await page.click(".fm-journey__again");
-    expect(page.host.querySelector(".fm-journey__think p")?.textContent).toBe(
-      "What would make it even better?",
-    );
+    expect(page.host.querySelector(".fm-journey__think")).toBeNull();
     await page.unmount();
   });
 
@@ -148,18 +147,6 @@ describe("Build Journey notebook", () => {
     expect(page.host.querySelector(".fm-journey__word h3")?.textContent).toBe(word);
     await page.rerender(<BuildJourney key="next" projection={empty} elapsedMs={0} finished />);
     expect(page.host.querySelector(".fm-journey__word h3")?.textContent).toBe("plan");
-    await page.unmount();
-  });
-
-  it("offers a page change in the child's voice after a birthday card build", async () => {
-    const onTellSam = vi.fn();
-    const page = await mount(
-      <BuildJourney projection={projection} elapsedMs={0} finished onTellSam={onTellSam} />,
-    );
-    await page.click(".fm-journey__answers button");
-    await page.click(".fm-journey__tell");
-    expect(onTellSam).toHaveBeenCalledWith("Can you add more colour?");
-    expect(page.host.textContent).not.toContain("A new level");
     await page.unmount();
   });
 });

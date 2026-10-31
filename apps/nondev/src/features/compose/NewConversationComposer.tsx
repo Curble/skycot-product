@@ -38,6 +38,7 @@ import { SegmentedControl } from "../../ui/SegmentedControl";
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
 import { useShortWindow } from "../../app/useShortWindow";
+import { useShellState } from "../../app/ShellState";
 import { useChildView } from "../../app/useChildView";
 import { useConnected } from "../../app/useConnection";
 import { catalogEntryFor } from "../settings/providerCatalog";
@@ -61,6 +62,7 @@ import {
   firstBlank,
   freshProjectName,
   KID_STARTERS,
+  selectionAfterFreshProject,
   starterMessageText,
   startsFreshProject,
   stillFromStarter,
@@ -440,6 +442,7 @@ function ComposerField({
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
   const childView = useChildView();
+  const shell = useShellState();
   const crew = useCrew();
   const canOperate = useAtomValue(canOperateEnvironmentAtom(environmentId));
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
@@ -581,6 +584,15 @@ function ComposerField({
         };
       }
       freshProjectId = created.value.projectId;
+      // A project chosen in the sidebar outranks "newest" in the chip: follow the new one.
+      if (shell.projectKey !== null) {
+        shell.setProjectKey(
+          selectionAfterFreshProject(shell.projectKey, {
+            environmentId,
+            projectId: freshProjectId,
+          }),
+        );
+      }
     }
     if (destination === null && freshProjectId === null) {
       const opened = await openScratch({ environmentId, input: {} });
