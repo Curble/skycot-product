@@ -22,6 +22,7 @@ import { shortTime } from "./time";
 import { replacedByNewerPlan } from "../plans";
 import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
+import { planMayNeedGrownUp } from "../planNeedsGrownUp";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -117,6 +118,13 @@ export function PlanCard({
             className="fm-md--plan"
           />
           {state === "actionable" ? <p className="fm-plan__note">{card.ifYouSayNo}</p> : null}
+          {state === "actionable" && planMayNeedGrownUp(item.markdown) ? (
+            <p className="fm-plan__note">
+              {childView
+                ? "One step may need a grown-up's OK: adding something from outside SKYCOT. Sam will ask them when it gets there."
+                : "One step may ask before adding something from outside this project."}
+            </p>
+          ) : null}
         </CardBody>
         {state === "actionable" && approve ? (
           <CardFooter>
