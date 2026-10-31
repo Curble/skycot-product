@@ -285,6 +285,36 @@ export function stillFromStarter(seedText: string, text: string): boolean {
 }
 
 /**
+ * Whether sending starts a project of its own: a child tapped a starter card, the box still
+ * holds the card's words and no project was picked by hand. A card means "make something new",
+ * so it never lands in whichever project the child used last. Grown-ups keep their project.
+ */
+export function startsFreshProject(input: {
+  readonly childView: boolean;
+  readonly seed: { readonly text: string } | null;
+  readonly text: string;
+  /** What the child picked in the project chip, if anything. */
+  readonly chosenKey: string | null;
+}): boolean {
+  const { childView, seed, text, chosenKey } = input;
+  return childView && seed !== null && chosenKey === null && stillFromStarter(seed.text, text);
+}
+
+/** A new project's name from its card ("A birthday card" -> "Birthday card"), never a repeat. */
+export function freshProjectName(cardTitle: string, taken: ReadonlyArray<string>): string {
+  const plain = cardTitle
+    .replace(/^(make|build)\s+(an?|the|my)\s+/i, "")
+    .replace(/^(an?|the)\s+/i, "")
+    .replace(/[?!.]+$/g, "")
+    .trim();
+  const base = plain.length === 0 ? "My project" : plain.charAt(0).toUpperCase() + plain.slice(1);
+  const used = new Set(taken.map((title) => title.trim().toLowerCase()));
+  let name = base;
+  for (let index = 2; used.has(name.toLowerCase()); index += 1) name = `${base} ${index}`;
+  return name;
+}
+
+/**
  * The message to send for what is in the box: the child's words, plus the card's hidden
  * marker while those words are still the card's. Own words (or a grown-up card, which shows
  * its rules) send no marker.

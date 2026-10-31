@@ -36,6 +36,18 @@ const target = (over: Partial<Parameters<typeof composeTargetFor>[0]>) =>
   });
 
 describe("where a new conversation goes", () => {
+  it("keeps a child's chosen project, even when a newer one exists", () => {
+    const older = project("older", "/Users/ava/older", false, "2026-01-01");
+    const newest = project("newest", "/Users/ava/newest", false, "2026-02-01");
+    expect(
+      target({
+        projects: [questions, older, newest],
+        chosen: `${ENV}:older`,
+        defaultToNewest: true,
+      }),
+    ).toEqual({ kind: "project", project: older });
+  });
+
   it("starts in the newest project when several projects exist and nothing was chosen", () => {
     const older = project("older", "/Users/ava/older", false, "2026-01-01");
     const newest = project("newest", "/Users/ava/newest", false, "2026-02-01");

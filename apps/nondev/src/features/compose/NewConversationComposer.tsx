@@ -1,7 +1,12 @@
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { ProviderInteractionMode, ServerConfig, ThreadId } from "@t3tools/contracts";
+import type {
+  ProjectId,
+  ProviderInteractionMode,
+  ServerConfig,
+  ThreadId,
+} from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { AlertCircle, ChevronDown, Info, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
@@ -52,7 +57,14 @@ import {
   runtimeModeFor,
   type Autonomy,
 } from "./autonomy";
-import { firstBlank, starterMessageText, stillFromStarter } from "../starters/starters";
+import {
+  firstBlank,
+  freshProjectName,
+  KID_STARTERS,
+  starterMessageText,
+  startsFreshProject,
+  stillFromStarter,
+} from "../starters/starters";
 import type { ComposerSeed } from "../starters/StarterCards";
 import { useShield, type ShieldOutcome } from "../shield";
 import { firstMessageLabels } from "./firstMessage";
@@ -348,6 +360,7 @@ export function NewConversationComposer({
             inputRef={inputRef}
             wantsPicture={appliedSeed?.wantsPicture === true}
             seed={appliedSeed}
+            chosenKey={chosenKey}
             onSend={async (send) => {
               setSending(true);
               setProblem(null);
@@ -403,6 +416,7 @@ function ComposerField({
   inputRef,
   wantsPicture,
   seed,
+  chosenKey,
   onSend,
 }: {
   readonly environmentId: EnvironmentProject["environmentId"];
@@ -421,6 +435,8 @@ function ComposerField({
   readonly wantsPicture: boolean;
   /** The starter card the box was filled from; its hidden rules go along while the words stand. */
   readonly seed: ComposerSeed | null;
+  /** The project picked by hand in the chip; a starter card never overrides that. */
+  readonly chosenKey: string | null;
   readonly onSend: (send: () => Promise<SendOutcome>) => Promise<void>;
 }) {
   const childView = useChildView();
@@ -433,6 +449,8 @@ function ComposerField({
   const pictureNotice = picturePrivacyNotice(
     provider ? catalogEntryFor(String(provider.driver)).brand : null,
   );
+  const allProjects = useAtomValue(environmentProjects.projectsAtom);
+  const createNewProject = useAtomCommand(projectEnvironment.createNew, { reportFailure: false });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
   // A question has no folder until the engine makes one; no Git calls run for it.
@@ -545,7 +563,26 @@ function ComposerField({
     // answers with the space of the child using SKYCOT here); the engine gives this question
     // its own folder inside it, so there is no private copy to make and nothing to set up.
     let destination = project;
-    if (destination === null) {
+    // A child's starter card makes something new: its own project, made the way the sidebar's
+    // "New project" makes one (in the child's own space), and the make starts straight in it.
+    let freshProjectId: ProjectId | null = null;
+    if (startsFreshProject({ childView, seed, text: cleared.text, chosenKey })) {
+      const card = KID_STARTERS.find((starter) => starter.id === seed?.starterId);
+      const name = freshProjectName(
+        card?.title ?? "My project",
+        allProjects.map((candidate) => candidate.title),
+      );
+      const created = await createNewProject({ environmentId, input: { name } });
+      if (created._tag === "Failure") {
+        console.warn("[skycot] new project failed:", squashAtomCommandFailure(created));
+        return {
+          kind: "failed",
+          message: "SKYCOT couldn't start a new project just now. Try again.",
+        };
+      }
+      freshProjectId = created.value.projectId;
+    }
+    if (destination === null && freshProjectId === null) {
       const opened = await openScratch({ environmentId, input: {} });
       if (opened._tag === "Failure") {
         console.warn("[skycot] opening Questions failed:", squashAtomCommandFailure(opened));
@@ -553,8 +590,13 @@ function ComposerField({
       }
       destination = opened.value;
     }
+    // A question has no folder to prepare, and a project made a moment ago has nothing to copy.
     const folder =
-      project === null ? ({ question: true } as const) : await prepareFolder(destination);
+      project === null || destination === null || freshProjectId !== null
+        ? ({ question: true } as const)
+        : await prepareFolder(destination);
+    const destinationId = freshProjectId ?? destination?.id;
+    if (destinationId === undefined) return { kind: "cancelled" };
     if ("cancelled" in folder) {
       setPhase(null);
       return { kind: "cancelled" };
@@ -575,7 +617,7 @@ function ComposerField({
           createdAt,
           bootstrap: {
             createThread: {
-              projectId: destination.id,
+              projectId: destinationId,
               // The engine requires a non-empty title; the server regenerates a better one later.
               title: labels.title,
               modelSelection,
@@ -625,7 +667,7 @@ function ComposerField({
     if (note !== null) rememberStartNote(threadId, `${note} ${PRIVATE_COPY_COPY.undoOff}`);
     // Family with siblings: list it under this child's conversations straight away.
     noteStartedHere(threadId);
-    writeLastProject({ environmentId, projectId: destination.id });
+    writeLastProject({ environmentId, projectId: destinationId });
     navigate(threadHref(environmentId, threadId));
     return { kind: "started" };
   };

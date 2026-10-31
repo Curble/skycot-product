@@ -12,10 +12,12 @@ import {
   KID_STARTERS,
   SURPRISE_IDEAS,
   firstBlank,
+  freshProjectName,
   pickSurprise,
   starterMessageText,
   starterPrompt,
   startersFor,
+  startsFreshProject,
   stillFromStarter,
 } from "./starters";
 
@@ -134,5 +136,44 @@ describe("starter cards", () => {
       .filter((starter) => firstBlank(starter.ask) === null)
       .map((starter) => starter.id);
     expect(withoutBlanks).toEqual(["surprise", "phones", "polish"]);
+  });
+});
+
+describe("a starter card starts a project of its own", () => {
+  const seed = { text: seedText() };
+  function seedText() {
+    return starterPrompt(KID_STARTERS.find((card) => card.id === "birthday")!);
+  }
+
+  it("is fresh for a child who tapped a card and picked no project", () => {
+    expect(startsFreshProject({ childView: true, seed, text: seed.text, chosenKey: null })).toBe(
+      true,
+    );
+  });
+
+  it("is not fresh when the project was picked by hand, or the box holds their own words", () => {
+    expect(startsFreshProject({ childView: true, seed, text: seed.text, chosenKey: "e:p" })).toBe(
+      false,
+    );
+    expect(
+      startsFreshProject({ childView: true, seed, text: "fix my snake game", chosenKey: null }),
+    ).toBe(false);
+  });
+
+  it("is not fresh without a card, or for a grown-up", () => {
+    expect(startsFreshProject({ childView: true, seed: null, text: "hi", chosenKey: null })).toBe(
+      false,
+    );
+    expect(startsFreshProject({ childView: false, seed, text: seed.text, chosenKey: null })).toBe(
+      false,
+    );
+  });
+
+  it("names the project from the card and never repeats a name", () => {
+    expect(freshProjectName("A birthday card", [])).toBe("Birthday card");
+    expect(freshProjectName("Make a game", [])).toBe("Game");
+    expect(freshProjectName("A birthday card", ["Birthday card", "birthday card 2"])).toBe(
+      "Birthday card 3",
+    );
   });
 });
