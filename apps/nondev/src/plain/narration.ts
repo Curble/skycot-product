@@ -527,7 +527,9 @@ function searchPattern(base: string, args: ReadonlyArray<string>): string | unde
 
 function describePackage(name: string): string {
   const bare = name.replace(/@[^@/]+$/, "");
-  return KNOWN_PACKAGES[bare] ?? `the "${bare}" add-on`;
+  // Keep the real name next to the friendly one: a grown-up deciding needs it.
+  const known = KNOWN_PACKAGES[bare];
+  return known === undefined ? `the "${bare}" add-on` : `${known} (${bare})`;
 }
 
 /**

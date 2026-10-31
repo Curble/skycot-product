@@ -17,12 +17,17 @@ const PATH_LIKE = /\.(tsx?|jsx?|css|json|md)\b|\/src\/|^\/|~\//;
 
 describe("classifyCommand", () => {
   it.each([
-    ["npm install react-datepicker", "install", "medium", "Installed 1 add-on: a date picker"],
+    [
+      "npm install react-datepicker",
+      "install",
+      "medium",
+      "Installed 1 add-on: a date picker (react-datepicker)",
+    ],
     [
       "pnpm add zod react-hook-form",
       "install",
       "medium",
-      "Installed 2 add-ons: a form and data checker and a form helper",
+      "Installed 2 add-ons: a form and data checker (zod) and a form helper (react-hook-form)",
     ],
     ["npm ci", "install", "medium", "Set up the add-ons the project already lists"],
     ["pnpm test", "test", "low", "Ran the project's checks"],
@@ -192,7 +197,7 @@ describe("describeTurnItem", () => {
     const running = describeTurnItem(
       items.command("npm install react-datepicker", {}, { status: "running" }),
     );
-    expect(running.headline).toBe("Installing 1 add-on: a date picker");
+    expect(running.headline).toBe("Installing 1 add-on: a date picker (react-datepicker)");
     expect(running.status).toBe("running");
     const dangerous = describeTurnItem(items.command("rm -rf dist"));
     expect(dangerous.risk).toBe("high");
@@ -213,7 +218,7 @@ describe("describeTurnItem", () => {
   it("narrates approvals in three states using the runtime request decision", () => {
     const item = items.approval("command", { prompt: "npm install dayjs" });
     expect(describeTurnItem(item).headline).toBe(
-      "The assistant wants to install 1 add-on: a date helper",
+      "The assistant wants to install 1 add-on: a date helper (dayjs)",
     );
     expect(describeTurnItem(item).status).toBe("pending");
     const requests = new Map([
@@ -346,7 +351,7 @@ describe("describeTurnItem", () => {
 describe("summarizeRun", () => {
   it("counts finished work and names what is happening now", () => {
     const run = [
-      items.user("Add a date picker"),
+      items.user("Add a date picker (react-datepicker)"),
       items.command("cat src/pages/booking.tsx", {}),
       items.fileChange("src/pages/booking.tsx", { additions: 4, deletions: 1 }),
       items.fileChange("src/pages/booking.tsx", { additions: 2, deletions: 0 }),

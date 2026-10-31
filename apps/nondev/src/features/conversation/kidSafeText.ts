@@ -5,6 +5,7 @@ export function kidSafeText(text: string): string {
     .replace(/`[^`\n]+`/gu, "something behind the scenes")
     .replace(/https?:\/\/[^\s)]+/giu, "a website")
     .replace(/\b(?:\/[^\s,;]+){2,}/gu, "something behind the scenes")
+    .replace(/\b(from|on|via|using) (?:the )?npm(?: registry)?\b/giu, "$1 the add-on library")
     .replace(
       /\b(?:files?|folders?|directories|repos?|commits?|branches|builds?|deploys?|servers?|terminals?|npm|packages?|scripts?|tokens?|apis?|json|urls?|paths?|sandboxes?|worktrees?|runtimes?|processes)\b/giu,
       "things",

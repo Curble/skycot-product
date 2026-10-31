@@ -501,8 +501,8 @@ export function RequestCard({
             {childView && !decided && grownUp !== null && remoteGrownUps ? (
               <p className="fm-help">
                 {grownUpNames.length > 0
-                  ? `We've let ${grownUpNames[0]} know on their phone. Or a grown-up can type the code here.`
-                  : "We've let a grown-up know on their phone. Or a grown-up can type the code here."}
+                  ? `${grownUpNames[0]} can say yes from their phone, or a grown-up can type the code here.`
+                  : "A grown-up can say yes from their phone, or type the code here."}
               </p>
             ) : null}
             {decided || (childView && grownUp !== null) ? null : (

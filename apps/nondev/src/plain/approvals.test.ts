@@ -24,7 +24,9 @@ describe("describeRuntimeRequest — commands", () => {
       items.approval("command", { prompt: "npm install react-datepicker" }),
     );
     expect(card.title).toBe("May I run this?");
-    expect(card.whatItWants).toBe("The assistant wants to install 1 add-on: a date picker.");
+    expect(card.whatItWants).toBe(
+      "The assistant wants to install 1 add-on: a date picker (react-datepicker).",
+    );
     expect(card.scope).toBe("the internet");
     expect(card.sizeOrCost).toBe("Downloads 1 add-on from the internet into this project.");
     expect(card.risk).toBe("medium");
@@ -206,7 +208,7 @@ describe("childApprovalSentence", () => {
         }),
       );
       expect(card.whatItWants).toBe(
-        "The assistant wants to install 1 add-on: a grab-bag of helpers.",
+        "The assistant wants to install 1 add-on: a grab-bag of helpers (lodash).",
       );
       expect(card.sizeOrCost).toContain("1 add-on");
       expect(childApprovalSentence(card, "Sam")).not.toContain(".npm-cache");

@@ -19,6 +19,10 @@ describe("kidSafeText", () => {
     );
   });
 
+  it("says where an add-on comes from instead of naming the registry", () => {
+    expect(kidSafeText("Install Lodash from npm.")).toBe("Install Lodash from the add-on library.");
+  });
+
   it("removes markdown markers that the phone cannot render", () => {
     expect(kidSafeText("**How I did it:** I drew a box.")).toBe("How I did it: I drew a box.");
   });
