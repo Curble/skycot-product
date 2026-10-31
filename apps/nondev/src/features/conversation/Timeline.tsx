@@ -22,6 +22,7 @@ import {
 import { foldTakenBack, rolledBackRunIds } from "../rewind/rewind";
 import { TakenBackFold } from "../rewind/TakenBackFold";
 import { Bubble, DayDivider, TypingIndicator } from "../../ui/Bubble";
+import { Highlight } from "../../ui/Highlight";
 import { groupTimelineItems, type TimelineEntry } from "./cards";
 import {
   getTimelineRenderer,
@@ -60,10 +61,18 @@ function renderDefault(context: TimelineRenderContext, childView = false): React
   const { item } = context;
   switch (item.type) {
     case "user_message":
-      return <Bubble author="me">{item.text}</Bubble>;
+      return (
+        <Bubble author="me">
+          <Highlight text={item.text} />
+        </Bubble>
+      );
     case "assistant_message":
       if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
-      return <Bubble author="crew">{item.text}</Bubble>;
+      return (
+        <Bubble author="crew">
+          <Highlight text={item.text} />
+        </Bubble>
+      );
     case "run_interrupt_result": {
       const askedToStop = context.items.some(
         (other) => other.type === "run_interrupt_request" && other.runId === item.runId,
@@ -274,7 +283,7 @@ export function Timeline({
           {sendingMessage && !sendingAlreadyRecorded ? (
             <div key={sendingMessage.id} className="fm-stream__item">
               <Bubble author="me" meta="Sending…">
-                {sendingMessage.text}
+                <Highlight text={sendingMessage.text} />
               </Bubble>
             </div>
           ) : null}

@@ -304,3 +304,35 @@ h1.fm-conv-header__name {
     visibility: visible !important;
   }
 }
+
+/* Find in a conversation: a find bar under the header, like Safari's and Notes'. */
+.fm-findbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--fm-sep-2);
+  background: var(--fm-bg-window);
+}
+.fm-findbar__field {
+  flex: 1 1 160px;
+  max-width: 360px;
+}
+.fm-findbar__count {
+  min-width: 64px;
+  font-size: calc(12px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* A calm yellow marker that reads on blue and grey bubbles, light or dark; the one you are on is stronger. */
+.fm-find-mark {
+  background: #ffe58a;
+  color: #1d1d1f;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.fm-find-mark--current {
+  background: #ffb340;
+  box-shadow: 0 0 0 2px var(--fm-accent);
+}

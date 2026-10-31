@@ -31,6 +31,7 @@ import {
   FolderPlus,
   Pencil,
   FolderOpen,
+  Search,
   Receipt,
   ShieldAlert,
   Square,
@@ -56,6 +57,7 @@ import { CrewAvatar } from "../../themes/CrewAvatar";
 import { useCrew } from "../../themes/useCrew";
 import { Banner } from "../../ui/Banner";
 import { Button, IconButton } from "../../ui/Button";
+import { FindWordProvider } from "../../ui/Highlight";
 import { TypingIndicator } from "../../ui/Bubble";
 import { EmptyState } from "../../ui/EmptyState";
 import { Pill } from "../../ui/Pill";
@@ -94,6 +96,7 @@ import { RewindHost } from "../rewind/RewindHost";
 import { stopEditing, useEditDraft } from "../rewind/store";
 import { useGoBackCommand, useRewindFacts } from "../rewind/useGoBack";
 import { ConversationMenuButton } from "../tidy/ConversationMenu";
+import { FindBar, isFindShortcut } from "../tidy/FindBar";
 import { DeleteSheet } from "../tidy/DeleteSheet";
 import { RenameSheet } from "../tidy/RenameSheet";
 import { useTidy } from "../tidy/useTidy";
@@ -363,6 +366,27 @@ export function ConversationView({
       setSendingMessage(null);
   }, [projection, sendingMessage]);
   const [journeyNote, setJourneyNote] = useState<string | null>(null);
+  // Find in this conversation: Cmd+F (Ctrl+F off a Mac) opens the bar under the header.
+  const [findOpen, setFindOpen] = useState(false);
+  const [findWord, setFindWord] = useState("");
+  const closeFind = () => {
+    setFindOpen(false);
+    setFindWord("");
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isFindShortcut(event)) return;
+      event.preventDefault();
+      setFindOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // Another conversation opens with a fresh, closed bar.
+  useEffect(() => {
+    setFindOpen(false);
+    setFindWord("");
+  }, [threadId]);
   const title = shell ? conversationTitle(shell) : null;
   const publish = usePublishOverview({
     environmentId,
@@ -442,6 +466,11 @@ export function ConversationView({
           ) : archived || question || childView || family.profile.me.kind === "grown-up" ? null : (
             <PublishButton readiness={publish.readiness} onClick={() => setPublishOpen(true)} />
           )}
+          <IconButton
+            icon={Search}
+            label="Find in conversation"
+            onClick={() => (findOpen ? closeFind() : setFindOpen(true))}
+          />
           {shell && canOperate ? (
             <ConversationMenuButton
               shell={shell}
@@ -453,6 +482,10 @@ export function ConversationView({
           {project ? <ProjectAvatar project={project} size="md" /> : null}
         </div>
       </header>
+
+      {findOpen ? (
+        <FindBar query={findWord} onQueryChange={setFindWord} onClose={closeFind} />
+      ) : null}
 
       {shell && status ? (
         <div className="fm-strip fm-strip--wrap">
@@ -563,45 +596,47 @@ export function ConversationView({
           </div>
         </div>
       ) : (
-        <Timeline
-          environmentId={environmentId}
-          threadId={threadId}
-          projection={projection}
-          shell={shell}
-          projectName={projectName}
-          sendingMessage={sendingMessage}
-          trailing={
-            childView &&
-            (active ||
-              // After a build: its Finish page stays until the child sends something new.
-              (!active &&
-                !waitingForGrownUp &&
-                latestRunId !== null &&
-                projection.turnItems.at(-1)?.type !== "user_message" &&
-                projection.turnItems.some(
-                  (item) => item.type === "file_change" && item.runId === latestRunId,
-                ))) ? (
-              <div hidden={active && waitingOnYou}>
-                <BuildJourney
-                  key={latestRunId}
-                  runId={latestRunId}
-                  projection={projection}
-                  elapsedMs={
-                    startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0
-                  }
-                  finished={!active}
-                  onTellSam={setJourneyNote}
-                />
-              </div>
-            ) : active &&
-              !waitingOnYou &&
-              !projection.turnItems.some(
-                (item) => item.type === "assistant_message" && item.streaming,
-              ) ? (
-              <TypingIndicator meta={`${crewName} is working…`} />
-            ) : null
-          }
-        />
+        <FindWordProvider value={findOpen ? findWord : ""}>
+          <Timeline
+            environmentId={environmentId}
+            threadId={threadId}
+            projection={projection}
+            shell={shell}
+            projectName={projectName}
+            sendingMessage={sendingMessage}
+            trailing={
+              childView &&
+              (active ||
+                // After a build: its Finish page stays until the child sends something new.
+                (!active &&
+                  !waitingForGrownUp &&
+                  latestRunId !== null &&
+                  projection.turnItems.at(-1)?.type !== "user_message" &&
+                  projection.turnItems.some(
+                    (item) => item.type === "file_change" && item.runId === latestRunId,
+                  ))) ? (
+                <div hidden={active && waitingOnYou}>
+                  <BuildJourney
+                    key={latestRunId}
+                    runId={latestRunId}
+                    projection={projection}
+                    elapsedMs={
+                      startedAt ? Math.max(0, Date.now() - Date.parse(startedAt) - waited) : 0
+                    }
+                    finished={!active}
+                    onTellSam={setJourneyNote}
+                  />
+                </div>
+              ) : active &&
+                !waitingOnYou &&
+                !projection.turnItems.some(
+                  (item) => item.type === "assistant_message" && item.streaming,
+                ) ? (
+                <TypingIndicator meta={`${crewName} is working…`} />
+              ) : null
+            }
+          />
+        </FindWordProvider>
       )}
 
       {family.profile.me.kind === "grown-up" ? (

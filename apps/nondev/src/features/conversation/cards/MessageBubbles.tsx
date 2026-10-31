@@ -22,6 +22,7 @@ import { useChildView } from "../../../app/useChildView";
 import { childErrors } from "../../../plain/copy";
 import { restCopy } from "../restCopy";
 import { Button } from "../../../ui/Button";
+import { Highlight } from "../../../ui/Highlight";
 import { useState } from "react";
 import { useDecisionDispatcher } from "./dispatch";
 import { retryTextFor } from "./retryText";
@@ -78,7 +79,7 @@ export function UserBubble({
       {pictures.length > 0 && environmentId !== undefined ? (
         <SentPictures environmentId={environmentId} pictures={pictures} />
       ) : null}
-      {item.text}
+      <Highlight text={item.text} />
       {pointing.length > 0 ? (
         <span className="fm-bubble-pointing">
           {[...new Set(pointing)].map((label) => (

@@ -1,5 +1,7 @@
 import type { MouseEvent, ReactNode } from "react";
 
+import { InMessage } from "./Highlight";
+
 export type BubbleAuthor = "me" | "crew";
 
 /**
@@ -32,7 +34,9 @@ export function Bubble({
       {full ? (
         children
       ) : (
-        <div className={`fm-bubble${muted ? " fm-bubble--muted" : ""}`}>{children}</div>
+        <div className={`fm-bubble${muted ? " fm-bubble--muted" : ""}`}>
+          <InMessage on={!muted}>{children}</InMessage>
+        </div>
       )}
       {meta ? <div className="fm-msg__meta">{meta}</div> : null}
     </div>

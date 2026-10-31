@@ -5,6 +5,8 @@
 // remark-gfm, which would drag the web store graph into this bundle.
 import { Fragment, type ReactNode } from "react";
 
+import { Highlight } from "../../../ui/Highlight";
+
 type Block =
   | { readonly kind: "p"; readonly text: string }
   | { readonly kind: "h"; readonly level: number; readonly text: string }
@@ -135,14 +137,22 @@ export function renderInline(text: string): ReactNode {
   while (rest.length > 0) {
     const match = INLINE.exec(rest);
     if (!match || match.index === undefined) {
-      nodes.push(rest);
+      key += 1;
+      nodes.push(<Highlight key={`t${key}`} text={rest} />);
       break;
     }
-    if (match.index > 0) nodes.push(rest.slice(0, match.index));
+    if (match.index > 0) {
+      key += 1;
+      nodes.push(<Highlight key={`t${key}`} text={rest.slice(0, match.index)} />);
+    }
     const token = match[0];
     key += 1;
     if (token.startsWith("`")) {
-      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
+      nodes.push(
+        <code key={key}>
+          <Highlight text={token.slice(1, -1)} />
+        </code>,
+      );
     } else if (token.startsWith("**") || token.startsWith("__")) {
       nodes.push(<strong key={key}>{renderInline(token.slice(2, -2))}</strong>);
     } else if (token.startsWith("*") || token.startsWith("_")) {
@@ -217,7 +227,9 @@ export function Markdown({
           case "code":
             return (
               <pre key={key(`code:${block.text.slice(0, 40)}`)} data-lang={block.lang ?? undefined}>
-                <code>{block.text}</code>
+                <code>
+                  <Highlight text={block.text} />
+                </code>
               </pre>
             );
           case "hr":
