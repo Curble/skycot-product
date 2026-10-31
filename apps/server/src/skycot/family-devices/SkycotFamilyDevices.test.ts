@@ -639,6 +639,23 @@ it.layer(NodeServices.layer)("who is who", (it) => {
     ),
   );
 
+  it.effect("a child can pin only a conversation they can already use", () =>
+    withWorld(({ visibility }) =>
+      Effect.gen(function* () {
+        const view = (yield* visibility.childViewFor("ava-ipad"))!;
+        const pin = (type: string, threadId: string) =>
+          visibility.allows(view, referencedBy({ type, commandId: "c", threadId }), "use");
+        for (const type of ["thread.pin", "thread.unpin", "thread.pin.reorder"]) {
+          assert.isTrue(yield* pin(type, "thread-ava"), type);
+          assert.isFalse(yield* pin(type, "thread-leo"), type);
+          assert.isFalse(yield* pin(type, "thread-leo-pinned"), type);
+        }
+        // A grown-up's phone is not filtered.
+        assert.isNull(yield* visibility.childViewFor("mum-phone"));
+      }),
+    ),
+  );
+
   // nondev-seam: skycot-project-put-away-test
   it.effect("a put-away project leaves the child's lists and calls, not the grown-up's", () =>
     withWorld(({ family, visibility }) =>

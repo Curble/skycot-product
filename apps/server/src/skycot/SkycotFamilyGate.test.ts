@@ -258,6 +258,11 @@ describe("gateNeedFor", () => {
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.create", worktreePath: null }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.archive" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unarchive" }],
+      // Pin to the top and Unpin only change a conversation's place in the list; whether the
+      // child may touch that conversation is the per-thread visibility check, not this gate.
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.pin" }],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unpin" }],
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.pin.reorder" }],
       // Going back to an earlier message, and Undo: the same rollback, with or without files.
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(true)],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(false)],

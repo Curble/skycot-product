@@ -7,6 +7,7 @@ import { useCrew } from "../../themes/useCrew";
 import { useChildView } from "../../app/useChildView";
 import { IconButton } from "../../ui/Button";
 import { MenuItem, MenuSeparator, Popover, type PopoverTriggerProps } from "../../ui/Popover";
+import { isPinned, pinMenuLabel } from "./pinned";
 import { putAwayBlocked } from "./tidy";
 import { useTidy } from "./useTidy";
 
@@ -50,6 +51,16 @@ export function ConversationMenuItems({
       >
         Rename…
       </MenuItem>
+      {archived ? null : (
+        <MenuItem
+          onSelect={() => {
+            close();
+            void tidy.setPinned(shell, !isPinned(shell));
+          }}
+        >
+          {pinMenuLabel(shell)}
+        </MenuItem>
+      )}
       {archived ? (
         <MenuItem
           onSelect={() => {

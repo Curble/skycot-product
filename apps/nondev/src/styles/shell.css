@@ -420,6 +420,12 @@
   align-self: start;
   padding-top: 1px;
 }
+.fm-convrow__pin {
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 4px;
+  color: var(--fm-label-2);
+}
 .fm-convrow__preview {
   font-size: calc(13px * var(--fm-text-scale));
   line-height: 1.3;

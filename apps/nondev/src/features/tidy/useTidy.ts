@@ -12,6 +12,7 @@ import { isFamilyRefusal } from "../family/cards";
 import { useFamily } from "../family/FamilyProvider";
 import { refreshFridge } from "../fridge/store";
 import { forgetRename, rememberRename } from "./renamedTitles";
+import { pinToastMessage } from "./pinned";
 import { cleanTitle, quotedName } from "./tidy";
 
 export type TidyOutcome = { readonly ok: true } | { readonly ok: false; readonly message: string };
@@ -48,6 +49,8 @@ export function useTidy() {
   const updateMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+  const pinThread = useAtomCommand(threadEnvironment.pin, { reportFailure: false });
+  const unpinThread = useAtomCommand(threadEnvironment.unpin, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
 
   const bringBack = async (
@@ -133,6 +136,33 @@ export function useTidy() {
   };
 
   /**
+   * Pin to the top, or unpin, with Undo. Both are the engine's own pin commands for this one
+   * conversation, so they change only its place in the list, never who can see it.
+   */
+  const setPinned = async (
+    shell: Pick<EnvironmentThreadShell, "environmentId" | "id">,
+    pinned: boolean,
+    options: { readonly toast?: boolean } = {},
+  ): Promise<TidyOutcome> => {
+    const run = pinned ? pinThread : unpinThread;
+    const outcome = await run({
+      environmentId: shell.environmentId,
+      input: { threadId: shell.id },
+    });
+    if (outcome._tag === "Failure") {
+      if (options.toast !== false) showToast(DIDNT_GO);
+      return { ok: false, message: DIDNT_GO };
+    }
+    if (options.toast !== false) {
+      showToast(pinToastMessage(pinned), {
+        label: "Undo",
+        run: () => setPinned(shell, !pinned, { toast: false }),
+      });
+    }
+    return { ok: true };
+  };
+
+  /**
    * Deletes for good. In a Family profile the delete sheet collects the code and the engine
    * records a yes for this one conversation, spent by the delete.
    */
@@ -164,5 +194,5 @@ export function useTidy() {
     return { kind: "deleted" };
   };
 
-  return { putAway, bringBack, rename, remove };
+  return { putAway, bringBack, rename, remove, setPinned };
 }

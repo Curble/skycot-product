@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ThreadId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { Archive, FolderOpen, Laptop, MessageSquareDashed, SquarePen } from "lucide-react";
+import { Archive, FolderOpen, Laptop, MessageSquareDashed, Pin, SquarePen } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 
 import { Mascot } from "../features/brand/Mascot";
@@ -33,6 +33,7 @@ import { startOneHint } from "../features/home/tip";
 import { useStarters } from "../features/starters/StarterCards";
 import { ConversationMenuButton, ConversationMenuItems } from "../features/tidy/ConversationMenu";
 import { DeleteSheet } from "../features/tidy/DeleteSheet";
+import { isPinned, splitPinned } from "../features/tidy/pinned";
 import { RenameSheet } from "../features/tidy/RenameSheet";
 import { useTidy } from "../features/tidy/useTidy";
 import { useCrew } from "../themes/useCrew";
@@ -42,7 +43,14 @@ import { useConnected } from "./useConnection";
 import { conversationSearchVisible } from "./searchVisibility";
 import type { Columns } from "./useColumns";
 
-const GROUP_ORDER: ReadonlyArray<DateGroup> = ["Today", "Yesterday", "This week", "Earlier"];
+type ListGroup = DateGroup | "Pinned";
+const GROUP_ORDER: ReadonlyArray<ListGroup> = [
+  "Pinned",
+  "Today",
+  "Yesterday",
+  "This week",
+  "Earlier",
+];
 
 /** The middle column: every conversation, grouped by day, filtered by the sidebar and search. */
 export function ConversationList({
@@ -192,8 +200,13 @@ export function ConversationList({
               </p>
             ) : null}
             {sections.map((section) => {
-              const groups = new Map<DateGroup, ConversationRow[]>();
-              for (const row of section.rows) {
+              const groups = new Map<ListGroup, ConversationRow[]>();
+              // Pinned ones lead each section; putting-away lists have no pins.
+              const { pinned, rest } = old
+                ? { pinned: [], rest: section.rows }
+                : splitPinned(section.rows);
+              if (pinned.length > 0) groups.set("Pinned", [...pinned]);
+              for (const row of rest) {
                 const group = dateGroup(row.at, now);
                 const list = groups.get(group);
                 if (list) list.push(row);
@@ -384,7 +397,18 @@ function ConversationRowButton({
       <span className="fm-convrow__body">
         <span className="fm-convrow__head">
           <span className="fm-convrow__title">{row.title}</span>
-          <span className="fm-convrow__time">{formatRowTime(row.at, now)}</span>
+          <span className="fm-convrow__time">
+            {isPinned(row.shell) ? (
+              <Pin
+                className="fm-convrow__pin"
+                size={11}
+                strokeWidth={2}
+                role="img"
+                aria-label="Pinned"
+              />
+            ) : null}
+            {formatRowTime(row.at, now)}
+          </span>
         </span>
         <span className="fm-convrow__preview">
           {row.project && row.title !== row.project.title ? `${row.project.title} · ` : ""}
