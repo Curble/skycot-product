@@ -22,12 +22,16 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
+import * as Fiber from "effect/Fiber";
+import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
 import * as ClaudeAdapterV2 from "../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
 import * as SkycotFamilyClaude from "./SkycotFamilyClaude.ts";
 import * as SkycotFamilyLockdown from "./SkycotFamilyLockdown.ts";
 
+type FamilyRuntime = ProviderAdapter.ProviderAdapterV2SessionRuntime;
 const lockdown = new SkycotFamilyLockdown.FamilyLockdown(ClaudeAdapterV2.CLAUDE_PROVIDER);
 const DEFAULT_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)({});
 const modelSelection = {
@@ -70,7 +74,13 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
 });
 
 describe("ClaudeAdapterV2 under the Family lockdown", () => {
-  const openAndStartTurn = (withLockdown: boolean) =>
+  const runTurn = <A, E>(
+    withLockdown: boolean,
+    use: (
+      opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOptions>,
+      runtime: FamilyRuntime,
+    ) => Effect.Effect<A, E, Scope.Scope>,
+  ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOptions> = [];
@@ -163,13 +173,16 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         modelSelection,
         runtimePolicy,
       });
-      return opened;
+      return yield* use(opened, runtime);
     }).pipe(
       Effect.scoped,
       Effect.provide(
         Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
       ),
     );
+
+  const openAndStartTurn = (withLockdown: boolean) =>
+    runTurn(withLockdown, (opened) => Effect.succeed(opened));
 
   it.effect("opens a Family session's queries without the parent's Claude setup", () =>
     Effect.gen(function* () {
@@ -186,6 +199,81 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
     }),
   );
 
+  const install = { command: "npm install lodash" };
+
+  // Asks for the step through the live permission callback; resolves to the raised card's
+  // request id, or to the immediate answer when no card was raised.
+  const ask = (
+    opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOptions>,
+    runtime: FamilyRuntime,
+    toolUseID: string,
+  ) =>
+    Effect.gen(function* () {
+      const card = yield* runtime.events.pipe(
+        Stream.filter((event) => event.type === "runtime_request.updated"),
+        Stream.runHead,
+        Effect.forkScoped,
+      );
+      const answer = yield* Effect.promise(() =>
+        opened[0]!.canUseTool!("Bash", install, {
+          signal: new AbortController().signal,
+          toolUseID,
+          requestId: `request-${toolUseID}`,
+        }),
+      ).pipe(Effect.forkScoped);
+      const first = yield* Effect.raceFirst(
+        Fiber.join(card).pipe(Effect.map((event) => ({ type: "card", event }) as const)),
+        Fiber.join(answer).pipe(Effect.map((result) => ({ type: "answer", result }) as const)),
+      );
+      return { first, answer };
+    });
+
+  it.effect("a no carries on without the step, and the same step is not asked twice", () =>
+    runTurn(true, (opened, runtime) =>
+      Effect.gen(function* () {
+        const one = yield* ask(opened, runtime, "tool-1");
+        assert.equal(one.first.type, "card");
+        if (one.first.type !== "card") return;
+        const event = one.first.event;
+        if (Option.isNone(event) || event.value.type !== "runtime_request.updated") return;
+        yield* runtime.respondToRuntimeRequest({
+          requestId: event.value.runtimeRequest.id,
+          decision: "decline",
+        });
+        const declined = yield* Fiber.join(one.answer);
+        assert.deepInclude(declined, {
+          behavior: "deny",
+          message: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
+        });
+        // The identical step again: refused at once, no new card.
+        const two = yield* ask(opened, runtime, "tool-2");
+        assert.equal(two.first.type, "answer");
+        if (two.first.type !== "answer") return;
+        assert.deepInclude(two.first.result, {
+          behavior: "deny",
+          message: SkycotFamilyClaude.FAMILY_DECLINED_AGAIN_MESSAGE,
+        });
+      }),
+    ),
+  );
+
+  it.effect("a grown-up's yes still lets the step run", () =>
+    runTurn(true, (opened, runtime) =>
+      Effect.gen(function* () {
+        const one = yield* ask(opened, runtime, "tool-1");
+        assert.equal(one.first.type, "card");
+        if (one.first.type !== "card") return;
+        const event = one.first.event;
+        if (Option.isNone(event) || event.value.type !== "runtime_request.updated") return;
+        yield* runtime.respondToRuntimeRequest({
+          requestId: event.value.runtimeRequest.id,
+          decision: "accept",
+        });
+        assert.equal((yield* Fiber.join(one.answer))?.behavior, "allow");
+      }),
+    ),
+  );
+
   it.effect("changes nothing while the profile is off", () =>
     Effect.gen(function* () {
       const opened = yield* openAndStartTurn(false);
@@ -198,4 +286,59 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
       }
     }),
   );
+});
+
+describe("SkycotFamilyClaude declined steps", () => {
+  it("tells the assistant plainly to carry on, with no age and no way to say yes", () => {
+    for (const message of [
+      SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
+      SkycotFamilyClaude.FAMILY_DECLINED_AGAIN_MESSAGE,
+    ]) {
+      assert.match(message, /family/);
+      assert.match(message, /[Cc]arry on without it/);
+      assert.notMatch(message, /child|kid|\d+-year|years? old/i);
+    }
+  });
+
+  it("remembers a step for its own turn only", () => {
+    const declined = new SkycotFamilyClaude.FamilyDeclinedSteps();
+    declined.record("turn-1", "Bash", { command: "npm install lodash" });
+    assert.isTrue(declined.has("turn-1", "Bash", { command: "npm install lodash" }));
+    assert.isFalse(declined.has("turn-1", "Bash", { command: "npm install left-pad" }));
+    assert.isFalse(declined.has("turn-1", "Write", { command: "npm install lodash" }));
+    assert.isFalse(declined.has("turn-2", "Bash", { command: "npm install lodash" }));
+  });
+
+  it("only changes the decline words; a yes is still a yes", () => {
+    const declined = ClaudeAdapterV2.permissionResultFromDecision({
+      toolName: "Bash",
+      decision: "decline",
+      toolInput: { command: "npm install lodash" },
+      toolUseID: "t1",
+      declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
+    });
+    assert.equal(declined.behavior, "deny");
+    if (declined.behavior === "deny") {
+      assert.equal(declined.message, SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE);
+    }
+    const stopped = ClaudeAdapterV2.permissionResultFromDecision({
+      toolName: "Bash",
+      decision: "cancel",
+      toolInput: {},
+      toolUseID: "t2",
+      declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
+    });
+    assert.equal(
+      stopped.behavior === "deny" ? stopped.message : "",
+      "User cancelled tool execution.",
+    );
+    const allowed = ClaudeAdapterV2.permissionResultFromDecision({
+      toolName: "Bash",
+      decision: "accept",
+      toolInput: { command: "npm install lodash" },
+      toolUseID: "t3",
+      declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
+    });
+    assert.equal(allowed.behavior, "allow");
+  });
 });

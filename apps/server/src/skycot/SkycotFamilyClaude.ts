@@ -72,3 +72,36 @@ export function lockQueryOptions<O extends ClaudeLockableOptions>(
     extraArgs: { ...options.extraArgs, "no-chrome": null },
   };
 }
+
+/**
+ * What the assistant is told when the family says no to a step. Plain words, no one's age:
+ * "the family said no" is all it needs. A no only ever stops the step; it never allows anything.
+ */
+export const FAMILY_DECLINED_MESSAGE =
+  "The family said no to this step, so it was not done. Do not try it again. Carry on without it: do the job another way that needs no install and no internet, or say in one short sentence that this part needs a grown-up.";
+
+/** The answer to the same step asked again after a no, without raising another card. */
+export const FAMILY_DECLINED_AGAIN_MESSAGE =
+  "The family already said no to this exact step, so SKYCOT will not ask again. Carry on without it: do the job another way that needs no install and no internet, or say in one short sentence that this part needs a grown-up.";
+
+/**
+ * The steps a Family turn's card was answered "no" to, kept for that turn only: the same tool
+ * with the same input is refused at once instead of raising the card again. A later message
+ * starts clean, so a grown-up who changes their mind can still be asked. Only a "decline" is
+ * recorded (Stop is a cancel and is not); nothing here ever answers yes.
+ */
+export class FamilyDeclinedSteps {
+  private readonly keys = new Set<string>();
+
+  private static key(turnId: string, toolName: string, toolInput: unknown): string {
+    return JSON.stringify([turnId, toolName, toolInput]);
+  }
+
+  record(turnId: string, toolName: string, toolInput: unknown): void {
+    this.keys.add(FamilyDeclinedSteps.key(turnId, toolName, toolInput));
+  }
+
+  has(turnId: string, toolName: string, toolInput: unknown): boolean {
+    return this.keys.has(FamilyDeclinedSteps.key(turnId, toolName, toolInput));
+  }
+}

@@ -2806,6 +2806,8 @@ export function permissionResultFromDecision(input: {
   readonly toolInput: Record<string, unknown>;
   readonly toolUseID: string;
   readonly suggestions?: Parameters<CanUseTool>[2]["suggestions"];
+  /** Family: what the assistant is told after a "decline" (SkycotFamilyClaude). */
+  readonly declineMessage?: string; // nondev-seam: skycot-family-lockdown-claude
 }): PermissionResult {
   if (input.decision === "accept" || input.decision === "acceptForSession") {
     return {
@@ -2827,7 +2829,7 @@ export function permissionResultFromDecision(input: {
     message:
       input.decision === "cancel"
         ? "User cancelled tool execution."
-        : "User declined tool execution.",
+        : (input.declineMessage ?? "User declined tool execution."), // nondev-seam: skycot-family-lockdown-claude
     toolUseID: input.toolUseID,
     decisionClassification: "user_reject",
     ...(input.decision === "cancel" ? { interrupt: true } : {}),
@@ -3890,6 +3892,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     openSession: Effect.fn("ClaudeAdapterV2.openSession")(
       function* (input: ProviderAdapter.ProviderAdapterV2OpenSessionInput) {
         const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown; // nondev-seam: skycot-family-lockdown-claude
+        const familyDeclined = new SkycotFamilyClaude.FamilyDeclinedSteps(); // nondev-seam: skycot-family-lockdown-claude
         const sessionScope = yield* Effect.scope;
         const now = yield* DateTime.now;
         const session = providerSession({
@@ -8856,6 +8859,19 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             } satisfies PermissionResult;
           }
 
+          // nondev-seam: skycot-family-lockdown-claude
+          if (
+            skycotLockdown !== null &&
+            familyDeclined.has(String(context.providerTurnId), toolName, toolInput)
+          ) {
+            return {
+              behavior: "deny",
+              message: SkycotFamilyClaude.FAMILY_DECLINED_AGAIN_MESSAGE,
+              toolUseID: callbackOptions.toolUseID,
+              decisionClassification: "user_reject",
+            } satisfies PermissionResult;
+          }
+
           const requestKind = providerRequestKindFromClaudeTool(toolName);
           const prompt =
             callbackOptions.title ??
@@ -8914,11 +8930,17 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ),
           );
 
+          if (skycotLockdown !== null && resolvedDecision === "decline") {
+            familyDeclined.record(String(context.providerTurnId), toolName, toolInput); // nondev-seam: skycot-family-lockdown-claude
+          }
           return permissionResultFromDecision({
             toolName,
             decision: resolvedDecision,
             toolInput,
             toolUseID: callbackOptions.toolUseID,
+            ...(skycotLockdown !== null
+              ? { declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE }
+              : {}), // nondev-seam: skycot-family-lockdown-claude
             ...(callbackOptions.suggestions === undefined
               ? {}
               : { suggestions: callbackOptions.suggestions }),
