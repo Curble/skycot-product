@@ -68,6 +68,7 @@ import {
   shouldAskTrackingSheet,
   STARTER_GITIGNORE,
 } from "./privateCopy";
+import { projectPlaceholder } from "./placeholderText";
 import { rememberStartNote } from "./startNotes";
 import {
   composeTargetFor,
@@ -665,7 +666,7 @@ function ComposerField({
         ? "No assistant is set up yet — connect one in Settings → AI assistants"
         : project === null
           ? JUST_ASK_COPY.placeholder
-          : `Say what you'd like done in ${project.title}…`;
+          : projectPlaceholder(project.title);
 
   return (
     <>
