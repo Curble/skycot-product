@@ -57,6 +57,7 @@ export function starterRulesFor(id: string | null): string | null {
     "This request came from a SKYCOT starter card, so it also follows these technical rules (they are not shown in the chat; do not repeat them):",
     `- Make it one new file called ${STARTER_FILE_NAMES[id]}, with the HTML, CSS and JavaScript all inside that one file.`,
     "- It must work offline: no internet, no installs, and no pictures, sounds or fonts from websites (draw with CSS, SVG or emoji).",
+    "- Do not run programs or scripts to test it (no node, python or test commands); reading the file back is enough.",
     "- If a [blank] is left in the request, ask one short question before making anything.",
     "- Then say in one short, friendly sentence what you made.",
   ].join("\n");

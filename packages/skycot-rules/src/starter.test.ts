@@ -55,6 +55,7 @@ describe("starterRulesFor", () => {
       expect(rules).toMatch(/HTML, CSS and JavaScript all inside that one file/);
       expect(rules).toMatch(/work offline/);
       expect(rules).toMatch(/no installs/);
+      expect(rules).toMatch(/Do not run programs or scripts to test it/);
       expect(rules).toContain(
         "If a [blank] is left in the request, ask one short question before making anything.",
       );

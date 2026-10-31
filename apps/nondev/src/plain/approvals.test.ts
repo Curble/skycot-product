@@ -187,6 +187,16 @@ describe("childApprovalSentence", () => {
     );
   });
 
+  it("does not call a self-check that only mentions the internet a download", () => {
+    const card = {
+      whatItWants: "The assistant wants to run a short node program.",
+      technical: `/bin/zsh -lc "node - <<'NODE'\nconst page = require('node:fs').readFileSync('birthday-card.html', 'utf8');\nconsole.log('Page checks passed: no internet links.');\nNODE"`,
+    };
+    expect(childApprovalSentence(card, "Sam")).toBe(
+      "Sam wants to run a short program it wrote. A grown-up needs to say yes.",
+    );
+  });
+
   it.each(["--cache .npm-cache", "--cache=.npm-cache", "--registry https://registry.npmjs.org"])(
     "does not call an option value an add-on: %s",
     (option) => {

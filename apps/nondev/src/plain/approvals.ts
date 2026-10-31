@@ -185,8 +185,15 @@ export function childApprovalSentence(
   if (/quiz check|check the quiz/i.test(`${card.whatItWants}\n${card.technical}`)) {
     return `${assistantName} wants to test the quiz by running it. A grown-up needs to say yes.`;
   }
-  if (/\bnode\b/i.test(card.technical) && /\b(?:fetch|https?:|internet)\b/i.test(card.technical)) {
+  // Only real network signs count: a self-check that prints "no internet links" is not a download.
+  if (
+    /\bnode\b/i.test(card.technical) &&
+    /\bfetch\s*\(|https?:\/\/|\bnode:https?\b/i.test(card.technical)
+  ) {
     return `${assistantName} wants to use a short program to get something from the internet. A grown-up needs to say yes.`;
+  }
+  if (/\bnode\s+(?:-e\b|-\s|-$|--eval\b)/im.test(card.technical)) {
+    return `${assistantName} wants to run a short program it wrote. A grown-up needs to say yes.`;
   }
   if (/install\b/i.test(card.technical) && /\bthree(?:\.js)?\b/i.test(card.technical)) {
     return `${assistantName} wants to download a 3D tool. This one needs a grown-up.`;
