@@ -353,6 +353,8 @@
 }
 .fm-builder__art {
   font-size: 24px;
+  font-family:
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--fm-font, system-ui), sans-serif;
 }
 .fm-builder__words {
   display: flex;
@@ -470,6 +472,8 @@ html.dark .fm-picker__tile:not(.fm-picker__tile--special) .fm-picker__art {
   border-radius: 10px;
 }
 html.dark .fm-builder__art {
+  /* Every part icon sits on the same light tile, so dark emoji (paw, speaker) stay readable. */
+  color: #1d1d1f;
   display: grid;
   place-items: center;
   flex: none;

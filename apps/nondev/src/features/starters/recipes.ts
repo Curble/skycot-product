@@ -5,7 +5,7 @@
 // child can change before Send. Pure data and string building, tested in recipes.test.ts.
 // Nothing here mentions ages or reading levels.
 
-import { blankCount, choicesFor, fillBlanks } from "./choices";
+import { blankCount, choicesFor } from "./choices";
 import { KID_STARTERS } from "./starters";
 
 export interface RecipeStepper {
@@ -32,8 +32,9 @@ export interface RecipeItem {
 export interface RecipeBlank {
   /** The small label above the text box, like "My game". */
   readonly label: string;
-  /** What the box starts with; defaults to the card's first picture choice. */
-  readonly initial?: string;
+  /** The grey example in the empty box; defaults to the card's first picture choice. It is only
+   *  ever shown, never written into the sentence. */
+  readonly example?: string;
 }
 
 export interface Recipe {
@@ -50,7 +51,15 @@ const item = (
   hint: string,
   phrase: string,
   stepper?: RecipeStepper,
-): RecipeItem => ({ id, art, title, hint, phrase, ...(stepper === undefined ? {} : { stepper }) });
+): RecipeItem => ({
+  id,
+  // U+FE0F asks for the full-colour picture, never a plain text glyph that takes the text colour.
+  art: art.includes("\uFE0F") ? art : `${art}\uFE0F`,
+  title,
+  hint,
+  phrase,
+  ...(stepper === undefined ? {} : { stepper }),
+});
 
 export const RECIPES: ReadonlyArray<Recipe> = [
   {
@@ -244,7 +253,7 @@ export const RECIPES: ReadonlyArray<Recipe> = [
   },
   {
     starterId: "draw",
-    blanks: [{ label: "Anything extra", initial: "make it spin" }],
+    blanks: [{ label: "Anything extra", example: "make it spin" }],
     items: [
       item(
         "move",
@@ -287,11 +296,11 @@ export function recipeFor(starterId: string): Recipe | undefined {
   return RECIPES.find((recipe) => recipe.starterId === starterId);
 }
 
-/** What a recipe blank's text box starts with. */
-export function initialBlank(starterId: string, blankIndex: number): string {
+/** The grey example shown in an empty text box. It is never part of the sentence. */
+export function exampleBlank(starterId: string, blankIndex: number): string {
   const recipe = recipeFor(starterId);
   const set = choicesFor(starterId).find((entry) => entry.blankIndex === blankIndex);
-  return recipe?.blanks[blankIndex]?.initial ?? set?.choices[0]?.label ?? "";
+  return recipe?.blanks[blankIndex]?.example ?? set?.choices[0]?.label ?? "";
 }
 
 /** The part's words with its stepper number filled in. */
@@ -307,18 +316,41 @@ function listWords(words: ReadonlyArray<string>): string {
 }
 
 /**
+ * The card's own sentence for each card, built from the words the child typed. An empty box
+ * leaves its piece out, so the sentence stays whole without any example words or [holes].
+ * With every box filled these read exactly like the card's own `ask`.
+ */
+const CARD_SENTENCES: Readonly<Record<string, (b: ReadonlyArray<string>) => string>> = {
+  game: ([what]) =>
+    `Please make a simple game I can play in the page${what ? `: ${what}` : ""}. Use the arrow keys or the mouse, keep score, and show a big “Play again” button at the end.`,
+  pet: ([animal, name]) =>
+    `Please make a page all about my pet${animal ? `, a ${animal}` : ""}${name ? `${animal ? " called" : ", called"} ${name}` : ""}. Draw them big using shapes, add three fun facts, and a button that makes them say hello.`,
+  birthday: ([who, age]) =>
+    `Please make a birthday card page${who ? ` for ${who}` : ""}${age ? `${who ? ", who is turning" : " for someone who is turning"} ${age}` : ""}. Make it bright and happy with balloons, a big “Happy birthday!”, and a button that makes confetti pop.`,
+  school: ([topic]) =>
+    `Please make a one-page project${topic ? ` about ${topic}` : ""}. Give it a title, three short sections with headings, a simple diagram drawn with shapes, and a five-question quiz at the end.`,
+  comic: ([what]) =>
+    `Please make a four-panel comic strip${what ? ` about ${what}` : ""}. Draw the characters with simple shapes and put the words in speech bubbles.`,
+  quiz: ([count, topic]) =>
+    `Please make a quiz${count ? ` with ${count} questions` : ""}${topic ? ` about ${topic}` : ""}. Show one question at a time, cheer when an answer is right, and show the score at the end with a “Try again” button.`,
+  draw: ([extra]) =>
+    `I drew a picture of what I want to build and added it to this message. It's a drawing I made, not a photo of anyone. Please build a page that looks like my drawing${extra ? `, and ${extra}` : ""}.`,
+};
+
+/**
  * The sentence the Builder text box opens with: the card's own sentence with the child's blanks
- * filled in, then "Also add: ..." for the ticked parts (in the recipe's order).
+ * filled in (an empty blank is left out), then "Also add: ..." for the ticked parts (in the
+ * recipe's order).
  */
 export function recipeSentence(
   starterId: string,
   blanks: ReadonlyArray<string>,
   ticked: ReadonlyArray<{ readonly id: string; readonly amount?: number | undefined }>,
 ): string {
-  const starter = KID_STARTERS.find((entry) => entry.id === starterId);
   const recipe = recipeFor(starterId);
-  if (starter === undefined || recipe === undefined) return "";
-  const base = fillBlanks(starter.ask, blanks);
+  const build = CARD_SENTENCES[starterId];
+  if (recipe === undefined || build === undefined) return "";
+  const base = build(blanks.map((entry) => entry.trim()));
   const phrases = recipe.items.flatMap((entry) => {
     const hit = ticked.find((tick) => tick.id === entry.id);
     return hit === undefined ? [] : [itemPhrase(entry, hit.amount)];

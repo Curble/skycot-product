@@ -197,8 +197,9 @@ describe("build help, remembered level", () => {
     await click("Next");
     await click("Next");
     expect(title()).toBe("Add a twist?");
+    // One tap: no twist moves straight on to the review screen.
     await click("No twist, thanks");
-    await click("Next");
+    expect(title()).toBe("Ready when you are");
     await click("Make it!");
     const text: string = setSeed.mock.calls[0]![0].text;
     expect(text).toContain("a rabbit called Luna.");
@@ -218,6 +219,15 @@ describe("build help, remembered level", () => {
           .querySelector("input")!
           .click(),
       );
+    const gameBox = document.querySelector<HTMLInputElement>(".fm-builder__blank input")!;
+    expect(gameBox.value).toBe("");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+        gameBox,
+        "catch the falling stars",
+      );
+      gameBox.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     await tick("Levels");
     await tick("Timer");
     await click("Longer timer");
@@ -247,6 +257,25 @@ describe("build help, remembered level", () => {
     expect(seed.text).toContain("catch the falling stars");
     expect(seed.text).toContain("Make the stars sparkle.");
     expect(dialog()).toBeNull();
+  });
+});
+
+describe("Builder with empty boxes", () => {
+  it("never writes the grey examples into the sentence", async () => {
+    state.buildHelp = "builder";
+    await mount(<Probe setSeed={vi.fn()} />);
+    await click("A birthday card");
+    const boxes = [...document.querySelectorAll<HTMLInputElement>(".fm-builder__blank input")];
+    expect(boxes.map((box) => box.value)).toEqual(["", ""]);
+    expect(boxes[0]!.placeholder).toContain("my Nan");
+    await act(async () =>
+      document.querySelector<HTMLInputElement>(".fm-builder__check input")!.click(),
+    );
+    await click("Write it up");
+    const text = document.querySelector<HTMLTextAreaElement>(".fm-builder__text")!.value;
+    expect(text).toContain("Please make a birthday card page. Make it bright");
+    expect(text).not.toContain("my Nan");
+    expect(text).not.toMatch(/turning|\[/);
   });
 });
 

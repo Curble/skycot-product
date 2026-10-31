@@ -297,7 +297,10 @@ export function WordsSheet({
                         className="fm-words__chip fm-words__chip--special"
                         aria-label="No twist, thanks"
                         aria-pressed={picked.length === 0}
-                        onClick={() => set(key, [])}
+                        onClick={() => {
+                          set(key, []);
+                          go(index + 1);
+                        }}
                       >
                         <span>No twist, thanks</span>
                       </button>

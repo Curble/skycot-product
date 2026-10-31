@@ -9,7 +9,7 @@ import { Button } from "../../ui/Button";
 import { Sheet } from "../../ui/Sheet";
 import { choicesFor } from "./choices";
 import { ChangeHowButton, SamArt, TypeMyselfLink } from "./BuildHelpParts";
-import { initialBlank, itemPhrase, recipeSentence, type Recipe } from "./recipes";
+import { exampleBlank, itemPhrase, recipeSentence, type Recipe } from "./recipes";
 
 interface Tick {
   readonly on: boolean;
@@ -33,9 +33,7 @@ export function BuilderSheet({
   readonly onTypeMyself: () => void;
 }) {
   const fieldId = useId();
-  const [blanks, setBlanks] = useState<ReadonlyArray<string>>(() =>
-    recipe.blanks.map((_, i) => initialBlank(starterId, i)),
-  );
+  const [blanks, setBlanks] = useState<ReadonlyArray<string>>(() => recipe.blanks.map(() => ""));
   const [ticks, setTicks] = useState<Readonly<Record<string, Tick>>>(() =>
     Object.fromEntries(
       recipe.items.map((entry) => [entry.id, { on: false, amount: entry.stepper?.start }]),
@@ -157,6 +155,7 @@ export function BuilderSheet({
                   value={blanks[i] ?? ""}
                   maxLength={80}
                   autoComplete="off"
+                  placeholder={`like ${exampleBlank(starterId, i)}`}
                   list={`${fieldId}-${i}`}
                   onChange={(event) =>
                     setBlanks((current) =>
@@ -244,12 +243,7 @@ export function BuilderSheet({
             <span className="fm-builder__count" aria-live="polite">
               {picked.length} picked · you can add your own words next
             </span>
-            <Button
-              variant="primary"
-              size="lg"
-              disabled={blanks.some((entry) => entry.trim() === "")}
-              onClick={writeItUp}
-            >
+            <Button variant="primary" size="lg" onClick={writeItUp}>
               Write it up
             </Button>
           </div>
