@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 interface ListRowProps {
   readonly title: ReactNode;
@@ -19,6 +19,8 @@ interface ListRowProps {
   readonly disabledReason?: string;
   /** One choice of several (a Settings picker): announced as a radio, ticked when true. */
   readonly checked?: boolean;
+  /** Right-click on the row (a context menu). */
+  readonly onContextMenu?: (event: MouseEvent<HTMLLIElement>) => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export function ListRow({
   expanded,
   disabledReason,
   checked,
+  onContextMenu,
 }: ListRowProps) {
   const interactive = onClick !== undefined || href !== undefined;
   const classes = [
@@ -70,7 +73,7 @@ export function ListRow({
   // Links to the wider web leave the app, so they open beside it.
   const external = href !== undefined && /^https?:\/\//i.test(href);
   return (
-    <li className="fm-list__item">
+    <li className="fm-list__item" onContextMenu={onContextMenu}>
       {href !== undefined ? (
         <a
           className={classes}

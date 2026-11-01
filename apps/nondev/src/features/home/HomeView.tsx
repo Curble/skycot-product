@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
-import { ChevronLeft, ListTodo, Sparkles, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronLeft, ListTodo, Pin, Sparkles, Users } from "lucide-react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
@@ -14,7 +14,12 @@ import { askWhoStarted, useLimits } from "../family-limits/store";
 import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
 import { Button, IconButton } from "../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
+import { ContextMenu, type MenuPoint } from "../../ui/ContextMenu";
 import { List, ListRow } from "../../ui/ListRow";
+import { ConversationMenuItems } from "../tidy/ConversationMenu";
+import { DeleteSheet } from "../tidy/DeleteSheet";
+import { isPinned, splitPinned } from "../tidy/pinned";
+import { RenameSheet } from "../tidy/RenameSheet";
 import { StepBadge } from "../../ui/StepBadge";
 import { Mascot } from "../brand/Mascot";
 import { mascotCopy } from "../brand/mascotCopy";
@@ -57,6 +62,8 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const { kids } = useStarters();
   const [seed, setSeed] = useState<ComposerSeed | null>(null);
   const starterPick = useStarterPick(setSeed);
+  const [renaming, setRenaming] = useState<ConversationRow | null>(null);
+  const [deleting, setDeleting] = useState<ConversationRow | null>(null);
 
   const active = homeRows(
     rows,
@@ -64,6 +71,7 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
     family.profile.me.kind === "child" ? family.profile.me.childId : family.profile.currentChildId,
     today.threads,
   );
+  const { pinned: pinnedJobs, rest: otherJobs } = splitPinned(active);
   const working = active.filter(
     (row) => row.status.kind === "working" || row.status.kind === "preparing",
   ).length;
@@ -157,17 +165,43 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                 />
                 {active.length > 0 ? (
                   <CardBody>
-                    <List
-                      label={
-                        family.enabled && family.profile.me.kind !== "grown-up"
-                          ? "Things Sam is making"
-                          : "Jobs"
-                      }
-                    >
-                      {active.map((row) => (
-                        <JobRow key={`${row.shell.environmentId}:${row.shell.id}`} row={row} />
-                      ))}
-                    </List>
+                    {/* Only rows already limited to this child's own (see homeRows). */}
+                    {pinnedJobs.length > 0 ? (
+                      <>
+                        <p className="fm-home__group">Pinned</p>
+                        <List label="Pinned">
+                          {pinnedJobs.map((row) => (
+                            <JobRow
+                              key={`${row.shell.environmentId}:${row.shell.id}`}
+                              row={row}
+                              onRename={() => setRenaming(row)}
+                              onDelete={() => setDeleting(row)}
+                            />
+                          ))}
+                        </List>
+                      </>
+                    ) : null}
+                    {otherJobs.length > 0 ? (
+                      <>
+                        {pinnedJobs.length > 0 ? <p className="fm-home__group">Others</p> : null}
+                        <List
+                          label={
+                            family.enabled && family.profile.me.kind !== "grown-up"
+                              ? "Things Sam is making"
+                              : "Jobs"
+                          }
+                        >
+                          {otherJobs.map((row) => (
+                            <JobRow
+                              key={`${row.shell.environmentId}:${row.shell.id}`}
+                              row={row}
+                              onRename={() => setRenaming(row)}
+                              onDelete={() => setDeleting(row)}
+                            />
+                          ))}
+                        </List>
+                      </>
+                    ) : null}
                   </CardBody>
                 ) : null}
               </Card>
@@ -189,6 +223,18 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
         </div>
       </div>
       <NewConversationComposer preferredProjectKey={shell.projectKey} seed={seed} />
+      <RenameSheet
+        shell={renaming?.shell ?? null}
+        currentTitle={renaming?.title ?? ""}
+        archived={false}
+        onClose={() => setRenaming(null)}
+      />
+      <DeleteSheet
+        shell={deleting?.shell ?? null}
+        currentTitle={deleting?.title ?? ""}
+        archived={false}
+        onClose={() => setDeleting(null)}
+      />
     </>
   );
 }
@@ -217,7 +263,16 @@ function FamilySetupCard() {
   );
 }
 
-function JobRow({ row }: { readonly row: ConversationRow }) {
+function JobRow({
+  row,
+  onRename,
+  onDelete,
+}: {
+  readonly row: ConversationRow;
+  readonly onRename: () => void;
+  readonly onDelete: () => void;
+}) {
+  const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
   const crew = useCrew();
   const family = useFamily();
   const childView = family.enabled && family.profile.me.kind !== "grown-up";
@@ -239,13 +294,45 @@ function JobRow({ row }: { readonly row: ConversationRow }) {
       <StepBadge state="now" label="Working" />
     );
   return (
-    <ListRow
-      leading={lead}
-      title={row.title}
-      subtitle={`${row.project?.title ?? "Project"} · ${headline}`}
-      chevron
-      href={threadHref(row.shell.environmentId, row.shell.id)}
-    />
+    <>
+      <ListRow
+        leading={lead}
+        title={
+          isPinned(row.shell) ? (
+            <>
+              <Pin
+                className="fm-convrow__pin"
+                size={11}
+                strokeWidth={2}
+                role="img"
+                aria-label="Pinned"
+              />
+              {row.title}
+            </>
+          ) : (
+            row.title
+          )
+        }
+        subtitle={`${row.project?.title ?? "Project"} · ${headline}`}
+        chevron
+        href={threadHref(row.shell.environmentId, row.shell.id)}
+        onContextMenu={(event: MouseEvent) => {
+          event.preventDefault();
+          setMenuAt({ x: event.clientX, y: event.clientY });
+        }}
+      />
+      <ContextMenu at={menuAt} onClose={() => setMenuAt(null)} label={row.title}>
+        {(close) => (
+          <ConversationMenuItems
+            shell={row.shell}
+            archived={false}
+            onRename={onRename}
+            onDelete={onDelete}
+            close={close}
+          />
+        )}
+      </ContextMenu>
+    </>
   );
 }
 

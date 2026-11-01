@@ -45,8 +45,11 @@
 }
 .fm-starter {
   --fm-starter-tint: var(--fm-accent-soft);
-  --fm-starter-glyph: var(--fm-glyph-blue);
-  --fm-starter-glyph-ink: #fff;
+  /* Soft pastel tile, darker icon of the same hue. Icon on tile measures 4.6:1 or better in
+     light and dark (WCAG 1.4.11 asks for 3:1); the colours are fixed so a theme cannot lose it. */
+  --fm-starter-hue: #0a84ff;
+  --fm-starter-ink: #0b4f9c;
+  --fm-starter-mix: 22%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -61,6 +64,10 @@
   text-align: left;
   cursor: pointer;
 }
+html.dark .fm-starter {
+  --fm-starter-ink: #8ec5ff;
+  --fm-starter-mix: 30%;
+}
 .fm-starter:disabled {
   cursor: default;
   opacity: 0.55;
@@ -70,24 +77,43 @@
 }
 .fm-starter[data-tone="orange"] {
   --fm-starter-tint: var(--fm-orange-soft);
-  --fm-starter-glyph: var(--fm-glyph-orange);
+  --fm-starter-hue: #ff9500;
+  --fm-starter-ink: #8a4e00;
 }
 .fm-starter[data-tone="green"] {
   --fm-starter-tint: var(--fm-green-soft);
-  --fm-starter-glyph: var(--fm-glyph-green);
+  --fm-starter-hue: #34c759;
+  --fm-starter-ink: #176f31;
 }
 .fm-starter[data-tone="red"] {
   --fm-starter-tint: var(--fm-red-soft);
-  --fm-starter-glyph: var(--fm-glyph-red);
+  --fm-starter-hue: #ff3b30;
+  --fm-starter-ink: #b3261e;
 }
 .fm-starter[data-tone="purple"] {
   --fm-starter-tint: rgba(142, 68, 236, 0.13);
-  --fm-starter-glyph: var(--fm-glyph-purple);
+  --fm-starter-hue: #8e44ec;
+  --fm-starter-ink: #5b21b6;
 }
 .fm-starter[data-tone="yellow"] {
   --fm-starter-tint: var(--fm-marker-soft);
-  --fm-starter-glyph: linear-gradient(180deg, #ffe066, #ffc400);
-  --fm-starter-glyph-ink: #1d1d1f;
+  --fm-starter-hue: #ffcc00;
+  --fm-starter-ink: #6b5200;
+}
+html.dark .fm-starter[data-tone="orange"] {
+  --fm-starter-ink: #ffc266;
+}
+html.dark .fm-starter[data-tone="green"] {
+  --fm-starter-ink: #7fe39b;
+}
+html.dark .fm-starter[data-tone="red"] {
+  --fm-starter-ink: #ff9e97;
+}
+html.dark .fm-starter[data-tone="purple"] {
+  --fm-starter-ink: #d3b1ff;
+}
+html.dark .fm-starter[data-tone="yellow"] {
+  --fm-starter-ink: #ffe066;
 }
 .fm-starter__art {
   display: grid;
@@ -96,8 +122,8 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--fm-starter-glyph);
-  color: var(--fm-starter-glyph-ink);
+  background: color-mix(in srgb, var(--fm-starter-hue) var(--fm-starter-mix), var(--fm-bg-card));
+  color: var(--fm-starter-ink);
 }
 .fm-starter__text {
   display: grid;

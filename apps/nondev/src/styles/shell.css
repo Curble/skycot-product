@@ -1366,3 +1366,9 @@ html.dark .fm-standalone__foot {
   justify-content: center;
   margin-top: 14px;
 }
+.fm-home__group {
+  margin: 8px 4px 4px;
+  font-size: calc(12px * var(--fm-text-scale));
+  font-weight: 600;
+  color: var(--fm-label-2);
+}

@@ -105,3 +105,22 @@ describe("homeRows", () => {
     expect(homeRows([row("c", "ready")], true, "leo", {}).length).toBe(0);
   });
 });
+
+describe("Your things pins", () => {
+  it("lists only the child's own pinned things in the Pinned group", async () => {
+    const { splitPinned } = await import("../tidy/pinned");
+    const rows = [
+      { shell: { id: "mine-a", pinnedAt: null } },
+      { shell: { id: "mine-b", pinnedAt: "2026-11-01T00:00:00.000Z" } },
+      { shell: { id: "sibling", pinnedAt: "2026-11-02T00:00:00.000Z" } },
+    ].map((row) => ({ ...row, status: { kind: "ready", headline: "Done" } }));
+    const mine = homeRows(rows, true, "kid-1", {
+      "mine-a": "kid-1",
+      "mine-b": "kid-1",
+      sibling: "kid-2",
+    });
+    const { pinned, rest } = splitPinned(mine);
+    expect(pinned.map((row) => row.shell.id)).toEqual(["mine-b"]);
+    expect(rest.map((row) => row.shell.id)).toEqual(["mine-a"]);
+  });
+});

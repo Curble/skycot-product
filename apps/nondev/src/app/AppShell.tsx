@@ -166,8 +166,10 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
   // leave a stale title behind when it unmounts.
   const detail = useTitleDetail(selectedEnvironmentId, selectedThreadId, route);
   useEffect(() => {
-    document.title = documentTitle(detail ?? undefined);
-  }, [detail]);
+    // A child's People and Automations pages say "There's nothing here": no section name.
+    const neutral = childView && (route.name === "people" || route.name === "automations");
+    document.title = documentTitle(neutral ? undefined : (detail ?? undefined));
+  }, [detail, childView, route.name]);
 
   useEffect(() => {
     if (columns === 3 && shell.drawerOpen) shell.setDrawerOpen(false);
