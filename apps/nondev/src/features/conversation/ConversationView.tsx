@@ -72,6 +72,7 @@ import { ThinkingDepth } from "../compose/ThinkingDepth";
 import {
   depthModelFor,
   descriptorsFor,
+  grownUpControlsShown,
   selectionWithDepth,
   useRememberedDepth,
 } from "../compose/depthChoice";
@@ -117,6 +118,13 @@ import { useProjectTidy } from "../projects/useProjectTidy";
 import { projectTitleFromFirstMake } from "../../plain/titles";
 import { PointerChips } from "../preview/PointerChips";
 import {
+  clearLineNotes,
+  LineNoteChips,
+  useLineNotes,
+  withLineNotes,
+  type LineNote,
+} from "../linecomment";
+import {
   clearPointers,
   closePreview,
   openPreview,
@@ -143,6 +151,8 @@ import { BuildJourney } from "../journey/BuildJourney";
 import { withoutAssistantPlumbing } from "../../plain/plumbing";
 import { recordBuildTime } from "./buildTimes";
 import { starterIdFromText } from "../badges/facts";
+
+const NO_LINE_NOTES: ReadonlyArray<LineNote> = [];
 
 /** Brings a What-changed card to the top of the stream; the card anchors itself by checkpoint id. */
 function scrollToCheckpoint(checkpointId: string) {
@@ -929,6 +939,11 @@ function ReplyComposer({
   const shield = useShield();
   // Thinking depth: a grown-up's pick for the next message, only where the assistant has one.
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
+  // Notes on lines of the code changes, for grown-ups only (the same rule as the depth control).
+  const savedNotes = useLineNotes(threadId);
+  const lineNotes = grownUpControlsShown({ childView, familyOn: family.enabled })
+    ? savedNotes
+    : NO_LINE_NOTES;
   const depthModel = depthModelFor(descriptorsFor(providers, shell?.modelSelection ?? null), {
     childView,
     familyOn: family.enabled,
@@ -1032,7 +1047,7 @@ function ReplyComposer({
   const crew = useCrew();
   const trimmed = text.trim();
   const ready = canOperate && shell !== null;
-  const hasContent = trimmed.length > 0 || pointers.length > 0;
+  const hasContent = trimmed.length > 0 || pointers.length > 0 || lineNotes.length > 0;
 
   const onChange = (value: string) => {
     setText(value);
@@ -1093,6 +1108,7 @@ function ReplyComposer({
     setText("");
     pictures.clear();
     clearPointers(threadId);
+    clearLineNotes(threadId);
     setFixIt(null);
     setSeedSent(true);
     setTypedWhileActive(false);
@@ -1108,9 +1124,12 @@ function ReplyComposer({
     }
     // What was pointed at in the preview travels as words in the message, so the shield reads
     // it too. Family profile: a full name, school or address waits for the child's pick.
-    const outgoing = withPointing(
-      trimmed,
-      pointers.map((draft) => draft.pointer),
+    const outgoing = withLineNotes(
+      withPointing(
+        trimmed,
+        pointers.map((draft) => draft.pointer),
+      ),
+      lineNotes,
     );
     const cleared = await shield.clear(
       outgoing,
@@ -1283,6 +1302,7 @@ function ReplyComposer({
         />
         {shield.card}
         <PointerChips threadId={threadId} pointers={pointers} disabled={sending} />
+        <LineNoteChips threadId={threadId} notes={lineNotes} disabled={sending} />
         {depthModel !== null ? (
           <ThinkingDepth
             model={depthModel}

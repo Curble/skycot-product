@@ -362,3 +362,59 @@
   background: var(--fm-accent-soft);
   color: var(--fm-accent);
 }
+
+/* "Add a note on this line": the small button in the code's margin, the box under the line, and
+   a note already added. Chips above the message box reuse the pointer chips. */
+.fm-line-note__add {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--fm-accent);
+  color: #fff;
+  cursor: pointer;
+}
+.fm-line-note {
+  margin: 4px 8px 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--fm-bg-content);
+  box-shadow: var(--fm-shadow-popover);
+  color: var(--fm-label);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif);
+  font-size: calc(13px * var(--fm-text-scale));
+}
+.fm-line-note--saved {
+  margin-block: 2px 4px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--fm-accent);
+  border-radius: 6px;
+  background: var(--fm-accent-soft);
+  box-shadow: none;
+}
+.fm-line-note__field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--fm-sep);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  caret-color: var(--fm-accent);
+}
+.fm-line-note__field:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: 1px;
+}
+.fm-line-note__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

@@ -54,6 +54,8 @@ import { rememberKeptVersion, useKeptVersions } from "./keptVersions";
 import { reviewTargetFor } from "./turnReview";
 import { useConversationShell } from "../../state/oldConversations";
 import { useChildView } from "../../app/useChildView";
+import { grownUpControlsShown } from "../compose/depthChoice";
+import { useFamily } from "../family/FamilyProvider";
 
 const CodeChanges = lazy(() => import("./CodeChanges"));
 
@@ -98,6 +100,9 @@ export function ReviewSection({
   const kept = useKeptVersions(threadId);
   const lastUpload = useLastUpload(threadId);
   const childView = useChildView();
+  const family = useFamily();
+  // Notes on a line of the code: the same grown-up-only rule as the thinking-depth control.
+  const notesOn = grownUpControlsShown({ childView, familyOn: family.enabled });
 
   const cwd = shell?.worktreePath ?? project?.workspaceRoot ?? null;
   const gitStatus = useEnvironmentQuery(
@@ -390,7 +395,11 @@ export function ReviewSection({
                   <Suspense
                     fallback={<p className="fm-disclosure__hint">Preparing the code view…</p>}
                   >
-                    <CodeChanges diff={diff.data.diff} scope={`review:${checkpoint.id}`} />
+                    <CodeChanges
+                      diff={diff.data.diff}
+                      scope={`review:${checkpoint.id}`}
+                      {...(notesOn ? { lineNotes: { threadId } } : {})}
+                    />
                   </Suspense>
                 )
               ) : null}
