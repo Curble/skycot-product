@@ -333,7 +333,7 @@ describe("plan first in the Family profile", () => {
           model: "gpt-5-codex",
           options: [
             { id: "reasoningEffort", value },
-            { id: "fastMode", value: true },
+            { id: "contextWindow", value: "1m" },
           ],
         },
       }) as unknown as ProviderAdapter.ProviderAdapterV2TurnInput;
@@ -345,7 +345,7 @@ describe("plan first in the Family profile", () => {
             family(true),
             withEffort(`depth-child-${value}`, value),
           );
-          assert.deepEqual(wrapped.modelSelection.options, [{ id: "fastMode", value: true }]);
+          assert.deepEqual(wrapped.modelSelection.options, [{ id: "contextWindow", value: "1m" }]);
           assert.equal(wrapped.modelSelection.model, "gpt-5-codex");
           // The turn itself still runs.
           assert.include(wrapped.message.text, "make a cat game");
@@ -377,7 +377,7 @@ describe("plan first in the Family profile", () => {
         );
         assert.deepEqual(wrapped.modelSelection.options, [
           { id: "reasoningEffort", value: "high" },
-          { id: "fastMode", value: true },
+          { id: "contextWindow", value: "1m" },
         ]);
       }),
     );
@@ -402,7 +402,85 @@ describe("plan first in the Family profile", () => {
           },
         } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime);
         yield* runtime.compactThread!(withEffort("depth-compact", "max"));
-        assert.deepEqual(seen, [{ id: "fastMode", value: true }]);
+        assert.deepEqual(seen, [{ id: "contextWindow", value: "1m" }]);
+      }),
+    );
+  });
+
+  describe("speed boost", () => {
+    const withSpeed = (id: string, options: ReadonlyArray<{ id: string; value: unknown }>) =>
+      ({
+        ...turn(id),
+        modelSelection: { instanceId: "codex", model: "gpt-5-codex", options },
+      }) as unknown as ProviderAdapter.ProviderAdapterV2TurnInput;
+
+    it.effect("drops a faster tier so the normal speed applies, keeping the rest", () =>
+      Effect.gen(function* () {
+        for (const speed of [
+          { id: "fastMode", value: true },
+          { id: "serviceTier", value: "ultrafast" },
+          { id: "service_tier", value: "fast" },
+        ]) {
+          const wrapped = yield* Instructions.familyTurnInput(
+            family(true),
+            withSpeed(`speed-child-${speed.id}`, [speed, { id: "contextWindow", value: "1m" }]),
+          );
+          assert.deepEqual(wrapped.modelSelection.options, [{ id: "contextWindow", value: "1m" }]);
+          assert.include(wrapped.message.text, "make a cat game");
+        }
+      }),
+    );
+
+    it.effect("keeps a grown-up's choice (Advanced mode pass)", () =>
+      Effect.gen(function* () {
+        yield* Instructions.letRunWithoutPlan("message:speed-parent", "grown-up");
+        const wrapped = yield* Instructions.familyTurnInput(
+          family(true),
+          withSpeed("speed-parent", [{ id: "serviceTier", value: "fast" }]),
+        );
+        assert.deepEqual(wrapped.modelSelection.options, [{ id: "serviceTier", value: "fast" }]);
+      }),
+    );
+
+    it.effect("changes nothing while the profile is off", () =>
+      Effect.gen(function* () {
+        const input = withSpeed("speed-off", [{ id: "fastMode", value: true }]);
+        const wrapped = yield* Instructions.familyTurnInput(family(false), input);
+        assert.deepEqual(wrapped.modelSelection.options, input.modelSelection.options);
+      }),
+    );
+
+    it.effect("keeps the same selection object when there is nothing to drop", () =>
+      Effect.gen(function* () {
+        const selection = {
+          instanceId: "codex",
+          model: "gpt-5-codex",
+          options: [{ id: "contextWindow", value: "1m" }],
+        } as unknown as import("@t3tools/contracts").ModelSelection;
+        const held = yield* Instructions.familyModelSelection(
+          family(true),
+          "speed-same",
+          selection,
+        );
+        assert.strictEqual(held, selection);
+      }),
+    );
+
+    it.effect("also holds a compaction to normal speed", () =>
+      Effect.gen(function* () {
+        let seen: unknown;
+        const runtime = Instructions.withFamilyRuntime(familyOn(true), {
+          startTurn: () => Effect.void,
+          steerTurn: () => Effect.void,
+          compactThread: (input: ProviderAdapter.ProviderAdapterV2TurnInput) => {
+            seen = input.modelSelection.options;
+            return Effect.void;
+          },
+        } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime);
+        yield* runtime.compactThread!(
+          withSpeed("speed-compact", [{ id: "fastMode", value: true }]),
+        );
+        assert.equal(seen, undefined);
       }),
     );
   });

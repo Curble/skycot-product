@@ -29,6 +29,10 @@
       "types": "./src/depth.ts",
       "import": "./src/depth.ts"
     },
+    "./speed": {
+      "types": "./src/speed.ts",
+      "import": "./src/speed.ts"
+    },
     "./explain": {
       "types": "./src/explain.ts",
       "import": "./src/explain.ts"

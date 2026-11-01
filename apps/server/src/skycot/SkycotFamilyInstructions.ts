@@ -42,7 +42,8 @@
 
 import type { ModelSelection, ProviderInteractionMode } from "@t3tools/contracts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import { withoutEffortOptions } from "@t3tools/skycot-rules/depth";
+import { isEffortOptionId } from "@t3tools/skycot-rules/depth";
+import { isSpeedOptionId, withoutHeldOptions } from "@t3tools/skycot-rules/speed";
 import {
   EXPLAIN_INSTRUCTIONS,
   explainDefault,
@@ -362,13 +363,15 @@ const inputWithFamilyRules = <
   );
 
 /**
- * Thinking depth: while the profile is on, a turn runs at the assistant's own default effort,
- * whatever a request or the conversation's stored model choice says. Only a grown-up working in
- * Advanced mode (the gate's "grown-up" pass) keeps what they chose. The effort options are
- * dropped, never the turn: the assistant simply uses its default. The same object when there is
+ * Thinking depth and speed boost: while the profile is on, a turn runs at the assistant's own
+ * default effort and normal speed (a faster tier costs more of the plan), whatever a request or
+ * the conversation's stored model choice says. Only a grown-up working in Advanced mode (the
+ * gate's "grown-up" pass) keeps what they chose. The effort and speed options (fastMode,
+ * serviceTier) are dropped, never the turn: the assistant simply uses its default. The same object when there is
  * nothing to drop.
  */
 // nondev-seam: skycot-thinking-depth-lock
+// (also holds speed: fastMode / serviceTier, backlog 25)
 export const familyModelSelection = (
   family: SkycotFamily.SkycotFamily["Service"],
   messageId: string,
@@ -379,9 +382,14 @@ export const familyModelSelection = (
     if ((yield* planPassFor(messageId)) === "grown-up") return selection;
     // Some callers and tests hand over a turn with no model choice: nothing to hold to default.
     if ((selection as ModelSelection | undefined) === undefined) return selection;
-    const options = withoutEffortOptions(selection.options);
+    const options = withoutHeldOptions(selection.options);
     if (options === selection.options) return selection;
-    yield* Effect.logInfo("skycot-family.thinking-depth-default", { messageId });
+    const had = (held: (id: string) => boolean) =>
+      (selection.options ?? []).some((option) => held(option.id));
+    if (had(isEffortOptionId)) {
+      yield* Effect.logInfo("skycot-family.thinking-depth-default", { messageId });
+    }
+    if (had(isSpeedOptionId)) yield* Effect.logInfo("skycot-family.speed-default", { messageId });
     const { options: _dropped, ...rest } = selection;
     return options === undefined ? rest : { ...rest, options };
   });

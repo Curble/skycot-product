@@ -96,6 +96,43 @@ describe("SkycotFamilyTextGeneration.lockTextGeneration", () => {
     }),
   );
 
+  it.effect("runs background calls at normal speed while the profile is on", () =>
+    Effect.gen(function* () {
+      const received: Array<unknown> = [];
+      const inner = {
+        generateThreadTitle: (input: { modelSelection: { options?: unknown } }) => {
+          received.push(input.modelSelection.options);
+          return Effect.succeed({ title: "Star" });
+        },
+      } as unknown as ProviderTextGeneration;
+      const run = (on: boolean) =>
+        SkycotFamilyTextGeneration.lockTextGeneration(Effect.succeed(inner)).pipe(
+          Effect.provideService(SkycotFamily.SkycotFamily, {
+            isEnabled: Effect.succeed(on),
+            assistantAllowed: () => Effect.succeed(false),
+          } as unknown as SkycotFamily.SkycotFamily["Service"]),
+          Effect.provideService(ProviderInstanceRegistry.ProviderInstanceRegistry, {
+            getInstance: (instanceId: string) =>
+              Effect.succeed({ driverKind: ProviderDriverKind.make(instanceId) }),
+          } as unknown as ProviderInstanceRegistry.ProviderInstanceRegistry["Service"]),
+        );
+      const input = {
+        ...titleInput("codex"),
+        modelSelection: {
+          ...titleInput("codex").modelSelection,
+          options: [
+            { id: "serviceTier", value: "fast" },
+            { id: "contextWindow", value: "1m" },
+          ],
+        },
+      };
+      yield* (yield* run(true)).generateThreadTitle(input as never);
+      yield* (yield* run(false)).generateThreadTitle(input as never);
+      assert.deepEqual(received[0], [{ id: "contextWindow", value: "1m" }]);
+      assert.deepEqual(received[1], input.modelSelection.options);
+    }),
+  );
+
   it.effect("changes nothing while the profile is off", () =>
     Effect.gen(function* () {
       const seen: Array<string | null> = [];

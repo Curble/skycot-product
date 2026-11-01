@@ -69,6 +69,7 @@ import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
 import { requestMode, usePlanFirst } from "../compose/planFirst";
 import { ThinkingDepth } from "../compose/ThinkingDepth";
+import { SpeedBoost } from "../compose/SpeedBoost";
 import {
   depthModelFor,
   descriptorsFor,
@@ -76,6 +77,7 @@ import {
   selectionWithDepth,
   useRememberedDepth,
 } from "../compose/depthChoice";
+import { selectionWithSpeed, speedModelFor, useRememberedSpeed } from "../compose/speedChoice";
 import { useEnsureInteractionMode } from "../compose/turnMode";
 import { useMadePage } from "../review/madePage";
 import { useOpenIt } from "../starters/PreviewSheet";
@@ -949,6 +951,12 @@ function ReplyComposer({
     familyOn: family.enabled,
   });
   const [rememberedDepth, rememberDepth] = useRememberedDepth(threadId);
+  // Speed boost: the same, for a faster tier that costs more of the plan.
+  const speedModel = speedModelFor(descriptorsFor(providers, shell?.modelSelection ?? null), {
+    childView,
+    familyOn: family.enabled,
+  });
+  const [rememberedSpeed, rememberSpeed] = useRememberedSpeed(threadId);
   const [explainOn] = useExplainMode(threadId, family.enabled);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
@@ -1089,7 +1097,11 @@ function ReplyComposer({
                 text: withExplainMarker(message.text, explainOn, family.enabled),
                 attachments: pictures.uploads(),
               },
-              modelSelection: selectionWithDepth(shell.modelSelection, depthModel, rememberedDepth),
+              modelSelection: selectionWithSpeed(
+                selectionWithDepth(shell.modelSelection, depthModel, rememberedDepth),
+                speedModel,
+                rememberedSpeed,
+              ),
               runtimeMode: shell.runtimeMode,
               interactionMode,
             },
@@ -1303,13 +1315,25 @@ function ReplyComposer({
         {shield.card}
         <PointerChips threadId={threadId} pointers={pointers} disabled={sending} />
         <LineNoteChips threadId={threadId} notes={lineNotes} disabled={sending} />
-        {depthModel !== null ? (
-          <ThinkingDepth
-            model={depthModel}
-            remembered={rememberedDepth}
-            onPick={(level) => rememberDepth(level, depthModel.usual)}
-            disabled={sending}
-          />
+        {depthModel !== null || speedModel !== null ? (
+          <div className="fm-tune">
+            {depthModel !== null ? (
+              <ThinkingDepth
+                model={depthModel}
+                remembered={rememberedDepth}
+                onPick={(level) => rememberDepth(level, depthModel.usual)}
+                disabled={sending}
+              />
+            ) : null}
+            {speedModel !== null ? (
+              <SpeedBoost
+                model={speedModel}
+                remembered={rememberedSpeed}
+                onPick={(level) => rememberSpeed(level, speedModel.usual)}
+                disabled={sending}
+              />
+            ) : null}
+          </div>
         ) : null}
         <MessageField
           inputRef={inputRef}

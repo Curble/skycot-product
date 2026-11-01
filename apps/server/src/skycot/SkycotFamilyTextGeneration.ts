@@ -19,6 +19,7 @@
 
 import { TextGenerationError } from "@t3tools/contracts";
 import type { ProviderTextGeneration } from "@t3tools/provider-core/server/textGeneration";
+import { withoutSpeedOptions } from "@t3tools/skycot-rules/speed";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
@@ -45,7 +46,15 @@ export const lockTextGeneration = Effect.fn("SkycotFamilyTextGeneration.lockText
     if (Option.isNone(family)) return service;
     const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
 
-    const locked = <I extends { readonly modelSelection: { readonly instanceId: string } }, A>(
+    const locked = <
+      I extends {
+        readonly modelSelection: {
+          readonly instanceId: string;
+          readonly options?: ReadonlyArray<{ readonly id: string; readonly value: unknown }>;
+        };
+      },
+      A,
+    >(
       operation: Operation,
       run: (input: I) => Effect.Effect<A, TextGenerationError>,
     ) =>
@@ -70,7 +79,17 @@ export const lockTextGeneration = Effect.fn("SkycotFamilyTextGeneration.lockText
             ),
           });
         }
-        return yield* run(input).pipe(
+        // A faster tier costs more of the plan: background calls run at normal speed too.
+        const options = withoutSpeedOptions(input.modelSelection.options);
+        const held =
+          options === input.modelSelection.options
+            ? input
+            : {
+                ...input,
+                modelSelection: (({ options: _dropped, ...rest }) =>
+                  options === undefined ? rest : { ...rest, options })(input.modelSelection),
+              };
+        return yield* run(held).pipe(
           Effect.provideService(
             SkycotFamilyLockdown.FamilyLockdownRef,
             new SkycotFamilyLockdown.FamilyLockdown(driver),

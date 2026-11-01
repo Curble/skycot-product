@@ -1,6 +1,7 @@
 import type { ProviderOptionDescriptor, RuntimeMode } from "@t3tools/contracts";
 
 import { EFFORT_OPTION_IDS } from "@t3tools/skycot-rules/depth";
+import { SPEED_OPTION_IDS } from "@t3tools/skycot-rules/speed";
 import { HARD_RULES, type HardRule } from "@t3tools/skycot-rules/rules";
 
 import { autonomy as copy, care as careCopy, hardRulesStatement } from "./copy";
@@ -270,8 +271,6 @@ export interface SpeedCareModel {
   readonly care?: TraitMapping<CareLevel>;
   readonly speed?: TraitMapping<SpeedLevel>;
 }
-
-const SPEED_OPTION_IDS = new Set(["speed", "serviceTier", "service_tier", "fastMode", "fast_mode"]);
 
 function careLevelFor(choiceId: string, index: number, total: number): CareLevel {
   const id = choiceId.toLowerCase();
