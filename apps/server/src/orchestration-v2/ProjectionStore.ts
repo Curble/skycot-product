@@ -88,6 +88,7 @@ import type * as Statement from "effect/sql/Statement";
 
 import { MCP_APP_OUTPUT_KEY } from "@t3tools/shared/mcpApp";
 import { planWaitingForBuild } from "@t3tools/skycot-rules/plans"; // nondev-seam: skycot-plan-really-waiting
+import { applyPlanReallyWaiting } from "../skycot/planSummary.ts"; // nondev-seam: skycot-plan-really-waiting
 import { threadHtmlRenderAttachmentIds } from "../attachmentStore.ts";
 import {
   isThreadHistoryUserTurn,
@@ -5628,7 +5629,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           ),
         );
 
-    const selectShellThreadRows = (
+    const selectShellThreadRowsUnfiltered = (
+      // nondev-seam: skycot-plan-really-waiting
       threadId?: ThreadId,
       { location, projectId, unsettledOnly = false }: ShellSnapshotOptions = {},
     ) =>
@@ -5831,6 +5833,12 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             }
             ORDER BY t.updated_at ASC, t.thread_id ASC
           `;
+
+    const selectShellThreadRows = (...args: Parameters<typeof selectShellThreadRowsUnfiltered>) =>
+      // nondev-seam: skycot-plan-really-waiting
+      selectShellThreadRowsUnfiltered(...args).pipe(
+        Effect.flatMap((rows) => applyPlanReallyWaiting(sql, rows)),
+      ); // nondev-seam: skycot-plan-really-waiting
 
     const selectShellRunRows = (threadIds?: ReadonlyArray<ThreadId>) =>
       threadIds === undefined
