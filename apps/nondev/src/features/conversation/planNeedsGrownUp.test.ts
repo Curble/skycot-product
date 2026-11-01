@@ -11,6 +11,7 @@ describe("planMayNeedGrownUp", () => {
     "1. Fetch https://example.com",
     "1. Use a library from the internet",
     "1) Run pip install pillow",
+    "2. Works without internet, but install confetti from npm",
   ])("is true for %s", (step) => {
     expect(planMayNeedGrownUp(step)).toBe(true);
   });
@@ -20,6 +21,9 @@ describe("planMayNeedGrownUp", () => {
     "1. Add a title and a big button",
     "1. Check the page works",
     "1. Draw an installation art poster",
+    "2. Make the confetti button work without internet",
+    "2. Keep it all in one page, no downloads needed",
+    "3. It doesn't need any add-ons",
   ])("is false for %s", (step) => {
     expect(planMayNeedGrownUp(step)).toBe(false);
   });
