@@ -8,6 +8,7 @@ import {
   canOfferEdit,
   canOfferTakeBack,
   mergeIntoBox,
+  noteDispatchMode,
   takeBackProblem,
   takeBackToast,
   countReplaced,
@@ -126,6 +127,14 @@ describe("canOfferTakeBack", () => {
       const item = message(ordinal, "queued_turn");
       expect(canOfferEdit(item, runs) && canOfferTakeBack(item, runs)).toBe(false);
     }
+  });
+});
+
+describe("noteDispatchMode", () => {
+  it("lines a child's note up so it can be taken back; others keep the engine's choice", () => {
+    expect(noteDispatchMode(true, true)).toBe("queue");
+    expect(noteDispatchMode(true, false)).toBeUndefined();
+    expect(noteDispatchMode(false, true)).toBeUndefined();
   });
 });
 

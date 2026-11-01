@@ -44,7 +44,12 @@ export function PlanCard({
   const { projection, environmentId, threadId, shell, projectName } = context;
   const childView = useChildView();
   const plan = projection.plans.find((p) => p.id === item.planId);
-  const newerPlan = replacedByNewerPlan(item, projection.turnItems, projection.plans);
+  const newerPlan = replacedByNewerPlan(
+    item,
+    projection.turnItems,
+    projection.plans,
+    projection.runs,
+  );
   const acceptedRun = projection.runs.find((run) => run.sourcePlanRef?.planId === item.planId);
   const busyThread = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const card = describeRuntimeRequest(item, projectName === null ? {} : { projectName });

@@ -98,6 +98,7 @@ import { enforcedRuntimeMode } from "../../plain/autonomy";
 import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
+import { planWaitingForBuild } from "./plans";
 import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
@@ -105,6 +106,7 @@ import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
 import {
   copy as rewindCopy,
   mergeIntoBox,
+  noteDispatchMode,
   type FilesChoice,
   type RewindTarget,
 } from "../rewind/rewind";
@@ -226,8 +228,18 @@ export function ConversationView({
     projection !== null && shell !== null && !active
       ? endedOnRefusal(projection, latestRunId)
       : false;
-  const status: ConversationStatus | null = shell
-    ? describeThreadStatus(shell, { refused, childView })
+  // The engine's "a plan is active" flag stays on for an older plan after a newer one is built:
+  // the header only says "plan ready" when a plan really is waiting for Build it.
+  const planWaiting =
+    shell !== null && shell.hasActionableProposedPlan && fullProjection !== null
+      ? planWaitingForBuild(fullProjection)
+      : (shell?.hasActionableProposedPlan ?? false);
+  const statusShell =
+    shell !== null && planWaiting !== shell.hasActionableProposedPlan
+      ? { ...shell, hasActionableProposedPlan: planWaiting }
+      : shell;
+  const status: ConversationStatus | null = statusShell
+    ? describeThreadStatus(statusShell, { refused, childView })
     : null;
   // Tell the list, which only has the shell, that this run ended on a refusal.
   const refusedRuns = useAtomValue(refusedRunIdsAtom);
@@ -238,8 +250,7 @@ export function ConversationView({
   }, [refused, latestRunId, refusedRuns, setRefusedRuns]);
   // Nothing is "working" while the Crew waits on an answer; the dots would lie.
   const waitingOnYou =
-    shell !== null &&
-    (shell.hasPendingApprovals || shell.hasPendingUserInput || shell.hasActionableProposedPlan);
+    shell !== null && (shell.hasPendingApprovals || shell.hasPendingUserInput || planWaiting);
   const waitingForGrownUp = shell?.hasPendingApprovals ?? false;
   const crew = useCrew();
   const crewName = crew.builder.name;
@@ -1104,6 +1115,10 @@ function ReplyComposer({
               ),
               runtimeMode: shell.runtimeMode,
               interactionMode,
+              // A child's note waits in line (so Take back works); it is never steered in.
+              ...(noteDispatchMode(asNote, childView) === undefined
+                ? {}
+                : { dispatchMode: "queue" as const }),
             },
           });
     setSending(false);

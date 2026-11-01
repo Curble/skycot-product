@@ -66,6 +66,16 @@ export function canOfferTakeBack(
 }
 
 /**
+ * How a message typed while the assistant works is delivered. A child's note is lined up
+ * (queued), never steered into the running turn: a steered note cannot be taken back, a lined-up
+ * one can. This only picks the engine's existing "queue" mode; it adds no capability. Anyone
+ * else keeps the engine's own choice.
+ */
+export function noteDispatchMode(asNote: boolean, childView: boolean): "queue" | undefined {
+  return asNote && childView ? "queue" : undefined;
+}
+
+/**
  * The words that go back in the message box after a take-back: after what is already there,
  * with a blank line between (like Edit's twin in the web app). Nothing to add changes nothing.
  */
