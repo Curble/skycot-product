@@ -647,7 +647,10 @@ export function builtAndNoPlanWaiting(
  * such a message plans again, like any other. Only the newest plan can be built: while a later
  * plan stands in the conversation (its turn not taken back), an older one never builds, so a
  * Build it pressed on an old card as a new plan arrives plans again instead of building the
- * wrong thing. This is a refusal only; it never lets a plan build that could not before.
+ * wrong thing. The same goes while any turn is still going or lined up: a Build it sent behind
+ * another message would run only after it, perhaps after a newer plan, so it plans again here
+ * rather than build a plan the child did not just approve. This is a refusal only; it never lets
+ * a plan build that could not before.
  */
 export function planStillBuildable(
   projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs"> &
@@ -660,8 +663,18 @@ export function planStillBuildable(
     const run = projection.runs.find((candidate) => candidate.id === plan.runId);
     if (run === undefined || run.status === "rolled_back") return false;
   }
+  if (projection.runs.some((candidate) => RUN_IN_PROGRESS.has(candidate.status))) return false;
   return !newerPlanStands(projection, planId);
 }
+
+/** Turns that have not finished: a Build it sent behind one could run after a newer plan. */
+const RUN_IN_PROGRESS: ReadonlySet<string> = new Set([
+  "preparing",
+  "queued",
+  "starting",
+  "running",
+  "waiting",
+]);
 
 /** Pure: whether a later plan (by its place in the conversation) still stands after this one. */
 function newerPlanStands(

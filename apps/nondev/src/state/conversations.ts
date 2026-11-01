@@ -65,15 +65,46 @@ export const refusedRunIdsAtom = Atom.make<ReadonlySet<string>>(readRefusedRunId
   Atom.withLabel("nondev-refused-run-ids"),
 );
 
+function noPlanFlags(): ReadonlySet<string> {
+  return new Set<string>();
+}
+
+/**
+ * Conversations whose engine "a plan is active" flag the conversation view found stale, keyed by
+ * the run it was found at (a later plan always comes with a later run, so it is read afresh).
+ * The shell cannot see plans being built, replaced or taken back, so the list learns it here
+ * once a thread was opened and until then shows the engine's flag. Kept for this session only.
+ */
+export const planNotWaitingAtom = Atom.make<ReadonlySet<string>>(noPlanFlags()).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("nondev-plan-not-waiting"),
+);
+
+export function planFlagKey(shell: Pick<EnvironmentThreadShell, "id" | "latestRun">): string {
+  return `${String(shell.id)}:${shell.latestRun?.runId ?? ""}`;
+}
+
+/** The shell with its plan flag cleared when the view found no plan really waiting at this run. */
+export function withRealPlanFlag(
+  shell: EnvironmentThreadShell,
+  notWaiting: ReadonlySet<string>,
+): EnvironmentThreadShell {
+  return shell.hasActionableProposedPlan && notWaiting.has(planFlagKey(shell))
+    ? { ...shell, hasActionableProposedPlan: false }
+    : shell;
+}
+
 /** One list row from a thread shell: its project, plain title, status and preview. */
 export function toConversationRow(
   get: Atom.AtomContext,
   shell: EnvironmentThreadShell,
   refusedRuns: ReadonlySet<string>,
+  planNotWaiting: ReadonlySet<string> = new Set(),
 ): ConversationRow {
   const runId = shell.latestRun?.runId ?? null;
   const family = readFamilyView();
-  const status = describeThreadStatus(shell, {
+  const real = withRealPlanFlag(shell, planNotWaiting);
+  const status = describeThreadStatus(real, {
     refused: runId !== null && refusedRuns.has(runId),
     childView: familyOn(family) && family.me.kind !== "grown-up",
   });
@@ -88,7 +119,7 @@ export function toConversationRow(
     ? projectForConversation(shell, own, get(environmentProjects.projectsAtom))
     : own;
   return {
-    shell,
+    shell: real,
     project,
     projectKey:
       project === null
@@ -96,7 +127,7 @@ export function toConversationRow(
         : projectKeyOf({ environmentId: project.environmentId, projectId: project.id }),
     title: conversationTitle(shell),
     status,
-    preview: conversationPreview(shell, status),
+    preview: conversationPreview(real, status),
     at: shell.updatedAt,
   };
 }
@@ -111,7 +142,10 @@ export function newestFirst(rows: ConversationRow[]): ConversationRow[] {
 export const conversationRowsAtom = Atom.make((get): ReadonlyArray<ConversationRow> => {
   const shells = get(environmentThreadShells.navigationThreadShellsAtom);
   const refusedRuns = get(refusedRunIdsAtom);
-  return newestFirst(shells.map((shell) => toConversationRow(get, shell, refusedRuns)));
+  const planNotWaiting = get(planNotWaitingAtom);
+  return newestFirst(
+    shells.map((shell) => toConversationRow(get, shell, refusedRuns, planNotWaiting)),
+  );
 }).pipe(Atom.withLabel("nondev-conversation-rows"));
 
 /** "old" lists the conversations that were put away (archived). */

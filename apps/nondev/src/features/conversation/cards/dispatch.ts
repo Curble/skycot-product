@@ -25,6 +25,7 @@ import { requestMode, usePlanFirst } from "../../compose/planFirst";
 import { useEnsureInteractionMode } from "../../compose/turnMode";
 import { useExplainMode } from "../../explain/explainMode";
 import { isFamilyRefusal } from "../../family/cards";
+import { BUILD_IT_HELD_BACK, beginSend, sendInFlight } from "../sendsInFlight";
 import { useFamily } from "../../family/FamilyProvider";
 import { noteDispatchMode } from "../../rewind/rewind";
 import { useChildView } from "../../../app/useChildView";
@@ -150,39 +151,54 @@ export function useDecisionDispatcher({
         case "send-message": {
           const typed = (extras.text ?? payload.text).trim();
           if (typed.length === 0 || shell === null) return null;
-          const text =
-            readExplainMarker(typed).choice === null
-              ? withExplainMarker(typed, explainOn, family.enabled)
-              : typed;
-          // The engine runs a follow-up in the conversation's stored mode, so set it first:
-          // "Build it" builds; any other new request plans while plan first is on.
-          const interactionMode =
-            extras.plan?.interactionMode ??
-            (threadRuntimeIsActive(shell.runtime) ? shell.interactionMode : requestMode(planFirst));
-          const modeProblem = await ensureMode({
-            environmentId,
-            threadId,
-            current: shell.interactionMode,
-            wanted: interactionMode,
-          });
-          if (modeProblem !== null) return calmFailure(modeProblem);
-          return startTurn({
-            environmentId,
-            input: {
+          // A Build it is tied to one plan: never lined up behind another message, where it
+          // could run after a newer plan was written. The child presses it again on the newest plan.
+          if (
+            extras.plan !== undefined &&
+            (sendInFlight(threadId) || threadRuntimeIsActive(shell.runtime))
+          ) {
+            return BUILD_IT_HELD_BACK;
+          }
+          const endSend = beginSend(threadId);
+          try {
+            const text =
+              readExplainMarker(typed).choice === null
+                ? withExplainMarker(typed, explainOn, family.enabled)
+                : typed;
+            // The engine runs a follow-up in the conversation's stored mode, so set it first:
+            // "Build it" builds; any other new request plans while plan first is on.
+            const interactionMode =
+              extras.plan?.interactionMode ??
+              (threadRuntimeIsActive(shell.runtime)
+                ? shell.interactionMode
+                : requestMode(planFirst));
+            const modeProblem = await ensureMode({
+              environmentId,
               threadId,
-              message: { messageId: newMessageId(), role: "user", text, attachments: [] },
-              modelSelection: shell.modelSelection,
-              runtimeMode: shell.runtimeMode,
-              interactionMode,
-              // Any other child message lines up (Take back works); Build it starts as usual.
-              ...(extras.plan === undefined && noteDispatchMode(childView) !== undefined
-                ? { dispatchMode: "queue" as const }
-                : {}),
-              ...(extras.plan && extras.plan.interactionMode === "default"
-                ? { sourceProposedPlan: { threadId, planId: extras.plan.planId } }
-                : {}),
-            },
-          });
+              current: shell.interactionMode,
+              wanted: interactionMode,
+            });
+            if (modeProblem !== null) return calmFailure(modeProblem);
+            return startTurn({
+              environmentId,
+              input: {
+                threadId,
+                message: { messageId: newMessageId(), role: "user", text, attachments: [] },
+                modelSelection: shell.modelSelection,
+                runtimeMode: shell.runtimeMode,
+                interactionMode,
+                // Any other child message lines up (Take back works); Build it starts as usual.
+                ...(extras.plan === undefined && noteDispatchMode(childView) !== undefined
+                  ? { dispatchMode: "queue" as const }
+                  : {}),
+                ...(extras.plan && extras.plan.interactionMode === "default"
+                  ? { sourceProposedPlan: { threadId, planId: extras.plan.planId } }
+                  : {}),
+              },
+            });
+          } finally {
+            endSend();
+          }
         }
       }
     })();

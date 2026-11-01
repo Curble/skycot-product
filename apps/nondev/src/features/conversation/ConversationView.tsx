@@ -45,7 +45,12 @@ import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
 import { useElapsedLabel } from "../../app/useElapsed";
 import { filesHref, HOME_HREF, navigate } from "../../router";
-import { refusedRunIdsAtom, withRefusedRun } from "../../state/conversations";
+import {
+  planFlagKey,
+  planNotWaitingAtom,
+  refusedRunIdsAtom,
+  withRefusedRun,
+} from "../../state/conversations";
 import { useConversationShell } from "../../state/oldConversations";
 import { environmentProjects, projectAtomOrEmpty } from "../../state/projects";
 import { canOperateEnvironmentAtom } from "../../state/session";
@@ -99,6 +104,7 @@ import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { planWaitingForBuild } from "./plans";
+import { beginSend } from "./sendsInFlight";
 import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
@@ -249,6 +255,23 @@ export function ConversationView({
     if (!refused || latestRunId === null || refusedRuns.has(latestRunId)) return;
     setRefusedRuns(withRefusedRun(refusedRuns, latestRunId));
   }, [refused, latestRunId, refusedRuns, setRefusedRuns]);
+  // Same for the plan flag: the list row only has the shell, so it learns here that no plan
+  // is really waiting (built, replaced, taken back or stopped) and stops saying "Your plan is ready".
+  const planNotWaiting = useAtomValue(planNotWaitingAtom);
+  const setPlanNotWaiting = useAtomSet(planNotWaitingAtom);
+  const planFlagRaised = shell?.hasActionableProposedPlan ?? false;
+  const planFlagAt = shell === null ? null : planFlagKey(shell);
+  useEffect(() => {
+    if (!planFlagRaised || planFlagAt === null || fullProjection === null) return;
+    if (planWaiting === planNotWaiting.has(planFlagAt)) {
+      setPlanNotWaiting((current) => {
+        const next = new Set(current);
+        if (planWaiting) next.delete(planFlagAt);
+        else next.add(planFlagAt);
+        return next;
+      });
+    }
+  }, [planFlagRaised, planFlagAt, fullProjection, planWaiting, planNotWaiting, setPlanNotWaiting]);
   // Nothing is "working" while the Crew waits on an answer; the dots would lie.
   const waitingOnYou =
     shell !== null && (shell.hasPendingApprovals || shell.hasPendingUserInput || planWaiting);
@@ -1088,6 +1111,7 @@ function ReplyComposer({
     asNote: boolean,
   ): Promise<boolean> => {
     if (shell === null) return false;
+    const endSend = beginSend(String(threadId));
     setSending(true);
     onSendingMessage({ id: String(message.messageId), text: message.text });
     setProblem(null);
@@ -1127,6 +1151,7 @@ function ReplyComposer({
             },
           });
     setSending(false);
+    endSend();
     if (outcome === null || outcome._tag === "Failure") {
       onSendingMessage(null);
       const cause = outcome === null ? modeProblem : squashAtomCommandFailure(outcome);

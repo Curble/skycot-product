@@ -57,6 +57,39 @@ describe("planWaitingForBuild", () => {
   });
 });
 
+describe("after Stop", () => {
+  const one = [{ ...earlier, completedAt: "2026-11-02T01:00:00.000Z" }];
+  it("a plan whose build was stopped no longer waits (the engine flag stays on)", () => {
+    expect(
+      planWaitingForBuild({
+        turnItems: one,
+        plans: [plan("one", "active", "r1")],
+        runs: [
+          { id: "r1", status: "completed" },
+          {
+            id: "r2",
+            status: "interrupted",
+            startedAt: "2026-11-02T01:00:30.000Z",
+            sourcePlanRef: { planId: "one" },
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+  it("a plan really waiting still waits after Stop on some other turn", () => {
+    expect(
+      planWaitingForBuild({
+        turnItems: one,
+        plans: [plan("one", "active", "r1")],
+        runs: [
+          { id: "r1", status: "completed" },
+          { id: "r2", status: "interrupted", startedAt: "2026-11-02T01:00:30.000Z" },
+        ],
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("a build that began after a plan was written built it", () => {
   const early = { ...earlier, completedAt: "2026-11-02T01:00:00.000Z" };
   const late = { ...newer, completedAt: "2026-11-02T01:00:10.000Z" };

@@ -1271,6 +1271,24 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     assert.isNull(SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { planId: "p" } }));
   });
 
+  it("a Build it sent while another turn is going or lined up plans instead of building", () => {
+    const at = (status: string) =>
+      ({
+        plans: [proposedPlan("plan-1", "run-1")],
+        runs: [
+          { id: "run-1", status: "completed" },
+          { id: "run-2", status },
+        ],
+        turnItems: [{ type: "proposed_plan", planId: "plan-1", ordinal: 1 }],
+      }) as never;
+    for (const status of ["preparing", "queued", "starting", "running", "waiting"]) {
+      assert.isFalse(SkycotFamilyGate.planStillBuildable(at(status), "plan-1"), status);
+    }
+    for (const status of ["completed", "interrupted", "failed", "cancelled", "rolled_back"]) {
+      assert.isTrue(SkycotFamilyGate.planStillBuildable(at(status), "plan-1"), status);
+    }
+  });
+
   it("only the newest plan builds: an older plan plans again while a later one stands", () => {
     const planItem = (planId: string, ordinal: number) => ({
       type: "proposed_plan",

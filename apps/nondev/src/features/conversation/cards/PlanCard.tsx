@@ -23,6 +23,7 @@ import { builtBy, replacedByNewerPlan } from "../plans";
 import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
+import { useSendInFlight } from "../sendsInFlight";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -60,6 +61,8 @@ export function PlanCard({
   const [mode, setMode] = useState<Mode>("idle");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // Another message of this conversation is still being sent: Build it waits for it.
+  const otherSendInFlight = useSendInFlight(String(threadId));
 
   // A plan whose turn was taken back (Undo, or going back to an earlier message) is gone
   // from the assistant's memory: building it would build nothing it remembers.
@@ -141,7 +144,7 @@ export function PlanCard({
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={sending}
+                  disabled={sending || otherSendInFlight}
                   onClick={() =>
                     void run(
                       approve.decision.type === "send-message"
