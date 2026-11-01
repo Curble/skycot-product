@@ -34,6 +34,7 @@ import { SwitchNote, useAssistantSwitches, useEnvironmentProviders } from "./Swi
 import { WorkingCard } from "./WorkingCard";
 import { useChildView } from "../../app/useChildView";
 import { isAllowanceRestRun } from "./restCopy";
+import { withQueuedMessageItems } from "./queuedMessages";
 
 export {
   getTimelineRenderer,
@@ -131,7 +132,9 @@ export function Timeline({
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
-  const items = projection.turnItems;
+  // A message lined up behind the assistant's work shows at once (the engine writes its row only
+  // when its turn starts), so it reads "Lined up for later" with Take back instead of "Sending…".
+  const items = withQueuedMessageItems(projection);
   const startedAt = shell?.createdAt ?? null;
   // Asks the SKYCOT rules answered were never a question for the person: they
   // live in the Working card's Show details, not as cards of their own.
@@ -229,7 +232,7 @@ export function Timeline({
   const sendingAlreadyRecorded =
     sendingMessage !== null &&
     sendingMessage !== undefined &&
-    projection.turnItems.some(
+    items.some(
       (item) => item.type === "user_message" && String(item.messageId) === sendingMessage.id,
     );
   useEffect(() => {
