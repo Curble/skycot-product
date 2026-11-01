@@ -1115,8 +1115,9 @@ function ReplyComposer({
               ),
               runtimeMode: shell.runtimeMode,
               interactionMode,
-              // A child's note waits in line (so Take back works); it is never steered in.
-              ...(noteDispatchMode(asNote, childView) === undefined
+              // A child's message waits in line (so Take back works); it is never steered in, even in the
+              // moment the screen has not yet caught up with a build that just began.
+              ...(noteDispatchMode(childView) === undefined
                 ? {}
                 : { dispatchMode: "queue" as const }),
             },

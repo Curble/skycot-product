@@ -644,17 +644,44 @@ export function builtAndNoPlanWaiting(
  * its turn must still be part of the conversation: going back to an earlier message (or Undo)
  * takes that turn back, the assistant forgets the plan, but the engine leaves the plan
  * "active". Building it then would make changes from a plan the assistant no longer has, so
- * such a message plans again, like any other.
+ * such a message plans again, like any other. Only the newest plan can be built: while a later
+ * plan stands in the conversation (its turn not taken back), an older one never builds, so a
+ * Build it pressed on an old card as a new plan arrives plans again instead of building the
+ * wrong thing. This is a refusal only; it never lets a plan build that could not before.
  */
 export function planStillBuildable(
-  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs">,
+  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs"> &
+    Partial<Pick<OrchestrationV2ThreadProjection, "turnItems">>,
   planId: string,
 ): boolean {
   const plan = projection.plans.find((candidate) => candidate.id === planId);
   if (plan === undefined || plan.kind !== "proposed_plan" || plan.status !== "active") return false;
-  if (plan.runId === null) return true;
-  const run = projection.runs.find((candidate) => candidate.id === plan.runId);
-  return run !== undefined && run.status !== "rolled_back";
+  if (plan.runId !== null) {
+    const run = projection.runs.find((candidate) => candidate.id === plan.runId);
+    if (run === undefined || run.status === "rolled_back") return false;
+  }
+  return !newerPlanStands(projection, planId);
+}
+
+/** Pure: whether a later plan (by its place in the conversation) still stands after this one. */
+function newerPlanStands(
+  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs"> &
+    Partial<Pick<OrchestrationV2ThreadProjection, "turnItems">>,
+  planId: string,
+): boolean {
+  const items = projection.turnItems ?? [];
+  const own = items.find((item) => item.type === "proposed_plan" && item.planId === planId);
+  if (own === undefined) return false;
+  return items.some((item) => {
+    if (item.type !== "proposed_plan" || item.planId === planId || item.ordinal <= own.ordinal) {
+      return false;
+    }
+    const later = projection.plans.find((candidate) => candidate.id === item.planId);
+    if (later === undefined || later.kind !== "proposed_plan") return false;
+    if (later.runId === null) return true;
+    const laterRun = projection.runs.find((candidate) => candidate.id === later.runId);
+    return laterRun === undefined || laterRun.status !== "rolled_back";
+  });
 }
 
 /**

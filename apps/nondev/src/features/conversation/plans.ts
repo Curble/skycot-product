@@ -1,3 +1,5 @@
+import * as DateTime from "effect/DateTime";
+
 /**
  * A later plan in the same conversation replaces the earlier card for good, whatever became of
  * the later one (waiting, being built, built). The earlier card never offers Build it again:
@@ -37,6 +39,40 @@ export function replacedByNewerPlan(
   );
 }
 
+/** Projection timestamps arrive as DateTime.Utc; accept ISO strings too (tests, shells). */
+type Time = DateTime.Utc | string | null | undefined;
+
+function millis(value: Time): number {
+  if (value === null || value === undefined) return NaN;
+  return typeof value === "string" ? Date.parse(value) : DateTime.toEpochMillis(value);
+}
+
+type BuildRun = {
+  readonly id: string;
+  readonly status: string;
+  readonly startedAt?: Time;
+  readonly sourcePlanRef?: { readonly planId: string } | undefined;
+};
+
+/**
+ * The turn that built a plan, if one did (a taken-back build does not count). A build that
+ * began after the plan was written built it too, even when its Build it was pressed on an
+ * older card as this plan arrived: the assistant works from the newest plan it has. Without
+ * this, that plan kept its buttons, and the header said "Plan ready", after it was built.
+ */
+export function builtBy<Run extends BuildRun>(
+  plan: { readonly planId: string; readonly writtenAt?: Time },
+  runs: ReadonlyArray<Run>,
+): Run | undefined {
+  const written = millis(plan.writtenAt);
+  return runs.find((run) => {
+    if (run.sourcePlanRef === undefined || run.status === "rolled_back") return false;
+    if (run.sourcePlanRef.planId === plan.planId) return true;
+    const began = millis(run.startedAt);
+    return !Number.isNaN(written) && !Number.isNaN(began) && began >= written;
+  });
+}
+
 /**
  * Whether a plan is really waiting for Build it: the newest plan, still active, its turn still
  * standing, and no turn has built it. The header reads this instead of trusting the engine's
@@ -47,6 +83,8 @@ export function planWaitingForBuild(projection: {
     readonly type: string;
     readonly ordinal: number;
     readonly planId?: string | undefined;
+    readonly completedAt?: Time;
+    readonly updatedAt?: Time;
   }>;
   readonly plans: ReadonlyArray<{
     readonly id: string;
@@ -57,6 +95,7 @@ export function planWaitingForBuild(projection: {
   readonly runs: ReadonlyArray<{
     readonly id: string;
     readonly status: string;
+    readonly startedAt?: Time;
     readonly sourcePlanRef?: { readonly planId: string } | undefined;
   }>;
 }): boolean {
@@ -80,8 +119,9 @@ export function planWaitingForBuild(projection: {
     if (projection.runs.some((run) => run.id === plan.runId && run.status === "rolled_back")) {
       return false;
     }
-    return !projection.runs.some(
-      (run) => run.sourcePlanRef?.planId === planId && run.status !== "rolled_back",
+    return (
+      builtBy({ planId, writtenAt: item.completedAt ?? item.updatedAt }, projection.runs) ===
+      undefined
     );
   });
 }

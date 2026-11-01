@@ -26,6 +26,8 @@ import { useEnsureInteractionMode } from "../../compose/turnMode";
 import { useExplainMode } from "../../explain/explainMode";
 import { isFamilyRefusal } from "../../family/cards";
 import { useFamily } from "../../family/FamilyProvider";
+import { noteDispatchMode } from "../../rewind/rewind";
+import { useChildView } from "../../../app/useChildView";
 import { shieldProblem } from "../../shield/shield";
 import { serverEnvironment } from "../../../state/server";
 import { threadEnvironment } from "../../../state/threads";
@@ -92,6 +94,7 @@ export function useDecisionDispatcher({
   const planFirst = usePlanFirst();
   // The failure cause can echo the request; keep it out of the console.
   const family = useFamily();
+  const childView = useChildView();
   const answerSecret = useAtomCommand(serverEnvironment.answerSecretRequest, {
     reportFailure: false,
     reportDefect: false,
@@ -171,6 +174,10 @@ export function useDecisionDispatcher({
               modelSelection: shell.modelSelection,
               runtimeMode: shell.runtimeMode,
               interactionMode,
+              // Any other child message lines up (Take back works); Build it starts as usual.
+              ...(extras.plan === undefined && noteDispatchMode(childView) !== undefined
+                ? { dispatchMode: "queue" as const }
+                : {}),
               ...(extras.plan && extras.plan.interactionMode === "default"
                 ? { sourceProposedPlan: { threadId, planId: extras.plan.planId } }
                 : {}),

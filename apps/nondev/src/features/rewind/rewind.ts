@@ -66,13 +66,15 @@ export function canOfferTakeBack(
 }
 
 /**
- * How a message typed while the assistant works is delivered. A child's note is lined up
- * (queued), never steered into the running turn: a steered note cannot be taken back, a lined-up
- * one can. This only picks the engine's existing "queue" mode; it adds no capability. Anyone
- * else keeps the engine's own choice.
+ * How a child's message is delivered: always lined up (queued), never steered into the running
+ * turn. A steered note cannot be taken back, a lined-up one can. It is decided by who is typing,
+ * not by whether the screen thinks the assistant is busy: the screen can lag the engine by a
+ * moment (right after Build it), and a "plain" send in that gap was steered in. When nothing is
+ * running the engine simply starts it. This only picks the engine's existing "queue" mode; it
+ * adds no capability. Anyone else keeps the engine's own choice.
  */
-export function noteDispatchMode(asNote: boolean, childView: boolean): "queue" | undefined {
-  return asNote && childView ? "queue" : undefined;
+export function noteDispatchMode(childView: boolean): "queue" | undefined {
+  return childView ? "queue" : undefined;
 }
 
 /**

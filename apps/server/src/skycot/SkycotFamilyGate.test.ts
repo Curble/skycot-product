@@ -1271,6 +1271,38 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     assert.isNull(SkycotFamilyGate.sourcePlanOf({ sourcePlanRef: { planId: "p" } }));
   });
 
+  it("only the newest plan builds: an older plan plans again while a later one stands", () => {
+    const planItem = (planId: string, ordinal: number) => ({
+      type: "proposed_plan",
+      planId,
+      ordinal,
+    });
+    const at = (laterRun: string) =>
+      ({
+        plans: [proposedPlan("plan-1", "run-1"), proposedPlan("plan-2", "run-2")],
+        runs: [
+          { id: "run-1", status: "completed" },
+          { id: "run-2", status: laterRun },
+        ],
+        turnItems: [planItem("plan-1", 1), planItem("plan-2", 2)],
+      }) as never;
+    // The newer plan can build; the older one cannot while the newer one stands.
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(at("completed"), "plan-2"));
+    assert.isFalse(SkycotFamilyGate.planStillBuildable(at("completed"), "plan-1"));
+    // A newer plan whose turn was taken back does not count.
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(at("rolled_back"), "plan-1"));
+    // A newer plan that was itself built still replaces the older one for good.
+    const built = {
+      plans: [proposedPlan("plan-1", "run-1"), proposedPlan("plan-2", "run-2", "completed")],
+      runs: [
+        { id: "run-1", status: "completed" },
+        { id: "run-2", status: "completed" },
+      ],
+      turnItems: [planItem("plan-1", 1), planItem("plan-2", 2)],
+    } as never;
+    assert.isFalse(SkycotFamilyGate.planStillBuildable(built, "plan-1"));
+  });
+
   it.effect("a shield yes for one message does not reach another session's message", () =>
     withGate([], ({ gate, family }) =>
       Effect.gen(function* () {

@@ -19,7 +19,7 @@ import { InlineReply } from "./InlineReply";
 import { Markdown, parseMarkdown } from "./Markdown";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
-import { replacedByNewerPlan } from "../plans";
+import { builtBy, replacedByNewerPlan } from "../plans";
 import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
@@ -50,7 +50,10 @@ export function PlanCard({
     projection.plans,
     projection.runs,
   );
-  const acceptedRun = projection.runs.find((run) => run.sourcePlanRef?.planId === item.planId);
+  const acceptedRun = builtBy(
+    { planId: item.planId, writtenAt: item.completedAt ?? item.updatedAt },
+    projection.runs,
+  );
   const busyThread = shell ? threadRuntimeIsActive(shell.runtime) : false;
   const card = describeRuntimeRequest(item, projectName === null ? {} : { projectName });
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });

@@ -132,9 +132,8 @@ describe("canOfferTakeBack", () => {
 
 describe("noteDispatchMode", () => {
   it("lines a child's note up so it can be taken back; others keep the engine's choice", () => {
-    expect(noteDispatchMode(true, true)).toBe("queue");
-    expect(noteDispatchMode(true, false)).toBeUndefined();
-    expect(noteDispatchMode(false, true)).toBeUndefined();
+    expect(noteDispatchMode(true)).toBe("queue");
+    expect(noteDispatchMode(false)).toBeUndefined();
   });
 });
 
