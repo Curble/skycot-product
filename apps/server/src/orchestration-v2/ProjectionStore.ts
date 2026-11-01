@@ -87,6 +87,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import type * as Statement from "effect/sql/Statement";
 
 import { MCP_APP_OUTPUT_KEY } from "@t3tools/shared/mcpApp";
+import { planWaitingForBuild } from "@t3tools/skycot-rules/plans"; // nondev-seam: skycot-plan-really-waiting
 import { threadHtmlRenderAttachmentIds } from "../attachmentStore.ts";
 import {
   isThreadHistoryUserTurn,
@@ -1622,9 +1623,7 @@ export function threadShellFromProjection(
     latestUserMessageAt: latestUserMessage?.updatedAt ?? null,
     latestUserAuthoredMessageAt:
       userMessages.find((message) => message.createdBy === "user")?.updatedAt ?? null,
-    hasActionableProposedPlan: projection.plans.some(
-      (plan) => plan.kind === "proposed_plan" && plan.status === "active",
-    ),
+    hasActionableProposedPlan: planWaitingForBuild(projection), // nondev-seam: skycot-plan-really-waiting
     pendingBackgroundTasks: [...pendingBackgroundTasks],
     providerInstanceHistory: providerInstanceHistoryForShell({
       threadId: projection.thread.id,

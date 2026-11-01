@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { builtBy, planWaitingForBuild, replacedByNewerPlan } from "./plans";
+import { builtBy, planWaitingForBuild, replacedByNewerPlan } from "./plans.ts";
 
 const earlier = { type: "proposed_plan", id: "one", planId: "one", ordinal: 1 } as const;
 const newer = { ...earlier, id: "two", planId: "two", ordinal: 2 };
@@ -123,5 +123,61 @@ describe("a build that began after a plan was written built it", () => {
     ];
     expect(builtBy({ planId: "two", writtenAt: "2026-11-02T01:00:10.000Z" }, runs)?.id).toBe("b");
     expect(builtBy({ planId: "two" }, runs)).toBeUndefined();
+  });
+});
+
+describe("what the thread list flag is built from (engine times, not strings)", () => {
+  const at = (iso: string) => ({ epochMilliseconds: Date.parse(iso) });
+  const written = { ...earlier, completedAt: at("2026-11-02T01:00:00.000Z") };
+  it("built then stopped: not waiting", () => {
+    expect(
+      planWaitingForBuild({
+        turnItems: [written],
+        plans: [plan("one", "active", "r1")],
+        runs: [
+          { id: "r1", status: "completed" },
+          {
+            id: "r2",
+            status: "interrupted",
+            startedAt: at("2026-11-02T01:00:30.000Z"),
+            sourcePlanRef: { planId: "one" },
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+  it("really waiting: waiting", () => {
+    expect(
+      planWaitingForBuild({
+        turnItems: [written],
+        plans: [plan("one", "active", "r1")],
+        runs: [{ id: "r1", status: "completed" }],
+      }),
+    ).toBe(true);
+  });
+  it("replaced: only the newest plan counts", () => {
+    const both = [written, { ...newer, completedAt: at("2026-11-02T01:00:10.000Z") }];
+    const plans = [plan("one", "active", "r1"), plan("two", "active", "r2")];
+    const runs = [
+      { id: "r1", status: "completed" },
+      { id: "r2", status: "completed" },
+    ];
+    expect(planWaitingForBuild({ turnItems: both, plans, runs })).toBe(true);
+    // the older plan alone must not make the list say "ready" once the newest is built
+    expect(
+      planWaitingForBuild({
+        turnItems: both,
+        plans,
+        runs: [
+          ...runs,
+          {
+            id: "r3",
+            status: "completed",
+            startedAt: at("2026-11-02T01:00:20.000Z"),
+            sourcePlanRef: { planId: "two" },
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 });
