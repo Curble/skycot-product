@@ -2,7 +2,11 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { canOfferEdit, canOfferTakeBack } from "../rewind/rewind";
 import { turnItem } from "../../plain/fixtures.test-helpers";
-import { withQueuedMessageItems, type QueuedMessageSource } from "./queuedMessages";
+import {
+  isWaitingQueuedRow,
+  withQueuedMessageItems,
+  type QueuedMessageSource,
+} from "./queuedMessages";
 
 const NOW = "2026-11-02T00:00:00.000Z";
 const run = (id: string, ordinal: number, status: string, userMessageId: string) => ({
@@ -58,6 +62,9 @@ describe("withQueuedMessageItems", () => {
     expect(added !== undefined && canOfferTakeBack(added, projection.runs)).toBe(true);
     expect(added !== undefined && canOfferEdit(added, projection.runs)).toBe(false);
     expect(added?.ordinal).toBeGreaterThan(items[0]?.ordinal ?? 0);
+    // Only the waiting row reads "Lined up for later"; the engine's own row, once started, does not.
+    expect(added !== undefined && isWaitingQueuedRow(added)).toBe(true);
+    expect(items[0] !== undefined && isWaitingQueuedRow(items[0])).toBe(false);
   });
 
   it("adds nothing once the engine has written the row, or for a run that is not queued", () => {

@@ -9,6 +9,13 @@ import type {
   TurnItemId,
 } from "@t3tools/contracts";
 
+const QUEUED_ROW = "queued:";
+
+/** Whether a row is one added here for a message still waiting (not the engine's own row). */
+export function isWaitingQueuedRow(item: { readonly id: string }): boolean {
+  return String(item.id).startsWith(QUEUED_ROW);
+}
+
 export type QueuedMessageSource = Pick<
   OrchestrationV2ThreadProjection,
   "turnItems" | "runs" | "messages"
@@ -38,7 +45,7 @@ export function withQueuedMessageItems(
     recorded.add(message.id);
     ordinal += 1;
     added.push({
-      id: `queued:${message.id}` as TurnItemId,
+      id: `${QUEUED_ROW}${message.id}` as TurnItemId,
       threadId: message.threadId,
       runId: run.id,
       nodeId: run.rootNodeId,

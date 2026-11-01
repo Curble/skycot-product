@@ -17,6 +17,7 @@ import { Markdown } from "./Markdown";
 import { ReadAloudButton, useAutoReadAloud } from "../../voice/ReadAloud";
 import type { TimelineRenderContext } from "./registry";
 import { imagesOf, SentPictures } from "./SentPictures";
+import { isWaitingQueuedRow } from "../queuedMessages";
 import { shortTime } from "./time";
 import { useChildView } from "../../../app/useChildView";
 import { childErrors } from "../../../plain/copy";
@@ -50,7 +51,8 @@ export function UserBubble({
   readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
 }) {
   const steered = item.inputIntent === "steer" || item.inputIntent === "promoted_queued_to_steer";
-  const queued = item.inputIntent === "queued_turn";
+  // "Lined up" only while it really waits: the engine writes its own row once the turn starts.
+  const queued = item.inputIntent === "queued_turn" && isWaitingQueuedRow(item);
   const pictures = environmentId === undefined ? [] : imagesOf(item.attachments);
   // Pictures show themselves; only what cannot be shown is counted.
   const others = item.attachments.length - pictures.length;

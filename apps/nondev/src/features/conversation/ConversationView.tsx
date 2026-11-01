@@ -150,6 +150,7 @@ import {
   type ConversationStatus,
 } from "./status";
 import { Timeline } from "./Timeline";
+import { withQueuedMessageItems } from "./queuedMessages";
 import { endedOnRefusal, waitedMillis, type AskItem } from "./WorkingCard";
 import { BuildJourney } from "../journey/BuildJourney";
 import { withoutAssistantPlumbing } from "../../plain/plumbing";
@@ -393,9 +394,12 @@ export function ConversationView({
   const starterPick = useStarterPick(setSeed);
   const [sendingMessage, setSendingMessage] = useState<{ id: string; text: string } | null>(null);
   useEffect(() => {
+    // A lined-up message counts as recorded once it shows as lined up: otherwise Take back
+    // removes it and the old "Sending…" bubble comes back for good.
     if (
       sendingMessage !== null &&
-      projection?.turnItems.some(
+      projection &&
+      withQueuedMessageItems(projection).some(
         (item) => item.type === "user_message" && String(item.messageId) === sendingMessage.id,
       )
     )
