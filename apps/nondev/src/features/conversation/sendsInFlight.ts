@@ -43,6 +43,32 @@ export function useSendInFlight(threadId: string): boolean {
   );
 }
 
+/**
+ * Runs one send with its in-flight mark switched on in the same tick it is called (before any
+ * await), and always switched off afterwards. The composer wraps its whole send path in this, so
+ * a Build it pressed in the very same instant, even while the words are still being checked,
+ * already sees the other message.
+ */
+export async function whileSending<T>(threadId: string, run: () => Promise<T>): Promise<T> {
+  const endSend = beginSend(threadId);
+  try {
+    return await run();
+  } finally {
+    endSend();
+  }
+}
+
+/** Why a Build it is held back right now: another message of the person's, or Sam still working. */
+export type BuildItHold = "other-message" | "assistant-busy";
+
+export function buildItHold(threadId: string, assistantBusy: boolean): BuildItHold | null {
+  if (sendInFlight(threadId)) return "other-message";
+  return assistantBusy ? "assistant-busy" : null;
+}
+
 /** What a child reads when a Build it is held back: calm, and says what to do next. */
-export const BUILD_IT_HELD_BACK =
-  "Your other message is still going. When it finishes, press Build it on the newest plan.";
+export function buildItHeldBackNote(hold: BuildItHold, builderName: string): string {
+  return hold === "other-message"
+    ? "Your other message is still going. When it finishes, press Build it on the newest plan."
+    : `${builderName} is still finishing. When ${builderName} is done, press Build it on the newest plan.`;
+}

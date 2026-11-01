@@ -25,7 +25,8 @@ import { requestMode, usePlanFirst } from "../../compose/planFirst";
 import { useEnsureInteractionMode } from "../../compose/turnMode";
 import { useExplainMode } from "../../explain/explainMode";
 import { isFamilyRefusal } from "../../family/cards";
-import { BUILD_IT_HELD_BACK, beginSend, sendInFlight } from "../sendsInFlight";
+import { beginSend, buildItHeldBackNote, buildItHold } from "../sendsInFlight";
+import { useCrew } from "../../../themes/useCrew";
 import { useFamily } from "../../family/FamilyProvider";
 import { noteDispatchMode } from "../../rewind/rewind";
 import { useChildView } from "../../../app/useChildView";
@@ -96,6 +97,7 @@ export function useDecisionDispatcher({
   // The failure cause can echo the request; keep it out of the console.
   const family = useFamily();
   const childView = useChildView();
+  const crew = useCrew();
   const answerSecret = useAtomCommand(serverEnvironment.answerSecretRequest, {
     reportFailure: false,
     reportDefect: false,
@@ -153,12 +155,11 @@ export function useDecisionDispatcher({
           if (typed.length === 0 || shell === null) return null;
           // A Build it is tied to one plan: never lined up behind another message, where it
           // could run after a newer plan was written. The child presses it again on the newest plan.
-          if (
-            extras.plan !== undefined &&
-            (sendInFlight(threadId) || threadRuntimeIsActive(shell.runtime))
-          ) {
-            return BUILD_IT_HELD_BACK;
-          }
+          const hold =
+            extras.plan === undefined
+              ? null
+              : buildItHold(threadId, threadRuntimeIsActive(shell.runtime));
+          if (hold !== null) return buildItHeldBackNote(hold, crew.builder.name);
           const endSend = beginSend(threadId);
           try {
             const text =

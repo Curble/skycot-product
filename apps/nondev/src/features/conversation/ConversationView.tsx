@@ -99,7 +99,7 @@ import { emptyConversationHint } from "../home/tip";
 import { ExplainToggle, useExplainMode } from "../explain";
 import { useFamily, useFamilySteps } from "../family/FamilyProvider";
 import { planWaitingForBuild } from "./plans";
-import { beginSend } from "./sendsInFlight";
+import { beginSend, whileSending } from "./sendsInFlight";
 import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
@@ -1151,8 +1151,14 @@ function ReplyComposer({
     return true;
   };
 
-  const send = async (asNewRequest = false) => {
-    if (!ready || !hasContent || shell === null) return;
+  // The in-flight mark goes on in the same tick as the press, before the words are checked.
+  const send = (asNewRequest = false): Promise<void> => {
+    if (!ready || !hasContent || shell === null) return Promise.resolve();
+    return whileSending(String(threadId), () => sendChecked(asNewRequest));
+  };
+
+  const sendChecked = async (asNewRequest: boolean) => {
+    if (shell === null) return;
     if (!active && typedWhileActive && !asNewRequest && editing === null) {
       setConfirmNewTurn(true);
       return;
