@@ -32,6 +32,14 @@ export function descriptorsFor(
     ?.optionDescriptors;
 }
 
+/** Grown-up-only controls (thinking depth, the command palette): never a child's, never with Family on. */
+export function grownUpControlsShown(who: {
+  readonly childView: boolean;
+  readonly familyOn: boolean;
+}): boolean {
+  return !who.childView && !who.familyOn;
+}
+
 /**
  * The control's model, or null when it should not be shown: a child, the Family profile, or an
  * assistant/model with no effort option (or only one stop to choose).
@@ -40,7 +48,7 @@ export function depthModelFor(
   descriptors: ReadonlyArray<ProviderOptionDescriptor> | undefined,
   who: { readonly childView: boolean; readonly familyOn: boolean },
 ): DepthModel | null {
-  if (who.childView || who.familyOn) return null;
+  if (!grownUpControlsShown(who)) return null;
   const care = describeSpeedCare(descriptors).care;
   if (care === undefined || care.choices.length < 2) return null;
   const usual =

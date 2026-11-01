@@ -16,6 +16,7 @@ import { documentTitle } from "../brand";
 import "../features/review";
 import { useFamily } from "../features/family/FamilyProvider";
 import { FamilyHeadsUp } from "../features/family-limits/HeadsUp";
+import { CommandPaletteHost } from "../features/palette/CommandPalette";
 import { NotificationCoordinator } from "../features/notifications/NotificationCoordinator";
 import { PreviewPanel } from "../features/preview/PreviewPanel";
 import {
@@ -259,6 +260,7 @@ function ShellFrame({ route, children }: { readonly route: Route; readonly child
         <SidebarDrawer route={route} onClose={() => shell.setDrawerOpen(false)} />
       ) : null}
       <UsageSheetHost />
+      <CommandPaletteHost />
       <ToastHost />
     </div>
   );
