@@ -133,3 +133,26 @@ describe("child waiting words", () => {
     ).not.toBe("plan");
   });
 });
+
+describe("describeThreadStatus after Take back (4o)", () => {
+  function withRun(run: Record<string, unknown>, stopRequested = false): EnvironmentThreadShell {
+    const base = shell({ runStatus: "cancelled", stopRequested });
+    return { ...base, latestRun: { ...base.latestRun, ...run } } as EnvironmentThreadShell;
+  }
+
+  it("does not say Stopped when a lined-up message was taken back before it started", () => {
+    const status = describeThreadStatus(withRun({ startedAt: null }));
+    expect(status.kind).toBe("done");
+    expect(status.presence).toBe("Ready when you are");
+  });
+
+  it("still says Stopped when the run had started", () => {
+    const status = describeThreadStatus(withRun({ startedAt: "2026-10-21T08:59:00.000Z" }));
+    expect(status.kind).toBe("stopped");
+  });
+
+  it("still says Stopped when Stop was pressed before the run began", () => {
+    const status = describeThreadStatus(withRun({ startedAt: null }, true));
+    expect(status.kind).toBe("stopped");
+  });
+});

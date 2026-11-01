@@ -199,7 +199,13 @@ export function describeThreadStatus(
       attention: "none",
     };
   }
-  switch (run.status) {
+  // A lined-up message taken back before it started ends as a cancelled run that never began and
+  // had no Stop pressed: nobody stopped anything, so it reads like the turn before it.
+  const takenBack =
+    run.status === "cancelled" &&
+    run.startedAt == null &&
+    shell.source.latestRunStopRequested !== true;
+  switch (takenBack ? "completed" : run.status) {
     case "failed":
       return {
         kind: "failed",
@@ -244,7 +250,7 @@ export function describeThreadStatus(
       ) {
         return { ...REFUSED_STATUS };
       }
-      const unseen = isUnseenSince(shell.lastVisitedAt, run.completedAt);
+      const unseen = !takenBack && isUnseenSince(shell.lastVisitedAt, run.completedAt);
       return unseen
         ? {
             kind: "ready",
