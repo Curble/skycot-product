@@ -5,8 +5,8 @@ import { parseExplanation, readExplainMarker } from "@t3tools/skycot-rules/expla
 import { readPointing } from "@t3tools/skycot-rules/preview";
 
 import { ExplainCard } from "../../explain/ExplainCard";
-import { EditActions } from "../../rewind/MessageActions";
-import { canOfferEdit } from "../../rewind/rewind";
+import { EditActions, TakeBackActions } from "../../rewind/MessageActions";
+import { canOfferEdit, canOfferTakeBack } from "../../rewind/rewind";
 import { CrewBubble, ErrorNote, UserBubble } from "./MessageBubbles";
 import { PlanCard } from "./PlanCard";
 import { registerTimelineRenderer } from "./registry";
@@ -19,6 +19,27 @@ registerTimelineRenderer("user_message", ({ item, environmentId, projection, thr
   if (item.type !== "user_message") return null;
   const pointing = readPointing(readExplainMarker(item.text).text);
   const shown = { ...item, text: pointing.text };
+  if (canOfferTakeBack(item, projection.runs) && item.runId !== null) {
+    return (
+      <TakeBackActions
+        environmentId={environmentId}
+        threadId={threadId}
+        runId={item.runId}
+        text={item.text}
+        pictures={item.attachments.length}
+      >
+        {({ actions, onContextMenu }) => (
+          <UserBubble
+            item={shown}
+            environmentId={environmentId}
+            pointing={pointing.labels}
+            actions={actions}
+            onContextMenu={onContextMenu}
+          />
+        )}
+      </TakeBackActions>
+    );
+  }
   if (!canOfferEdit(item, projection.runs)) {
     return <UserBubble item={shown} environmentId={environmentId} pointing={pointing.labels} />;
   }

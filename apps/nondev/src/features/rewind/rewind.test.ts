@@ -6,6 +6,10 @@ import { describe, expect, it } from "vite-plus/test";
 import { checkpoint, turnItem } from "../../plain/fixtures.test-helpers";
 import {
   canOfferEdit,
+  canOfferTakeBack,
+  mergeIntoBox,
+  takeBackProblem,
+  takeBackToast,
   countReplaced,
   copy,
   editableText,
@@ -94,6 +98,58 @@ describe("canOfferEdit", () => {
         runs,
       ),
     ).toBe(false);
+  });
+});
+
+describe("canOfferTakeBack", () => {
+  it("only on the person's own lined-up message whose run has not started", () => {
+    const runs = [run(1), run(2, "queued"), run(3, "running"), run(4, "rolled_back")];
+    expect(canOfferTakeBack(message(2, "queued_turn"), runs)).toBe(true);
+    expect(canOfferTakeBack(message(1, "queued_turn"), runs)).toBe(false);
+    expect(canOfferTakeBack(message(3, "queued_turn"), runs)).toBe(false);
+    expect(canOfferTakeBack(message(4, "queued_turn"), runs)).toBe(false);
+    // A note added while it worked, or an ordinary message, is not "lined up".
+    expect(canOfferTakeBack(message(2, "steer"), runs)).toBe(false);
+    expect(canOfferTakeBack(message(2, "turn_start"), runs)).toBe(false);
+    expect(canOfferTakeBack(message(9, "queued_turn"), runs)).toBe(false);
+    expect(
+      canOfferTakeBack(
+        turnItem("assistant_message", { messageId: "m", text: "hi", streaming: false }),
+        runs,
+      ),
+    ).toBe(false);
+  });
+
+  it("never overlaps with Edit", () => {
+    const runs = [run(1), run(2, "queued")];
+    for (const ordinal of [1, 2]) {
+      const item = message(ordinal, "queued_turn");
+      expect(canOfferEdit(item, runs) && canOfferTakeBack(item, runs)).toBe(false);
+    }
+  });
+});
+
+describe("mergeIntoBox", () => {
+  it("fills an empty box, or adds after a blank line", () => {
+    expect(mergeIntoBox("", "Make it blue")).toBe("Make it blue");
+    expect(mergeIntoBox("  \n", "Make it blue")).toBe("Make it blue");
+    expect(mergeIntoBox("Also add a title", "Make it blue")).toBe(
+      "Also add a title\n\nMake it blue",
+    );
+  });
+  it("adds nothing when there is nothing to add", () => {
+    expect(mergeIntoBox("Hello", "")).toBe("Hello");
+    expect(mergeIntoBox("Hello", "  ")).toBe("Hello");
+  });
+});
+
+describe("take back words", () => {
+  it("says plainly what happened", () => {
+    expect(takeBackToast(0)).toBe("Taken back. It's in the message box if you want to change it.");
+    expect(takeBackToast(2)).toContain("pictures didn't come back");
+    expect(takeBackProblem("Sam")).toBe(
+      "Sam already started on that one, so it can't be taken back. You can use Edit once it's done.",
+    );
   });
 });
 

@@ -91,9 +91,14 @@ import { useChildView } from "../../app/useChildView";
 import { useShield } from "../shield";
 import { useBadgeWatcher } from "../badges/useBadgeWatcher";
 import { GoBackSheet, type GoBackStage } from "../rewind/GoBackSheet";
-import { copy as rewindCopy, type FilesChoice, type RewindTarget } from "../rewind/rewind";
+import {
+  copy as rewindCopy,
+  mergeIntoBox,
+  type FilesChoice,
+  type RewindTarget,
+} from "../rewind/rewind";
 import { RewindHost } from "../rewind/RewindHost";
-import { stopEditing, useEditDraft } from "../rewind/store";
+import { stopEditing, useEditDraft, usePutBack } from "../rewind/store";
 import { useGoBackCommand, useRewindFacts } from "../rewind/useGoBack";
 import { ConversationMenuButton } from "../tidy/ConversationMenu";
 import { FindBar, isFindShortcut } from "../tidy/FindBar";
@@ -977,6 +982,21 @@ function ReplyComposer({
     setAppliedEdit(null);
     setBeforeEdit(null);
   }
+  // "Take back" on a lined-up message adds its words after whatever is already typed.
+  const putBack = usePutBack(threadId);
+  const [appliedPutBack, setAppliedPutBack] = useState<number | null>(putBack?.nonce ?? null);
+  if (putBack !== null && putBack.nonce !== appliedPutBack) {
+    setAppliedPutBack(putBack.nonce);
+    setText(mergeIntoBox(text, putBack.text));
+    setProblem(null);
+  }
+  useEffect(() => {
+    if (appliedPutBack === null) return;
+    const field = inputRef.current;
+    if (field === null) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [appliedPutBack]);
   useEffect(() => {
     const field = inputRef.current;
     if (appliedEdit === null || field === null) return;

@@ -83,3 +83,28 @@ export function clearEditRequest(threadId: string): void {
   requests = next;
   for (const listener of listeners) listener();
 }
+
+/**
+ * Words from a taken-back message, waiting to be added to a conversation's message box. The
+ * box adds them after what is already typed, once per nonce.
+ */
+export interface PutBack {
+  readonly text: string;
+  readonly nonce: number;
+}
+
+let putBacks: ReadonlyMap<string, PutBack> = new Map();
+
+export function putBackInBox(threadId: string, text: string): void {
+  nonce += 1;
+  putBacks = new Map(putBacks).set(threadId, { text, nonce });
+  for (const listener of listeners) listener();
+}
+
+export function usePutBack(threadId: string): PutBack | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => putBacks.get(threadId) ?? null,
+    () => null,
+  );
+}

@@ -656,6 +656,23 @@ it.layer(NodeServices.layer)("who is who", (it) => {
     ),
   );
 
+  it.effect("a child can take back a lined-up message only in their own conversation", () =>
+    withWorld(({ visibility }) =>
+      Effect.gen(function* () {
+        const view = (yield* visibility.childViewFor("ava-ipad"))!;
+        const cancel = (threadId: string) =>
+          visibility.allows(
+            view,
+            referencedBy({ type: "queued-run.cancel", commandId: "c", threadId, runId: "run-q" }),
+            "use",
+          );
+        assert.isTrue(yield* cancel("thread-ava"));
+        assert.isFalse(yield* cancel("thread-leo"));
+        assert.isFalse(yield* cancel("thread-leo-pinned"));
+      }),
+    ),
+  );
+
   // nondev-seam: skycot-project-put-away-test
   it.effect("a put-away project leaves the child's lists and calls, not the grown-up's", () =>
     withWorld(({ family, visibility }) =>

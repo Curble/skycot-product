@@ -263,6 +263,9 @@ describe("gateNeedFor", () => {
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.pin" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.unpin" }],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "thread.pin.reorder" }],
+      // Taking back a message that is still lined up: only drops that waiting run. Whether the
+      // child may touch that conversation is the per-thread visibility check, not this gate.
+      [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, { type: "queued-run.cancel" }],
       // Going back to an earlier message, and Undo: the same rollback, with or without files.
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(true)],
       [ORCHESTRATION_V2_WS_METHODS.dispatchCommand, goBack(false)],

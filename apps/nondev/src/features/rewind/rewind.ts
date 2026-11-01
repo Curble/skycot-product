@@ -51,6 +51,41 @@ export function canOfferEdit(
   return run !== undefined && LIVE_STARTED.has(run.status);
 }
 
+/**
+ * Whether a message gets "Take back": the person's own message that is still lined up behind
+ * the assistant's work (its run has not started). It is the mirror of Edit, which needs the
+ * run to have started.
+ */
+export function canOfferTakeBack(
+  item: OrchestrationV2TurnItem,
+  runs: ReadonlyArray<OrchestrationV2Run>,
+): item is UserMessage {
+  if (item.type !== "user_message") return false;
+  if (item.inputIntent !== "queued_turn") return false;
+  return runOf(runs, item)?.status === "queued";
+}
+
+/**
+ * The words that go back in the message box after a take-back: after what is already there,
+ * with a blank line between (like Edit's twin in the web app). Nothing to add changes nothing.
+ */
+export function mergeIntoBox(current: string, restored: string): string {
+  if (restored.trim().length === 0) return current;
+  return current.trim().length === 0 ? restored : `${current}\n\n${restored}`;
+}
+
+/** The calm toast after a take-back; pictures do not come back with the words. */
+export function takeBackToast(pictures: number): string {
+  return pictures > 0
+    ? "Taken back. The words are in the message box; the pictures didn't come back, so add them again."
+    : "Taken back. It's in the message box if you want to change it.";
+}
+
+/** One plain sentence when the engine refused (the run most likely just started). */
+export function takeBackProblem(builderName: string): string {
+  return `${builderName} already started on that one, so it can't be taken back. You can use Edit once it's done.`;
+}
+
 export type RewindBlock =
   /** This connection can read but not change anything. */
   | "read-only"
