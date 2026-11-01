@@ -618,6 +618,28 @@ export function sourcePlanOf(
 }
 
 /**
+ * Pure: whether a small tweak may skip the plan card. Something must already have been built
+ * (a turn that built a plan and still stands), and no plan may be waiting for Build it: a tweak
+ * typed while a plan waits changes the plan, it never builds it. A plan's own `runId` is the
+ * turn that wrote the plan, not one that built it, so it is not read here (2 Nov 2026: every
+ * waiting plan counted as built, and "make it purple" built the card without Build it).
+ */
+export function builtAndNoPlanWaiting(
+  projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs">,
+): boolean {
+  const builders = projection.runs.filter(
+    (run) => run.sourcePlanRef !== undefined && run.status !== "rolled_back",
+  );
+  if (builders.length === 0) return false;
+  return !projection.plans.some(
+    (plan) =>
+      plan.kind === "proposed_plan" &&
+      plan.status === "active" &&
+      !builders.some((run) => run.sourcePlanRef?.planId === plan.id),
+  );
+}
+
+/**
  * Pure: whether a Build it may run without a fresh plan. The plan must still be waiting, and
  * its turn must still be part of the conversation: going back to an earlier message (or Undo)
  * takes that turn back, the assistant forgets the plan, but the engine leaves the plan
@@ -1196,7 +1218,7 @@ const make = Effect.gen(function* () {
     ) {
       // A small change to something this conversation already built: no plan card for it.
       const builtBefore = yield* projections.getThreadProjection(message.threadId as ThreadId).pipe(
-        Effect.map((projection) => projection.plans.some((plan) => plan.runId !== null)),
+        Effect.map(builtAndNoPlanWaiting),
         // Anything that cannot be read plans (the safe side), a missing store included.
         Effect.catchCause(() => Effect.succeed(false)),
       );

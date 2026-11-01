@@ -1186,6 +1186,66 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
       ),
   );
 
+  it("a small tweak skips the plan only after a build, and never while a plan waits", () => {
+    const at = (
+      plans: ReadonlyArray<readonly [string, string, string?]>,
+      runs: ReadonlyArray<{ id: string; status: string; builds?: string }>,
+    ) =>
+      ({
+        plans: plans.map(([id, runId, status]) => proposedPlan(id, runId, status)),
+        runs: runs.map((run) => ({
+          id: run.id,
+          status: run.status,
+          ...(run.builds === undefined
+            ? {}
+            : { sourcePlanRef: { threadId: THREAD_ID, planId: run.builds } }),
+        })),
+      }) as never;
+    // A plan that only waits is not something built (its runId is the turn that wrote it).
+    assert.isFalse(
+      SkycotFamilyGate.builtAndNoPlanWaiting(
+        at([["plan-1", "run-1"]], [{ id: "run-1", status: "completed" }]),
+      ),
+    );
+    // Built: a later tweak may skip the plan.
+    const built = at(
+      [["plan-1", "run-1"]],
+      [
+        { id: "run-1", status: "completed" },
+        { id: "run-2", status: "completed", builds: "plan-1" },
+      ],
+    );
+    assert.isTrue(SkycotFamilyGate.builtAndNoPlanWaiting(built));
+    // Built once, but a newer plan waits for Build it: the tweak plans.
+    assert.isFalse(
+      SkycotFamilyGate.builtAndNoPlanWaiting(
+        at(
+          [
+            ["plan-1", "run-1"],
+            ["plan-2", "run-3"],
+          ],
+          [
+            { id: "run-1", status: "completed" },
+            { id: "run-2", status: "completed", builds: "plan-1" },
+            { id: "run-3", status: "completed" },
+          ],
+        ),
+      ),
+    );
+    // A build that was taken back does not count.
+    assert.isFalse(
+      SkycotFamilyGate.builtAndNoPlanWaiting(
+        at(
+          [["plan-1", "run-1"]],
+          [
+            { id: "run-1", status: "completed" },
+            { id: "run-2", status: "rolled_back", builds: "plan-1" },
+          ],
+        ),
+      ),
+    );
+  });
+
   it("a plan builds only while it waits and its turn still stands", () => {
     const projection = (planStatus: string, runStatus: string) =>
       ({
