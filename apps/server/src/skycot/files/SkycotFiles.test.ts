@@ -68,13 +68,21 @@ const withFiles = <A, E, R>(
       path.join(root, "pictures", "big", "huge.png"),
       new Uint8Array(SkycotFiles.BINARY_PREVIEW_BYTES + 1),
     );
+    yield* write(
+      path.join(root, "pictures", "story.txt"),
+      "Once upon a time there was a Dragon.\nThe end.",
+    );
+    yield* write(path.join(root, "node_modules", "left-pad", "dragon.js"), "dragon");
     yield* write(path.join(outside, "diary.txt"), "private");
+    yield* write(path.join(outside, "secret-dragon.txt"), "dragon");
     yield* write(path.join(copy, "index.html"), "<h1>Bubbles, in the copy</h1>");
     // Links: one to the rest of the disk, one to a file there, one that stays inside, one broken.
     yield* fs.symlink(outside, path.join(root, "sneaky-folder"));
     yield* fs.symlink(path.join(outside, "diary.txt"), path.join(root, "sneaky.txt"));
     yield* fs.symlink(path.join(root, "notes.md"), path.join(root, "notes-link.md"));
     yield* fs.symlink(path.join(dir, "nowhere"), path.join(root, "broken.txt"));
+    // A plainly named link to the secrets file.
+    yield* fs.symlink(path.join(root, ".env"), path.join(root, "pictures", "keys.txt"));
 
     const layerStores = Layer.mergeAll(
       Layer.mock(ProjectStore.ProjectStoreV2)({
@@ -170,8 +178,10 @@ it.layer(NodeServices.layer)("SkycotFiles", (it) => {
         const nested = yield* files.list(target("pictures"));
         assert.deepEqual(
           nested.entries.map((entry) => entry.path),
-          ["pictures/big", "pictures/cat.png"],
+          ["pictures/big", "pictures/cat.png", "pictures/keys.txt", "pictures/story.txt"],
         );
+        // A plainly named link to `.env` is flagged as noise like `.env` itself.
+        assert.isTrue(nested.entries.find((entry) => entry.name === "keys.txt")?.noise);
       }),
     ),
   );
@@ -289,6 +299,148 @@ it.layer(NodeServices.layer)("SkycotFiles", (it) => {
       }),
     ),
   );
+
+  it.effect("searches names and words inside files, shallow first, with a short snippet", () =>
+    withFiles(({ files }) =>
+      Effect.gen(function* () {
+        const byName = yield* files.search({ ...target(""), query: "NOTES" });
+        assert.deepEqual(
+          byName.hits.filter((hit) => hit.nameMatch).map((hit) => hit.path),
+          ["notes-link.md", "notes.md"],
+        );
+        const byWords = yield* files.search({ ...target(""), query: "dragon" });
+        assert.deepEqual(
+          byWords.hits.map((hit) => hit.path),
+          ["pictures/story.txt"],
+        );
+        const hit = byWords.hits[0]!;
+        assert.isFalse(hit.nameMatch);
+        assert.equal(hit.snippet?.match, "Dragon");
+        assert.equal(hit.snippet?.before, "Once upon a time there was a ");
+        assert.equal(hit.snippet?.after, ". The end.");
+        assert.isFalse(byWords.truncated);
+        // A picture is found by name only, and nothing is found twice.
+        const cat = yield* files.search({ ...target(""), query: "cat" });
+        assert.deepEqual(
+          cat.hits.map((entry) => [entry.path, entry.snippet]),
+          [["pictures/cat.png", null]],
+        );
+        const copy = yield* files.search({ ...target("", THREAD), query: "in the copy" });
+        assert.isTrue(copy.privateCopy);
+        assert.deepEqual(
+          copy.hits.map((entry) => entry.path),
+          ["index.html"],
+        );
+      }),
+    ),
+  );
+
+  it.effect("does not search or list through a link that points outside the project", () =>
+    withFiles(({ files }) =>
+      Effect.gen(function* () {
+        for (const query of ["diary", "private", "secret-dragon", "sneaky"]) {
+          const found = yield* files.search({ ...target(""), query });
+          assert.deepEqual(found.hits, [], query);
+        }
+        const all = yield* files.search({ ...target(""), query: "." });
+        const paths = all.hits.map((hit) => hit.path);
+        for (const left of ["sneaky.txt", "sneaky-folder/diary.txt", "broken.txt"]) {
+          assert.notInclude(paths, left);
+        }
+        // A link that stays inside the project is still an ordinary file.
+        assert.include(paths, "notes-link.md");
+      }),
+    ),
+  );
+
+  it.effect("leaves noise out until a grown-up shows everything, and never opens add-ons", () =>
+    withFiles(({ files, family }) =>
+      Effect.gen(function* () {
+        yield* family.enable({ code: CODE, childName: null });
+        for (const query of ["sk-secret", ".env", "left-pad", "core"]) {
+          assert.deepEqual((yield* files.search({ ...target(""), query })).hits, [], query);
+        }
+        assert.equal((yield* files.search({ ...target(""), query: "bubbles" })).hits.length, 1);
+        // A link with a plain name is judged by the file it points at.
+        assert.deepEqual((yield* files.search({ ...target(""), query: "keys" })).hits, []);
+        assert.equal(yield* reasonOf(files.read(target("pictures/keys.txt"))), "hidden");
+        yield* family.verify({ code: CODE, purpose: "files", sessionId: SESSION });
+        const secret = yield* files.search({ ...target(""), query: "sk-secret" });
+        assert.deepEqual(
+          secret.hits.map((hit) => hit.path),
+          [".env", "pictures/keys.txt"],
+        );
+        // Even then add-ons and .git are not walked.
+        for (const query of ["left-pad", "dragon.js", "core"]) {
+          const found = yield* files.search({ ...target(""), query });
+          assert.deepEqual(
+            found.hits.map((hit) => hit.path),
+            [],
+            query,
+          );
+        }
+        // And ../ cannot be reached by naming it.
+        assert.deepEqual((yield* files.search({ ...target(""), query: "../" })).hits, []);
+      }),
+    ),
+  );
+
+  it.effect("refuses a sibling's conversation like list does, and a bad word", () =>
+    withFiles(({ files }) =>
+      Effect.gen(function* () {
+        assert.equal(
+          yield* reasonOf(
+            files.search({
+              sessionId: "child-device",
+              projectId: PROJECT,
+              threadId: SIBLING_THREAD,
+              path: "",
+              query: "pet",
+            }),
+          ),
+          "not-theirs",
+        );
+        assert.equal(
+          yield* reasonOf(files.search({ ...target("", OTHER_THREAD), query: "pet" })),
+          "no-project",
+        );
+        for (const query of ["", "   ", "a".repeat(101), 42, null]) {
+          assert.equal(yield* reasonOf(files.search({ ...target(""), query })), "invalid-request");
+        }
+        assert.equal(
+          (yield* files.search({ ...target(""), query: `  ${"a".repeat(100)}  ` })).hits.length,
+          0,
+        );
+      }),
+    ),
+  );
+
+  it.effect("stops early and says so when there are too many answers", () =>
+    withFiles(({ files, root }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const crowd = path.join(root, "crowd");
+        yield* fs.makeDirectory(crowd);
+        for (let index = 0; index < SkycotFiles.MAX_SEARCH_RESULTS + 5; index += 1) {
+          yield* fs.writeFileString(path.join(crowd, `pebble-${index}.txt`), "x");
+        }
+        const found = yield* files.search({ ...target(""), query: "pebble" });
+        assert.equal(found.hits.length, SkycotFiles.MAX_SEARCH_RESULTS);
+        assert.isTrue(found.truncated);
+      }),
+    ),
+  );
+
+  it("snippetAround keeps one short line and marks cuts", () => {
+    const text = `${"a ".repeat(200)}\nneedle\n${"b ".repeat(200)}`;
+    const snippet = SkycotFiles.snippetAround(text, text.indexOf("needle"), 6);
+    assert.equal(snippet.match, "needle");
+    assert.isTrue(snippet.before.startsWith("…"));
+    assert.isTrue(snippet.after.endsWith("…"));
+    assert.isFalse(`${snippet.before}${snippet.match}${snippet.after}`.includes("\n"));
+    assert.isAtMost(snippet.before.length + snippet.after.length, 170);
+  });
 
   it.effect("with the Family profile on, holds the noise until a grown-up shows everything", () =>
     withFiles(({ files, family }) =>

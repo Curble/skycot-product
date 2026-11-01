@@ -297,3 +297,20 @@ html[data-flavour-cards="sticky"] .fm-files__glyph {
 .fm-shell[data-columns="1"] .fm-files__look {
   display: none;
 }
+
+/* A search answer's line of text, the match marked like Spotlight does. */
+.fm-files__snippet {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(12.5px * var(--fm-text-scale));
+  color: var(--fm-label-2);
+}
+.fm-files__snippet mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--fm-accent-soft);
+  color: var(--fm-label);
+  font-weight: 600;
+}

@@ -1,4 +1,5 @@
-// Files and Quick Look, engine side: list a folder of one SKYCOT project and read one file of it
+// Files and Quick Look, engine side: list a folder of one SKYCOT project, read one file of it and
+// search its names and words
 // for the plain client's Files view. Read-only: nothing here writes, moves or deletes.
 //
 // The engine picks the folder from the project (or the conversation's private copy), never from
@@ -50,6 +51,7 @@ export class SkycotFilesError extends Schema.TaggedError<SkycotFilesError>()("Sk
     "hidden",
     "not-a-folder",
     "not-theirs",
+    "invalid-request",
   ]),
 }) {
   override get message(): string {
@@ -66,6 +68,8 @@ export class SkycotFilesError extends Schema.TaggedError<SkycotFilesError>()("Sk
         return "That's not yours to open.";
       case "not-a-folder":
         return "That isn't a folder.";
+      case "invalid-request":
+        return "Type a word or two to look for, up to 100 letters.";
     }
   }
 }
@@ -115,6 +119,41 @@ export interface FileRead {
   readonly absolutePath: string;
 }
 
+/** A search looks at most this many files and folders, and keeps this many answers. */
+export const MAX_SEARCH_VISITS = 5000;
+export const MAX_SEARCH_RESULTS = 200;
+export const MAX_SEARCH_QUERY = 100;
+/** Words inside files are looked for only in files up to this size. */
+export const SEARCH_TEXT_BYTES = 512 * 1024;
+/** About this much text is shown around the first match. */
+export const SNIPPET_CHARS = 160;
+
+/** The line of text around the first match, split so the client can highlight the match. */
+export interface SearchSnippet {
+  readonly before: string;
+  readonly match: string;
+  readonly after: string;
+}
+
+export interface SearchHit {
+  readonly name: string;
+  /** Project-relative, with forward slashes. */
+  readonly path: string;
+  /** The name itself matched. */
+  readonly nameMatch: boolean;
+  /** Set when words inside the file matched. */
+  readonly snippet: SearchSnippet | null;
+}
+
+export interface SearchResults {
+  readonly root: string;
+  readonly privateCopy: boolean;
+  readonly query: string;
+  readonly hits: ReadonlyArray<SearchHit>;
+  /** Stopped early: too many answers, or too many files to look at. */
+  readonly truncated: boolean;
+}
+
 export interface FilesTarget {
   readonly sessionId: string;
   readonly projectId: ProjectId;
@@ -128,6 +167,10 @@ export class SkycotFiles extends Context.Service<
   {
     readonly list: (input: FilesTarget) => Effect.Effect<FilesListing, SkycotFilesError>;
     readonly read: (input: FilesTarget) => Effect.Effect<FileRead, SkycotFilesError>;
+    /** Finds files of the project by name and by the words inside them. Read-only. */
+    readonly search: (
+      input: FilesTarget & { readonly query: unknown },
+    ) => Effect.Effect<SearchResults, SkycotFilesError>;
   }
 >()("t3/skycot/files/SkycotFiles") {}
 
@@ -142,6 +185,22 @@ function looksBinary(bytes: Uint8Array): boolean {
   const end = Math.min(bytes.length, 8000);
   for (let index = 0; index < end; index += 1) if (bytes[index] === 0) return true;
   return false;
+}
+
+/** Folders a search never goes into, even for a grown-up who opened Show everything. */
+const SEARCH_SKIPPED_FOLDERS: ReadonlySet<string> = new Set(["node_modules", ".git"]);
+
+/** One short, single-line piece of `text` around the match at `at`, split for highlighting. */
+export function snippetAround(text: string, at: number, length: number): SearchSnippet {
+  const room = Math.max(0, SNIPPET_CHARS - length);
+  const start = Math.max(0, at - Math.floor(room / 2));
+  const end = Math.min(text.length, at + length + Math.ceil(room / 2));
+  const flat = (part: string) => part.replace(/\s+/g, " ");
+  return {
+    before: `${start > 0 ? "…" : ""}${flat(text.slice(start, at)).trimStart()}`,
+    match: flat(text.slice(at, at + length)),
+    after: `${flat(text.slice(at + length, end)).trimEnd()}${end < text.length ? "…" : ""}`,
+  };
 }
 
 export const make = Effect.gen(function* () {
@@ -222,6 +281,10 @@ export const make = Effect.gen(function* () {
     return { relative, real };
   });
 
+  /** Whether a real place inside the project is noise: a plainly named link to `.env` is too. */
+  const realIsNoise = (root: string, real: string, folder: boolean) =>
+    real !== root && pathHasNoise(path.relative(root, real).split(path.sep).join("/"), folder);
+
   const modifiedOf = (info: FileSystem.File.Info) =>
     Option.match(info.mtime, { onNone: () => null, onSome: (date) => date.getTime() });
 
@@ -229,7 +292,7 @@ export const make = Effect.gen(function* () {
     const { root, privateCopy } = yield* rootFor(input);
     const { relative, real } = yield* resolve(root, input.path);
     const mayShowNoise = yield* noiseAllowed(input.sessionId);
-    if (!mayShowNoise && pathHasNoise(relative, true)) {
+    if (!mayShowNoise && (pathHasNoise(relative, true) || realIsNoise(root, real, true))) {
       return yield* new SkycotFilesError({ reason: "hidden" });
     }
     const info = yield* fs
@@ -256,7 +319,7 @@ export const make = Effect.gen(function* () {
       if (stat === null) continue;
       const folder = stat.type === "Directory";
       if (stat.type !== "Directory" && stat.type !== "File") continue;
-      const noise = isNoiseName(name, folder);
+      const noise = isNoiseName(name, folder) || realIsNoise(root, target, folder);
       if (noise && !mayShowNoise) {
         hiddenCount += 1;
         continue;
@@ -285,7 +348,10 @@ export const make = Effect.gen(function* () {
     const { root } = yield* rootFor(input);
     const { relative, real } = yield* resolve(root, input.path);
     if (relative === "") return yield* new SkycotFilesError({ reason: "missing" });
-    if (pathHasNoise(relative, false) && !(yield* noiseAllowed(input.sessionId))) {
+    if (
+      (pathHasNoise(relative, false) || realIsNoise(root, real, false)) &&
+      !(yield* noiseAllowed(input.sessionId))
+    ) {
       yield* Effect.logInfo("skycot-files.refused", { reason: "hidden" });
       return yield* new SkycotFilesError({ reason: "hidden" });
     }
@@ -345,7 +411,89 @@ export const make = Effect.gen(function* () {
     };
   });
 
-  return SkycotFiles.of({ list, read });
+  const search: SkycotFiles["Service"]["search"] = Effect.fn("SkycotFiles.search")(
+    function* (input) {
+      const raw = typeof input.query === "string" ? input.query.trim() : "";
+      if (raw.length < 1 || raw.length > MAX_SEARCH_QUERY) {
+        return yield* new SkycotFilesError({ reason: "invalid-request" });
+      }
+      // The same folder, the same not-theirs check and the same real path as list and read.
+      const { root, privateCopy } = yield* rootFor(input);
+      const mayShowNoise = yield* noiseAllowed(input.sessionId);
+      const needle = raw.toLowerCase();
+      const hits: Array<SearchHit> = [];
+      let visits = 0;
+      let truncated = false;
+      // Shallow folders first. A folder is walked once, by its real place, so a link back up
+      // the tree cannot loop.
+      const seen = new Set<string>([root]);
+      const queue: Array<{ readonly real: string; readonly relative: string }> = [
+        { real: root, relative: "" },
+      ];
+      for (let next = 0; next < queue.length && !truncated; next += 1) {
+        const { real: folder, relative } = queue[next]!;
+        const names = yield* fs.readDirectory(folder).pipe(Effect.orElseSucceed(() => []));
+        for (const name of [...names].sort((a, b) => a.localeCompare(b))) {
+          if (visits >= MAX_SEARCH_VISITS || hits.length >= MAX_SEARCH_RESULTS) {
+            truncated = true;
+            break;
+          }
+          visits += 1;
+          const target = yield* fs
+            .realPath(path.join(folder, name))
+            .pipe(Effect.orElseSucceed(() => null));
+          // A link is searched only when its real place is inside the project.
+          if (target === null || !isInsideRoot(root, target, path.sep)) continue;
+          const stat = yield* fs.stat(target).pipe(Effect.orElseSucceed(() => null));
+          if (stat === null) continue;
+          const isFolder = stat.type === "Directory";
+          if (!isFolder && stat.type !== "File") continue;
+          if (
+            (isNoiseName(name, isFolder) || realIsNoise(root, target, isFolder)) &&
+            !mayShowNoise
+          ) {
+            continue;
+          }
+          const shown = relative === "" ? name : `${relative}/${name}`;
+          if (isFolder) {
+            if (SEARCH_SKIPPED_FOLDERS.has(name.toLowerCase()) || seen.has(target)) continue;
+            seen.add(target);
+            queue.push({ real: target, relative: shown });
+            continue;
+          }
+          const nameMatch = name.toLowerCase().includes(needle);
+          let snippet: SearchSnippet | null = null;
+          const size = Number(stat.size);
+          const mode = quickLookModeOf(name);
+          if (
+            size > 0 &&
+            size <= SEARCH_TEXT_BYTES &&
+            (mode === "text" || mode === "markdown" || mode === "page")
+          ) {
+            const bytes = yield* Effect.scoped(
+              Effect.gen(function* () {
+                const file = yield* fs.open(target, { flag: "r" });
+                const chunk = yield* file.readAlloc(size);
+                return Option.getOrElse(chunk, () => new Uint8Array(0));
+              }),
+            ).pipe(Effect.orElseSucceed(() => null));
+            if (bytes !== null && !looksBinary(bytes)) {
+              const text = new TextDecoder("utf-8").decode(bytes);
+              const at = text.toLowerCase().indexOf(needle);
+              // Lower-casing can change a text's length; a stale position is not shown.
+              if (at >= 0 && text.slice(at, at + needle.length).toLowerCase() === needle) {
+                snippet = snippetAround(text, at, needle.length);
+              }
+            }
+          }
+          if (nameMatch || snippet !== null) hits.push({ name, path: shown, nameMatch, snippet });
+        }
+      }
+      return { root, privateCopy, query: raw, hits, truncated };
+    },
+  );
+
+  return SkycotFiles.of({ list, read, search });
 });
 
 /** Needs `SkycotFamily` from above when the profile should apply (the server provides it). */

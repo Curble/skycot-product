@@ -42,6 +42,25 @@ export interface FileRead {
   readonly absolutePath: string;
 }
 
+export interface SearchSnippet {
+  readonly before: string;
+  readonly match: string;
+  readonly after: string;
+}
+
+export interface SearchHit {
+  readonly name: string;
+  readonly path: string;
+  readonly nameMatch: boolean;
+  readonly snippet: SearchSnippet | null;
+}
+
+export interface SearchResults {
+  readonly query: string;
+  readonly hits: ReadonlyArray<SearchHit>;
+  readonly truncated: boolean;
+}
+
 const record = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 const numberOrNull = (value: unknown) =>
@@ -90,6 +109,71 @@ const MODES: ReadonlySet<string> = new Set<QuickLookMode>([
   "media",
   "none",
 ]);
+
+function parseSnippet(value: unknown): SearchSnippet | null {
+  const snippet = record(value);
+  if (snippet === null) return null;
+  const { before, match, after } = snippet;
+  if (typeof before !== "string" || typeof match !== "string" || typeof after !== "string") {
+    return null;
+  }
+  return { before, match, after };
+}
+
+function parseHit(value: unknown): SearchHit | null {
+  const hit = record(value);
+  if (hit === null) return null;
+  const { name, path } = hit;
+  if (typeof name !== "string" || typeof path !== "string") return null;
+  return {
+    name,
+    path,
+    nameMatch: hit["nameMatch"] === true,
+    snippet: parseSnippet(hit["snippet"]),
+  };
+}
+
+export function parseSearch(body: unknown): SearchResults | null {
+  const found = record(body);
+  if (found === null || !Array.isArray(found["hits"]) || typeof found["query"] !== "string") {
+    return null;
+  }
+  return {
+    query: found["query"],
+    hits: found["hits"].flatMap((hit: unknown) => {
+      const parsed = parseHit(hit);
+      return parsed === null ? [] : [parsed];
+    }),
+    truncated: found["truncated"] === true,
+  };
+}
+
+/** The folder a hit lives in, for the grey line under its name ("" at the top of the project). */
+export function folderOfPath(path: string): string {
+  const cut = path.lastIndexOf("/");
+  return cut < 0 ? "" : path.slice(0, cut);
+}
+
+/** A hit as the list's own file entry, so tapping it opens Quick Look like any file. */
+export function entryOfHit(hit: SearchHit): FilesEntry {
+  return {
+    name: hit.name,
+    path: hit.path,
+    kind: "file",
+    size: null,
+    modifiedAt: null,
+    noise: false,
+  };
+}
+
+export const SEARCH_MAX_QUERY = 100;
+export const SEARCH_SHOWN_CAP = 200;
+
+/** What was typed, ready to ask about; null while there is nothing (or too much) to look for. */
+export function searchTerm(typed: string): string | null {
+  const term = typed.trim();
+  return term.length === 0 ? null : term.slice(0, SEARCH_MAX_QUERY);
+}
 
 export function parseFileRead(body: unknown): FileRead | null {
   const file = record(body);

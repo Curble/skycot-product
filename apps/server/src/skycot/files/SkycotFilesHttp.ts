@@ -1,5 +1,5 @@
 // HTTP transport for Files and Quick Look: `/api/skycot/files`, authenticated with the same
-// session (cookie or bearer) as every other `/api` route. Both routes only read, so any
+// session (cookie or bearer) as every other `/api` route. All routes only read, so any
 // signed-in device may use them; the Family profile's rules live in SkycotFiles.
 import { ProjectId, ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
@@ -15,6 +15,8 @@ export const FILES_ROUTE = "/api/skycot/files";
 const json = (body: unknown, status = 200) =>
   HttpServerResponse.jsonUnsafe(body, { status, headers: { "cache-control": "no-store" } });
 
+const queryOf = (value: string | null): string => (value ?? "").slice(0, 1000);
+
 const idOf = (value: string | null): string | null =>
   value !== null && value.trim().length > 0 && value.length <= 200 ? value : null;
 
@@ -23,7 +25,7 @@ const refusal = (error: SkycotFiles.SkycotFilesError) =>
   json({ error: error.reason, message: error.message });
 
 type Handler = (input: {
-  readonly target: SkycotFiles.FilesTarget;
+  readonly target: SkycotFiles.FilesTarget & { readonly query: string };
   readonly files: SkycotFiles.SkycotFiles["Service"];
 }) => Effect.Effect<HttpServerResponse.HttpServerResponse>;
 
@@ -57,6 +59,7 @@ const route = (path: string, handler: Handler) =>
               projectId: ProjectId.make(projectId),
               ...(threadId === null ? {} : { threadId: ThreadId.make(threadId) }),
               path: query.get("path") ?? "",
+              query: queryOf(query.get("q")),
             },
             files,
           });
@@ -69,6 +72,12 @@ export const layerRoutes = Layer.mergeAll(
   route("/list", ({ target, files }) =>
     files.list(target).pipe(
       Effect.map((listing) => json(listing)),
+      Effect.catchTags({ SkycotFilesError: (error) => Effect.succeed(refusal(error)) }),
+    ),
+  ),
+  route("/search", ({ target, files }) =>
+    files.search(target).pipe(
+      Effect.map((found) => json(found)),
       Effect.catchTags({ SkycotFilesError: (error) => Effect.succeed(refusal(error)) }),
     ),
   ),

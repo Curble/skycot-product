@@ -9,8 +9,10 @@ import {
   pageAssetRefs,
   parseFileRead,
   parseListing,
+  parseSearch,
   type FileRead,
   type FilesListing,
+  type SearchResults,
 } from "./model";
 
 export const FILES_API_PATH = "/api/skycot/files";
@@ -34,6 +36,12 @@ export const filesApi = {
     engineRequest("GET", `${FILES_API_PATH}/list`, undefined, parseListing, query(place, path)),
   read: (place: FilesPlace, path: string): Promise<FamilyResult<FileRead>> =>
     engineRequest("GET", `${FILES_API_PATH}/read`, undefined, parseFileRead, query(place, path)),
+  /** Files of this project (or the conversation's copy) by name and by the words inside. */
+  search: (place: FilesPlace, term: string): Promise<FamilyResult<SearchResults>> =>
+    engineRequest("GET", `${FILES_API_PATH}/search`, undefined, parseSearch, {
+      ...query(place, ""),
+      q: term,
+    }),
 };
 
 // nondev-seam: skycot-playable-copy

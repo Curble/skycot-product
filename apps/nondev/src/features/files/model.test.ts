@@ -13,6 +13,10 @@ import {
   parentOf,
   parseFileRead,
   parseListing,
+  parseSearch,
+  entryOfHit,
+  folderOfPath,
+  searchTerm,
   resolvePageRef,
   visibleEntries,
   type FilesEntry,
@@ -223,5 +227,43 @@ describe("markdownForQuickLook", () => {
   it("keeps text that only mentions a tag", () => {
     const text = "Use <b>bold</b> for names.\n`<img>` is a picture tag.";
     expect(markdownForQuickLook(text)).toBe(text);
+  });
+});
+
+describe("search answers", () => {
+  it("reads hits with and without a snippet, and refuses what it doesn't understand", () => {
+    const found = parseSearch({
+      query: "dragon",
+      hits: [
+        {
+          name: "story.txt",
+          path: "pictures/story.txt",
+          nameMatch: false,
+          snippet: { before: "there was a ", match: "Dragon", after: "." },
+        },
+        { name: "dragon.png", path: "dragon.png", nameMatch: true, snippet: null },
+        { name: "bad" },
+        { name: "odd.txt", path: "odd.txt", snippet: { match: 1 } },
+      ],
+      truncated: true,
+    });
+    expect(found?.hits).toHaveLength(3);
+    expect(found?.hits[0]?.snippet?.match).toBe("Dragon");
+    expect(found?.hits[1]?.nameMatch).toBe(true);
+    expect(found?.hits[2]?.snippet).toBeNull();
+    expect(found?.truncated).toBe(true);
+    expect(parseSearch({ hits: "nope", query: "x" })).toBeNull();
+    expect(parseSearch({ hits: [] })).toBeNull();
+    expect(parseSearch(null)).toBeNull();
+  });
+
+  it("turns a hit into a file entry, names its folder, and trims what was typed", () => {
+    const hit = { name: "a.md", path: "docs/a.md", nameMatch: true, snippet: null };
+    expect(entryOfHit(hit)).toMatchObject({ kind: "file", path: "docs/a.md", noise: false });
+    expect(folderOfPath("docs/deep/a.md")).toBe("docs/deep");
+    expect(folderOfPath("a.md")).toBe("");
+    expect(searchTerm("   ")).toBeNull();
+    expect(searchTerm("  cat ")).toBe("cat");
+    expect(searchTerm("x".repeat(300))).toHaveLength(100);
   });
 });

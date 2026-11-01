@@ -24,6 +24,12 @@ export function SearchField({
         className="fm-search__input"
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && value.length > 0) {
+            event.preventDefault();
+            onChange("");
+          }
+        }}
         placeholder={placeholder}
         aria-label={label}
         autoComplete="off"

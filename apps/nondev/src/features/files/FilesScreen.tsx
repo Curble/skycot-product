@@ -11,7 +11,6 @@ import { Atom } from "effect/reactivity";
 import { ChevronLeft, ChevronRight, FileText, Folder, FolderOpen, Lock } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { useColumns } from "../../app/useColumns";
 import { useChildView } from "../../app/useChildView";
 import { navigate, threadHref } from "../../router";
 import { projectAtomOrEmpty } from "../../state/projects";
@@ -30,10 +29,16 @@ import {
   entryDetails,
   hiddenHere,
   kindOfEntry,
+  entryOfHit,
+  folderOfPath,
   parentOf,
+  searchTerm,
   visibleEntries,
+  SEARCH_SHOWN_CAP,
   type FilesEntry,
   type FilesListing,
+  type SearchHit,
+  type SearchResults,
 } from "./model";
 import { KIND_ICON } from "./icons";
 import { QuickLook } from "./QuickLook";
@@ -50,6 +55,15 @@ type Load =
   | { readonly state: "loading" }
   | { readonly state: "ready"; readonly listing: FilesListing }
   | { readonly state: "refused"; readonly reason: string; readonly message: string };
+
+type Found =
+  | { readonly state: "idle" }
+  | { readonly state: "looking" }
+  | { readonly state: "done"; readonly term: string; readonly results: SearchResults }
+  | { readonly state: "failed"; readonly message: string };
+
+// Typing waits this long before the engine is asked, so a word is asked about once, not per letter.
+const SEARCH_DELAY_MS = 250;
 
 const NO_SHELL_ATOM = Atom.make<EnvironmentThreadShell | null>(null).pipe(
   Atom.withLabel("nondev-files:no-thread"),
@@ -72,11 +86,11 @@ export function FilesScreen({
   );
   const family = useFamily();
   const childView = useChildView();
-  const columns = useColumns();
   const now = useSyncExternalStore(subscribeMinute, readMinute, readMinute);
   const [path, setPath] = useState("");
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [search, setSearch] = useState("");
+  const [found, setFound] = useState<Found>({ state: "idle" });
   const [showEverything, setShowEverything] = useState(false);
   const [looking, setLooking] = useState<FilesEntry | null>(null);
   const place: FilesPlace = { projectId, threadId };
@@ -103,6 +117,38 @@ export function FilesScreen({
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A new version is a fresh read of the same folder.
   }, [projectId, threadId, path, version]);
 
+  // Search the whole project (or the conversation's copy) a moment after typing stops. An answer
+  // for an older word is dropped when a newer one was asked.
+  const term = searchTerm(search);
+  const [searchVersion, setSearchVersion] = useState(0);
+  useEffect(() => {
+    if (term === null) {
+      setFound({ state: "idle" });
+      return;
+    }
+    let stale = false;
+    setFound({ state: "looking" });
+    const timer = window.setTimeout(() => {
+      void filesApi.search({ projectId, threadId }, term).then((answer) => {
+        if (stale) return;
+        if (!answer.ok && isNotTheirsMessage(answer.message)) {
+          returnHomeFromOwnershipRefusal(answer.message);
+          return;
+        }
+        setFound(
+          answer.ok
+            ? { state: "done", term, results: answer.value }
+            : { state: "failed", message: answer.message },
+        );
+      });
+    }, SEARCH_DELAY_MS);
+    return () => {
+      stale = true;
+      window.clearTimeout(timer);
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A new version asks again after a grown-up opens Show everything.
+  }, [projectId, threadId, term, searchVersion]);
+
   const listing = load.state === "ready" ? load.listing : null;
   const projectTitle = project?.title ?? "This project";
   const crumbs = crumbsOf(path, projectTitle);
@@ -113,7 +159,7 @@ export function FilesScreen({
   const entries =
     listing === null
       ? []
-      : visibleEntries(listing.entries, { showEverything: showingNoise, search });
+      : visibleEntries(listing.entries, { showEverything: showingNoise, search: "" });
 
   const open = (to: string) => {
     setSearch("");
@@ -129,6 +175,7 @@ export function FilesScreen({
     if (family.enabled && listing?.noiseIncluded !== true) {
       if (!(await family.requireParentCode("seeAllFiles"))) return;
       setVersion((count) => count + 1);
+      setSearchVersion((count) => count + 1);
     }
     setShowEverything(true);
   };
@@ -195,8 +242,8 @@ export function FilesScreen({
               <SearchField
                 value={search}
                 onChange={setSearch}
-                placeholder={columns === 1 ? "Find" : "Find in this folder"}
-                label="Find in this folder"
+                placeholder="Search files"
+                label="Search files"
               />
             </div>
             <label className="fm-files__everything">
@@ -228,15 +275,13 @@ export function FilesScreen({
           </Banner>
         ) : null}
 
-        {load.state === "loading" ? (
+        {term !== null ? (
+          <SearchResultsList found={found} onOpen={(hit) => setLooking(entryOfHit(hit))} />
+        ) : load.state === "loading" ? (
           <p className="fm-help">Looking…</p>
         ) : listing === null ? null : entries.length === 0 ? (
-          <EmptyState icon={search.trim() ? FileText : Folder} title={emptyTitle(search, listing)}>
-            {search.trim()
-              ? "Try another word, or clear the search."
-              : hidden > 0 && !showingNoise
-                ? "Only hidden files are in here."
-                : null}
+          <EmptyState icon={Folder} title={emptyTitle(listing)}>
+            {hidden > 0 && !showingNoise ? "Only hidden files are in here." : null}
           </EmptyState>
         ) : (
           <ul
@@ -256,7 +301,7 @@ export function FilesScreen({
           </ul>
         )}
 
-        {listing !== null ? (
+        {listing !== null && term === null ? (
           <p className="fm-help fm-files__foot">
             {hidden > 0 && !showingNoise
               ? `${hidden === 1 ? "1 hidden item isn't" : `${hidden} hidden items aren't`} shown: add-ons, settings and secret files the project needs but nobody has to look at.`
@@ -282,9 +327,76 @@ export function FilesScreen({
   );
 }
 
-function emptyTitle(search: string, listing: FilesListing): string {
-  if (search.trim()) return `Nothing called “${search.trim()}” here`;
+function emptyTitle(listing: FilesListing): string {
   return listing.path === "" ? "This project has no files yet" : "This folder is empty";
+}
+
+function SearchResultsList({
+  found,
+  onOpen,
+}: {
+  readonly found: Found;
+  readonly onOpen: (hit: SearchHit) => void;
+}) {
+  if (found.state === "idle" || found.state === "looking") {
+    return <p className="fm-help">Looking…</p>;
+  }
+  if (found.state === "failed") return <Banner tone="warning">{found.message}</Banner>;
+  const { hits, truncated } = found.results;
+  if (hits.length === 0) {
+    return (
+      <EmptyState icon={FileText} title={`No files match “${found.term}”`}>
+        Try another word, or clear the search.
+      </EmptyState>
+    );
+  }
+  return (
+    <>
+      <ul className="fm-files__list" role="list" aria-label={`Files matching ${found.term}`}>
+        {hits.map((hit) => (
+          <SearchRow key={hit.path} hit={hit} onOpen={() => onOpen(hit)} />
+        ))}
+      </ul>
+      {truncated ? (
+        <p className="fm-help fm-files__foot">
+          Showing the first {Math.min(hits.length, SEARCH_SHOWN_CAP)}. Try a longer word to narrow
+          it down.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function SearchRow({ hit, onOpen }: { readonly hit: SearchHit; readonly onOpen: () => void }) {
+  const kind = kindOfEntry({ name: hit.name, kind: "file" });
+  const Icon = KIND_ICON[kind];
+  const folder = folderOfPath(hit.path);
+  return (
+    <li className="fm-files__item">
+      <button
+        type="button"
+        className="fm-files__row"
+        onClick={onOpen}
+        aria-label={`${hit.name}${folder === "" ? "" : `, in ${folder}`}, ${FILE_KIND_LABEL[kind]}`}
+      >
+        <span className={`fm-files__icon fm-files__icon--${kind}`} aria-hidden>
+          <Icon size={18} strokeWidth={1.7} />
+        </span>
+        <span className="fm-files__text">
+          <span className="fm-files__name">{hit.name}</span>
+          <span className="fm-files__details">{folder === "" ? "Top of the project" : folder}</span>
+          {hit.snippet !== null ? (
+            <span className="fm-files__snippet">
+              {hit.snippet.before}
+              <mark>{hit.snippet.match}</mark>
+              {hit.snippet.after}
+            </span>
+          ) : null}
+        </span>
+        <span className="fm-files__look">Look</span>
+      </button>
+    </li>
+  );
 }
 
 function FileRow({
