@@ -988,6 +988,32 @@ html.dark .fm-standalone__foot {
   display: contents;
 }
 
+/* Composer: "Thinking depth" button above the reply box, and its popover */
+.fm-depth {
+  display: flex;
+  margin-bottom: 8px;
+}
+.fm-depth__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, 80vw);
+  padding: 12px;
+}
+.fm-depth__panel p {
+  margin: 0;
+}
+.fm-depth__intro,
+.fm-depth__what {
+  color: var(--fm-label-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.fm-depth__cost {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
 /* Composer: "Plan first" switch beside the autonomy control */
 .fm-planfirst {
   display: inline-flex;

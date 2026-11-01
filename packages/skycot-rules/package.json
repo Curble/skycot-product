@@ -25,6 +25,10 @@
       "types": "./src/family.ts",
       "import": "./src/family.ts"
     },
+    "./depth": {
+      "types": "./src/depth.ts",
+      "import": "./src/depth.ts"
+    },
     "./explain": {
       "types": "./src/explain.ts",
       "import": "./src/explain.ts"

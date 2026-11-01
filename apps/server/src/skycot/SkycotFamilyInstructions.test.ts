@@ -323,6 +323,90 @@ describe("plan first in the Family profile", () => {
     }),
   );
 
+  // nondev-seam: skycot-thinking-depth-lock-tests
+  describe("thinking depth", () => {
+    const withEffort = (id: string, value: string) =>
+      ({
+        ...turn(id),
+        modelSelection: {
+          instanceId: "codex",
+          model: "gpt-5-codex",
+          options: [
+            { id: "reasoningEffort", value },
+            { id: "fastMode", value: true },
+          ],
+        },
+      }) as unknown as ProviderAdapter.ProviderAdapterV2TurnInput;
+
+    it.effect("drops a child's effort so the assistant's default applies, keeping the rest", () =>
+      Effect.gen(function* () {
+        for (const value of ["high", "max", "xhigh"]) {
+          const wrapped = yield* Instructions.familyTurnInput(
+            family(true),
+            withEffort(`depth-child-${value}`, value),
+          );
+          assert.deepEqual(wrapped.modelSelection.options, [{ id: "fastMode", value: true }]);
+          assert.equal(wrapped.modelSelection.model, "gpt-5-codex");
+          // The turn itself still runs.
+          assert.include(wrapped.message.text, "make a cat game");
+        }
+      }),
+    );
+
+    it.effect("drops an effort named in another case, and leaves no empty options behind", () =>
+      Effect.gen(function* () {
+        const only = {
+          ...turn("depth-only"),
+          modelSelection: {
+            instanceId: "claude",
+            model: "opus",
+            options: [{ id: "Effort", value: "max" }],
+          },
+        } as unknown as ProviderAdapter.ProviderAdapterV2TurnInput;
+        const wrapped = yield* Instructions.familyTurnInput(family(true), only);
+        assert.equal("options" in wrapped.modelSelection, false);
+      }),
+    );
+
+    it.effect("keeps a grown-up's choice (Advanced mode pass)", () =>
+      Effect.gen(function* () {
+        yield* Instructions.letRunWithoutPlan("message:depth-parent", "grown-up");
+        const wrapped = yield* Instructions.familyTurnInput(
+          family(true),
+          withEffort("depth-parent", "high"),
+        );
+        assert.deepEqual(wrapped.modelSelection.options, [
+          { id: "reasoningEffort", value: "high" },
+          { id: "fastMode", value: true },
+        ]);
+      }),
+    );
+
+    it.effect("changes nothing while the profile is off", () =>
+      Effect.gen(function* () {
+        const input = withEffort("depth-off", "high");
+        const wrapped = yield* Instructions.familyTurnInput(family(false), input);
+        assert.deepEqual(wrapped.modelSelection.options, input.modelSelection.options);
+      }),
+    );
+
+    it.effect("also holds a compaction to the default", () =>
+      Effect.gen(function* () {
+        let seen: unknown;
+        const runtime = Instructions.withFamilyRuntime(familyOn(true), {
+          startTurn: () => Effect.void,
+          steerTurn: () => Effect.void,
+          compactThread: (input: ProviderAdapter.ProviderAdapterV2TurnInput) => {
+            seen = input.modelSelection.options;
+            return Effect.void;
+          },
+        } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime);
+        yield* runtime.compactThread!(withEffort("depth-compact", "max"));
+        assert.deepEqual(seen, [{ id: "fastMode", value: true }]);
+      }),
+    );
+  });
+
   it.effect("changes nothing while the profile is off", () =>
     Effect.gen(function* () {
       const input = turn("plan-off");

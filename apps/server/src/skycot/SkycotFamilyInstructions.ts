@@ -40,8 +40,9 @@
 // same reason as the rules: a raw RPC, an old thread left in "default", a queued message and a
 // restart all reach the provider through `startTurn`.
 
-import type { ProviderInteractionMode } from "@t3tools/contracts";
+import type { ModelSelection, ProviderInteractionMode } from "@t3tools/contracts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import { withoutEffortOptions } from "@t3tools/skycot-rules/depth";
 import {
   EXPLAIN_INSTRUCTIONS,
   explainDefault,
@@ -361,13 +362,45 @@ const inputWithFamilyRules = <
   );
 
 /**
+ * Thinking depth: while the profile is on, a turn runs at the assistant's own default effort,
+ * whatever a request or the conversation's stored model choice says. Only a grown-up working in
+ * Advanced mode (the gate's "grown-up" pass) keeps what they chose. The effort options are
+ * dropped, never the turn: the assistant simply uses its default. The same object when there is
+ * nothing to drop.
+ */
+// nondev-seam: skycot-thinking-depth-lock
+export const familyModelSelection = (
+  family: SkycotFamily.SkycotFamily["Service"],
+  messageId: string,
+  selection: ModelSelection,
+): Effect.Effect<ModelSelection> =>
+  Effect.gen(function* () {
+    if (!(yield* family.isEnabled)) return selection;
+    if ((yield* planPassFor(messageId)) === "grown-up") return selection;
+    // Some callers and tests hand over a turn with no model choice: nothing to hold to default.
+    if ((selection as ModelSelection | undefined) === undefined) return selection;
+    const options = withoutEffortOptions(selection.options);
+    if (options === selection.options) return selection;
+    yield* Effect.logInfo("skycot-family.thinking-depth-default", { messageId });
+    const { options: _dropped, ...rest } = selection;
+    return options === undefined ? rest : { ...rest, options };
+  });
+
+/**
  * A turn start while the profile may be on: plan first decides the mode, then the message is
  * wrapped (with the plan line when it plans). The same object when nothing changes.
  */
 export const familyTurnInput = Effect.fn("SkycotFamilyInstructions.familyTurnInput")(function* (
   family: SkycotFamily.SkycotFamily["Service"],
-  input: ProviderAdapter.ProviderAdapterV2TurnInput,
+  rawInput: ProviderAdapter.ProviderAdapterV2TurnInput,
 ) {
+  const modelSelection = yield* familyModelSelection(
+    family,
+    rawInput.message.messageId,
+    rawInput.modelSelection,
+  );
+  const input =
+    modelSelection === rawInput.modelSelection ? rawInput : { ...rawInput, modelSelection };
   const requested = input.runtimePolicy.interactionMode;
   const interactionMode = (yield* family.isEnabled)
     ? familyInteractionMode(requested, yield* planPassFor(input.message.messageId))
@@ -414,5 +447,18 @@ export function withFamilyRuntime(
       inputWithFamilyRules(family.value, input).pipe(
         Effect.flatMap((wrapped) => runtime.steerTurn(wrapped)),
       ),
+    // Compaction keeps the adapter's own request, but not a stored effort the profile forbids.
+    ...(runtime.compactThread === undefined
+      ? {}
+      : {
+          compactThread: (input: ProviderAdapter.ProviderAdapterV2TurnInput) =>
+            familyModelSelection(family.value, input.message.messageId, input.modelSelection).pipe(
+              Effect.flatMap((modelSelection) =>
+                runtime.compactThread!(
+                  modelSelection === input.modelSelection ? input : { ...input, modelSelection },
+                ),
+              ),
+            ),
+        }),
   };
 }

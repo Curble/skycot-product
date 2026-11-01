@@ -39,6 +39,7 @@ import {
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { useAtomCommand } from "~/state/use-atom-command";
+import { serverEnvironment } from "../../state/server";
 
 import { ProjectAvatar } from "../../app/ProjectAvatar";
 import { useColumns } from "../../app/useColumns";
@@ -67,6 +68,13 @@ import { autonomyForRuntimeMode, autonomyLabel } from "../compose/autonomy";
 import { MessageField } from "../compose/MessageField";
 import { usePictures } from "../compose/usePictures";
 import { requestMode, usePlanFirst } from "../compose/planFirst";
+import { ThinkingDepth } from "../compose/ThinkingDepth";
+import {
+  depthModelFor,
+  descriptorsFor,
+  selectionWithDepth,
+  useRememberedDepth,
+} from "../compose/depthChoice";
 import { useEnsureInteractionMode } from "../compose/turnMode";
 import { useMadePage } from "../review/madePage";
 import { useOpenIt } from "../starters/PreviewSheet";
@@ -919,6 +927,13 @@ function ReplyComposer({
   const pointers = usePointers(threadId);
   const family = useFamily();
   const shield = useShield();
+  // Thinking depth: a grown-up's pick for the next message, only where the assistant has one.
+  const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
+  const depthModel = depthModelFor(descriptorsFor(providers, shell?.modelSelection ?? null), {
+    childView,
+    familyOn: family.enabled,
+  });
+  const [rememberedDepth, rememberDepth] = useRememberedDepth(threadId);
   const [explainOn] = useExplainMode(threadId, family.enabled);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [appliedSeed, setAppliedSeed] = useState<ComposerSeed | null>(null);
@@ -1059,7 +1074,7 @@ function ReplyComposer({
                 text: withExplainMarker(message.text, explainOn, family.enabled),
                 attachments: pictures.uploads(),
               },
-              modelSelection: shell.modelSelection,
+              modelSelection: selectionWithDepth(shell.modelSelection, depthModel, rememberedDepth),
               runtimeMode: shell.runtimeMode,
               interactionMode,
             },
@@ -1268,6 +1283,14 @@ function ReplyComposer({
         />
         {shield.card}
         <PointerChips threadId={threadId} pointers={pointers} disabled={sending} />
+        {depthModel !== null ? (
+          <ThinkingDepth
+            model={depthModel}
+            remembered={rememberedDepth}
+            onPick={(level) => rememberDepth(level, depthModel.usual)}
+            disabled={sending}
+          />
+        ) : null}
         <MessageField
           inputRef={inputRef}
           value={text}
