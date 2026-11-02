@@ -148,7 +148,10 @@ export function describeThreadStatus(
       attention: "waiting",
     };
   }
-  if (shell.hasActionableProposedPlan) {
+  // While Sam is answering again the Build it buttons are hidden, so an older waiting plan
+  // must not say "press Build it": the running turn speaks until it finishes.
+  const turnUnderway = live && runtimeStatus !== "waiting";
+  if (shell.hasActionableProposedPlan && !turnUnderway) {
     return {
       kind: "plan",
       headline: options.childView

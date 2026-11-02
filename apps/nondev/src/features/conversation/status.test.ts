@@ -131,6 +131,12 @@ describe("child waiting words", () => {
     expect(
       describeThreadStatus(shell({ runStatus: "completed" }), { childView: true }).kind,
     ).not.toBe("plan");
+    // Sam answering again after a plan: no Build it button shows, so no "press Build it".
+    const answering = {
+      ...shell({ runStatus: "running", runtime: "running" }),
+      hasActionableProposedPlan: true,
+    } as EnvironmentThreadShell;
+    expect(describeThreadStatus(answering, { childView: true }).kind).toBe("working");
   });
 });
 
