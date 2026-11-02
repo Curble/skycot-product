@@ -73,6 +73,7 @@ import {
   type ProjectApprovalCover,
 } from "@t3tools/skycot-rules/family";
 import { childMayStartInProject } from "@t3tools/skycot-rules/people";
+import { overtakenByLaterChanges } from "@t3tools/skycot-rules/plans";
 import { describeMatches } from "@t3tools/skycot-rules/rules";
 import { isLocalPreviewAddress } from "@t3tools/skycot-rules/preview";
 import {
@@ -649,8 +650,9 @@ export function builtAndNoPlanWaiting(
  * Build it pressed on an old card as a new plan arrives plans again instead of building the
  * wrong thing. The same goes while any turn is still going or lined up: a Build it sent behind
  * another message would run only after it, perhaps after a newer plan, so it plans again here
- * rather than build a plan the child did not just approve. This is a refusal only; it never lets
- * a plan build that could not before.
+ * rather than build a plan the child did not just approve. Once files changed after the plan (in
+ * a turn still standing, whoever started it) the project has moved on, so it plans again too.
+ * This is a refusal only; it never lets a plan build that could not before.
  */
 export function planStillBuildable(
   projection: Pick<OrchestrationV2ThreadProjection, "plans" | "runs"> &
@@ -664,6 +666,9 @@ export function planStillBuildable(
     if (run === undefined || run.status === "rolled_back") return false;
   }
   if (projection.runs.some((candidate) => RUN_IN_PROGRESS.has(candidate.status))) return false;
+  const items = projection.turnItems ?? [];
+  const own = items.find((item) => item.type === "proposed_plan" && item.planId === planId);
+  if (own !== undefined && overtakenByLaterChanges(own, items, projection.runs)) return false;
   return !newerPlanStands(projection, planId);
 }
 

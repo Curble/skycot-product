@@ -1289,6 +1289,24 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     }
   });
 
+  it("a plan overtaken by later file changes plans again instead of building", () => {
+    const at = (laterRun: string, changeRun = "run-2") =>
+      ({
+        plans: [proposedPlan("plan-1", "run-1")],
+        runs: [
+          { id: "run-1", status: "completed" },
+          { id: "run-2", status: laterRun },
+        ],
+        turnItems: [
+          { type: "proposed_plan", planId: "plan-1", runId: "run-1", ordinal: 100 },
+          { type: "file_change", runId: changeRun, ordinal: changeRun === "run-1" ? 101 : 200 },
+        ],
+      }) as never;
+    assert.isFalse(SkycotFamilyGate.planStillBuildable(at("completed"), "plan-1"));
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(at("rolled_back"), "plan-1"));
+    assert.isTrue(SkycotFamilyGate.planStillBuildable(at("completed", "run-1"), "plan-1"));
+  });
+
   it("only the newest plan builds: an older plan plans again while a later one stands", () => {
     const planItem = (planId: string, ordinal: number) => ({
       type: "proposed_plan",

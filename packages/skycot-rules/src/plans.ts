@@ -75,8 +75,32 @@ export function builtBy<Run extends BuildRun>(
 }
 
 /**
+ * Whether files changed after this plan, in a later turn that still stands, whatever started that
+ * turn (a Build it, a chat message, a grown-up's direct request). The plan's own turn never
+ * counts, even if the assistant saved the plan as a file. The project has then moved on from
+ * the plan: building it would replay it over changes already made, so it no longer waits.
+ */
+export function overtakenByLaterChanges(
+  item: { readonly ordinal: number; readonly runId?: string | null | undefined },
+  items: ReadonlyArray<{
+    readonly type: string;
+    readonly ordinal: number;
+    readonly runId?: string | null | undefined;
+  }>,
+  runs: ReadonlyArray<{ readonly id: string; readonly status: string }>,
+): boolean {
+  return items.some(
+    (candidate) =>
+      candidate.type === "file_change" &&
+      candidate.ordinal > item.ordinal &&
+      (candidate.runId ?? null) !== (item.runId ?? null) &&
+      !runs.some((run) => run.id === candidate.runId && run.status === "rolled_back"),
+  );
+}
+
+/**
  * Whether a plan is really waiting for Build it: the newest plan, still active, its turn still
- * standing, and no turn has built it. The header reads this instead of trusting the engine's
+ * standing, no turn has built it, and no file changed after it. The header reads this instead of trusting the engine's
  * "some plan is active" flag, which stays on for an older plan after a newer one is built.
  */
 export function planWaitingForBuild(projection: {
@@ -84,6 +108,7 @@ export function planWaitingForBuild(projection: {
     readonly type: string;
     readonly ordinal: number;
     readonly planId?: string | undefined;
+    readonly runId?: string | null | undefined;
     readonly completedAt?: Time;
     readonly updatedAt?: Time;
   }>;
@@ -120,6 +145,7 @@ export function planWaitingForBuild(projection: {
     if (projection.runs.some((run) => run.id === plan.runId && run.status === "rolled_back")) {
       return false;
     }
+    if (overtakenByLaterChanges(item, projection.turnItems, projection.runs)) return false;
     return (
       builtBy({ planId, writtenAt: item.completedAt ?? item.updatedAt }, projection.runs) ===
       undefined

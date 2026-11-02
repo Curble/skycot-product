@@ -57,6 +57,30 @@ describe("planWaitingForBuild", () => {
   });
 });
 
+describe("files changed after the plan", () => {
+  const planned = { ...earlier, runId: "r1", ordinal: 100 };
+  const change = (runId: string, ordinal: number) => ({ type: "file_change", runId, ordinal });
+  const waiting = (turnItems: ReadonlyArray<object>, laterStatus = "completed") =>
+    planWaitingForBuild({
+      turnItems: turnItems as never,
+      plans: [plan("one", "active", "r1")],
+      runs: [
+        { id: "r1", status: "completed" },
+        { id: "r2", status: laterStatus },
+      ],
+    });
+  it("a later turn that changed files (no Build it) means the plan no longer waits", () => {
+    expect(waiting([planned, change("r2", 200)])).toBe(false);
+  });
+  it("not when that turn was taken back, or the change is in the plan's own turn", () => {
+    expect(waiting([planned, change("r2", 200)], "rolled_back")).toBe(true);
+    expect(waiting([planned, change("r1", 101)])).toBe(true);
+  });
+  it("changes made before the plan do not count", () => {
+    expect(waiting([change("r0", 50), planned])).toBe(true);
+  });
+});
+
 describe("after Stop", () => {
   const one = [{ ...earlier, completedAt: "2026-11-02T01:00:00.000Z" }];
   it("a plan whose build was stopped no longer waits (the engine flag stays on)", () => {

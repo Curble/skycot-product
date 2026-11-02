@@ -32,17 +32,18 @@ export const threadsReallyWaitingForBuild = Effect.fn("skycot.threadsReallyWaiti
           WHERE thread_id IN ${sql.in(ids)}`,
         sql<{
           thread_id: string;
+          run_id: string | null;
           type: string;
           ordinal: number;
           plan_id: string | null;
           completed_at: string | null;
           updated_at: string;
         }>`
-          SELECT thread_id, type, ordinal, updated_at,
+          SELECT thread_id, run_id, type, ordinal, updated_at,
             json_extract(payload_json, '$.planId') AS plan_id,
             json_extract(payload_json, '$.completedAt') AS completed_at
           FROM orchestration_v2_projection_turn_items
-          WHERE thread_id IN ${sql.in(ids)} AND type = 'proposed_plan'`,
+          WHERE thread_id IN ${sql.in(ids)} AND type IN ('proposed_plan', 'file_change')`,
         sql<{
           thread_id: string;
           run_id: string;
@@ -72,6 +73,7 @@ export const threadsReallyWaitingForBuild = Effect.fn("skycot.threadsReallyWaiti
               type: row.type,
               ordinal: row.ordinal,
               planId: row.plan_id ?? undefined,
+              runId: row.run_id,
               completedAt: row.completed_at,
               updatedAt: row.updated_at,
             })),
