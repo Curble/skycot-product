@@ -24,13 +24,14 @@ import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
 import { engineCaughtUp, useSendInFlight } from "../sendsInFlight";
+import { shownAgainLater, splitInlineSteps } from "../planText";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
 type Mode = "idle" | "change" | "ask";
 
 function countSteps(markdown: string): number {
-  return parseMarkdown(markdown)
+  return parseMarkdown(splitInlineSteps(markdown))
     .filter((block) => block.kind === "ol")
     .reduce((sum, block) => sum + (block.kind === "ol" ? block.items.length : 0), 0);
 }
@@ -91,6 +92,7 @@ export function PlanCard({
                   ? "busy"
                   : "actionable";
 
+  const steppedText = splitInlineSteps(item.markdown);
   const steps = countSteps(item.markdown);
   const subtitle =
     state === "writing"
@@ -127,13 +129,16 @@ export function PlanCard({
     setMode("idle");
   };
 
+  // Sam answered a question and showed the very same plan again below: one card is enough.
+  if (newerPlan && shownAgainLater(item, projection.turnItems)) return null;
+
   return (
     <Bubble author="crew" full meta={shortTime(item.completedAt ?? item.updatedAt)}>
       <Card label="Plan" muted={state === "superseded" || state === "overtaken"}>
         <CardHeader icon={ListChecks} tone="blue" title="Here's my plan" subtitle={subtitle} />
         <CardBody>
           <Markdown
-            text={childView ? kidSafePlan(item.markdown) : item.markdown}
+            text={childView ? kidSafePlan(steppedText) : steppedText}
             className="fm-md--plan"
           />
           {state === "actionable" ? <p className="fm-plan__note">{card.ifYouSayNo}</p> : null}
