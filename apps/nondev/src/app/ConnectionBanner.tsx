@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
+import { useEffect, useState } from "react";
 
 import { requestReconnect } from "../connection/platform";
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
@@ -12,13 +13,55 @@ import { useChildView } from "./useChildView";
  * Calm connection status, never a raw error. Hidden while connected. The copy
  * only ever asks for a reload when the app has genuinely stopped retrying;
  * while it retries on its own it says so and offers to try at once.
+ *
+ * Connecting is normal on every load and after a short blip, so the "can't
+ * reach" wording waits CONNECTION_GRACE_MS before it shows: a child should
+ * never read "SKYCOT can't wake up" while the page is simply starting.
  */
+export const CONNECTION_GRACE_MS = 6000;
+
+/** Phases that are part of a normal (re)connect and get the grace period. */
+export function isGracePhase(phase: string): boolean {
+  return phase === "connecting" || phase === "reconnecting" || phase === "available";
+}
+
+/** True once the app has been waiting longer than the grace period. */
+export function waitedPastGrace(waitingSinceMs: number, nowMs: number): boolean {
+  return nowMs - waitingSinceMs >= CONNECTION_GRACE_MS;
+}
+
+/** Becomes true CONNECTION_GRACE_MS after `waiting` turns true; resets when it turns false. */
+function useWaitedPastGrace(waiting: boolean): boolean {
+  const [since, setSince] = useState<number | null>(null);
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    if (!waiting) {
+      setSince(null);
+      setPast(false);
+      return;
+    }
+    const start = since ?? Date.now();
+    if (since === null) setSince(start);
+    const left = CONNECTION_GRACE_MS - (Date.now() - start);
+    if (left <= 0) {
+      setPast(true);
+      return;
+    }
+    const timer = setTimeout(() => setPast(waitedPastGrace(start, Date.now())), left);
+    return () => clearTimeout(timer);
+  }, [waiting, since]);
+  return waiting && past;
+}
+
 export function ConnectionBanner() {
   const childView = useChildView();
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
+  const noEnvironment = catalog.isReady && environmentIds.length === 0;
+  const showNoEnvironment = useWaitedPastGrace(noEnvironment);
   if (!catalog.isReady) return <div />;
   if (environmentIds.length === 0) {
+    if (!showNoEnvironment) return <div />;
     return (
       <Banner tone="offline">
         {childView ? (
@@ -41,6 +84,7 @@ function EnvironmentBanner({ environmentId }: { readonly environmentId: Environm
   const childView = useChildView();
   const presentation = useAtomValue(environmentPresentations.presentationAtom(environmentId));
   const phase = presentation?.connection.phase ?? "connecting";
+  const showWaiting = useWaitedPastGrace(isGracePhase(phase));
   const tryNow = (
     <Button size="sm" onClick={requestReconnect}>
       Try now
@@ -66,6 +110,7 @@ function EnvironmentBanner({ environmentId }: { readonly environmentId: Environm
     case "connecting":
     case "reconnecting":
     case "available":
+      if (!showWaiting) return <div />;
       return (
         <Banner tone="offline" action={tryNow}>
           {childView ? (
