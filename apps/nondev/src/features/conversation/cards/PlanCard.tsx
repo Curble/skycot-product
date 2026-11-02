@@ -19,7 +19,7 @@ import { InlineReply } from "./InlineReply";
 import { Markdown, parseMarkdown } from "./Markdown";
 import type { TimelineRenderContext } from "./registry";
 import { shortTime } from "./time";
-import { builtBy, replacedByNewerPlan } from "../plans";
+import { builtBy, overtakenByLaterChanges, replacedByNewerPlan } from "../plans";
 import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
@@ -77,13 +77,15 @@ export function PlanCard({
         ? "taken-back"
         : acceptedRun
           ? "accepted"
-          : plan?.status === "superseded"
-            ? "superseded"
-            : plan?.status === "completed"
-              ? "completed"
-              : busyThread
-                ? "busy"
-                : "actionable";
+          : overtakenByLaterChanges(item, projection.turnItems, projection.runs)
+            ? "overtaken"
+            : plan?.status === "superseded"
+              ? "superseded"
+              : plan?.status === "completed"
+                ? "completed"
+                : busyThread
+                  ? "busy"
+                  : "actionable";
 
   const steps = countSteps(item.markdown);
   const subtitle =
@@ -91,13 +93,15 @@ export function PlanCard({
       ? "Writing the plan…"
       : state === "taken-back"
         ? "Taken back when you went back. Ask again for a new plan."
-        : state === "accepted"
-          ? `You pressed Build it · ${shortTime(acceptedRun?.requestedAt ?? null)}`
-          : state === "superseded"
-            ? "Replaced by a newer plan"
-            : state === "completed"
-              ? "Carried out"
-              : `${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
+        : state === "overtaken"
+          ? "Things were changed after this plan. Ask again for a new plan."
+          : state === "accepted"
+            ? `You pressed Build it · ${shortTime(acceptedRun?.requestedAt ?? null)}`
+            : state === "superseded"
+              ? "Replaced by a newer plan"
+              : state === "completed"
+                ? "Carried out"
+                : `${steps > 0 ? `${steps} ${steps === 1 ? "step" : "steps"} · ` : ""}${card.whyItMatters}`;
 
   const approve = card.options.find((o) => o.id === "approve");
 
@@ -121,7 +125,7 @@ export function PlanCard({
 
   return (
     <Bubble author="crew" full meta={shortTime(item.completedAt ?? item.updatedAt)}>
-      <Card label="Plan" muted={state === "superseded"}>
+      <Card label="Plan" muted={state === "superseded" || state === "overtaken"}>
         <CardHeader icon={ListChecks} tone="blue" title="Here's my plan" subtitle={subtitle} />
         <CardBody>
           <Markdown
