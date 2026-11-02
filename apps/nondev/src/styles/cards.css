@@ -3,10 +3,11 @@
    Tokens only from styles/apple.css; no continuously repainting animation. */
 
 /* A replaced or overtaken card dims its old content and icon; its title and the subtitle
-   that says what to do next stay at full contrast (opacity on them fell to ~2.8:1). */
+   that says what to do next stay at full contrast (opacity on them fell to ~2.8:1).
+   0.72 keeps dimmed plan step numbers at ~5.2:1 in the light theme (0.64 gave 4.1:1). */
 .fm-card--muted > .fm-card__body,
 .fm-card--muted .fm-card__icon {
-  opacity: 0.64;
+  opacity: 0.72;
 }
 
 /* ---------------------------------------------------------------------------
