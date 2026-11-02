@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   beginSend,
   buildItHeldBackNote,
+  engineCaughtUp,
   buildItHold,
   sendInFlight,
   whileSending,
@@ -60,5 +61,35 @@ describe("Build it hold-back", () => {
     const end = beginSend("t7");
     expect(buildItHold("t7", true)).toBe("other-message");
     end();
+  });
+
+  it("holds Build it after an accepted send until the screen shows the turn", () => {
+    const end = beginSend("t6");
+    end(true);
+    // The engine took the message but the conversation still looks idle.
+    expect(buildItHold("t6", false)).toBe("other-message");
+    // Sam shows as working: the note says so.
+    expect(buildItHold("t6", true)).toBe("assistant-busy");
+    engineCaughtUp("t6");
+    expect(buildItHold("t6", false)).toBeNull();
+  });
+
+  it("lets the accepted-send mark go after a few seconds if the turn never shows", () => {
+    vi.useFakeTimers();
+    try {
+      const end = beginSend("t5");
+      end(true);
+      expect(sendInFlight("t5")).toBe(true);
+      vi.advanceTimersByTime(3000);
+      expect(sendInFlight("t5")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not hold Build it after a send that failed", () => {
+    const end = beginSend("t4");
+    end(false);
+    expect(buildItHold("t4", false)).toBeNull();
   });
 });

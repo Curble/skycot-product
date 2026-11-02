@@ -161,6 +161,7 @@ export function useDecisionDispatcher({
               : buildItHold(threadId, threadRuntimeIsActive(shell.runtime));
           if (hold !== null) return buildItHeldBackNote(hold, crew.builder.name);
           const endSend = beginSend(threadId);
+          let accepted = false;
           try {
             const text =
               readExplainMarker(typed).choice === null
@@ -180,7 +181,7 @@ export function useDecisionDispatcher({
               wanted: interactionMode,
             });
             if (modeProblem !== null) return calmFailure(modeProblem);
-            return startTurn({
+            const started = await startTurn({
               environmentId,
               input: {
                 threadId,
@@ -197,8 +198,10 @@ export function useDecisionDispatcher({
                   : {}),
               },
             });
+            accepted = started._tag !== "Failure";
+            return started;
           } finally {
-            endSend();
+            endSend(accepted);
           }
         }
       }

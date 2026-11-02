@@ -6,29 +6,56 @@
 import { useSyncExternalStore } from "react";
 
 const counts = new Map<string, number>();
+// A send the engine accepted, until the screen shows the turn it started (or SETTLE_MS passes):
+// in that gap the conversation still looks idle, so a Build it would slip in behind it.
+const settling = new Map<string, ReturnType<typeof setTimeout>>();
+const SETTLE_MS = 3000;
 const listeners = new Set<() => void>();
 
 function changed() {
   for (const listener of listeners) listener();
 }
 
-/** Marks one send as started for the thread; call the returned function when it has finished. */
-export function beginSend(threadId: string): () => void {
+/**
+ * Marks one send as started for the thread; call the returned function when it has finished,
+ * with `true` when the engine accepted it (the mark then stays until the turn shows).
+ */
+export function beginSend(threadId: string): (accepted?: boolean) => void {
   counts.set(threadId, (counts.get(threadId) ?? 0) + 1);
   changed();
   let ended = false;
-  return () => {
+  return (accepted = false) => {
     if (ended) return;
     ended = true;
     const left = (counts.get(threadId) ?? 1) - 1;
     if (left <= 0) counts.delete(threadId);
     else counts.set(threadId, left);
+    if (accepted) {
+      clearTimeout(settling.get(threadId));
+      settling.set(
+        threadId,
+        setTimeout(() => engineCaughtUp(threadId), SETTLE_MS),
+      );
+    }
     changed();
   };
 }
 
-export function sendInFlight(threadId: string): boolean {
+/** The screen now shows the turn an accepted send started: its mark can go. */
+export function engineCaughtUp(threadId: string): void {
+  const timer = settling.get(threadId);
+  if (timer === undefined) return;
+  clearTimeout(timer);
+  settling.delete(threadId);
+  changed();
+}
+
+function sending(threadId: string): boolean {
   return (counts.get(threadId) ?? 0) > 0;
+}
+
+export function sendInFlight(threadId: string): boolean {
+  return sending(threadId) || settling.has(threadId);
 }
 
 /** Re-renders while a send for the thread is in flight. */
@@ -62,8 +89,9 @@ export async function whileSending<T>(threadId: string, run: () => Promise<T>): 
 export type BuildItHold = "other-message" | "assistant-busy";
 
 export function buildItHold(threadId: string, assistantBusy: boolean): BuildItHold | null {
-  if (sendInFlight(threadId)) return "other-message";
-  return assistantBusy ? "assistant-busy" : null;
+  if (sending(threadId)) return "other-message";
+  if (assistantBusy) return "assistant-busy";
+  return settling.has(threadId) ? "other-message" : null;
 }
 
 /** What a child reads when a Build it is held back: calm, and says what to do next. */

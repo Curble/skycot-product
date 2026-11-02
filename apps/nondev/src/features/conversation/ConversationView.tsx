@@ -1129,7 +1129,7 @@ function ReplyComposer({
             },
           });
     setSending(false);
-    endSend();
+    endSend(outcome !== null && outcome._tag !== "Failure");
     if (outcome === null || outcome._tag === "Failure") {
       onSendingMessage(null);
       const cause = outcome === null ? modeProblem : squashAtomCommandFailure(outcome);

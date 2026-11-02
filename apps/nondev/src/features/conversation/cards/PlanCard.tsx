@@ -7,7 +7,7 @@
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { ListChecks } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { describeRuntimeRequest } from "../../../plain/approvals";
 import { Banner } from "../../../ui/Banner";
@@ -23,7 +23,7 @@ import { builtBy, overtakenByLaterChanges, replacedByNewerPlan } from "../plans"
 import { useChildView } from "../../../app/useChildView";
 import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
-import { useSendInFlight } from "../sendsInFlight";
+import { engineCaughtUp, useSendInFlight } from "../sendsInFlight";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -63,6 +63,10 @@ export function PlanCard({
   const [problem, setProblem] = useState<string | null>(null);
   // Another message of this conversation is still being sent: Build it waits for it.
   const otherSendInFlight = useSendInFlight(String(threadId));
+  // Once the screen shows Sam working, the busy state holds Build it back on its own.
+  useEffect(() => {
+    if (busyThread) engineCaughtUp(String(threadId));
+  }, [busyThread, threadId]);
 
   // A plan whose turn was taken back (Undo, or going back to an earlier message) is gone
   // from the assistant's memory: building it would build nothing it remembers.

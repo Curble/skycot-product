@@ -2,7 +2,10 @@
    secret field, developer disclosure and the light Markdown inside bubbles.
    Tokens only from styles/apple.css; no continuously repainting animation. */
 
-.fm-card--muted {
+/* A replaced or overtaken card dims its old content and icon; its title and the subtitle
+   that says what to do next stay at full contrast (opacity on them fell to ~2.8:1). */
+.fm-card--muted > .fm-card__body,
+.fm-card--muted .fm-card__icon {
   opacity: 0.64;
 }
 
