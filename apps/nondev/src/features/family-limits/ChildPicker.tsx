@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { ConnectionBanner } from "../../app/ConnectionBanner";
 import { Button } from "../../ui/Button";
 import { Mascot } from "../brand/Mascot";
 import { useModal } from "../../ui/useModal";
@@ -134,6 +135,10 @@ export function ChildPicker({
       aria-labelledby="fm-picker-title"
       tabIndex={-1}
     >
+      {/* The shell's own banner sits under this full-screen cover, so show it here too. */}
+      <div className="fm-picker__notice">
+        <ConnectionBanner childWording />
+      </div>
       <div className="fm-picker__inner">
         <div className="fm-picker__hello">
           <Mascot pose="hello" size={104} decorative />

@@ -20,6 +20,9 @@
   gap: 8px;
   min-width: 0;
 }
+.fm-shell__notices > .fm-banner {
+  flex: 1 1 100%;
+}
 .fm-shell__notices > .fm-btn {
   flex: none;
   margin-left: auto;

@@ -3,6 +3,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { useEffect, useState } from "react";
 
 import { requestReconnect } from "../connection/platform";
+import { ENGINE_PROBE_INTERVAL_MS, engineAnswers, shouldWake } from "./engineProbe";
 import { enabledEnvironmentIdsAtom, environmentCatalog } from "../state/catalog";
 import { environmentPresentations } from "../state/server";
 import { Banner } from "../ui/Banner";
@@ -53,8 +54,36 @@ function useWaitedPastGrace(waiting: boolean): boolean {
   return waiting && past;
 }
 
-export function ConnectionBanner() {
-  const childView = useChildView();
+/** Module-wide so two banners (shell and picker) never send wakeups back to back. */
+let lastWakeMs: number | null = null;
+
+/**
+ * While the banner is showing, ask the engine every few seconds and send the
+ * "Try now" wakeup as soon as it answers, instead of waiting out the
+ * connection layer's growing retry delay.
+ */
+function useWakeWhenEngineAnswers(active: boolean): void {
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void engineAnswers().then((answered) => {
+        const now = Date.now();
+        if (stopped || !shouldWake(answered, lastWakeMs, now)) return;
+        lastWakeMs = now;
+        requestReconnect();
+      });
+    }, ENGINE_PROBE_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [active]);
+}
+
+export function ConnectionBanner({ childWording }: { readonly childWording?: boolean } = {}) {
+  const ownChildView = useChildView();
+  const childView = childWording ?? ownChildView;
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const environmentIds = useAtomValue(enabledEnvironmentIdsAtom);
   const noEnvironment = catalog.isReady && environmentIds.length === 0;
@@ -77,14 +106,20 @@ export function ConnectionBanner() {
       </Banner>
     );
   }
-  return <EnvironmentBanner environmentId={environmentIds[0]!} />;
+  return <EnvironmentBanner environmentId={environmentIds[0]!} childView={childView} />;
 }
 
-function EnvironmentBanner({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const childView = useChildView();
+function EnvironmentBanner({
+  environmentId,
+  childView,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly childView: boolean;
+}) {
   const presentation = useAtomValue(environmentPresentations.presentationAtom(environmentId));
   const phase = presentation?.connection.phase ?? "connecting";
   const showWaiting = useWaitedPastGrace(isGracePhase(phase));
+  useWakeWhenEngineAnswers(showWaiting || phase === "error");
   const tryNow = (
     <Button size="sm" onClick={requestReconnect}>
       Try now

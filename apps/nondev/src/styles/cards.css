@@ -129,7 +129,9 @@
   font-size: calc(12px * var(--fm-text-scale, 1));
   font-weight: 600;
   background: var(--fm-accent-soft);
-  color: var(--fm-accent);
+  /* Label ink, not accent: accent on accent-soft fell to 3.9:1 in the light Workshop theme
+     and ~2.4:1 on a replaced (dimmed) plan (3 Nov 2026 on-screen round). */
+  color: var(--fm-label);
 }
 .fm-md--plan h3,
 .fm-md--plan h4 {
