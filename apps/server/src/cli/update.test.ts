@@ -8,7 +8,12 @@ import * as Path from "effect/Path";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { afterEach, vi } from "vite-plus/test";
 
-import { repointLauncher, resolveLauncherPath, resolveNewestVersion } from "./update.ts";
+import {
+  brandedUpdateRefusal,
+  repointLauncher,
+  resolveLauncherPath,
+  resolveNewestVersion,
+} from "./update.ts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -126,5 +131,14 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       assert.equal(relative, launcher);
       assert.equal(absent, undefined);
     }).pipe(Effect.scoped, Effect.provideService(HostProcess.Platform, "linux")),
+  );
+});
+
+// nondev-seam: brand-cli-update-refuse
+it("refuses to self-update a branded command and leaves upstream's alone", () => {
+  assert.equal(brandedUpdateRefusal("t3", "T3 Code"), undefined);
+  assert.equal(
+    brandedUpdateRefusal("skycot", "SKYCOT")?.reason,
+    "SKYCOT updates itself. Open SKYCOT and use its update instead.",
   );
 });

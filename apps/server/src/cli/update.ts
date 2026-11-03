@@ -234,6 +234,15 @@ const versionArgument = Argument.String("version").pipe(
   Argument.optional,
 );
 
+// nondev-seam: brand-cli-update-refuse (a branded app updates itself through its own signed
+// updater; release downloads from GitHub are only checked against a file in the same release)
+export const brandedUpdateRefusal = (commandName: string, appName: string) =>
+  commandName === "t3"
+    ? undefined
+    : new CliUpdateError({
+        reason: `${appName} updates itself. Open ${appName} and use its update instead.`,
+      });
+
 export const updateCommand = Command.make("update", {
   ...updateFlags,
   version: versionArgument,
@@ -243,6 +252,8 @@ export const updateCommand = Command.make("update", {
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
+      const refusal = brandedUpdateRefusal(CLI_COMMAND_NAME, CLI_APP_NAME); // nondev-seam: brand-cli-update-refuse
+      if (refusal) return yield* refusal;
       const logLevel = yield* GlobalFlag.LogLevel;
       const config = yield* resolveCliAuthConfig(flags, logLevel);
       return yield* runUpdate({
