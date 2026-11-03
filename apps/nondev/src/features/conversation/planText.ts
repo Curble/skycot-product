@@ -59,3 +59,20 @@ export function shownAgainLater(
     );
   return next?.markdown !== undefined && sameWords(next.markdown) === sameWords(item.markdown);
 }
+
+const PLAN_TAG_BLOCK = /<proposed_plan>([\s\S]*?)<\/proposed_plan>/giu;
+const ESCAPED_PLAN_TAG_BLOCK = /&lt;proposed_plan&gt;([\s\S]*?)&lt;\/proposed_plan&gt;/giu;
+
+/**
+ * A plan that arrives as plain message text still wrapped in its tags (the engine normally
+ * turns it into a plan card first) shows its steps as ordinary words, never the tags. This
+ * only tidies the words; a "Build it" button belongs to real plan items alone.
+ */
+export function unwrapProposedPlanTags(text: string): string {
+  if (!/proposed_plan/iu.test(text)) return text;
+  return text
+    .replace(PLAN_TAG_BLOCK, (_, inner: string) => `\n${inner.trim()}\n`)
+    .replace(ESCAPED_PLAN_TAG_BLOCK, (_, inner: string) => `\n${inner.trim()}\n`)
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}

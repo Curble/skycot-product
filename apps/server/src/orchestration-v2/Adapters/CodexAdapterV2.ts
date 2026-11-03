@@ -1141,6 +1141,20 @@ function codexUsageLimitError(
   );
 }
 
+const PROPOSED_PLAN_BLOCK = /<proposed_plan>([\s\S]*?)<\/proposed_plan>/;
+
+/** Splits one complete tagged plan block out of an assistant message, or returns null. */
+export function extractTaggedProposedPlan(
+  text: string,
+): { readonly markdown: string; readonly remainingText: string } | null {
+  const match = PROPOSED_PLAN_BLOCK.exec(text);
+  if (match === null) return null;
+  const markdown = (match[1] ?? "").trim();
+  if (markdown.length === 0) return null;
+  const remainingText = `${text.slice(0, match.index)}${text.slice(match.index + match[0].length)}`;
+  return { markdown, remainingText: remainingText.trim() };
+}
+
 interface ActiveCodexTurnContext {
   closedCommandItemIds?: ReadonlySet<string>;
   latestProviderFailure?: {
@@ -1940,6 +1954,8 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         const offeredContinuationItemsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const finalAnswerItemIdsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const completedFinalAnswerTextsByTurn = yield* Ref.make(new Map<string, Set<string>>());
+        // Native turns where the app-server sent a real plan item (so no tag fallback).
+        const nativePlanTurns = yield* Ref.make(new Set<string>());
         // Native completion and the interrupt timeout share one finalization
         // path. Serialize the race so only one can publish terminal events.
         const turnTerminalizationPermit = yield* Semaphore.make(1);
@@ -2236,6 +2252,14 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 return current;
               }
               const updated = new Map(current);
+              updated.delete(nativeTurnId);
+              return updated;
+            });
+            yield* Ref.update(nativePlanTurns, (current) => {
+              if (!current.has(nativeTurnId)) {
+                return current;
+              }
+              const updated = new Set(current);
               updated.delete(nativeTurnId);
               return updated;
             });
@@ -3978,6 +4002,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           return { node, plan, turnItem };
         });
 
+        const markNativePlanTurn = (nativeTurnId: string) =>
+          Ref.update(nativePlanTurns, (current) =>
+            current.has(nativeTurnId) ? current : new Set(current).add(nativeTurnId),
+          );
+
         const planDeltas = yield* makeProviderTextDeltaCoalescer({
           flushIntervalMs: CODEX_PLAN_DELTA_FLUSH_INTERVAL_MS,
           emit:
@@ -4333,6 +4362,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return;
             }
             yield* completeProviderRetry(context, yield* DateTime.now);
+            yield* markNativePlanTurn(payload.turnId);
             yield* planDeltas.append({
               turnId: payload.turnId,
               itemId: payload.itemId,
@@ -5029,6 +5059,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
 
             if (payload.item.type === "plan") {
+              yield* markNativePlanTurn(payload.turnId);
               yield* planDeltas.complete({
                 turnId: payload.turnId,
                 itemId: payload.item.id,
@@ -5117,11 +5148,46 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             const completedTextsBefore =
               (yield* Ref.get(completedFinalAnswerTextsByTurn)).get(payload.turnId) ??
               new Set<string>();
+            // Codex occasionally answers a plan-mode turn with the tagged plan inside an
+            // ordinary message instead of a native plan item. Only a final answer in a
+            // root plan turn with no native plan item qualifies; the plan is lifted out
+            // so the existing "Build it" flow sees a normal proposed plan.
+            const taggedPlan =
+              finalAnswer &&
+              context.subagent === null &&
+              context.input.runtimePolicy.interactionMode === "plan" &&
+              !(yield* Ref.get(nativePlanTurns)).has(payload.turnId)
+                ? extractTaggedProposedPlan(payload.item.text)
+                : null;
             const text = yield* agentMessageDeltas.complete({
               turnId: payload.turnId,
               itemId: payload.item.id,
-              finalText: payload.item.text,
+              finalText: taggedPlan === null ? payload.item.text : taggedPlan.remainingText,
             });
+            if (taggedPlan !== null) {
+              const artifacts = yield* buildProposedPlanArtifacts({
+                context,
+                nativeItemId: `${payload.item.id}:plan`,
+                status: "active",
+                markdown: taggedPlan.markdown,
+                completed: true,
+              });
+              yield* emitProviderEvent({
+                type: "node.updated",
+                driver: CODEX_PROVIDER,
+                node: artifacts.node,
+              });
+              yield* emitProviderEvent({
+                type: "plan.updated",
+                driver: CODEX_PROVIDER,
+                plan: artifacts.plan,
+              });
+              yield* emitProviderEvent({
+                type: "turn_item.updated",
+                driver: CODEX_PROVIDER,
+                turnItem: artifacts.turnItem,
+              });
+            }
             yield* Ref.update(finalAnswerItemIdsByTurn, (current) => {
               const itemIds = current.get(payload.turnId);
               if (itemIds === undefined || !itemIds.has(payload.item.id)) {

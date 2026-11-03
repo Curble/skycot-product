@@ -544,6 +544,7 @@ function codexReplayPreamble(input: {
   readonly nativeTurnId: string;
   readonly prompt: string;
   readonly sentPrompt?: string;
+  readonly planMode?: boolean;
 }): Array<CodexReplay.CodexAppServerReplayEntry> {
   return [
     {
@@ -641,6 +642,9 @@ function codexReplayPreamble(input: {
           approvalsReviewer: "user",
           sandboxPolicy: { type: "dangerFullAccess" },
           summary: "detailed",
+          ...(input.planMode === true
+            ? { collaborationMode: { mode: "plan", settings: { model: "gpt-5.4" } } }
+            : {}),
         },
       },
     },
@@ -2650,6 +2654,174 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
         ),
       ),
+    ),
+  );
+
+  const TAGGED_PLAN_STEPS = "1. Add a big green button.\n2. Make it say hi when pressed.";
+  const TAGGED_PLAN_TEXT = `<proposed_plan>\n${TAGGED_PLAN_STEPS}\n</proposed_plan>`;
+
+  // Replays one plan-shaped agent message, optionally preceded by a native plan item.
+  const runTaggedPlanTurn = (input: {
+    readonly scenario: string;
+    readonly interactionMode: "default" | "plan";
+    readonly nativePlan: boolean;
+    readonly answerText: string;
+  }) =>
+    Effect.gen(function* () {
+      const nativeThreadId = `native-${input.scenario}-thread`;
+      const nativeTurnId = `native-${input.scenario}-turn`;
+      const prompt = "Make a plan for a page with a big green button.";
+      const item = (type: string, id: string, extra: Record<string, unknown>) => ({
+        type: "emit_inbound" as const,
+        label: `item/completed/${id}`,
+        frame: {
+          method: "item/completed",
+          params: {
+            item: { type, id, ...extra },
+            threadId: nativeThreadId,
+            turnId: nativeTurnId,
+            completedAtMs: 1782622441000,
+          },
+        },
+      });
+      const transcript = makeCodexReplayTranscript({
+        scenario: input.scenario,
+        entries: [
+          ...codexReplayPreamble({
+            nativeThreadId,
+            nativeTurnId,
+            prompt,
+            planMode: input.interactionMode === "plan",
+          }),
+          ...(input.nativePlan ? [item("plan", "native-plan", { text: "1. Native step." })] : []),
+          item("agentMessage", "answer-1", {
+            text: input.answerText,
+            phase: "final_answer",
+            memoryCitation: null,
+          }),
+          {
+            type: "emit_inbound" as const,
+            label: "turn/completed",
+            frame: {
+              method: "turn/completed",
+              params: {
+                threadId: nativeThreadId,
+                turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+              },
+            },
+          },
+        ],
+      });
+      const harness = yield* makeCodexReplayHarness(transcript);
+      const now = yield* DateTime.now;
+      const turnInput = makeCodexTestTurnInput({
+        threadId: harness.threadId,
+        providerThread: harness.providerThread,
+        now,
+        attemptId: RunAttemptId.make(`attempt-${input.scenario}`),
+        text: prompt,
+      });
+      yield* harness.runtime.startTurn({
+        ...turnInput,
+        runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+          runtimeMode: "full-access",
+          interactionMode: input.interactionMode,
+          cwd: "/workspace",
+        }),
+      });
+      yield* harness.awaitTerminal(1);
+      const planItems = harness.events.flatMap((event) =>
+        event.type === "turn_item.updated" && event.turnItem.type === "proposed_plan"
+          ? [event.turnItem]
+          : [],
+      );
+      return { events: harness.events, planItems };
+    });
+
+  const taggedPlanLayers = Layer.mergeAll(
+    IdAllocator.layer,
+    McpProviderSessions.layer,
+    NodeServices.layer,
+  );
+
+  it.effect("lifts a tagged plan out of a plan-mode agent message", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { events, planItems } = yield* runTaggedPlanTurn({
+          scenario: "codex-tagged-plan",
+          interactionMode: "plan",
+          nativePlan: false,
+          answerText: `Here you go.\n${TAGGED_PLAN_TEXT}`,
+        });
+        assert.equal(planItems.length, 1);
+        assert.equal(
+          planItems[0]?.type === "proposed_plan" && planItems[0].markdown,
+          TAGGED_PLAN_STEPS,
+        );
+        assert.equal(planItems[0]?.status, "completed");
+        assert.deepEqual(
+          assistantMessages(events).map((event) => event.message.text),
+          ["Here you go."],
+        );
+      }).pipe(Effect.provide(taggedPlanLayers)),
+    ),
+  );
+
+  it.effect("leaves an empty message when the whole answer was the tagged plan", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { events, planItems } = yield* runTaggedPlanTurn({
+          scenario: "codex-tagged-plan-only",
+          interactionMode: "plan",
+          nativePlan: false,
+          answerText: TAGGED_PLAN_TEXT,
+        });
+        assert.equal(planItems.length, 1);
+        assert.deepEqual(
+          assistantMessages(events).map((event) => event.message.text),
+          [""],
+        );
+      }).pipe(Effect.provide(taggedPlanLayers)),
+    ),
+  );
+
+  it.effect("never adds a second plan when the app-server sent a native plan item", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { events, planItems } = yield* runTaggedPlanTurn({
+          scenario: "codex-tagged-plan-native",
+          interactionMode: "plan",
+          nativePlan: true,
+          answerText: TAGGED_PLAN_TEXT,
+        });
+        assert.equal(planItems.length, 1);
+        assert.equal(
+          planItems[0]?.type === "proposed_plan" && planItems[0].markdown,
+          "1. Native step.",
+        );
+        assert.deepEqual(
+          assistantMessages(events).map((event) => event.message.text),
+          [TAGGED_PLAN_TEXT],
+        );
+      }).pipe(Effect.provide(taggedPlanLayers)),
+    ),
+  );
+
+  it.effect("leaves tagged text alone outside plan mode", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { events, planItems } = yield* runTaggedPlanTurn({
+          scenario: "codex-tagged-plan-default",
+          interactionMode: "default",
+          nativePlan: false,
+          answerText: TAGGED_PLAN_TEXT,
+        });
+        assert.equal(planItems.length, 0);
+        assert.deepEqual(
+          assistantMessages(events).map((event) => event.message.text),
+          [TAGGED_PLAN_TEXT],
+        );
+      }).pipe(Effect.provide(taggedPlanLayers)),
     ),
   );
 

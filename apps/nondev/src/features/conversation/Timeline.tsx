@@ -35,6 +35,7 @@ import { WorkingCard } from "./WorkingCard";
 import { useChildView } from "../../app/useChildView";
 import { isAllowanceRestRun } from "./restCopy";
 import { withQueuedMessageItems } from "./queuedMessages";
+import { unwrapProposedPlanTags } from "./planText";
 
 export {
   getTimelineRenderer,
@@ -68,10 +69,11 @@ function renderDefault(context: TimelineRenderContext, childView = false): React
         </Bubble>
       );
     case "assistant_message":
-      if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
+      if (unwrapProposedPlanTags(item.text).trim().length === 0)
+        return item.streaming ? <TypingIndicator /> : null;
       return (
         <Bubble author="crew">
-          <Highlight text={item.text} />
+          <Highlight text={unwrapProposedPlanTags(item.text)} />
         </Bubble>
       );
     case "run_interrupt_result": {

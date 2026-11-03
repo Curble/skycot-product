@@ -27,6 +27,7 @@ import { Highlight } from "../../../ui/Highlight";
 import { useState } from "react";
 import { useDecisionDispatcher } from "./dispatch";
 import { retryTextFor } from "./retryText";
+import { unwrapProposedPlanTags } from "../planText";
 
 type UserMessage = Extract<OrchestrationV2TurnItem, { type: "user_message" }>;
 type AssistantMessage = Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>;
@@ -99,7 +100,9 @@ export function UserBubble({
 export function CrewBubble({ item }: { readonly item: AssistantMessage }) {
   const crew = useCrew();
   useAutoReadAloud(item);
-  if (item.text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
+  // A plan that slipped through as tagged text shows its steps, never the tags.
+  const text = unwrapProposedPlanTags(item.text);
+  if (text.trim().length === 0) return item.streaming ? <TypingIndicator /> : null;
   return (
     <Bubble
       author="crew"
@@ -109,12 +112,12 @@ export function CrewBubble({ item }: { readonly item: AssistantMessage }) {
         ) : (
           <>
             {shortTime(item.completedAt ?? item.updatedAt)}
-            <ReadAloudButton id={item.id} text={item.text} />
+            <ReadAloudButton id={item.id} text={text} />
           </>
         )
       }
     >
-      <Markdown text={item.text} />
+      <Markdown text={text} />
     </Bubble>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { shownAgainLater, splitInlineSteps } from "./planText";
+import { shownAgainLater, splitInlineSteps, unwrapProposedPlanTags } from "./planText";
 
 describe("splitInlineSteps", () => {
   it("puts steps squeezed onto one line on their own lines", () => {
@@ -48,5 +48,29 @@ describe("shownAgainLater", () => {
         { type: "proposed_plan", ordinal: 1, markdown: plan },
       ]),
     ).toBe(false);
+  });
+});
+
+describe("unwrapProposedPlanTags", () => {
+  const steps = "1. Add a big green button.\n2. Make it say hi.";
+
+  it("shows the steps without the tags", () => {
+    expect(unwrapProposedPlanTags(`<proposed_plan>\n${steps}\n</proposed_plan>`)).toBe(steps);
+  });
+
+  it("keeps the words before and after the block", () => {
+    expect(
+      unwrapProposedPlanTags(`Here you go.\n<proposed_plan>\n${steps}\n</proposed_plan>\nOK?`),
+    ).toBe(`Here you go.\n\n${steps}\n\nOK?`);
+  });
+
+  it("handles tags that were escaped on the way", () => {
+    expect(unwrapProposedPlanTags(`&lt;proposed_plan&gt;\n${steps}\n&lt;/proposed_plan&gt;`)).toBe(
+      steps,
+    );
+  });
+
+  it("leaves ordinary text alone", () => {
+    expect(unwrapProposedPlanTags("Just a normal reply.")).toBe("Just a normal reply.");
   });
 });
