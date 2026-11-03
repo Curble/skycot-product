@@ -336,7 +336,7 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 
 SITE = "https://skycot.com"
 LAST_UPDATED = "28 October 2026"
-TERMS_UPDATED = "29 October 2026"
+TERMS_UPDATED = "3 November 2026"
 H1 = "The family-friendly AI developer."
 LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
         "Plain English, on your own Mac, with the AI you already pay for.")
@@ -362,7 +362,7 @@ STRUCTURED = json.dumps({
          "operatingSystem": "macOS 13 Ventura or later", "processorRequirements": "Apple silicon (M1 or later)",
          "applicationCategory": "DeveloperApplication", "applicationSubCategory": "Family",
          "softwareVersion": "0.1.1 beta", "releaseNotes": SITE + "/#new",
-         "downloadUrl": "https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.39.beta-arm64.dmg",
+         "downloadUrl": "https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.40.beta-arm64.dmg",
          "fileSize": "160MB", "image": SITE + "/assets/brand/og-beta.png",
          "screenshot": SITE + "/assets/hero.jpg",
          "offers": {"@type": "Offer", "price": "0", "priceCurrency": "AUD",
@@ -759,7 +759,7 @@ def home_body():
     <h3>Try the beta.</h3>
     <p>For Apple silicon Macs (M1 or later) with macOS 13 Ventura or newer. About 160 MB. You'll need an account with at least one supported assistant.</p>
     <div class="actions">
-      <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.39.beta-arm64.dmg">Download the beta for Mac</a>
+      <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.40.beta-arm64.dmg">Download the beta for Mac</a>
       <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
     </div>
     <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/38gtBbywq6">Discord</a>. No newsletter, and the app sends us nothing.</p>
@@ -915,8 +915,8 @@ TERMS = f'''{nav(True)}
   <h2>5. Acceptable use</h2>
   <p>Do not use SKYCOT to break the law or anyone's rights; to access systems or data you are not entitled to; to spread malicious software or attack other systems; to harass, deceive or defraud anyone; to get around the terms, limits or safeguards of the assistants you connect; or to claim that an assistant's output was made or endorsed by us. Do not remove or alter the open-source and copyright notices in the app.</p>
 
-  <h2>6. Licence to use SKYCOT</h2>
-  <p>SKYCOT is based on T3 Code by T3 Tools Inc., which is licensed under the MIT licence; that licence continues to apply to that code. Curble's own additions are licensed under the Apache License 2.0. Both licences are reproduced in the app and on our <a href="/open-source">open-source page</a>. If these terms and an open-source licence ever conflict for that code, the open-source licence wins. The SKYCOT name, logo and mascot are not licensed. <em>Summary: the code is open source under MIT and Apache 2.0; the SKYCOT name is ours.</em></p>
+  <h2>6. Licence and source code</h2>
+  <p>SKYCOT's source code is published at <a href="https://github.com/Curble/skycot-product">github.com/Curble/skycot-product</a>. The parts that came from T3 Code by T3 Tools Inc. are licensed under the MIT licence, and Curble's own additions are licensed under the Apache License 2.0. Both licences are reproduced in the app, in the source code and on our <a href="/open-source">open-source page</a>. Your rights to copy, change and share the source code come from those licences, and nothing in these terms limits them; if these terms and an open-source licence ever conflict for that code, the licence wins. These terms cover the SKYCOT app we distribute, the skycot.com website and our services, such as updates and the SKYCOT Relay. The SKYCOT name, logo, cloud mascot and crew characters are not licensed: if you build your own version from the source code, give it your own name and artwork, and do not suggest it is made or endorsed by us. <em>Summary: the code is open source and yours to build on; the SKYCOT name and characters stay ours.</em></p>
 
   <h2>7. Price</h2>
   <p>SKYCOT is free during the beta. You pay your AI provider, and anyone else whose service you use with SKYCOT, under their own terms. If we introduce a price, we will show it before it applies, and you will not be charged unless you agree to it.</p>
@@ -937,7 +937,7 @@ TERMS = f'''{nav(True)}
   <p>To the extent permitted by law, we are not liable for any loss of data, loss of profit, business interruption, or indirect or consequential loss arising from your use of SKYCOT or of any AI assistant used with it, and our total liability for any claim is limited to the amount you paid us for SKYCOT in the twelve months before the claim (which during the free beta is nil) or, where the law requires a remedy, to re-supplying the software.</p>
 
   <h2>13. Ending</h2>
-  <p>You can stop using SKYCOT at any time by deleting it; your files remain yours and on your Mac. We may end your right to use SKYCOT if you breach these terms. The parts of these terms that by their nature should continue after that (including the licence notices, sections 11 and 12, and governing law) continue.</p>
+  <p>You can stop using SKYCOT at any time by deleting it; your files remain yours and on your Mac. We may stop providing our services (such as updates and the SKYCOT Relay) to you if you breach these terms; this does not take away the rights the open-source licences give you to the source code. The parts of these terms that by their nature should continue after that (including the licence notices, sections 11 and 12, and governing law) continue.</p>
 
   <h2>14. Problems and governing law</h2>
   <p>If something goes wrong, please email us first; we will try in good faith to sort it out within 30 days. These terms are governed by the laws of Victoria, Australia, and you submit to the non-exclusive jurisdiction of its courts. Nothing here stops you from going to a consumer protection regulator or tribunal.</p>
@@ -958,6 +958,7 @@ OSS = f'''{nav()}
   <p><strong>SKYCOT is based on T3 Code, © T3 Tools Inc., used under the MIT licence.</strong> T3 Code is an open-source control plane for AI coding assistants, published at <a href="https://github.com/pingdotgg/t3code">github.com/pingdotgg/t3code</a>. SKYCOT adds a plain-language interface on top of it and keeps the original interface available as "Advanced mode".</p>
   <p>SKYCOT is an independent product of Curble Pty Ltd. <strong>SKYCOT is not affiliated with, sponsored by or endorsed by T3 Tools Inc.</strong> "T3" and "T3 Code" are names and marks of T3 Tools Inc.; the MIT licence covers the code, not those marks, and SKYCOT does not use them in its name or logo.</p>
   <p>We are grateful to the T3 Code team. Their README says they want people to have everything they need to fork and build the editor they want. That is exactly what SKYCOT is.</p>
+  <p><strong>SKYCOT's own source code is published too</strong>, at <a href="https://github.com/Curble/skycot-product">github.com/Curble/skycot-product</a>. If you build your own version, give it your own name and artwork: the SKYCOT name, logo, cloud mascot and crew characters are not licensed.</p>
 
   <h2>The MIT licence (T3 Code)</h2>
   <p>Reproduced in full, as the licence requires, from the LICENSE file that ships with SKYCOT:</p>
