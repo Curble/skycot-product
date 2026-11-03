@@ -87,7 +87,7 @@ network capture and confirm no request to `ingest.t3.codes`.
 
 ## Seam L-5: CLI self-update feed
 
-**Applied** as seam `brand-cli-update-repo`, reading `T3CODE_CLI_UPDATE_REPOSITORY` (set by `env.cjs` to `brand.updateRepository`, which `apply-brand.ts` requires to equal the git origin, `mark-hallam/skycot-product`). It covers both the `update` command's release index and the default download base URL.
+**Applied** as seam `brand-cli-update-repo`, reading `T3CODE_CLI_UPDATE_REPOSITORY` (set by `env.cjs` to `brand.updateRepository`, the public repository `Curble/skycot-product`; day-to-day work is in the private `Curble/skycot-internal`). It covers both the `update` command's release index and the default download base URL.
 
 `packages/shared/src/cliRelease.ts` hard-codes `pingdotgg/t3code` as the release repository for
 the `update` command. A SKYCOT CLI would update itself into T3's binary. Read the repository from

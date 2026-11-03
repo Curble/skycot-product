@@ -151,7 +151,7 @@ function ownNotices(): OwnNotice[] {
     {
       name: "SKYCOT",
       license: "Apache-2.0",
-      sourceUrl: "https://github.com/mark-hallam/skycot-product",
+      sourceUrl: "https://github.com/Curble/skycot-product",
       text: `Copyright (c) 2026 Curble Pty Ltd, trading as SKYCOT\n\n${read("LICENSE-APACHE")}`,
     },
     {

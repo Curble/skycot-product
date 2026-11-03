@@ -8,7 +8,7 @@
   "cliName": "skycot",
   "artifactPrefix": "SKYCOT",
   "defaultClientEntry": "simple/index.html",
-  "updateRepository": "mark-hallam/skycot-product",
+  "updateRepository": "Curble/skycot-product",
   "updates": {
     "$comment": "Where the Mac app looks for new SKYCOT versions. The ONLY source: env.cjs hands it on as T3CODE_SKYCOT_UPDATE_FEED; the desktop build bakes it into the app, the app refuses any other feed, and T3 Code's releases are refused everywhere (packages/skycot-brand/src/updateFeed.ts). null = no updates. Switched on for the first public beta (23 October 2026, 0.1.1-nondev.1.beta): \"https://downloads.skycot.com/mac/\" (Cloudflare R2; a folder serving latest-mac.yml + the signed zip/dmg; see docs/nondev/RELEASE.md); the other kind of feed is \"github:<owner>/<public-repo>\". updateRepository above is the source repo (the CLI `update` command and Advanced mode's release links), not the app's feed.",
     "feed": "https://downloads.skycot.com/mac/"
