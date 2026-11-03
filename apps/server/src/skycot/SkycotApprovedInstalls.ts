@@ -22,7 +22,11 @@
 // add-on that way instead (video shoot, 24 October 2026), and the sandbox would fail it in the
 // same way. SKYCOT downloads that one file itself, inside the folder, with a size limit.
 //
-// Codex only: Claude Code runs an approved command without a sandbox, so its yes already works.
+// Codex, and Claude while the Family profile is on: a child's Claude runs every command in
+// Claude Code's sandbox with the internet off (SkycotFamilyClaude.familySandbox), so it has the
+// same problem. Claude is told through its declined command's message instead of a steer, so
+// the note and the "declined" arrive as one answer. A grown-up's own Claude runs an approved
+// command without a sandbox, so its yes already works.
 
 import {
   MessageId,
@@ -58,6 +62,7 @@ import { keepAddOnsOutOfVersions, type RunGit } from "./questions/SkycotKeepOutO
 import * as SkycotQuestions from "./questions/SkycotQuestions.ts";
 import { makeAddOnStore } from "./SkycotAddOnApprovals.ts";
 import * as SkycotFamily from "./SkycotFamily.ts";
+import * as SkycotFamilyClaude from "./SkycotFamilyClaude.ts";
 import { addOnFilePathOption } from "./SkycotFamilyExtras.ts";
 import { requestFacts } from "./SkycotPolicy.ts";
 
@@ -273,7 +278,12 @@ export const layerRuntimeRequests = Layer.effect(
       if (approval === null || approval.type !== "approval_request") return null;
       if (approval.requestKind !== "command") return null;
       const driver: ProviderDriverKind | undefined = approval.nativeItemRef?.driver;
-      if (driver !== "codex") return null;
+      const sandboxed =
+        driver === "codex" ||
+        (driver === "claudeAgent" &&
+          Option.isSome(family) &&
+          (yield* family.value.isEnabled.pipe(Effect.orElseSucceed(() => false))));
+      if (!sandboxed) return null;
       const ref = approval.nativeItemRef;
       const toolCall =
         ref === null || ref.nativeId === null
@@ -300,15 +310,45 @@ export const layerRuntimeRequests = Layer.effect(
       if (projectRoot === null) return null;
       const names = addOnAskOf(command)?.names ?? [];
       const trusted = isTrustedAddOnAsk(addOnAskOf(command));
+      const steers = driver === "codex";
       return install !== null
-        ? ({ kind: "install", install, folder: projectRoot, names, trusted } as const)
-        : ({ kind: "download", download: download!, folder: projectRoot, names, trusted } as const);
+        ? ({ kind: "install", install, folder: projectRoot, names, trusted, steers } as const)
+        : ({
+            kind: "download",
+            download: download!,
+            folder: projectRoot,
+            names,
+            trusted,
+            steers,
+          } as const);
     });
 
-    const tellAssistant = Effect.fnUntraced(function* (
-      input: Parameters<RuntimeRequestService.RuntimeRequestServiceV2Shape["respond"]>[0],
+    type RespondInput = Parameters<
+      RuntimeRequestService.RuntimeRequestServiceV2Shape["respond"]
+    >[0];
+
+    /** The note, then "decline" so the assistant's own copy never runs. */
+    const skipWithNote = Effect.fnUntraced(function* (
+      input: RespondInput,
       text: string,
+      steers: boolean,
     ) {
+      if (!steers) {
+        return yield* base.respond({
+          ...input,
+          decision: "decline",
+          answers: { ...input.answers, [SkycotFamilyClaude.ASSISTANT_NOTE_ANSWER]: text },
+        });
+      }
+      yield* tellAssistant(input, text).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
+        ),
+      );
+      return yield* base.respond({ ...input, decision: "decline" });
+    });
+
+    const tellAssistant = Effect.fnUntraced(function* (input: RespondInput, text: string) {
       const session = yield* sessions.get(input.providerSessionId);
       if (Option.isNone(session)) return;
       const running = yield* projections.getRunningTurnContext(input.threadId);
@@ -362,12 +402,11 @@ export const layerRuntimeRequests = Layer.effect(
           yield* remember(input.threadId, plan, relief, fetched.ok).pipe(
             Effect.catchCause((cause) => Effect.logWarning("skycot-installs.not-noted", { cause })),
           );
-          yield* tellAssistant(input, noteForDownload(plan.download, fetched, because)).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
-            ),
+          return yield* skipWithNote(
+            input,
+            noteForDownload(plan.download, fetched, because),
+            plan.steers,
           );
-          return yield* base.respond({ ...input, decision: "decline" });
         }
 
         // The add-ons are not something the child made: keep them out of "What changed" and
@@ -409,12 +448,11 @@ export const layerRuntimeRequests = Layer.effect(
         yield* remember(input.threadId, plan, relief, outcome.ok).pipe(
           Effect.catchCause((cause) => Effect.logWarning("skycot-installs.not-noted", { cause })),
         );
-        yield* tellAssistant(input, noteForAssistant(plan.install, outcome, because)).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning("skycot-installs.note-not-delivered", { cause }),
-          ),
+        return yield* skipWithNote(
+          input,
+          noteForAssistant(plan.install, outcome, because),
+          plan.steers,
         );
-        return yield* base.respond({ ...input, decision: "decline" });
       }),
     });
   }),

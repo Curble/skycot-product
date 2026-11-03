@@ -178,13 +178,8 @@ describe("family rules — a web address written as text is not the internet", (
     "grep -rn 'http://' --include=*.html .",
     "rg 'http://'",
     "rg -l 'https?://' src | wc -l",
-    `node -e "const fs=require('fs'); const s=fs.readFileSync('index.html','utf8'); console.log(s.includes('https://'))"`,
-    `node -e "const s=require('fs').readFileSync('index.html','utf8'); console.log(/https?:\\/\\//.test(s) ? 'remote links left' : 'all local')"`,
-    `python3 -c "s=open('index.html').read(); print('https://' in s)"`,
-    `python3 -c "import re; print(re.findall(r'https://[^\\"]+', open('index.html').read()))"`,
     "cat > check.js <<'EOF'\nconst fs = require('fs');\nconst s = fs.readFileSync('index.html', 'utf8');\nif (s.includes('https://')) console.log('remote links left');\nEOF",
     "cat > check.js <<'EOF'\nconst s = require('fs').readFileSync('index.html', 'utf8');\nconsole.log(s.includes('https://') ? 'remote' : 'local');\nEOF\nnode check.js",
-    "python3 - <<'EOF'\nhtml = open('index.html').read()\nprint('https://' in html)\nEOF",
     'echo "see https://example.com"',
     "printf 'Made with https://skycot.com\\n' >> credits.txt",
     'if grep -q "https://" index.html; then echo "remote links left"; else echo "all local"; fi',
@@ -195,6 +190,99 @@ describe("family rules — a web address written as text is not the internet", (
     "sed -i '' 's#https://cdn.example.com/#./vendor/#g' index.html",
     `/bin/zsh -lc "grep -rn \\"https://\\" index.html styles.css"`,
   ])("%s", (command) => {
+    expect(ids(command)).toEqual([]);
+    expect(needsGrownUp(command)).toBe(false);
+  });
+  it.each([
+    `node -e "const fs=require('fs'); const s=fs.readFileSync('index.html','utf8'); console.log(s.includes('https://'))"`,
+    `node -e "const s=require('fs').readFileSync('index.html','utf8'); console.log(/https?:\\/\\//.test(s) ? 'remote links left' : 'all local')"`,
+    `python3 -c "s=open('index.html').read(); print('https://' in s)"`,
+    `python3 -c "import re; print(re.findall(r'https://[^\\"]+', open('index.html').read()))"`,
+    "python3 - <<'EOF'\nhtml = open('index.html').read()\nprint('https://' in html)\nEOF",
+  ])("inline code that reads a file is not the internet, but needs a grown-up: %s", (command) => {
+    expect(ids(command)).toEqual(["opaque-code"]);
+    expect(needsGrownUp(command)).toBe(true);
+  });
+});
+
+// F1 of the pre-open-source review (3 Nov 2026): a path inside inline code is not a word of the
+// command, so the hard rules never saw these deletes, writes and secret reads.
+describe("family rules — inline code that reaches this computer needs a grown-up", () => {
+  it.each([
+    `node -e "require('fs').unlinkSync(require('os').homedir()+'/.skycot/userdata/skycot-family.json')"`,
+    `python3 -c 'import os;os.remove(os.path.expanduser("~/.skycot/userdata/skycot-family.json"))'`,
+    `perl -e 'unlink glob("~/.skycot/userdata/*.json")'`,
+    `node -e "fs.rmSync(os.homedir() + '/.skycot', { recursive: true })"`,
+    `node -e "const { unlinkSync } = fs; unlinkSync('/Users/me/.zshrc')"`,
+    `node -e "const r = require; r('f' + 's')"`,
+    `node -e "vm.runInThisContext('process.mainModule')"`,
+    `node -e "require.main"`,
+    `node -e "console.log(process.env.HOME)"`,
+    `node -e "const p = process; p.kill(1)"`,
+    `node -p "require('node:fs/promises')"`,
+    `node --input-type=module -e "import { rm } from 'node:fs/promises'; await rm('x')"`,
+    `node -e "require('child_process').execSync('ls')"`,
+    `node -e "$(cat payload.js)"`,
+    `bun -e "await Bun.write('/Users/me/.zshrc', 'x')"`,
+    `deno eval "Deno.removeSync('/Users/me/.zshrc')"`,
+    `python3 -c "print(open('/Users/me/.ssh/id_rsa').read())"`,
+    `python3 -c "import shutil; shutil.rmtree('/Users/me/.skycot')"`,
+    `python3 -c "import pathlib; pathlib.Path.home().joinpath('.zshrc').write_text('x')"`,
+    `python3 -c "import glob; print(glob.glob('/Users/me/*'))"`,
+    `python3 -c "import io; io.open('x', 'w')"`,
+    `python -c "import subprocess; subprocess.run(['ls'])"`,
+    `python3 -c "$CODE"`,
+    "python3 - <<'EOF'\nimport os\nos.remove('/Users/me/.zshrc')\nEOF",
+    "node - <<'EOF'\nrequire('fs').unlinkSync('/Users/me/.zshrc')\nEOF",
+    "node <<'EOF'\nfs.unlinkSync('/Users/me/.zshrc')\nEOF",
+    "cat <<'EOF' | python3\nimport os; os.remove('x')\nEOF",
+    `echo "require('fs').unlinkSync('x')" | node`,
+    "cat payload.py | python3 -",
+    "ruby -e 'File.delete(\"/Users/me/.zshrc\")'",
+    "ruby -rfileutils -e 'FileUtils.rm_rf(Dir.home)'",
+    "perl -pi -e 's/a/b/' index.html",
+    `php -r "unlink('/Users/me/.zshrc');"`,
+    `lua -e "os.remove('/Users/me/.zshrc')"`,
+    `Rscript -e "file.remove('x')"`,
+    `pwsh -c "Remove-Item ~/.zshrc"`,
+    `pwsh -Command "Remove-Item ~/.zshrc"`,
+    "ruby <<'EOF'\nFile.delete('x')\nEOF",
+    "echo 'unlink \"x\"' | perl",
+  ])("%s", (command) => {
+    expect(ids(command)).toContain("opaque-code");
+    expect(needsGrownUp(command)).toBe(true);
+  });
+
+  it("names the reason a parent sees on the card", () => {
+    const command = `node -e "require('fs').unlinkSync('x')"`;
+    expect(
+      evaluateFamilyRequest({ kind: "command", command }, { projectRoot: ROOT }).family[0]?.rule
+        .held,
+    ).toBe("SKYCOT can't read exactly what this does");
+  });
+
+  it.each([
+    `node -e "console.log(1+1)"`,
+    `node -p "2 ** 10"`,
+    `node -e "console.log(JSON.stringify({ a: 1 }))"`,
+    `node -e "console.log(require('path').join('a', 'b'))"`,
+    `node -e "console.log(require('node:crypto').randomUUID())"`,
+    `node -e "process.stdout.write('hi\\n')"`,
+    `node -e "console.log(process.version, process.platform)"`,
+    `node -e "console.log('the fs and os words in a message are text')"`,
+    `python3 -c "print(1+1)"`,
+    `python3 -c "import math; print(math.sqrt(2))"`,
+    `python3 -c "import json, sys; print(json.dumps({'a': 1}))"`,
+    `python -c "import random; print(random.randint(1, 6))"`,
+    "cat data.json | node -e \"let s='';process.stdin.on('data',d=>s+=d)\"",
+    "cat data.json | python3 -m json.tool",
+    "node --version",
+    "python3 --version",
+    "ruby --version",
+    "node game.js",
+    "ruby game.rb",
+    "cat > check.js <<'EOF'\nconst s = require('fs').readFileSync('index.html', 'utf8');\nconsole.log(s.length);\nEOF\nnode check.js",
+  ])("a pure one-liner or a script file stays the child's: %s", (command) => {
     expect(ids(command)).toEqual([]);
     expect(needsGrownUp(command)).toBe(false);
   });

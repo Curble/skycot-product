@@ -1152,6 +1152,28 @@ describe("SkycotPolicyReactor", () => {
       }),
     );
 
+    it.effect("never lets inline code that reaches files through Codex's sandbox by itself", () =>
+      Effect.sync(() => {
+        const roots = { projectRoot: "/work/site", projectFolder: "/projects/site" };
+        for (const command of [
+          `node -e "console.log(require('fs').readFileSync('/Users/kid/.ssh/id_rsa', 'utf8'))"`,
+          `node -e "eval('1'); fs.readFileSync('/Users/kid/.ssh/id_rsa')"`,
+          `python3 -c "print(open('/Users/kid/.ssh/id_rsa').read())"`,
+          `perl -e 'print <STDIN>'`,
+        ]) {
+          const request = { kind: "command", command } as const;
+          assert.isFalse(
+            SkycotPolicyReactor.mayAutoApprove(
+              evaluateRequest(request, roots),
+              evaluateFamilyRequest(request, roots),
+              { codexNetworkLocked: true, command },
+            ),
+            command,
+          );
+        }
+      }),
+    );
+
     it.effect("mayAutoApprove is false whenever a Family rule or a hard rule holds", () =>
       Effect.sync(() => {
         const roots = { projectRoot: "/work/site", projectFolder: "/projects/site" };

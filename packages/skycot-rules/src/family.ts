@@ -182,6 +182,11 @@ export const FAMILY_RULES: ReadonlyArray<FamilyRule> = [
 export interface FamilyMatch {
   readonly rule: FamilyRule;
   readonly detail?: string;
+  /**
+   * Inline code that reaches files, the system or other programs. An offline sandbox does not
+   * contain it (Codex's still lets it read the whole Mac), so it always waits for a grown-up.
+   */
+  readonly reachesComputer?: true;
 }
 
 export interface FamilyRequest extends RuleRequest {
@@ -432,10 +437,119 @@ const JS_NETWORK = new RegExp(
 );
 /** Code that hides what it calls (`eval`, building a name, loading a module by variable). */
 const JS_OPAQUE =
-  /\beval\s*\(|\bFunction\s*\(|\batob\s*\(|\bfromCharCode\b|['"\x60]base64['"\x60]|\bimport\s*\(|\brequire\s*\((?!\s*(['"\x60])[^'"\x60]*\1\s*\))|\b(?:globalThis|global|window|self|process)\s*\[|\bprocess\s*\.\s*(?:binding|dlopen)\b|['"\x60](?:node:)?vm['"\x60]|\bmodule\s*\.\s*constructor\b|\bWebAssembly\b/;
+  /\beval\s*\(|\bFunction\s*\(|\batob\s*\(|\bfromCharCode\b|['"\x60]base64['"\x60]|\bimport\s*\(|\brequire\s*\((?!\s*(['"\x60])[^'"\x60]*\1\s*\))|\b(?:globalThis|global|window|self|process)\s*\[|\bprocess\s*\.\s*(?:binding|dlopen)\b|['"\x60](?:node:)?vm['"\x60]|\bmodule\s*\.\s*constructor\b|\bWebAssembly\b|(?<![\w$.])vm\s*\./;
 /** Code that starts another program, which is then judged as a command. */
 const JS_SPAWN =
   /\bchild_process\b|\b(?:execSync|execFileSync|spawnSync|execFile|spawn|fork)\s*\(|(?<!\.)\bexec\s*\(|\b(?:Bun|Deno)\s*\.\s*(?:spawn|spawnSync|run|Command|\$)|(?:^|[^\w$])\$\s*\x60/;
+
+// ── Inline code that touches this computer ────────────────────────────────────────────
+// `node -e "require('fs').unlinkSync(…)"` deletes a file the hard rules never see: the path is
+// inside the script, not a word of the command. In the Family profile Claude runs inside an
+// OS sandbox that keeps every command in the project whatever it says (SkycotFamilyClaude),
+// and Codex in its own; this is the second line. A one-liner may compute and print; one that
+// reaches files, the operating system or other programs is code SKYCOT can't vouch for. These
+// are allowlists, so a module nobody thought of holds too. A script file the project runs
+// (`node build.js`) is not inline code: the sandbox is what keeps that one in the project.
+
+/** Node modules that only compute. `node -e` also has every other built-in as a global. */
+const JS_PURE_MODULES = new Set([
+  "assert",
+  "buffer",
+  "crypto",
+  "events",
+  "path",
+  "punycode",
+  "querystring",
+  "string_decoder",
+  "url",
+  "util",
+]);
+/**
+ * Built-ins that reach files, the system or other programs, usable as bare globals in `-e`.
+ * `vm` is not one: it only runs code, and is already code SKYCOT can't read (`JS_OPAQUE`).
+ */
+const JS_SYSTEM_GLOBALS =
+  /(?<![\w$.])(?:fs|os|child_process|cluster|module|repl|v8|worker_threads|inspector|wasi|tty|sys|trace_events|domain|perf_hooks|stream|zlib|dgram|net|tls|http2?|https|dns|process|require|Deno|Bun)(?![\w$])/g;
+/** What a one-liner may use of `process`: its own input, output, arguments and version. */
+const JS_PURE_PROCESS =
+  /^process\s*\.\s*(?:stdin|stdout|stderr|argv|version|versions|platform|arch|exit|exitCode|hrtime|nextTick|uptime|memoryUsage)\b/;
+/** Python modules that only compute. */
+const PY_PURE_MODULES = new Set([
+  "math",
+  "cmath",
+  "json",
+  "random",
+  "re",
+  "string",
+  "itertools",
+  "functools",
+  "collections",
+  "statistics",
+  "decimal",
+  "fractions",
+  "datetime",
+  "time",
+  "calendar",
+  "textwrap",
+  "unicodedata",
+  "hashlib",
+  "uuid",
+  "operator",
+  "typing",
+  "dataclasses",
+  "enum",
+  "pprint",
+  "sys",
+  "array",
+  "bisect",
+  "heapq",
+  "copy",
+  "numbers",
+  "secrets",
+]);
+/** Python built-ins that open files or hand control to something else. */
+const PY_SYSTEM_BUILTINS = /(?<![\w.])(?:open|file|execfile|breakpoint|help)\s*\(/;
+/** Code put together by the shell (`node -e "$(cat x.js)"`, `python3 -c "$CODE"`). */
+const SHELL_BUILT_CODE = /\$\(|^\s*\$\{?[A-Za-z_]\w*\}?\s*$/;
+
+/** Modules that compute only, or (`vm`) that `JS_OPAQUE` already holds as unreadable code. */
+function isPureJsModule(name: string): boolean {
+  const bare = name.replace(/^node:/, "").split("/")[0]!;
+  return JS_PURE_MODULES.has(bare) || bare === "vm";
+}
+
+/** The code with its '…' and "…" strings emptied, so a word in a message is not code. */
+function withoutPlainStrings(code: string): string {
+  return code.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g, '""');
+}
+
+/** Does this inline JavaScript reach files, the operating system or other programs? */
+function jsTouchesSystem(code: string): boolean {
+  if (SHELL_BUILT_CODE.test(code)) return true;
+  for (const match of code.matchAll(/(?:\bfrom|\bimport)\s*(['"\x60])([^'"\x60]*)\1/g)) {
+    if (!isPureJsModule(match[2]!)) return true;
+  }
+  // Every `require` must be a plain call naming a module that only computes: `const r =
+  // require; r('fs')` and `require.main` hold. The word inside a message holds too, on purpose.
+  for (const match of code.matchAll(/\brequire\b/g)) {
+    const call = /^require\s*\(\s*(['"\x60])([^'"\x60]*)\1\s*\)/.exec(code.slice(match.index));
+    if (call === null || !isPureJsModule(call[2]!)) return true;
+  }
+  const bare = withoutPlainStrings(code);
+  for (const match of bare.matchAll(JS_SYSTEM_GLOBALS)) {
+    if (match[0] === "require") continue;
+    if (match[0] === "process" && JS_PURE_PROCESS.test(bare.slice(match.index))) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Does this inline Python reach files, the operating system or other programs? */
+function pythonTouchesSystem(code: string): boolean {
+  if (SHELL_BUILT_CODE.test(code)) return true;
+  if (pythonImports(code).some((name) => !PY_PURE_MODULES.has(name))) return true;
+  return PY_SYSTEM_BUILTINS.test(withoutPlainStrings(code));
+}
 
 const PY_NETWORK_MODULES = new Set([
   "urllib",
@@ -510,9 +624,34 @@ function stringLiterals(code: string): Array<string> {
 /**
  * Does this JavaScript or Python reach the internet? It does when it calls the network, when
  * it hides what it calls, or when it starts a program that would (`execSync('curl …')`).
- * A web address that it only reads, compares or prints is text.
+ * A web address that it only reads, compares or prints is text. Inline code (`-e`, `-c`, a
+ * heredoc or pipe into the interpreter) that reaches files, the system or other programs is
+ * also code SKYCOT can't vouch for; a script file written and then run is judged like the
+ * project's own scripts, by the internet alone.
  */
-function codeMatches(code: string, language: Language, detail: string, depth: number) {
+function codeMatches(
+  code: string,
+  language: Language,
+  detail: string,
+  depth: number,
+  inline = true,
+): Array<FamilyMatch> {
+  const matches = networkCodeMatches(code, language, detail, depth);
+  const touchesSystem =
+    inline && (language === "js" ? jsTouchesSystem(code) : pythonTouchesSystem(code));
+  return touchesSystem ? [...matches, reachesComputer(detail)] : matches;
+}
+
+function reachesComputer(detail: string): FamilyMatch {
+  return { rule: familyRule("opaque-code"), detail, reachesComputer: true };
+}
+
+function networkCodeMatches(
+  code: string,
+  language: Language,
+  detail: string,
+  depth: number,
+): Array<FamilyMatch> {
   const internet = [{ rule: familyRule("uses-internet"), detail }];
   if (language === "js") {
     if (JS_NETWORK.test(code)) return internet;
@@ -534,6 +673,24 @@ function codeMatches(code: string, language: Language, detail: string, depth: nu
   if (URL_PATTERN.test(code)) return internet;
   const literals = stringLiterals(code);
   return [literals.join(" "), ...literals].flatMap((text) => judge(text, false, depth + 1));
+}
+
+/** `ruby -e`, `perl -pi -e`, `php -r`, `osascript -e`, `pwsh -c`, `Rscript -e`, `lua -e`. */
+function hasOtherInlineCode(tokens: ReadonlyArray<string>): boolean {
+  return tokens
+    .slice(1)
+    .some(
+      (token) =>
+        /^-[A-Za-z]*[eErc]$/.test(token) ||
+        /^-(?:command|encodedcommand|ec)$/i.test(token) ||
+        /^--(?:eval|execute|command)(?:=|$)/.test(token),
+    );
+}
+
+/** An interpreter given no script file, so it runs whatever arrives on its input. */
+function readsCodeFromInput(tokens: ReadonlyArray<string>): boolean {
+  const positional = tokens.slice(1).filter((arg) => !arg.startsWith("-") || arg === "-");
+  return positional.length === 0 || positional[0] === "-";
 }
 
 /** `node -e "…"`, `python3 -c "…"`, `deno eval "…"`: the inline code and its language. */
@@ -821,6 +978,8 @@ interface SegmentContext {
   readonly urlsAreText: boolean;
   /** The step's output is piped into something that runs it as commands. */
   readonly feedsCode: boolean;
+  /** The step reads what the step before it in the pipeline writes (`echo … | node`). */
+  readonly fedByPipe: boolean;
   /** Script files this command runs (see `executedFiles`). */
   readonly executed: ReadonlyMap<string, RunnerKind>;
   readonly depth: number;
@@ -941,6 +1100,17 @@ function segmentMatches(segment: string, ctx: SegmentContext): Array<FamilyMatch
   if (OTHER_INTERPRETERS.has(base) && OTHER_NETWORK_CODE.test(segment)) hit("uses-internet");
 
   const code = inlineCode(base, tokens);
+  const kind = runnerKind(base);
+  if (
+    !ctx.urlsAreText &&
+    kind !== null &&
+    kind !== "shell" &&
+    ((kind === "other" && hasOtherInlineCode(tokens)) ||
+      (code === null && ctx.fedByPipe && readsCodeFromInput(tokens)))
+  ) {
+    // Inline code in another language, or a program read from a pipe: SKYCOT can't vouch for it.
+    matches.push(reachesComputer(segment));
+  }
   if (code !== null && !ctx.urlsAreText) {
     // A web address in the code is judged by what the code does with it.
     matches.push(...codeMatches(code.code, code.language, segment, ctx.depth));
@@ -967,10 +1137,12 @@ function heredocMatches(
     if (CODE_SINKS.has(rawHead)) return "eval";
     return programBaseName(programTokens(text)[0] ?? "").toLowerCase();
   });
-  const byKind = (kind: RunnerKind): Array<FamilyMatch> =>
+  const byKind = (kind: RunnerKind, inline = true): Array<FamilyMatch> =>
     kind === "js" || kind === "python"
-      ? codeMatches(doc.body, kind, detail, depth)
-      : judge(doc.body, false, depth + 1);
+      ? codeMatches(doc.body, kind, detail, depth, inline)
+      : kind === "other" && inline
+        ? [reachesComputer(detail)]
+        : judge(doc.body, false, depth + 1);
   const substitutions = doc.quoted
     ? []
     : commandSubstitutions(doc.body).flatMap((inner) => judge(inner, false, depth + 1));
@@ -985,7 +1157,9 @@ function heredocMatches(
       .flatMap(writtenFiles)
       .map((file) => executed.get(file))
       .filter((kind): kind is RunnerKind => kind !== undefined);
-    if (runs.length > 0) return [...runs.flatMap(byKind), ...substitutions];
+    if (runs.length > 0) {
+      return [...runs.flatMap((kind) => byKind(kind, false)), ...substitutions];
+    }
     return [...judge(doc.body, true, depth + 1), ...substitutions];
   }
   // Something else reads it (`sqlite3 db <<EOF`): judged as commands, web addresses and all.
@@ -1003,7 +1177,15 @@ function judge(text: string, urlsAreText: boolean, depth: number): Array<FamilyM
   for (const pipeline of pipelines) {
     pipeline.forEach((segment, index) => {
       const feedsCode = pipeline.slice(index + 1).some(isCodeSink);
-      matches.push(...segmentMatches(segment, { urlsAreText, feedsCode, executed, depth }));
+      matches.push(
+        ...segmentMatches(segment, {
+          urlsAreText,
+          feedsCode,
+          fedByPipe: index > 0,
+          executed,
+          depth,
+        }),
+      );
     });
   }
   for (const doc of heredocs) matches.push(...heredocMatches(doc, executed, urlsAreText, depth));
@@ -1014,13 +1196,16 @@ function judge(text: string, urlsAreText: boolean, depth: number): Array<FamilyM
   return matches;
 }
 
+/** One match per rule; one that reaches the computer wins over a plain one of the same rule. */
 function unique(matches: ReadonlyArray<FamilyMatch>): Array<FamilyMatch> {
-  const seen = new Set<FamilyRuleId>();
-  return matches.filter((match) => {
-    if (seen.has(match.rule.id)) return false;
-    seen.add(match.rule.id);
-    return true;
-  });
+  const byRule = new Map<FamilyRuleId, FamilyMatch>();
+  for (const match of matches) {
+    const kept = byRule.get(match.rule.id);
+    if (kept === undefined || (match.reachesComputer && !kept.reachesComputer)) {
+      byRule.set(match.rule.id, match);
+    }
+  }
+  return [...byRule.values()];
 }
 
 /** The family rules a shell command trips; empty for ordinary project work. */

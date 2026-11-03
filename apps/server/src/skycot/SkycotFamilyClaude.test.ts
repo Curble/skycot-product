@@ -1,3 +1,8 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFs from "node:fs";
+import * as NodeOs from "node:os";
+import * as NodePath from "node:path";
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -28,6 +33,7 @@ import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
 import * as ClaudeAdapterV2 from "../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
+import { userFacingDispatchErrorMessage } from "../orchestration-v2/UserFacingErrors.ts";
 import * as SkycotFamilyClaude from "./SkycotFamilyClaude.ts";
 import * as SkycotFamilyLockdown from "./SkycotFamilyLockdown.ts";
 
@@ -44,10 +50,97 @@ const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
   cwd: "/workspace",
 });
 
+const places = {
+  home: "/Users/kid",
+  engineHome: "/Users/kid/.skycot",
+  stateDir: "/Users/kid/.skycot/userdata",
+};
+
+const lock = (options: SkycotFamilyClaude.ClaudeLockableOptions) =>
+  SkycotFamilyClaude.lockQueryOptions(lockdown, options, places);
+
 describe("SkycotFamilyClaude.lockQueryOptions", () => {
   it("is the same options while the profile is off", () => {
     const options = { settingSources: ["user", "project", "local"] as const, env: { A: "1" } };
-    assert.strictEqual(SkycotFamilyClaude.lockQueryOptions(null, options), options);
+    assert.strictEqual(SkycotFamilyClaude.lockQueryOptions(null, options, places), options);
+  });
+
+  it("runs every command in a sandbox SKYCOT's callback still judges, with no way out", () => {
+    const locked = lock({ cwd: "/Users/kid/SKYCOT/my-game", env: { PATH: "/usr/bin" } });
+    const sandbox = locked.sandbox!;
+    assert.include(sandbox, {
+      enabled: true,
+      failIfUnavailable: true,
+      allowUnsandboxedCommands: false,
+      autoAllowBashIfSandboxed: false,
+      enableWeakerNestedSandbox: false,
+      enableWeakerNetworkIsolation: false,
+      allowAppleEvents: false,
+    });
+    assert.deepEqual(sandbox.excludedCommands, []);
+    assert.deepInclude(sandbox.network, {
+      allowedDomains: [],
+      strictAllowlist: true,
+      allowLocalBinding: false,
+      allowAllUnixSockets: false,
+    });
+    assert.deepEqual(sandbox.filesystem?.allowWrite, []);
+    for (const secret of [
+      "/Users/kid/.skycot",
+      "/Users/kid/.skycot-family",
+      "/Users/kid/.ssh",
+      "/Users/kid/.aws",
+      "/Users/kid/.gnupg",
+      "/Users/kid/.config/gh",
+      "/Users/kid/Library/Keychains",
+      "/Users/kid/.codex",
+      "/Users/kid/.claude",
+      "/Users/kid/.netrc",
+      "/Users/kid/.skycot/userdata",
+    ]) {
+      assert.include(sandbox.filesystem?.denyRead ?? [], secret);
+    }
+    for (const place of [
+      "/Users/kid/.skycot/userdata",
+      "/Users/kid/.skycot/bin",
+      "/Users/kid/.skycot/origin-secret.txt",
+      "/Users/kid/SKYCOT/my-game/.git/hooks",
+      "/Users/kid/SKYCOT/my-game/.git/config",
+    ]) {
+      assert.include(sandbox.filesystem?.denyWrite ?? [], place);
+    }
+    // The project is not inside any place above, so nothing is read-allowed again.
+    assert.deepEqual(sandbox.filesystem?.allowRead, []);
+  });
+
+  it("reads a question's folder inside SKYCOT's home again, and nothing beside it", () => {
+    const cwd = "/Users/kid/.skycot/scratch/what-is-a-star";
+    const locked = lock({ cwd });
+    assert.include(locked.sandbox?.filesystem?.denyRead ?? [], "/Users/kid/.skycot");
+    assert.deepEqual(locked.sandbox?.filesystem?.allowRead, [cwd]);
+  });
+
+  it("keeps the grown-up's keys in the environment away from sandboxed commands", () => {
+    const locked = lock({
+      env: { PATH: "/usr/bin", GITHUB_TOKEN: "x", OPENAI_API_KEY: "y", HOME: "/Users/kid" },
+    });
+    assert.deepEqual(locked.sandbox?.credentials?.envVars, [
+      { name: "GITHUB_TOKEN", mode: "deny" },
+      { name: "OPENAI_API_KEY", mode: "deny" },
+    ]);
+  });
+
+  it("asks before every step (or plans) whatever the grown-up's launch arguments say", () => {
+    const locked = lock({
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      extraArgs: { "mcp-config": "/Users/me/servers.json", "add-dir": "/Users/me" },
+    });
+    assert.equal(locked.permissionMode, "default");
+    assert.isFalse(locked.allowDangerouslySkipPermissions);
+    assert.deepEqual(locked.extraArgs, { "no-chrome": null });
+    const planning = lock({ permissionMode: "plan" });
+    assert.equal(planning.permissionMode, "plan");
   });
 
   it("reads no settings, no MCP server but SKYCOT's, no plugin, skill, hook or Chrome", () => {
@@ -56,7 +149,7 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
       env: { PATH: "/usr/bin" },
       extraArgs: { "thinking-display": "summarized" },
     };
-    const locked = SkycotFamilyClaude.lockQueryOptions(lockdown, options);
+    const locked = SkycotFamilyClaude.lockQueryOptions(lockdown, options, places);
     assert.deepEqual(locked.settingSources, []);
     assert.isTrue(locked.strictMcpConfig);
     assert.deepEqual(locked.plugins, []);
@@ -68,7 +161,7 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
 
   it("does not trust a settings file path", () => {
     const options: SkycotFamilyClaude.ClaudeLockableOptions = { settings: "/tmp/s.json" };
-    const locked = SkycotFamilyClaude.lockQueryOptions(lockdown, options);
+    const locked = SkycotFamilyClaude.lockQueryOptions(lockdown, options, places);
     assert.deepEqual(locked.settings, { disableAllHooks: true });
   });
 });
@@ -80,6 +173,7 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
       opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOptions>,
       runtime: FamilyRuntime,
     ) => Effect.Effect<A, E, Scope.Scope>,
+    sandboxAvailable = true,
   ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -89,6 +183,8 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         settings: DEFAULT_CLAUDE_SETTINGS,
         environment: {},
         attachmentsDir: yield* fileSystem.makeTempDirectoryScoped({ prefix: "skycot-claude-" }),
+        engineHome: "/Users/kid/.skycot",
+        familySandboxAvailable: () => sandboxAvailable,
         fileSystem,
         path: yield* Path.Path,
         crypto: yield* Crypto.Crypto,
@@ -195,8 +291,76 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         assert.deepEqual(options.skills, []);
         assert.strictEqual(options.env?.ENABLE_CLAUDEAI_MCP_SERVERS, "false");
         assert.property(options.extraArgs ?? {}, "no-chrome");
+        assert.include(options.sandbox, {
+          enabled: true,
+          failIfUnavailable: true,
+          allowUnsandboxedCommands: false,
+          autoAllowBashIfSandboxed: false,
+        });
+        assert.include(options.sandbox?.filesystem?.denyRead ?? [], "/Users/kid/.skycot");
+        assert.equal(options.permissionMode, "default");
       }
     }),
+  );
+
+  it.effect("does not start a child's Claude when its sandbox can't start", () =>
+    Effect.gen(function* () {
+      const failed = yield* runTurn(true, (opened) => Effect.succeed(opened), false).pipe(
+        Effect.flip,
+      );
+      assert.equal(
+        userFacingDispatchErrorMessage(failed),
+        SkycotFamilyClaude.FAMILY_CLAUDE_SANDBOX_REFUSAL,
+      );
+    }),
+  );
+
+  it.effect("refuses Claude's own file tools outside the project, before any card", () =>
+    runTurn(true, (opened) =>
+      Effect.gen(function* () {
+        for (const [toolName, toolInput] of [
+          ["Read", { file_path: "/Users/kid/.skycot/userdata/skycot-family.json" }],
+          ["Read", { file_path: "/workspace/../Users/kid/.ssh/id_rsa" }],
+          ["Write", { file_path: "/Users/kid/.zshrc", content: "x" }],
+          ["Edit", { file_path: "/workspace/.git/hooks/pre-commit" }],
+          ["Glob", { pattern: "/Users/kid/**/*.json" }],
+          ["Grep", { pattern: "token", path: "/Users/kid" }],
+        ] as const) {
+          const answer = yield* Effect.promise(() =>
+            opened[0]!.canUseTool!(toolName, toolInput, {
+              signal: new AbortController().signal,
+              toolUseID: `outside-${toolName}`,
+              requestId: `request-outside-${toolName}`,
+            }),
+          );
+          assert.deepInclude(answer, {
+            behavior: "deny",
+            message: SkycotFamilyClaude.FAMILY_OUTSIDE_PROJECT_MESSAGE,
+          });
+        }
+      }),
+    ),
+  );
+
+  it.effect("a note SKYCOT leaves with a decline is what the assistant reads", () =>
+    runTurn(true, (opened, runtime) =>
+      Effect.gen(function* () {
+        const one = yield* ask(opened, runtime, "tool-installed");
+        if (one.first.type !== "card") return assert.fail("expected a card");
+        const event = one.first.event;
+        if (Option.isNone(event) || event.value.type !== "runtime_request.updated") return;
+        const note = "SKYCOT note: it was approved, so SKYCOT installed lodash for you.";
+        yield* runtime.respondToRuntimeRequest({
+          requestId: event.value.runtimeRequest.id,
+          decision: "decline",
+          answers: { [SkycotFamilyClaude.ASSISTANT_NOTE_ANSWER]: note },
+        });
+        assert.deepInclude(yield* Fiber.join(one.answer), { behavior: "deny", message: note });
+        // Not remembered as a family "no": the same step raises a card again.
+        const two = yield* ask(opened, runtime, "tool-installed-again");
+        assert.equal(two.first.type, "card");
+      }),
+    ),
   );
 
   const install = { command: "npm install lodash" };
@@ -283,6 +447,7 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         assert.isUndefined(options.strictMcpConfig);
         assert.isUndefined(options.plugins);
         assert.notProperty(options.extraArgs ?? {}, "no-chrome");
+        assert.isUndefined(options.sandbox);
       }
     }),
   );
@@ -340,5 +505,89 @@ describe("SkycotFamilyClaude declined steps", () => {
       declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE,
     });
     assert.equal(allowed.behavior, "allow");
+  });
+});
+
+describe("SkycotFamilyClaude.fileToolRefusal", () => {
+  const withProject = (
+    run: (dirs: { project: string; outside: string; attachments: string }) => void,
+  ) => {
+    const root = NodeFs.realpathSync(
+      NodeFs.mkdtempSync(NodePath.join(NodeOs.tmpdir(), "skycot-tools-")),
+    );
+    try {
+      const project = NodePath.join(root, "my-game");
+      const outside = NodePath.join(root, "secrets");
+      const attachments = NodePath.join(root, "attachments");
+      for (const dir of [project, outside, attachments]) NodeFs.mkdirSync(dir);
+      NodeFs.writeFileSync(NodePath.join(outside, "key"), "x");
+      NodeFs.symlinkSync(outside, NodePath.join(project, "link"));
+      run({ project, outside, attachments });
+    } finally {
+      NodeFs.rmSync(root, { recursive: true, force: true });
+    }
+  };
+  const refusal = (
+    dirs: { project: string; attachments: string },
+    toolName: string,
+    toolInput: Record<string, unknown>,
+  ) =>
+    SkycotFamilyClaude.fileToolRefusal({
+      toolName,
+      toolInput,
+      cwd: dirs.project,
+      home: "/Users/kid",
+      readRoots: [dirs.attachments],
+    });
+
+  it("lets the project's own files through to the rules", () =>
+    withProject((dirs) => {
+      assert.isNull(
+        refusal(dirs, "Read", { file_path: NodePath.join(dirs.project, "index.html") }),
+      );
+      assert.isNull(refusal(dirs, "Write", { file_path: "sprites/new.png", content: "" }));
+      assert.isNull(refusal(dirs, "Edit", { file_path: NodePath.join(dirs.project, "a/b/c.js") }));
+      assert.isNull(refusal(dirs, "Glob", { pattern: "**/*.js" }));
+      assert.isNull(refusal(dirs, "Grep", { pattern: "x" }));
+      assert.isNull(refusal(dirs, "Read", { file_path: NodePath.join(dirs.attachments, "a.png") }));
+      assert.isNull(refusal(dirs, "Bash", { command: "rm -rf /" }));
+    }));
+
+  it("refuses a symlink, `..`, `~` or an absolute path that leaves the project", () =>
+    withProject((dirs) => {
+      for (const [toolName, toolInput] of [
+        ["Read", { file_path: NodePath.join(dirs.project, "link", "key") }],
+        ["Write", { file_path: NodePath.join(dirs.project, "link", "new"), content: "" }],
+        ["Read", { file_path: "../secrets/key" }],
+        ["Read", { file_path: "~/.ssh/id_rsa" }],
+        ["Read", { file_path: NodePath.join(dirs.outside, "key") }],
+        ["Glob", { pattern: "**/../../secrets/*" }],
+        ["Glob", { pattern: "*", path: dirs.outside }],
+        ["LS", { path: dirs.outside }],
+        ["NotebookEdit", { notebook_path: NodePath.join(dirs.outside, "n.ipynb") }],
+        ["Write", { file_path: NodePath.join(dirs.attachments, "a.png"), content: "" }],
+        ["Write", { file_path: NodePath.join(dirs.project, ".git", "hooks", "pre-commit") }],
+        ["SomeNewTool", { path: dirs.outside }],
+      ] as const) {
+        assert.equal(
+          refusal(dirs, toolName, toolInput),
+          SkycotFamilyClaude.FAMILY_OUTSIDE_PROJECT_MESSAGE,
+          `${toolName} ${JSON.stringify(toolInput)}`,
+        );
+      }
+    }));
+});
+
+describe("SkycotFamilyClaude.familySandboxAvailable", () => {
+  it("needs sandbox-exec on macOS and bubblewrap with socat on Linux, and nothing else runs", () => {
+    assert.isTrue(
+      SkycotFamilyClaude.familySandboxAvailable("darwin", (p) => p === "/usr/bin/sandbox-exec"),
+    );
+    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("darwin", () => false));
+    const linux = (has: ReadonlyArray<string>) =>
+      SkycotFamilyClaude.familySandboxAvailable("linux", (p) => has.includes(p), "/usr/bin");
+    assert.isTrue(linux(["/usr/bin/bwrap", "/usr/bin/socat"]));
+    assert.isFalse(linux(["/usr/bin/bwrap"]));
+    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("win32", () => true));
   });
 });
