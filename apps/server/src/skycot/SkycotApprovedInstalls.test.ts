@@ -280,6 +280,36 @@ describe("SkycotApprovedInstalls outside the sandbox", () => {
       }
     }));
 
+  it("refuses a project that already lists an add-on from outside the registry", () => {
+    for (const spec of [
+      "git+https://example.com/x.git",
+      "github:someone/thing",
+      "someone/thing",
+      "https://example.com/x.tgz",
+      "file:../family",
+    ]) {
+      withProject(({ project }) => {
+        NodeFS.writeFileSync(
+          NodePath.join(project, "package.json"),
+          JSON.stringify({ dependencies: { thing: spec } }),
+        );
+        assert.match(installRefusal(project, "npm")!, /outside the add-on registry/, spec);
+      });
+    }
+    withProject(({ project }) => {
+      NodeFS.writeFileSync(
+        NodePath.join(project, "package.json"),
+        JSON.stringify({ dependencies: { ms: "^2.1.3", alias: "npm:ms@2" } }),
+      );
+      assert.isNull(installRefusal(project, "npm"));
+      NodeFS.writeFileSync(
+        NodePath.join(project, "package-lock.json"),
+        '{"packages":{"node_modules/x":{"resolved":"git+ssh://git@example.com/x.git"}}}',
+      );
+      assert.match(installRefusal(project, "npm")!, /in package-lock\.json/);
+    });
+  });
+
   it("refuses to install through a link that leads outside the project", () => {
     withProject(({ project, outside }) => {
       NodeFS.symlinkSync(outside, NodePath.join(project, "node_modules"));

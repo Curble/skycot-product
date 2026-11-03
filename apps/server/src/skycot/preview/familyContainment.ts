@@ -76,6 +76,9 @@ export function containedStart(input: {
     TMPDIR: input.tmpDir,
     PWD: input.folder,
     BROWSER: "none",
+    // macOS's sandbox lets a server that listens on every address through its "this Mac only"
+    // rule, so ask the common dev servers for this Mac's own address too.
+    HOST: "127.0.0.1",
     ...(input.port > 0 ? { PORT: String(input.port) } : {}),
   });
   const assignments = Object.entries(env)

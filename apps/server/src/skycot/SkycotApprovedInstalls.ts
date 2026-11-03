@@ -158,6 +158,8 @@ export function installArguments(install: ApprovedInstall, folder: string): Read
 export const INSTALL_SHELL_SETUP =
   "unset -m 'npm_config_*' 'NPM_CONFIG_*' 'pnpm_config_*' 'PNPM_CONFIG_*' 'BUN_CONFIG_*' 'COREPACK_*' NODE_OPTIONS; " +
   "export npm_config_userconfig=/dev/null npm_config_globalconfig=/var/empty/skycot-npmrc XDG_CONFIG_HOME=/dev/null " +
+  // The flag alone doesn't reach the nested install npm runs to prepare a git dependency.
+  "npm_config_ignore_scripts=true " +
   "COREPACK_ENABLE_PROJECT_SPEC=0 COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=0 COREPACK_ENABLE_AUTO_PIN=0 COREPACK_ENABLE_STRICT=0; ";
 
 /** The whole command line SKYCOT's login shell runs for an approved install. */
@@ -193,6 +195,53 @@ function lstatOrNull(path: string): NodeFS.Stats | null {
   }
 }
 
+/** A dependency spec that isn't a registry version: git, a web address, a folder or a tarball. */
+const FETCHED_SPEC =
+  /^(?:git\+|git:|github:|gitlab:|bitbucket:|gist:|ssh:|https?:|file:|link:|portal:|workspace:)|^[\w.-]+\/[\w.-]+(?:#.*)?$|\.(?:tgz|tar\.gz|tar)$/i;
+/** The same kinds of source as they appear in a lockfile. */
+const FETCHED_IN_LOCKFILE = /git\+|git:\/\/|github:|codeload\.github\.com|\bfile:|\blink:/;
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+  "overrides",
+  "resolutions",
+  "pnpm",
+];
+
+/** Where a dependency the project already lists would be fetched from, when not the registry. */
+function fetchedDependency(folder: string): string | null {
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = JSON.parse(NodeFS.readFileSync(NodePath.join(folder, "package.json"), "utf8"));
+  } catch {
+    manifest = {};
+  }
+  const specs: Array<string> = [];
+  const collect = (value: unknown) => {
+    if (typeof value === "string") specs.push(value);
+    else if (value !== null && typeof value === "object") Object.values(value).forEach(collect);
+  };
+  for (const field of DEPENDENCY_FIELDS) collect(manifest[field]);
+  if (specs.some((spec) => FETCHED_SPEC.test(spec.trim()))) return "outside the add-on registry";
+  for (const lockfile of [
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "pnpm-lock.yaml",
+    "bun.lock",
+  ]) {
+    let text: string;
+    try {
+      text = NodeFS.readFileSync(NodePath.join(folder, lockfile), "utf8");
+    } catch {
+      continue;
+    }
+    if (FETCHED_IN_LOCKFILE.test(text)) return `outside the add-on registry (in ${lockfile})`;
+  }
+  return null;
+}
+
 /**
  * Why SKYCOT won't run this install in `folder` (a sentence for the assistant's note), or null.
  * Reads only; called just before the install, after the grown-up's yes.
@@ -213,6 +262,11 @@ export function installRefusal(folder: string, manager: ApprovedInstall["manager
     if (lstatOrNull(NodePath.join(real, name))?.isSymbolicLink()) {
       return `${name} in this project is a link to somewhere else, so SKYCOT won't install into it.`;
     }
+  }
+  // Read only after the link checks above, so this never reads through a link.
+  const fetched = fetchedDependency(real);
+  if (fetched !== null) {
+    return `this project lists an add-on that comes from ${fetched}, and installing it would run its own setup. Ask a grown-up.`;
   }
   const modules = NodePath.join(real, "node_modules");
   const entries = (dir: string) => {

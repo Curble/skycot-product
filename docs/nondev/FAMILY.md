@@ -106,7 +106,7 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   command that installs something or uses the internet (`npx serve`) shows **Ask a grown-up** and
   the engine refuses it without the parent code. On a Mac the site then runs inside the same
   safe area as a child's Claude commands (below): it can read only the project, change only the
-  project, serve the page on this Mac and nothing else, with no internet and none of the
+  project, serve the page on this Mac (it asks the page's server to use this Mac's own address; a server that ignores that can still be reached from the home network, as before), with no internet and none of the
   grown-up's keys. Where SKYCOT can't start that safe area (not a Mac), every start of a
   project's own script shows **Ask a grown-up**. The engine only ever names this Mac's own
   addresses for the preview. In the Mac app, a link inside the page that goes to the internet is
@@ -771,7 +771,7 @@ Honestly, so a parent can decide how nearby to stay:
 - **A grown-up's yes to an install or a download** is carried out by SKYCOT itself, outside the
   sandbox, for the one add-on or file named; the assistant is told it is done. Nothing the
   assistant wrote in the project changes what that install does: it runs with SKYCOT's own empty
-  package-manager settings, the add-ons' and the project's install scripts never run, pnpm's
+  package-manager settings, the add-ons' and the project's install scripts never run, pnpm's An install is refused, with the reason, when the project already lists an add-on that comes from git, a web address or a folder instead of the add-on registry, because installing those runs their own setup.
   `.pnpmfile.cjs` and bun's `bunfig.toml` are skipped, and a project with its own `.npmrc` or
   `pnpm-workspace.yaml` (which can't be skipped) is not installed into: the assistant is told why.
   A `node_modules` that is a shortcut to somewhere else is refused, and a downloaded file is
