@@ -36,7 +36,7 @@
 // (SkycotApprovedInstalls), exactly as for Codex.
 
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- a synchronous realpath inside the SDK's permission callback.
-import * as NodeFs from "node:fs";
+import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- path arithmetic for sandbox settings.
 import * as NodePath from "node:path";
 
@@ -236,9 +236,9 @@ export class FamilyClaudeSandboxUnavailable extends Schema.TaggedError<FamilyCla
  * refusal; `failIfUnavailable` is the backstop inside Claude Code.
  */
 export function familySandboxAvailable(
-  platform: NodeJS.Platform = process.platform,
-  exists: (path: string) => boolean = NodeFs.existsSync,
-  pathEnv: string | undefined = process.env.PATH,
+  platform: NodeJS.Platform,
+  pathEnv: string | undefined,
+  exists: (path: string) => boolean = NodeFS.existsSync,
 ): boolean {
   if (platform === "darwin") return exists("/usr/bin/sandbox-exec");
   if (platform !== "linux") return false;
@@ -262,7 +262,7 @@ function realPath(path: string): string {
   const rest: Array<string> = [];
   for (let guard = 0; guard < 256; guard += 1) {
     try {
-      return NodePath.join(NodeFs.realpathSync.native(current), ...rest.reverse());
+      return NodePath.join(NodeFS.realpathSync.native(current), ...rest.toReversed());
     } catch {
       const parent = NodePath.dirname(current);
       if (parent === current) return path;

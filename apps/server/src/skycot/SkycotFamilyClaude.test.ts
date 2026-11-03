@@ -1,6 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off
-import * as NodeFs from "node:fs";
-import * as NodeOs from "node:os";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -512,19 +512,19 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
   const withProject = (
     run: (dirs: { project: string; outside: string; attachments: string }) => void,
   ) => {
-    const root = NodeFs.realpathSync(
-      NodeFs.mkdtempSync(NodePath.join(NodeOs.tmpdir(), "skycot-tools-")),
+    const root = NodeFS.realpathSync(
+      NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "skycot-tools-")),
     );
     try {
       const project = NodePath.join(root, "my-game");
       const outside = NodePath.join(root, "secrets");
       const attachments = NodePath.join(root, "attachments");
-      for (const dir of [project, outside, attachments]) NodeFs.mkdirSync(dir);
-      NodeFs.writeFileSync(NodePath.join(outside, "key"), "x");
-      NodeFs.symlinkSync(outside, NodePath.join(project, "link"));
+      for (const dir of [project, outside, attachments]) NodeFS.mkdirSync(dir);
+      NodeFS.writeFileSync(NodePath.join(outside, "key"), "x");
+      NodeFS.symlinkSync(outside, NodePath.join(project, "link"));
       run({ project, outside, attachments });
     } finally {
-      NodeFs.rmSync(root, { recursive: true, force: true });
+      NodeFS.rmSync(root, { recursive: true, force: true });
     }
   };
   const refusal = (
@@ -581,13 +581,17 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
 describe("SkycotFamilyClaude.familySandboxAvailable", () => {
   it("needs sandbox-exec on macOS and bubblewrap with socat on Linux, and nothing else runs", () => {
     assert.isTrue(
-      SkycotFamilyClaude.familySandboxAvailable("darwin", (p) => p === "/usr/bin/sandbox-exec"),
+      SkycotFamilyClaude.familySandboxAvailable(
+        "darwin",
+        "/usr/bin",
+        (p) => p === "/usr/bin/sandbox-exec",
+      ),
     );
-    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("darwin", () => false));
+    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("darwin", "/usr/bin", () => false));
     const linux = (has: ReadonlyArray<string>) =>
-      SkycotFamilyClaude.familySandboxAvailable("linux", (p) => has.includes(p), "/usr/bin");
+      SkycotFamilyClaude.familySandboxAvailable("linux", "/usr/bin", (p) => has.includes(p));
     assert.isTrue(linux(["/usr/bin/bwrap", "/usr/bin/socat"]));
     assert.isFalse(linux(["/usr/bin/bwrap"]));
-    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("win32", () => true));
+    assert.isFalse(SkycotFamilyClaude.familySandboxAvailable("win32", "/usr/bin", () => true));
   });
 });

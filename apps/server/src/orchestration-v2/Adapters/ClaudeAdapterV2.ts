@@ -3836,6 +3836,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   ).pipe(Effect.provideService(Path.Path, path));
   const hostEnvironment = yield* HostProcess.Environment;
   const hostHome = yield* HostProcess.HomeDirectory; // nondev-seam: skycot-family-lockdown-claude
+  const hostPlatform = yield* HostProcess.Platform; // nondev-seam: skycot-family-lockdown-claude
   const customHome =
     adapterOptions.settings.homePath.trim().length > 0 ||
     adapterOptions.environment.CLAUDE_CONFIG_DIR !== hostEnvironment.CLAUDE_CONFIG_DIR;
@@ -9233,10 +9234,17 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           // nondev-seam: skycot-family-lockdown-claude
           if (
             skycotLockdown !== null &&
-            !(adapterOptions.familySandboxAvailable ?? SkycotFamilyClaude.familySandboxAvailable)()
+            !(
+              adapterOptions.familySandboxAvailable ??
+              (() =>
+                SkycotFamilyClaude.familySandboxAvailable(
+                  hostPlatform,
+                  adapterOptions.environment.PATH ?? hostEnvironment.PATH,
+                ))
+            )()
           ) {
             return yield* new SkycotFamilyClaude.FamilyClaudeSandboxUnavailable({
-              platform: process.platform,
+              platform: hostPlatform,
             });
           }
           const querySession = yield* queryRunner
