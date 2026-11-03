@@ -442,7 +442,7 @@ FOOTER = '''<footer><div class="wrap">
       <li><a href="/#how">How it works</a></li>
       <li><a href="/#safety">Safety</a></li>
       <li><a href="/#looks">Looks</a></li>
-      <li><a href="/#grown-ups">For business</a></li>
+      <li><a href="/business">For business</a></li>
       <li><a href="/#faq">FAQ</a></li>
       <li><a href="/privacy">Privacy</a></li>
       <li><a href="/terms">Terms</a></li>
@@ -998,6 +998,14 @@ NOTFOUND = f'''{nav()}
 </div></main>
 '''
 write("404.html", head("Page not found · SKYCOT", "This page is not on skycot.com.", "/404", robots="noindex") + NOTFOUND + footer())
+
+# ---------- SKYCOT Business (/business) ----------
+# The page and its copy live in business_page.py; its app screenshots are in assets/biz-*.jpg.
+from business_page import business_page
+write("business.html", business_page(head, footer))
+os.makedirs(OUT + "assets", exist_ok=True)
+for _shot in ("biz-interview.jpg", "biz-today.jpg", "biz-help.jpg"):
+    shutil.copyfile(HERE + "assets/" + _shot, OUT + "assets/" + _shot)
 
 # ---------- brand files: favicons, manifest, share image, lockups, mascot poses, Sam and Mo ----------
 os.makedirs(OUT + "assets/brand", exist_ok=True)
