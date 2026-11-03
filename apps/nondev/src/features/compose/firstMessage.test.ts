@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { firstMessageLabels, titleSeedFrom } from "./firstMessage";
 
-const SHOWPIECE = "my name is Ava Smith and I go to St Kilda Primary";
+const SHOWPIECE = "my name is Ava Smith and I go to Sunnyvale Primary";
 
 describe("firstMessageLabels", () => {
   it("never puts a full name or a school in the title or the branch in the Family profile", () => {

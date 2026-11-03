@@ -32,7 +32,7 @@ const message = (
   creationSource: "web",
 });
 
-const SHOWPIECE = "my name is Ava Smith and I go to St Kilda Primary";
+const SHOWPIECE = "my name is Ava Smith and I go to Sunnyvale Primary";
 
 describe("the personal-details shield on Family turns", () => {
   it("tells Sam to make the first page in an empty project", () => {
@@ -44,7 +44,7 @@ describe("the personal-details shield on Family turns", () => {
     Effect.gen(function* () {
       const wrapped = yield* Instructions.withFamilyRules(familyOn(true), message(SHOWPIECE));
       assert.notInclude(wrapped.text, "Ava Smith");
-      assert.notInclude(wrapped.text, "St Kilda");
+      assert.notInclude(wrapped.text, "Sunnyvale");
       assert.include(
         wrapped.text,
         `my name is ${hiddenPlaceholder("full-name")} and I go to ${hiddenPlaceholder("school")}`,

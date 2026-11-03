@@ -10,7 +10,7 @@ import {
   unknownPictureKeysForChild,
 } from "./shield";
 
-const SHOWPIECE = "my name is Ava Smith and I go to St Kilda Primary";
+const SHOWPIECE = "my name is Ava Smith and I go to Sunnyvale Primary";
 
 describe("shieldFinding", () => {
   it("catches the showpiece sentence with a one-tap rewrite", () => {
@@ -59,7 +59,7 @@ describe("segments for highlighting", () => {
       ["my name is ", false],
       ["Ava Smith", true],
       [" and I go to ", false],
-      ["St Kilda Primary", true],
+      ["Sunnyvale Primary", true],
     ]);
     expect(
       rewriteSegments(SHOWPIECE, finding.details)
@@ -71,7 +71,7 @@ describe("segments for highlighting", () => {
 
 describe("shieldProblem", () => {
   it("gives a calm line for a short reply", () => {
-    expect(shieldProblem("my phone is 0412 345 678")).toBe(
+    expect(shieldProblem("my phone is 0491 570 156")).toBe(
       "That looks like a phone number. Try a nickname instead — your full name, school and address stay private.",
     );
     expect(shieldProblem("the blue one please")).toBeNull();

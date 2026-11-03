@@ -19,7 +19,7 @@ import {
 } from "./decide";
 import { notifySettingsFor } from "./prefs";
 
-const PRIVATE_TITLE = "Ava Smith's birthday page for St Kilda Primary";
+const PRIVATE_TITLE = "Ava Smith's birthday page for Sunnyvale Primary";
 const PRIVATE_TEXT = "my name is Ava Smith, password hunter2, I live at 12 Ferny Road";
 
 function shell(fields: {
@@ -246,7 +246,7 @@ describe("what a notification says", () => {
     for (const event of events) {
       const text = notificationText(event, { builder: "Sam", project: "Space game" });
       const shown = `${text.title} ${text.body}`;
-      for (const secret of ["Ava Smith", "St Kilda", "hunter2", "Ferny Road", "birthday"]) {
+      for (const secret of ["Ava Smith", "Sunnyvale", "hunter2", "Ferny Road", "birthday"]) {
         expect(shown).not.toContain(secret);
       }
     }

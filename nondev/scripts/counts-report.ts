@@ -3,7 +3,16 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-const ACCOUNT = "[CLOUDFLARE-ACCOUNT-ID]";
+// The account id stays out of the repository: CLOUDFLARE_ACCOUNT_ID, or one line in
+// ~/.config/skycot/cloudflare-account-id.
+const ACCOUNT = (
+  process.env.CLOUDFLARE_ACCOUNT_ID ??
+  (await readFile(join(homedir(), ".config/skycot/cloudflare-account-id"), "utf8").catch(() => ""))
+).trim();
+if (!ACCOUNT) {
+  console.error("Set CLOUDFLARE_ACCOUNT_ID to the SKYCOT Cloudflare account id.");
+  process.exit(1);
+}
 const ZONE = "skycot.com";
 const GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
 const ANALYTICS_URL = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/analytics_engine/sql`;

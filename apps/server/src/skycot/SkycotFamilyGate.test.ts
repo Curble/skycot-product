@@ -1011,7 +1011,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
     withGate([], ({ gate, family, limits }) =>
       Effect.gen(function* () {
         yield* family.enable({ code: CODE, childName: "Ava" });
-        const typed = "my name is Ava Smith and I go to St Kilda Primary";
+        const typed = "my name is Ava Smith and I go to Sunnyvale Primary";
         const send = (messageId: string) => ({
           sessionId: SESSION,
           method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
@@ -1039,7 +1039,7 @@ it.layer(NodeServices.layer)("SkycotFamilyGate.check", (it) => {
         assert.notInclude(yield* providerSees("message:allowed"), "Ava Smith");
         // The next message, with nobody's yes, is shielded as always.
         yield* gate.check(send("message:next"));
-        assert.notInclude(yield* providerSees("message:next"), "St Kilda");
+        assert.notInclude(yield* providerSees("message:next"), "Sunnyvale");
         // The recap hears what happened by kind of detail only.
         const events = (yield* limits.snapshot)?.activity.events ?? [];
         assert.deepEqual(

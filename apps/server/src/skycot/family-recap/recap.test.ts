@@ -121,7 +121,7 @@ const threads: ReadonlyArray<RecapThreadInput> = [
       {
         id: "m2",
         createdBy: "user",
-        text: "my name is Ava Smith and I go to St Kilda Primary",
+        text: "my name is Ava Smith and I go to Sunnyvale Primary",
         createdAt: at("2026-10-22T15:10:00+11:00"),
       },
       { id: "m3", createdBy: "agent", text: "wake up", createdAt: at("2026-10-22T15:20:00+11:00") },
@@ -206,7 +206,7 @@ describe("the household's days", () => {
 
 describe("askFor", () => {
   it("never keeps words the shield would catch, only their kinds", () => {
-    expect(askFor("my name is Ava Smith and I go to St Kilda Primary")).toEqual({
+    expect(askFor("my name is Ava Smith and I go to Sunnyvale Primary")).toEqual({
       text: null,
       hidden: ["full-name", "school"],
     });

@@ -14,13 +14,13 @@ const categories = (text: string) => personalCategories(findPersonalDetails(text
 const caught = (text: string) => findPersonalDetails(text).map((detail) => detail.text);
 
 describe("personal details — the showpiece sentence", () => {
-  const sentence = "my name is Ava Smith and I go to St Kilda Primary";
+  const sentence = "my name is Ava Smith and I go to Sunnyvale Primary";
 
   it("finds the full name and the school, nothing else", () => {
     expect(findPersonalDetails(sentence).map(({ category, text }) => ({ category, text }))).toEqual(
       [
         { category: "full-name", text: "Ava Smith" },
-        { category: "school", text: "St Kilda Primary" },
+        { category: "school", text: "Sunnyvale Primary" },
       ],
     );
   });
@@ -56,7 +56,7 @@ describe("personal details — true positives", () => {
     ["say hi to Mrs Brown", "full-name", "Mrs Brown"],
     ["this is Zara McDonald", "full-name", "Zara McDonald"],
     // Schools.
-    ["I go to St Kilda Primary", "school", "St Kilda Primary"],
+    ["I go to Sunnyvale Primary", "school", "Sunnyvale Primary"],
     ["i go to st kilda primary", "school", "st kilda primary"],
     ["a poster for Sunnyvale High School's fete", "school", "Sunnyvale High School"],
     ["my school is called brighton grammar", "school", "brighton grammar"],
@@ -67,7 +67,7 @@ describe("personal details — true positives", () => {
     ["come to 4/27 Acland St.", "address", "4/27 Acland St"],
     ["our house is 7 wattle crescent", "address", "7 wattle crescent"],
     ["I live on Fitzroy Street", "address", "Fitzroy Street"],
-    ["St Kilda VIC 3182", "address", "St Kilda VIC 3182"],
+    ["Sunnyvale VIC 3999", "address", "Sunnyvale VIC 3999"],
     ["we are in Richmond, Vic 3121", "address", "Richmond, Vic 3121"],
     ["my postcode is 3182", "address", "3182"],
     ["I live in St Kilda", "address", "St Kilda"],
@@ -76,12 +76,12 @@ describe("personal details — true positives", () => {
     ["London SW1A 1AA", "address", "SW1A 1AA"],
     ["my address is 5 the avenue, hobart", "address", "5 the avenue, hobart"],
     // Phone numbers.
-    ["call 0412 345 678", "phone", "0412 345 678"],
+    ["call 0491 570 156", "phone", "0491 570 156"],
     ["my number is 0412345678", "phone", "0412345678"],
-    ["ring (03) 9123 4567 tonight", "phone", "(03) 9123 4567"],
+    ["ring (03) 5550 4567 tonight", "phone", "(03) 5550 4567"],
     ["+61 412 345 678", "phone", "+61 412 345 678"],
     ["+44 20 7946 0958", "phone", "+44 20 7946 0958"],
-    ["call me on 9123 4567", "phone", "9123 4567"],
+    ["call me on 5550 4567", "phone", "5550 4567"],
     ["1800 123 456", "phone", "1800 123 456"],
     ["(555) 123-4567", "phone", "(555) 123-4567"],
     // Email.
@@ -105,13 +105,13 @@ describe("personal details — true positives", () => {
   it("finds several details in one message, in reading order", () => {
     expect(
       categories(
-        "Hi I'm Ava Smith, I'm 8 years old, I live at 12 Smith Street St Kilda VIC 3182, call 0412 345 678 or ava@example.com",
+        "Hi I'm Ava Smith, I'm 8 years old, I live at 12 Smith Street Sunnyvale VIC 3999, call 0491 570 156 or ava@example.com",
       ),
     ).toEqual(["full-name", "address", "phone", "email", "birthday"]);
   });
 
   it("rewrites every catch with its stand-in", () => {
-    expect(rewriteWithNicknames("I live at 12 Smith Street and my number is 0412 345 678")).toBe(
+    expect(rewriteWithNicknames("I live at 12 Smith Street and my number is 0491 570 156")).toBe(
       "I live at my street and my number is my phone number",
     );
     expect(rewriteWithNicknames("my password is dragon123")).toBe("my password is a secret");
@@ -169,7 +169,7 @@ describe("personal details — false positives stay quiet", () => {
 
 describe("personal details — the engine's redaction", () => {
   it("hides each detail and reports only the kinds", () => {
-    const redaction = redactPersonalDetails("my name is Ava Smith and I go to St Kilda Primary");
+    const redaction = redactPersonalDetails("my name is Ava Smith and I go to Sunnyvale Primary");
     expect(redaction.text).toBe(
       `my name is ${hiddenPlaceholder("full-name")} and I go to ${hiddenPlaceholder("school")}`,
     );
