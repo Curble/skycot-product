@@ -143,9 +143,12 @@ export function mayAutoApprove(
   if (family?.relief !== undefined) return !family.needsGrownUp && family.base.decision !== "hold";
   if (options.codexNetworkLocked && family !== undefined) {
     const familyIds = family.family.map((match) => match.rule.id);
+    // Inline code that reaches files is not contained: Codex's sandbox still lets it read
+    // anything on the Mac (family.ts `reachesComputer`).
     const internetContained =
       familyIds.length === 1 &&
-      (familyIds[0] === "uses-internet" || familyIds[0] === "opaque-code");
+      (familyIds[0] === "uses-internet" || familyIds[0] === "opaque-code") &&
+      !family.family.some((match) => match.reachesComputer === true);
     // No hard rule at all, and above all not "leaves-sandbox": that is Codex asking to run the
     // command OUTSIDE its sandbox, where a yes would put it on the internet.
     const staysInSandbox = evaluation.matches.length === 0 && family.base.matches.length === 0;

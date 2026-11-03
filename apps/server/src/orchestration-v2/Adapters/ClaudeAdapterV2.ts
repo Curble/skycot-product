@@ -3801,6 +3801,10 @@ export interface ClaudeAdapterV2Options {
   readonly settings: ClaudeSettings;
   readonly environment: NodeJS.ProcessEnv;
   readonly attachmentsDir: string;
+  /** The T3 home, kept unreadable by a child's sandboxed commands. */
+  readonly engineHome?: string; // nondev-seam: skycot-family-lockdown-claude
+  readonly familySandboxAvailable?: () => boolean; // nondev-seam: skycot-family-lockdown-claude
+  readonly familyClaudeVersion?: () => Effect.Effect<string | null>; // nondev-seam: skycot-family-lockdown-claude
   readonly fileSystem: FileSystem.FileSystem;
   readonly path: Path.Path;
   readonly crypto: Crypto.Crypto;
@@ -3832,6 +3836,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     adapterOptions.environment,
   ).pipe(Effect.provideService(Path.Path, path));
   const hostEnvironment = yield* HostProcess.Environment;
+  const hostHome = yield* HostProcess.HomeDirectory; // nondev-seam: skycot-family-lockdown-claude
+  const hostPlatform = yield* HostProcess.Platform; // nondev-seam: skycot-family-lockdown-claude
   const customHome =
     adapterOptions.settings.homePath.trim().length > 0 ||
     adapterOptions.environment.CLAUDE_CONFIG_DIR !== hostEnvironment.CLAUDE_CONFIG_DIR;
@@ -3893,6 +3899,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
       function* (input: ProviderAdapter.ProviderAdapterV2OpenSessionInput) {
         const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown; // nondev-seam: skycot-family-lockdown-claude
         const familyDeclined = new SkycotFamilyClaude.FamilyDeclinedSteps(); // nondev-seam: skycot-family-lockdown-claude
+        const familyDeclineNotes = new Map<string, string>(); // nondev-seam: skycot-family-lockdown-claude
+        const familyTmpDir = // nondev-seam: skycot-family-lockdown-claude
+          skycotLockdown === null ? undefined : yield* SkycotFamilyClaude.scopedFamilyTempDir;
         const sessionScope = yield* Effect.scope;
         const now = yield* DateTime.now;
         const session = providerSession({
@@ -8851,6 +8860,25 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             } satisfies PermissionResult;
           }
 
+          // nondev-seam: skycot-family-lockdown-claude
+          const outsideProject =
+            skycotLockdown === null
+              ? null
+              : SkycotFamilyClaude.fileToolRefusal({
+                  toolName,
+                  toolInput,
+                  cwd: context.input.runtimePolicy.cwd,
+                  home: hostHome,
+                  readRoots: [attachmentsDir],
+                });
+          if (outsideProject !== null) {
+            return {
+              behavior: "deny",
+              message: outsideProject,
+              toolUseID: callbackOptions.toolUseID,
+            } satisfies PermissionResult;
+          }
+
           if (!requiresClaudeApproval(context)) {
             return {
               behavior: "allow",
@@ -8930,8 +8958,16 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ),
           );
 
-          if (skycotLockdown !== null && resolvedDecision === "decline") {
-            familyDeclined.record(String(context.providerTurnId), toolName, toolInput); // nondev-seam: skycot-family-lockdown-claude
+          // nondev-seam: skycot-family-lockdown-claude
+          // A note means SKYCOT did the step itself (an approved install), not that it was refused.
+          const familyNote = familyDeclineNotes.get(String(artifacts.request.id));
+          familyDeclineNotes.delete(String(artifacts.request.id));
+          if (
+            skycotLockdown !== null &&
+            resolvedDecision === "decline" &&
+            familyNote === undefined
+          ) {
+            familyDeclined.record(String(context.providerTurnId), toolName, toolInput);
           }
           return permissionResultFromDecision({
             toolName,
@@ -8939,7 +8975,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             toolInput,
             toolUseID: callbackOptions.toolUseID,
             ...(skycotLockdown !== null
-              ? { declineMessage: SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE }
+              ? { declineMessage: familyNote ?? SkycotFamilyClaude.FAMILY_DECLINED_MESSAGE }
               : {}), // nondev-seam: skycot-family-lockdown-claude
             ...(callbackOptions.suggestions === undefined
               ? {}
@@ -9198,11 +9234,52 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             supportedDialogKinds: ["resume_return"],
             ...(appendSystemPromptFileText === undefined ? {} : { appendSystemPromptFileText }),
           });
+          // nondev-seam: skycot-family-lockdown-claude
+          if (
+            skycotLockdown !== null &&
+            !(
+              adapterOptions.familySandboxAvailable ??
+              (() =>
+                SkycotFamilyClaude.familySandboxAvailable(
+                  hostPlatform,
+                  adapterOptions.environment.PATH ?? hostEnvironment.PATH,
+                ))
+            )()
+          ) {
+            return yield* new SkycotFamilyClaude.FamilyClaudeSandboxUnavailable({
+              platform: hostPlatform,
+            });
+          }
+          // nondev-seam: skycot-family-lockdown-claude
+          if (skycotLockdown !== null) {
+            if (familyTmpDir === undefined) {
+              return yield* new SkycotFamilyClaude.FamilyClaudeSandboxUnavailable({
+                platform: hostPlatform,
+              });
+            }
+            const version = yield* (
+              adapterOptions.familyClaudeVersion ??
+              (() =>
+                SkycotFamilyClaude.claudeVersionOutput(
+                  adapterOptions.settings.binaryPath,
+                  adapterOptions.environment,
+                ))
+            )();
+            if (!SkycotFamilyClaude.claudeVersionSupportsFamily(version)) {
+              return yield* new SkycotFamilyClaude.FamilyClaudeTooOld({ version });
+            }
+          }
           const querySession = yield* queryRunner
             .open({
               threadId: turnInput.threadId,
               providerSessionId: input.providerSessionId,
-              options: SkycotFamilyClaude.lockQueryOptions(skycotLockdown, queryOptions), // nondev-seam: skycot-family-lockdown-claude
+              options: SkycotFamilyClaude.lockQueryOptions(skycotLockdown, queryOptions, {
+                home: hostHome,
+                engineHome: adapterOptions.engineHome,
+                stateDir: path.dirname(attachmentsDir),
+                tmpDir: familyTmpDir,
+                platform: hostPlatform,
+              }), // nondev-seam: skycot-family-lockdown-claude
             })
             .pipe(
               Effect.onError(() =>
@@ -10171,6 +10248,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   }),
                 });
               }
+              // nondev-seam: skycot-family-lockdown-claude
+              const familyNote = SkycotFamilyClaude.assistantNoteFrom(requestInput.answers);
+              if (skycotLockdown !== null && requestInput.decision === "decline" && familyNote) {
+                familyDeclineNotes.set(String(requestInput.requestId), familyNote);
+              }
               yield* Deferred.succeed(pending.decision, requestInput.decision);
             },
             (effect, requestInput) =>
@@ -10383,6 +10465,7 @@ export const createClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2Driver.create")(
       settings: { ...config, enabled, binaryPath },
       environment: claudeEnvironment,
       attachmentsDir: serverConfig.attachmentsDir,
+      engineHome: serverConfig.baseDir, // nondev-seam: skycot-family-lockdown-claude
       fileSystem,
       path,
       crypto,
@@ -10431,6 +10514,7 @@ const makeDefaultClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2.layer")(function* 
     settings: DEFAULT_CLAUDE_SETTINGS,
     environment: hostEnvironment,
     attachmentsDir: serverConfig.attachmentsDir,
+    engineHome: serverConfig.baseDir, // nondev-seam: skycot-family-lockdown-claude
     fileSystem,
     path,
     crypto,
