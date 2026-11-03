@@ -43,7 +43,7 @@ describe("family rules — unreadable code has its own reason", () => {
     expect(
       evaluateFamilyRequest({ kind: "command", command: selfCheck }, { projectRoot: ROOT })
         .family[0]?.rule.held,
-    ).toBe("SKYCOT can't read exactly what this does");
+    ).toBe("runs code SKYCOT can't read exactly");
   });
 });
 
@@ -199,9 +199,9 @@ describe("family rules — a web address written as text is not the internet", (
     `python3 -c "s=open('index.html').read(); print('https://' in s)"`,
     `python3 -c "import re; print(re.findall(r'https://[^\\"]+', open('index.html').read()))"`,
     "python3 - <<'EOF'\nhtml = open('index.html').read()\nprint('https://' in html)\nEOF",
-  ])("inline code that reads a file is not the internet, but needs a grown-up: %s", (command) => {
-    expect(ids(command)).toEqual(["opaque-code"]);
-    expect(needsGrownUp(command)).toBe(true);
+  ])("inline code that reads a project file is neither the internet nor held: %s", (command) => {
+    expect(ids(command)).toEqual([]);
+    expect(needsGrownUp(command)).toBe(false);
   });
 });
 
@@ -219,7 +219,6 @@ describe("family rules — inline code that reaches this computer needs a grown-
     `node -e "require.main"`,
     `node -e "console.log(process.env.HOME)"`,
     `node -e "const p = process; p.kill(1)"`,
-    `node -p "require('node:fs/promises')"`,
     `node --input-type=module -e "import { rm } from 'node:fs/promises'; await rm('x')"`,
     `node -e "require('child_process').execSync('ls')"`,
     `node -e "$(cat payload.js)"`,
@@ -229,7 +228,6 @@ describe("family rules — inline code that reaches this computer needs a grown-
     `python3 -c "import shutil; shutil.rmtree('/Users/me/.skycot')"`,
     `python3 -c "import pathlib; pathlib.Path.home().joinpath('.zshrc').write_text('x')"`,
     `python3 -c "import glob; print(glob.glob('/Users/me/*'))"`,
-    `python3 -c "import io; io.open('x', 'w')"`,
     `python -c "import subprocess; subprocess.run(['ls'])"`,
     `python3 -c "$CODE"`,
     "python3 - <<'EOF'\nimport os\nos.remove('/Users/me/.zshrc')\nEOF",
@@ -258,7 +256,7 @@ describe("family rules — inline code that reaches this computer needs a grown-
     expect(
       evaluateFamilyRequest({ kind: "command", command }, { projectRoot: ROOT }).family[0]?.rule
         .held,
-    ).toBe("SKYCOT can't read exactly what this does");
+    ).toBe("runs code SKYCOT can't read exactly");
   });
 
   it.each([
@@ -437,5 +435,37 @@ describe("isSimpleHttpsFetch", () => {
     ]) {
       expect(isSimpleHttpsFetch(command), command).toBe(false);
     }
+  });
+});
+
+describe("family rules — a one-liner checking the project's own files is the child's", () => {
+  it.each([
+    `node -e "console.log(require('fs').readFileSync('index.html','utf8'))"`,
+    `node -e "const fs=require('node:fs'); console.log(fs.existsSync('index.html'))"`,
+    `node -e "require('fs').writeFileSync('notes.txt','hi')"`,
+    `node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).name)"`,
+    `python3 -c "print(open('index.html').read()[:200])"`,
+    `python3 -c "import json; print(json.load(open('data.json')))"`,
+  ])("%s", (command) => {
+    expect(ids(command)).toEqual([]);
+    expect(needsGrownUp(command)).toBe(false);
+  });
+
+  it.each([
+    `node -e "require('fs').unlinkSync(require('os').homedir()+'/.skycot/userdata/skycot-family.json')"`,
+    `node -e "require('fs').unlinkSync('index.html')"`,
+    `node -e "console.log(require('fs').readFileSync('/etc/passwd','utf8'))"`,
+    `node -e "console.log(require('fs').readFileSync('../other/secret.txt','utf8'))"`,
+    `node -e "console.log(require('fs').readFileSync('~/.ssh/id_rsa','utf8'))"`,
+    `node -e "console.log(require('fs').readFileSync(process.env.HOME+'/x','utf8'))"`,
+    `node -e "console.log(require('fs').readFileSync(process.argv[1],'utf8'))" notes.txt`,
+    "node -e \"console.log(require('fs').readFileSync(`${1}`))\"",
+    `node -e "require('child_process').execSync('ls')"`,
+    `python3 -c "import os; os.remove('index.html')"`,
+    `python3 -c "import os; print(open(os.path.expanduser('~/.zshrc')).read())"`,
+    `python3 -c "import shutil; shutil.rmtree('src')"`,
+    `perl -e 'unlink glob("*.html")'`,
+  ])("%s holds for a grown-up", (command) => {
+    expect(needsGrownUp(command)).toBe(true);
   });
 });

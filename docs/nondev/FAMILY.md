@@ -47,10 +47,12 @@ push`), installs something (`npm install`, `pip install`, `brew`), deletes files
   grown-up**: the Allow needs the parent code, and the engine refuses it without one. "Always
   allow" is not offered. So does a one-line program typed straight into a command
   (`node -e "…"`, `python3 -c "…"`, `ruby -e`, `perl -e`, code piped into an interpreter) that
-  touches files, the Mac or other programs: SKYCOT can't see which files it means, so the card
-  says "SKYCOT can't read exactly what this does". A one-liner that only works something out
-  (`node -e "console.log(2 + 2)"`) stays the child's. With Codex such a step can still run by
-  itself, inside Codex's offline sandbox; with Claude it waits for a grown-up.
+  reaches outside the project, deletes or renames files, uses the Mac's settings or other
+  programs, or builds a file name SKYCOT can't read: the card says it "runs code SKYCOT can't
+  read exactly", for Claude and Codex alike. A one-liner that only works something out
+  (`node -e "console.log(2 + 2)"`) or reads and writes the project's own files by name (the
+  assistant checking the page it just made) stays the child's. Every other language's
+  one-liner (`ruby -e`, `perl -e`…) asks a grown-up.
 - **The assistant is told it is helping a child.** Every message the assistant receives
   carries short rules — the first message, a follow-up typed while it is working, and a
   message that starts with "/" alike: keep it kind, simple and age-appropriate; never ask for

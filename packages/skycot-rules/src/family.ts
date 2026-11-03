@@ -170,7 +170,7 @@ export const FAMILY_RULES: ReadonlyArray<FamilyRule> = [
   {
     id: "opaque-code",
     title: "Code SKYCOT can't read",
-    held: "SKYCOT can't read exactly what this does",
+    held: "runs code SKYCOT can't read exactly",
   },
   {
     id: "admin-rights",
@@ -544,6 +544,65 @@ function jsTouchesSystem(code: string): boolean {
   return false;
 }
 
+// A one-liner that only reads or writes files named relative to the project is the assistant
+// checking its own work (`node -e "console.log(require('fs').readFileSync('index.html','utf8'))"`):
+// the project is where the child's work lives and SKYCOT keeps its versions. It still holds when
+// it names a place outside the project, builds a path the rules can't read, takes one from its
+// arguments or the environment, deletes or renames, or uses anything beyond files.
+const JS_FILE_MODULES = new Set(["fs", "fs/promises", "path"]);
+// Network names are judged by `networkCodeMatches`, and an `https` inside a regular expression
+// is text, so they don't decide this.
+const JS_FILE_GLOBALS = new Set([
+  "fs",
+  "require",
+  "process",
+  "stream",
+  "zlib",
+  "dgram",
+  "net",
+  "tls",
+  "http",
+  "http2",
+  "https",
+  "dns",
+]);
+const JS_LEAVES_OR_DELETES =
+  /\b(?:unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync|rename|renameSync|symlink|symlinkSync|link|linkSync|chmod|chmodSync|chown|chownSync|cp|cpSync|truncate|truncateSync|utimes|utimesSync|opendir|realpath|realpathSync|watch|createWriteStream|createReadStream)\b|\bprocess\b(?!\s*\.\s*(?:cwd|stdout|stderr|exit)\b)|\$\{|\b__filename\b|\b__dirname\b/;
+const PY_FILE_MODULES = new Set([...PY_PURE_MODULES, "pathlib", "os", "glob", "csv", "io"]);
+const PY_LEAVES_OR_DELETES =
+  /\bos\s*\.\s*(?!path\b|listdir\b|getcwd\b|makedirs\b|mkdir\b|sep\b)\w+|\b(?:expanduser|expandvars|home|unlink|rmdir|rename|replace|symlink_to|hardlink_to|chmod|touch|environ|getenv|argv)\b|\bsys\s*\.\s*argv\b/;
+
+/** A string in the code that names a place outside the project. */
+function namesOutsidePath(code: string): boolean {
+  return stringLiterals(code).some((text) =>
+    /^\s*(?:[/~\\]|[A-Za-z]:[\\/]|file:)|(?:^|[\\/])\.\.(?:[\\/]|$)/.test(text),
+  );
+}
+
+/** Inline code that only reads or writes files named relative to the project. */
+function staysInProject(code: string, language: Language): boolean {
+  if (SHELL_BUILT_CODE.test(code) || namesOutsidePath(code)) return false;
+  if (language === "js") {
+    if (/\x60/.test(code) || JS_LEAVES_OR_DELETES.test(code)) return false;
+    for (const match of code.matchAll(/(?:\bfrom|\bimport)\s*(['"])([^'"]*)\1/g)) {
+      const bare = match[2]!.replace(/^node:/, "");
+      if (!isPureJsModule(bare) && !JS_FILE_MODULES.has(bare)) return false;
+    }
+    for (const match of code.matchAll(/\brequire\b/g)) {
+      const call = /^require\s*\(\s*(['"])([^'"]*)\1\s*\)/.exec(code.slice(match.index));
+      const bare = call?.[2]?.replace(/^node:/, "");
+      if (bare === undefined || (!isPureJsModule(bare) && !JS_FILE_MODULES.has(bare))) return false;
+    }
+    const bare = withoutPlainStrings(code);
+    for (const match of bare.matchAll(JS_SYSTEM_GLOBALS)) {
+      if (!JS_FILE_GLOBALS.has(match[0])) return false;
+    }
+    return true;
+  }
+  if (PY_LEAVES_OR_DELETES.test(code) || PY_SPAWN.test(code)) return false;
+  return pythonImports(code).every((name) => PY_FILE_MODULES.has(name));
+}
+
 /** Does this inline Python reach files, the operating system or other programs? */
 function pythonTouchesSystem(code: string): boolean {
   if (SHELL_BUILT_CODE.test(code)) return true;
@@ -638,7 +697,9 @@ function codeMatches(
 ): Array<FamilyMatch> {
   const matches = networkCodeMatches(code, language, detail, depth);
   const touchesSystem =
-    inline && (language === "js" ? jsTouchesSystem(code) : pythonTouchesSystem(code));
+    inline &&
+    (language === "js" ? jsTouchesSystem(code) : pythonTouchesSystem(code)) &&
+    !staysInProject(code, language);
   return touchesSystem ? [...matches, reachesComputer(detail)] : matches;
 }
 
