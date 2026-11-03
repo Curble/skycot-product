@@ -118,7 +118,7 @@ export function TakeBackActions({
         actions: (
           <button
             type="button"
-            className="fm-msg-edit"
+            className="fm-btn fm-btn--sm fm-msg-take-back"
             onClick={() => void takeBack()}
             disabled={busy}
             aria-label="Take back this lined-up message"

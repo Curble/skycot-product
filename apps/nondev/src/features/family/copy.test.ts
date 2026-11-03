@@ -23,6 +23,16 @@ describe("actionReason", () => {
     expect(reason.match(/Allow for this project/g)).toHaveLength(1);
   });
 
+  it("keeps the grown-up's project choice off a code sheet a child can see", () => {
+    for (const reason of [
+      actionReason("approve", "It installs something.", true),
+      actionReason("approve", null, true),
+    ]) {
+      expect(reason).toContain("A grown-up can say yes here.");
+      expect(reason).not.toMatch(/Allow for this project|across the project/);
+    }
+  });
+
   it("explains the new grown-up actions", () => {
     expect(actionReason("renameChild")).toMatch(/parent set up/);
     expect(actionReason("saveSecret")).toMatch(/key or password/);

@@ -161,3 +161,74 @@ describe("Send button affordance", () => {
     expect(button().title).toBe("Send (Return)");
   });
 });
+
+describe("Return and the send arrow share one path", () => {
+  async function mountKeys(props: { canSend: boolean; disabled?: boolean }) {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const onSend = vi.fn();
+    await act(async () =>
+      root.render(
+        <MessageField
+          value="also add a vegan option"
+          onChange={() => {}}
+          onSend={onSend}
+          placeholder="Tell Sam what to change…"
+          canSend={props.canSend}
+          disabled={props.disabled ?? false}
+        />,
+      ),
+    );
+    const field = host.querySelector("textarea")!;
+    const press = async (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      });
+      await act(async () => field.dispatchEvent(event));
+      return event;
+    };
+    const arrow = async () =>
+      act(async () => host.querySelector<HTMLButtonElement>("[aria-label='Send']")!.click());
+    return {
+      onSend,
+      press,
+      arrow,
+      async [Symbol.asyncDispose]() {
+        await act(async () => root.unmount());
+        host.remove();
+        vi.unstubAllGlobals();
+      },
+    };
+  }
+
+  it("lines the message up on Return exactly as the arrow does", async () => {
+    await using page = await mountKeys({ canSend: true });
+    await page.arrow();
+    expect(page.onSend).toHaveBeenCalledTimes(1);
+    const event = await page.press({});
+    expect(event.defaultPrevented).toBe(true);
+    expect(page.onSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps Shift-Return as a new line and ignores Return while composing", async () => {
+    await using page = await mountKeys({ canSend: true });
+    const shifted = await page.press({ shiftKey: true });
+    expect(shifted.defaultPrevented).toBe(false);
+    await page.press({ isComposing: true });
+    expect(page.onSend).not.toHaveBeenCalled();
+  });
+
+  it("refuses on Return whatever the arrow refuses", async () => {
+    await using notReady = await mountKeys({ canSend: false });
+    await notReady.press({});
+    expect(notReady.onSend).not.toHaveBeenCalled();
+    await using off = await mountKeys({ canSend: true, disabled: true });
+    await off.press({});
+    expect(off.onSend).not.toHaveBeenCalled();
+  });
+});

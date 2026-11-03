@@ -91,10 +91,17 @@ export function familySteps(askEachStep: boolean): {
  * What the code sheet says it is for. A grown-up card passes its own reason ("It uses the
  * internet and installs something."), so the sheet says what this step does (QA FK-13).
  */
-export function actionReason(action: FamilyAction, cardReason?: string | null): string {
+export function actionReason(
+  action: FamilyAction,
+  cardReason?: string | null,
+  // The code sheet opens before the code is proven, so on a child's device it can be seen by
+  // the child: there it only says that a grown-up can answer, never the grown-up's choices.
+  childVisible = false,
+): string {
   if (action === "aiSettings" && cardReason) return cardReason;
+  const scope = childVisible ? childApprovalScopeCopy : approvalScopeCopy;
   if (action === "approve" && cardReason) {
-    return `${cardReason} ${approvalScopeCopy}`;
+    return `${cardReason} ${scope}`;
   }
   switch (action) {
     case "publish":
@@ -114,7 +121,7 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
     case "openFolder":
       return "Opening another folder lets Sam work there, so a parent chooses it.";
     case "approve":
-      return `This step uses the internet, installs something, deletes or reaches outside the project. ${approvalScopeCopy}`;
+      return `This step uses the internet, installs something, deletes or reaches outside the project. ${scope}`;
     case "aiSettings":
       return "The AI helpers use a parent's accounts and settings, so a parent changes them.";
     case "renameChild":
@@ -139,6 +146,8 @@ export function actionReason(action: FamilyAction, cardReason?: string | null): 
       return "";
   }
 }
+
+export const childApprovalScopeCopy = "A grown-up can say yes here.";
 
 export const approvalScopeCopy =
   "A grown-up can allow just this step, or choose “Allow for this project” to allow this kind of request across the project.";

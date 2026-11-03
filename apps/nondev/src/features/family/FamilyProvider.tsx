@@ -308,7 +308,11 @@ function ParentCodeSheet({ pending }: { readonly pending: Pending }) {
             ? "Delete with the parent code"
             : "Parent code"
       }
-      description={actionReason(pending.action, pending.options.reason)}
+      description={actionReason(
+        pending.action,
+        pending.options.reason,
+        view.me.kind !== "grown-up",
+      )}
       sober
       initialFocus="first"
       actions={
