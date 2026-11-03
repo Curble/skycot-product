@@ -54,7 +54,9 @@ const places = {
   home: "/Users/kid",
   engineHome: "/Users/kid/.skycot",
   stateDir: "/Users/kid/.skycot/userdata",
-};
+  platform: "darwin",
+  uid: 501,
+} as const;
 
 const lock = (options: SkycotFamilyClaude.ClaudeLockableOptions) =>
   SkycotFamilyClaude.lockQueryOptions(lockdown, options, places);
@@ -85,49 +87,88 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
       allowAllUnixSockets: false,
     });
     assert.deepEqual(sandbox.filesystem?.allowWrite, []);
-    for (const secret of [
+    // The whole home folder, every account, external drives and the shared temporary folders.
+    for (const place of [
+      "/Users/kid",
+      "/Users",
+      "/Volumes",
+      "/private/tmp",
+      "/private/var/folders",
       "/Users/kid/.skycot",
-      "/Users/kid/.skycot-family",
       "/Users/kid/.ssh",
-      "/Users/kid/.aws",
-      "/Users/kid/.gnupg",
-      "/Users/kid/.config/gh",
-      "/Users/kid/Library/Keychains",
-      "/Users/kid/.codex",
       "/Users/kid/.claude",
-      "/Users/kid/.netrc",
-      "/Users/kid/.skycot/userdata",
     ]) {
-      assert.include(sandbox.filesystem?.denyRead ?? [], secret);
+      assert.include(sandbox.filesystem?.denyRead ?? [], place);
     }
     for (const place of [
       "/Users/kid/.skycot/userdata",
       "/Users/kid/.skycot/bin",
       "/Users/kid/.skycot/origin-secret.txt",
-      "/Users/kid/SKYCOT/my-game/.git/hooks",
-      "/Users/kid/SKYCOT/my-game/.git/config",
+      "/Users/kid/SKYCOT/my-game/.git",
+      "/private/tmp/claude-501",
     ]) {
       assert.include(sandbox.filesystem?.denyWrite ?? [], place);
     }
-    // The project is not inside any place above, so nothing is read-allowed again.
-    assert.deepEqual(sandbox.filesystem?.allowRead, []);
+    // Only the project comes back (and the temporary folder, when there is one).
+    assert.deepEqual(sandbox.filesystem?.allowRead, ["/Users/kid/SKYCOT/my-game"]);
   });
 
-  it("reads a question's folder inside SKYCOT's home again, and nothing beside it", () => {
+  it("reads a question's folder inside SKYCOT's home again, and the conversation's temporary folder", () => {
     const cwd = "/Users/kid/.skycot/scratch/what-is-a-star";
-    const locked = lock({ cwd });
+    const options: SkycotFamilyClaude.ClaudeLockableOptions = { cwd, env: { PATH: "/usr/bin" } };
+    const locked = SkycotFamilyClaude.lockQueryOptions(lockdown, options, {
+      ...places,
+      tmpDir: "/private/tmp/skycot-501/abc123",
+    });
     assert.include(locked.sandbox?.filesystem?.denyRead ?? [], "/Users/kid/.skycot");
-    assert.deepEqual(locked.sandbox?.filesystem?.allowRead, [cwd]);
+    assert.deepEqual(locked.sandbox?.filesystem?.allowRead, [
+      cwd,
+      "/private/tmp/skycot-501/abc123",
+    ]);
+    assert.equal(locked.env?.CLAUDE_CODE_TMPDIR, "/private/tmp/skycot-501/abc123");
   });
 
-  it("keeps the grown-up's keys in the environment away from sandboxed commands", () => {
+  it("gives sandboxed commands only the environment a build needs", () => {
     const locked = lock({
-      env: { PATH: "/usr/bin", GITHUB_TOKEN: "x", OPENAI_API_KEY: "y", HOME: "/Users/kid" },
+      env: {
+        PATH: "/usr/bin",
+        HOME: "/Users/kid",
+        LC_ALL: "en_AU.UTF-8",
+        NVM_DIR: "/Users/kid/.nvm",
+        GITHUB_TOKEN: "x",
+        OPENAI_API_KEY: "y",
+        STRIPE_KEY: "z",
+        HF_PAT: "p",
+        SSH_AUTH_SOCK: "/private/tmp/agent.sock",
+        npm_config_registry: "https://evil.example",
+      },
     });
-    assert.deepEqual(locked.sandbox?.credentials?.envVars, [
-      { name: "GITHUB_TOKEN", mode: "deny" },
-      { name: "OPENAI_API_KEY", mode: "deny" },
-    ]);
+    const hidden = (locked.sandbox?.credentials?.envVars ?? []).map((entry) => {
+      assert.equal(entry.mode, "deny");
+      return entry.name;
+    });
+    for (const name of [
+      "GITHUB_TOKEN",
+      "OPENAI_API_KEY",
+      "STRIPE_KEY",
+      "HF_PAT",
+      "SSH_AUTH_SOCK",
+      "npm_config_registry",
+      "ENABLE_CLAUDEAI_MCP_SERVERS",
+    ]) {
+      assert.include(hidden, name);
+    }
+    for (const name of [
+      "PATH",
+      "HOME",
+      "LC_ALL",
+      "NVM_DIR",
+      "GIT_CONFIG_GLOBAL",
+      "GIT_CONFIG_KEY_0",
+      "GIT_CONFIG_VALUE_0",
+    ]) {
+      assert.notInclude(hidden, name);
+    }
   });
 
   it("asks before every step (or plans) whatever the grown-up's launch arguments say", () => {
@@ -155,7 +196,14 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
     assert.deepEqual(locked.plugins, []);
     assert.deepEqual(locked.skills, []);
     assert.deepEqual(locked.settings, { showThinkingSummaries: true, disableAllHooks: true });
-    assert.deepEqual(locked.env, { PATH: "/usr/bin", ENABLE_CLAUDEAI_MCP_SERVERS: "false" });
+    assert.deepEqual(locked.env, {
+      PATH: "/usr/bin",
+      ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "core.excludesFile",
+      GIT_CONFIG_VALUE_0: "/dev/null",
+    });
     assert.deepEqual(locked.extraArgs, { "thinking-display": "summarized", "no-chrome": null });
   });
 
@@ -174,6 +222,7 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
       runtime: FamilyRuntime,
     ) => Effect.Effect<A, E, Scope.Scope>,
     sandboxAvailable = true,
+    claudeVersion: string | null = "2.1.296 (Claude Code)",
   ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -185,6 +234,7 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         attachmentsDir: yield* fileSystem.makeTempDirectoryScoped({ prefix: "skycot-claude-" }),
         engineHome: "/Users/kid/.skycot",
         familySandboxAvailable: () => sandboxAvailable,
+        familyClaudeVersion: () => Effect.succeed(claudeVersion),
         fileSystem,
         path: yield* Path.Path,
         crypto: yield* Crypto.Crypto,
@@ -312,6 +362,46 @@ describe("ClaudeAdapterV2 under the Family lockdown", () => {
         userFacingDispatchErrorMessage(failed),
         SkycotFamilyClaude.FAMILY_CLAUDE_SANDBOX_REFUSAL,
       );
+    }),
+  );
+
+  it.effect(
+    "does not start a child's Claude older than the first one with every sandbox setting",
+    () =>
+      Effect.gen(function* () {
+        for (const version of ["2.0.14 (Claude Code)", "2.1.275 (Claude Code)", null, "huh"]) {
+          const failed = yield* runTurn(
+            true,
+            (opened) => Effect.succeed(opened),
+            true,
+            version,
+          ).pipe(Effect.flip);
+          assert.equal(
+            userFacingDispatchErrorMessage(failed),
+            SkycotFamilyClaude.FAMILY_CLAUDE_TOO_OLD_REFUSAL,
+            String(version),
+          );
+        }
+        // A grown-up's Claude is not asked its version at all.
+        const opened = yield* runTurn(false, (opened) => Effect.succeed(opened), true, null);
+        assert.isAbove(opened.length, 0);
+      }),
+  );
+
+  it.effect("gives each Family conversation its own temporary folder, gone when it ends", () =>
+    Effect.gen(function* () {
+      const seen = yield* runTurn(true, (opened) =>
+        Effect.sync(() => {
+          const dir = opened[0]!.env?.CLAUDE_CODE_TMPDIR;
+          assert.isString(dir);
+          assert.match(dir!, /\/skycot-\d+\/[^/]+$/);
+          const stat = NodeFS.statSync(dir!);
+          assert.equal(stat.mode & 0o777, 0o700);
+          assert.include(opened[0]!.sandbox?.filesystem?.allowRead ?? [], dir!);
+          return dir!;
+        }),
+      );
+      assert.isFalse(NodeFS.existsSync(seen));
     }),
   );
 
@@ -522,6 +612,11 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
       for (const dir of [project, outside, attachments]) NodeFS.mkdirSync(dir);
       NodeFS.writeFileSync(NodePath.join(outside, "key"), "x");
       NodeFS.symlinkSync(outside, NodePath.join(project, "link"));
+      NodeFS.symlinkSync(
+        NodePath.join(outside, "LaunchAgents", "com.example.plist"),
+        NodePath.join(project, "dangling.plist"),
+      );
+      NodeFS.symlinkSync(NodePath.join(outside, "not-yet"), NodePath.join(project, "dangling-dir"));
       run({ project, outside, attachments });
     } finally {
       NodeFS.rmSync(root, { recursive: true, force: true });
@@ -568,6 +663,10 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
         ["Write", { file_path: NodePath.join(dirs.attachments, "a.png"), content: "" }],
         ["Write", { file_path: NodePath.join(dirs.project, ".git", "hooks", "pre-commit") }],
         ["SomeNewTool", { path: dirs.outside }],
+        // A link whose target is not there yet: a write would land wherever it points.
+        ["Write", { file_path: NodePath.join(dirs.project, "dangling.plist"), content: "" }],
+        ["Write", { file_path: NodePath.join(dirs.project, "dangling-dir", "x.js"), content: "" }],
+        ["Read", { file_path: NodePath.join(dirs.project, "dangling.plist") }],
       ] as const) {
         assert.equal(
           refusal(dirs, toolName, toolInput),
@@ -576,6 +675,17 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
         );
       }
     }));
+});
+
+describe("SkycotFamilyClaude.claudeVersionSupportsFamily", () => {
+  it("lets a child's Claude run only on a Claude Code that knows every sandbox setting", () => {
+    assert.isTrue(SkycotFamilyClaude.claudeVersionSupportsFamily("2.1.296 (Claude Code)"));
+    assert.isTrue(SkycotFamilyClaude.claudeVersionSupportsFamily("2.1.276"));
+    assert.isTrue(SkycotFamilyClaude.claudeVersionSupportsFamily("3.0.0 (Claude Code)"));
+    for (const old of ["2.1.275", "2.0.99", "1.9.300", "", null, undefined, "Claude Code"]) {
+      assert.isFalse(SkycotFamilyClaude.claudeVersionSupportsFamily(old), String(old));
+    }
+  });
 });
 
 describe("SkycotFamilyClaude.familySandboxAvailable", () => {

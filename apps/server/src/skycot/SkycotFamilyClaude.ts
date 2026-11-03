@@ -24,26 +24,34 @@
 // words, so `node -e "require('fs').unlinkSync(…)"` or a script the project runs can reach
 // anything the child's macOS account can. The promise "SKYCOT always asks before leaving the
 // project" is therefore kept by the operating system, as Codex's is by its own sandbox:
-//   - every Bash command runs in Claude Code's sandbox (`familySandbox`): writes only in the
-//     project, no internet, the engine's state and the grown-up's secrets unreadable, no way
-//     out of the sandbox, and SKYCOT's permission callback still judges every command. If the
-//     sandbox can't start, nothing runs (`failIfUnavailable`, and `familySandboxAvailable`
-//     before the query is opened);
+//   - every Bash command runs in Claude Code's sandbox (`familySandbox`, rules in
+//     SkycotFamilySandbox): reads only in the project, the conversation's own temporary folder
+//     and the toolchains; writes only in the project (never its `.git`) and that folder; no
+//     internet; only the environment variables a build needs; no way out of the sandbox; and
+//     SKYCOT's permission callback still judges every command. If the sandbox can't start, the
+//     temporary folder can't be made or Claude Code is older than FAMILY_CLAUDE_MIN_VERSION,
+//     nothing runs (plain refusals before the query is opened, `failIfUnavailable` inside);
 //   - Claude's own file tools (Read, Write, Edit, Glob, Grep…) run in Claude's process, not in
 //     the sandbox, so the permission callback refuses any of them that points outside the
-//     project (`fileToolRefusal`), symlinks and `..` resolved first.
+//     project (`fileToolRefusal`), symlinks and `..` resolved first, and any through a link
+//     whose target isn't there yet.
 // A grown-up's yes to an install or a download is done by SKYCOT itself outside the sandbox
 // (SkycotApprovedInstalls), exactly as for Codex.
 
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- `claude --version` before a child's first query.
+import * as NodeChildProcess from "node:child_process";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- a synchronous realpath inside the SDK's permission callback.
 import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- path arithmetic for sandbox settings.
 import * as NodePath from "node:path";
 
 import type { PermissionMode, SandboxSettings } from "@anthropic-ai/claude-agent-sdk";
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 
 import type { FamilyLockdown } from "./SkycotFamilyLockdown.ts";
+import * as SkycotFamilySandbox from "./SkycotFamilySandbox.ts";
 
 /** The SDK query options SKYCOT touches; the rest pass through unchanged. */
 export interface ClaudeLockableOptions {
@@ -73,79 +81,34 @@ export function lockTextSettings<S extends object>(
 }
 
 /** Environment a Family query runs with on top of its own. */
-export const FAMILY_CLAUDE_ENV = { ENABLE_CLAUDEAI_MCP_SERVERS: "false" } as const;
+export const FAMILY_CLAUDE_ENV = {
+  ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+  ...SkycotFamilySandbox.FAMILY_GIT_ENV,
+} as const;
 
-/** Where SKYCOT's own state lives on this Mac, for the sandbox's unreadable list. */
-export interface FamilySandboxPlaces {
-  /** The macOS account's home folder. */
-  readonly home: string;
-  /** The engine's T3 home (userdata, runtime, tools, worktrees, scratch), when known. */
-  readonly engineHome?: string | undefined;
-  /** The engine's state folder (`<T3 home>/userdata`), which holds the attachments folder. */
-  readonly stateDir?: string | undefined;
-}
+/** Where SKYCOT's own state lives on this Mac, and this conversation's temporary folder. */
+export type FamilySandboxPlaces = Omit<SkycotFamilySandbox.FamilyPlaces, "cwd" | "pathEnv">;
 
 /**
- * Inside the home folder: SKYCOT's own homes and app data, and where the grown-up keeps keys and
- * sign-ins. A child's project inside one of them (a question's folder in `.skycot/scratch`)
- * is read-allowed again on its own.
- */
-const PRIVATE_HOME_PLACES = [
-  ".skycot",
-  ".skycot-family",
-  ".t3",
-  "Library/Application Support/SKYCOT",
-  ".ssh",
-  ".aws",
-  ".gnupg",
-  ".config/gh",
-  ".config/gcloud",
-  "Library/Keychains",
-  ".codex",
-  ".claude",
-  ".claude.json",
-  ".netrc",
-  ".npmrc",
-  ".git-credentials",
-  ".docker",
-  ".kube",
-];
-
-/** Environment variables a sandboxed command does not get: the grown-up's keys and tokens. */
-const SECRET_ENV_NAME = /TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_?KEY|AUTH/i;
-
-const unique = (paths: ReadonlyArray<string>) => [...new Set(paths)];
-
-function isWithin(root: string, target: string): boolean {
-  const relative = NodePath.relative(root, target);
-  return relative === "" || (!relative.startsWith("..") && !NodePath.isAbsolute(relative));
-}
-
-/**
- * The sandbox every Bash command of a child's Claude runs in. Claude Code's defaults already
- * limit writes to the working folders; the lists below make the rest explicit. The project's
- * `.git/hooks` and `.git/config` are not writable: SKYCOT runs git there itself, outside any
- * sandbox, and both can make git run a program.
+ * The sandbox every Bash command of a child's Claude runs in (SkycotFamilySandbox): reads only
+ * in the project, its temporary folder and the toolchains; writes only in the project (never
+ * its `.git`, where SKYCOT keeps the versions and whose hooks and config git would run) and
+ * the temporary folder; no internet; only the environment variables a build needs.
  */
 export function familySandbox(
   places: FamilySandboxPlaces & {
     readonly cwd: string | undefined;
     readonly env?: Readonly<Record<string, string | undefined>> | undefined;
   },
+  io?: Parameters<typeof SkycotFamilySandbox.familyFilesystem>[1],
 ): SandboxSettings {
-  const denyRead = unique([
-    ...PRIVATE_HOME_PLACES.map((place) => NodePath.join(places.home, place)),
-    ...(places.engineHome === undefined ? [] : [places.engineHome]),
-    ...(places.stateDir === undefined ? [] : [places.stateDir]),
-  ]);
-  const engineState =
-    places.engineHome === undefined
-      ? []
-      : ["userdata", "runtime", "tools", "bin", "caches", "origin-secret.txt"].map((name) =>
-          NodePath.join(places.engineHome!, name),
-        );
-  const cwd = places.cwd;
-  const secretEnv = Object.keys(places.env ?? {}).filter((name) => SECRET_ENV_NAME.test(name));
+  const filesystem = SkycotFamilySandbox.familyFilesystem(
+    { ...places, pathEnv: places.env?.PATH },
+    io,
+  );
+  const hiddenEnv = Object.keys(places.env ?? {}).filter(
+    (name) => !SkycotFamilySandbox.isAllowedChildEnv(name),
+  );
   return {
     enabled: true,
     failIfUnavailable: true,
@@ -163,21 +126,15 @@ export function familySandbox(
       allowUnixSockets: [],
     },
     filesystem: {
+      // Claude Code already lets commands write in the project and its own temporary folder.
       allowWrite: [],
-      denyWrite: unique([
-        ...engineState,
-        ...(places.stateDir === undefined ? [] : [places.stateDir]),
-        ...(cwd === undefined
-          ? []
-          : [NodePath.join(cwd, ".git", "hooks"), NodePath.join(cwd, ".git", "config")]),
-      ]),
-      denyRead,
-      // Only the project itself comes back, and only when it sits inside a place above.
-      allowRead: cwd !== undefined && denyRead.some((place) => isWithin(place, cwd)) ? [cwd] : [],
+      denyWrite: [...filesystem.denyWrite],
+      denyRead: [...filesystem.denyRead],
+      allowRead: [...filesystem.allowRead],
     },
-    ...(secretEnv.length === 0
+    ...(hiddenEnv.length === 0
       ? {}
-      : { credentials: { envVars: secretEnv.map((name) => ({ name, mode: "deny" as const })) } }),
+      : { credentials: { envVars: hiddenEnv.map((name) => ({ name, mode: "deny" as const })) } }),
   };
 }
 
@@ -198,7 +155,11 @@ export function lockQueryOptions<O extends ClaudeLockableOptions>(
       ? { ...(options.settings as Record<string, unknown>), disableAllHooks: true }
       : { disableAllHooks: true };
   const thinking = options.extraArgs?.["thinking-display"];
-  const env = { ...(options.env ?? process.env), ...FAMILY_CLAUDE_ENV };
+  const env = {
+    ...(options.env ?? process.env),
+    ...FAMILY_CLAUDE_ENV,
+    ...(places.tmpDir === undefined ? {} : { CLAUDE_CODE_TMPDIR: places.tmpDir }),
+  };
   return {
     ...options,
     permissionMode: options.permissionMode === "plan" ? "plan" : "default",
@@ -231,6 +192,91 @@ export class FamilyClaudeSandboxUnavailable extends Schema.TaggedError<FamilyCla
 }
 
 /**
+ * The first Claude Code SKYCOT lets a child's Claude run on: the version the bundled Agent SDK
+ * describes (its sandbox settings have every field `familySandbox` sets: reads allowed again
+ * inside an unreadable folder, environment variables withheld, the strict network allowlist,
+ * `failIfUnavailable`). An older Claude Code may ignore a setting it doesn't know and run the
+ * child's commands with less containment than FAMILY.md promises (review F1-R7), so it is refused.
+ */
+export const FAMILY_CLAUDE_MIN_VERSION = "2.1.276";
+
+/** Whether `claude --version`'s answer is new enough; an answer SKYCOT can't read is not. */
+export function claudeVersionSupportsFamily(output: string | null | undefined): boolean {
+  const found = /\b(\d+)\.(\d+)\.(\d+)\b/.exec(output ?? "");
+  if (found === null) return false;
+  const have = found.slice(1, 4).map(Number);
+  const need = FAMILY_CLAUDE_MIN_VERSION.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (have[index]! !== need[index]!) return have[index]! > need[index]!;
+  }
+  return true;
+}
+
+/** Answers already new enough, by program: asked once per program, not before every turn. */
+const supportedVersions = new Map<string, string>();
+
+/**
+ * `claude --version`'s output, or null when it would not run (refused as too old). A new enough
+ * answer is remembered while the engine runs; an older one is asked again, so updating Claude
+ * Code needs no restart.
+ */
+export const claudeVersionOutput = (
+  binaryPath: string,
+  env: Readonly<Record<string, string | undefined>>,
+): Effect.Effect<string | null> =>
+  Effect.suspend(() => {
+    const known = supportedVersions.get(binaryPath);
+    if (known !== undefined) return Effect.succeed(known);
+    return Effect.callback<string | null>((resume) => {
+      const child = NodeChildProcess.execFile(
+        binaryPath,
+        ["--version"],
+        { env: env as NodeJS.ProcessEnv, timeout: 15_000, maxBuffer: 64 * 1024 },
+        (error, stdout) => {
+          const output = error === null ? String(stdout) : null;
+          if (output !== null && claudeVersionSupportsFamily(output)) {
+            supportedVersions.set(binaryPath, output);
+          }
+          resume(Effect.succeed(output));
+        },
+      );
+      return Effect.sync(() => child.kill());
+    });
+  });
+
+/**
+ * This conversation's own temporary folder (SkycotFamilySandbox.makeFamilyTempDir), removed
+ * when the session ends; undefined when it could not be made, and the child's Claude is then
+ * refused like a missing sandbox.
+ */
+export const scopedFamilyTempDir: Effect.Effect<string | undefined, never, Scope.Scope> =
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      try {
+        return SkycotFamilySandbox.makeFamilyTempDir();
+      } catch {
+        return undefined;
+      }
+    }),
+    (dir) =>
+      dir === undefined
+        ? Effect.void
+        : Effect.sync(() => NodeFS.rmSync(dir, { recursive: true, force: true })),
+  );
+
+/** What the child sees when the installed Claude Code is older than that. */
+export const FAMILY_CLAUDE_TOO_OLD_REFUSAL = `The Family profile is on, and the Claude Code on this computer is too old for Claude's safe area (it keeps Claude's commands inside the project and off the internet), so Claude didn't start. A grown-up can update Claude Code to version ${FAMILY_CLAUDE_MIN_VERSION} or newer, choose Codex for this conversation, or switch the Family profile off.`;
+
+export class FamilyClaudeTooOld extends Schema.TaggedError<FamilyClaudeTooOld>()(
+  "FamilyClaudeTooOld",
+  { version: Schema.NullOr(Schema.String) },
+) {
+  override get message(): string {
+    return FAMILY_CLAUDE_TOO_OLD_REFUSAL;
+  }
+}
+
+/**
  * Whether Claude Code's sandbox can start here: macOS's own `sandbox-exec`, or bubblewrap and
  * socat on Linux. Checked before a child's query is opened so a missing sandbox is a plain
  * refusal; `failIfUnavailable` is the backstop inside Claude Code.
@@ -256,14 +302,19 @@ const READING_TOOLS = new Set(["Read", "NotebookRead", "Glob", "Grep", "LS"]);
 const PATH_KEYS = ["file_path", "notebook_path", "path"] as const;
 const GLOB_CHARS = /[*?[{]/;
 
-/** The real path, symlinks resolved; for a file not made yet, its nearest real folder's. */
-function realPath(path: string): string {
+/**
+ * The real path, symlinks resolved; for a file not made yet, its nearest real folder's. Null
+ * when the path goes through a link whose target is not there yet (review F1-R6): where a
+ * write through it would land can't be known, so it is never inside the project.
+ */
+function realPath(path: string): string | null {
   let current = path;
   const rest: Array<string> = [];
   for (let guard = 0; guard < 256; guard += 1) {
     try {
       return NodePath.join(NodeFS.realpathSync.native(current), ...rest.toReversed());
     } catch {
+      if (isLink(current)) return null;
       const parent = NodePath.dirname(current);
       if (parent === current) return path;
       rest.push(NodePath.basename(current));
@@ -271,6 +322,14 @@ function realPath(path: string): string {
     }
   }
   return path;
+}
+
+function isLink(path: string): boolean {
+  try {
+    return NodeFS.lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
 }
 
 /** The fixed folder a glob starts from: `/a/b/**\/*.js` -> `/a/b`; null if `..` follows a wildcard. */
@@ -312,18 +371,24 @@ export function fileToolRefusal(input: {
   const cwd = input.cwd;
   if (cwd === undefined || cwd === null) return FAMILY_OUTSIDE_PROJECT_MESSAGE;
   const project = realPath(NodePath.resolve(cwd));
+  if (project === null) return FAMILY_OUTSIDE_PROJECT_MESSAGE;
   const writes = !READING_TOOLS.has(input.toolName);
   const roots = writes
     ? [project]
-    : [project, ...(input.readRoots ?? []).map((root) => realPath(NodePath.resolve(root)))];
+    : [
+        project,
+        ...(input.readRoots ?? []).flatMap((root) => realPath(NodePath.resolve(root)) ?? []),
+      ];
   for (const target of targets) {
     const expanded =
       target === "~" || target.startsWith("~/")
         ? NodePath.join(input.home, target.slice(1))
         : target;
     const real = realPath(NodePath.resolve(cwd, expanded));
-    if (!roots.some((root) => isWithin(root, real))) return FAMILY_OUTSIDE_PROJECT_MESSAGE;
-    if (writes && isWithin(NodePath.join(project, ".git"), real)) {
+    if (real === null || !roots.some((root) => SkycotFamilySandbox.isWithin(root, real))) {
+      return FAMILY_OUTSIDE_PROJECT_MESSAGE;
+    }
+    if (writes && SkycotFamilySandbox.isWithin(NodePath.join(project, ".git"), real)) {
       return FAMILY_OUTSIDE_PROJECT_MESSAGE;
     }
   }

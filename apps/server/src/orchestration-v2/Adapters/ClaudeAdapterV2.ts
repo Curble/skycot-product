@@ -3804,6 +3804,7 @@ export interface ClaudeAdapterV2Options {
   /** The T3 home, kept unreadable by a child's sandboxed commands. */
   readonly engineHome?: string; // nondev-seam: skycot-family-lockdown-claude
   readonly familySandboxAvailable?: () => boolean; // nondev-seam: skycot-family-lockdown-claude
+  readonly familyClaudeVersion?: () => Effect.Effect<string | null>; // nondev-seam: skycot-family-lockdown-claude
   readonly fileSystem: FileSystem.FileSystem;
   readonly path: Path.Path;
   readonly crypto: Crypto.Crypto;
@@ -3899,6 +3900,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown; // nondev-seam: skycot-family-lockdown-claude
         const familyDeclined = new SkycotFamilyClaude.FamilyDeclinedSteps(); // nondev-seam: skycot-family-lockdown-claude
         const familyDeclineNotes = new Map<string, string>(); // nondev-seam: skycot-family-lockdown-claude
+        const familyTmpDir = // nondev-seam: skycot-family-lockdown-claude
+          skycotLockdown === null ? undefined : yield* SkycotFamilyClaude.scopedFamilyTempDir;
         const sessionScope = yield* Effect.scope;
         const now = yield* DateTime.now;
         const session = providerSession({
@@ -9247,6 +9250,25 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               platform: hostPlatform,
             });
           }
+          // nondev-seam: skycot-family-lockdown-claude
+          if (skycotLockdown !== null) {
+            if (familyTmpDir === undefined) {
+              return yield* new SkycotFamilyClaude.FamilyClaudeSandboxUnavailable({
+                platform: hostPlatform,
+              });
+            }
+            const version = yield* (
+              adapterOptions.familyClaudeVersion ??
+              (() =>
+                SkycotFamilyClaude.claudeVersionOutput(
+                  adapterOptions.settings.binaryPath,
+                  adapterOptions.environment,
+                ))
+            )();
+            if (!SkycotFamilyClaude.claudeVersionSupportsFamily(version)) {
+              return yield* new SkycotFamilyClaude.FamilyClaudeTooOld({ version });
+            }
+          }
           const querySession = yield* queryRunner
             .open({
               threadId: turnInput.threadId,
@@ -9255,6 +9277,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 home: hostHome,
                 engineHome: adapterOptions.engineHome,
                 stateDir: path.dirname(attachmentsDir),
+                tmpDir: familyTmpDir,
+                platform: hostPlatform,
               }), // nondev-seam: skycot-family-lockdown-claude
             })
             .pipe(

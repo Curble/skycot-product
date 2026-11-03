@@ -100,6 +100,10 @@ export function findPreviewCommand(files: ProjectStartFiles): PreviewCommand | n
   return null;
 }
 
+/** Why a grown-up is asked when the preview can't run inside the Family sandbox here. */
+export const FAMILY_UNCONTAINED_REASON =
+  "runs the project's own code, and this computer can't keep it inside the project";
+
 export type StartDecision =
   /** Starts without a question ("Just do it, carefully" with nothing risky, or hands-off). */
   | { readonly kind: "start" }
@@ -110,12 +114,16 @@ export type StartDecision =
 
 /**
  * Whether starting the site needs a yes, and whose. Both the runner and the script it runs are
- * judged, so `"dev": "npx serve"` is caught as the install it is.
+ * judged, so `"dev": "npx serve"` is caught as the install it is. With the Family profile on,
+ * the child's own yes is enough only when SKYCOT can start the site inside the Family sandbox
+ * (`familyContained`, familyContainment.ts): the words of the command can't show what the files
+ * it runs will do.
  */
 export function startDecision(input: {
   readonly command: PreviewCommand;
   readonly runtimeMode: RuntimeMode;
   readonly familyOn: boolean;
+  readonly familyContained?: boolean;
   readonly ctx: RuleContext;
 }): StartDecision {
   // Showing a plain page runs nothing on this Mac (no command, no install): SKYCOT reads the
@@ -132,6 +140,9 @@ export function startDecision(input: {
         describeFamilyMatches(evaluation.family),
       ]),
     );
+    if (input.familyContained !== true) {
+      return { kind: "grown-up", reasons: unique([...reasons, FAMILY_UNCONTAINED_REASON]) };
+    }
     return evaluations.some((evaluation) => evaluation.needsGrownUp)
       ? { kind: "grown-up", reasons }
       : { kind: "ask", reasons };

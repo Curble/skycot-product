@@ -7,10 +7,12 @@
 // (staticSite.ts), inside the engine: no terminal, nothing of the project's runs.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
+import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 
 import type { RuntimeMode, TerminalEvent, ThreadId } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { isLocalPreviewAddress, localAddressFromOutput } from "@t3tools/skycot-rules/preview";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -25,6 +27,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { FetchHttpClient, HttpClient } from "effect/http";
 
+import * as ServerConfig from "../../config.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as PortScanner from "../../preview/PortScanner.ts";
@@ -44,6 +47,8 @@ import {
   type PreviewStatus,
 } from "./plan.ts";
 import { serveStaticSite, STATIC_ROOTS, type StaticSite } from "./staticSite.ts";
+import { containedStart, PreviewSandboxCheck, writeContainedStart } from "./familyContainment.ts";
+import { familyFilesystem, makeFamilyTempDir } from "../SkycotFamilySandbox.ts";
 
 /** The terminal the preview runs in, one per conversation that started one. */
 export const PREVIEW_TERMINAL_ID = "skycot-preview";
@@ -116,6 +121,8 @@ interface Running {
   lastScanAt: number;
   /** A plain web page's server; null for a site started in a terminal. */
   site: StaticSite | null;
+  /** The Family sandbox's temporary folder for this start, removed when it stops. */
+  tmpDir: string | null;
 }
 
 const hashOf = (text: string) =>
@@ -163,6 +170,13 @@ export const make = Effect.gen(function* () {
   /** Keyed by folder: conversations sharing a folder share its site. */
   const running = new Map<string, Running>();
   const homeDir = NodeOS.homedir();
+  // nondev-seam: skycot-policy-files
+  // The Family sandbox for a started site (familyContainment.ts): SKYCOT's own folder for its
+  // start files, and whether this computer can run one.
+  const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+  const hostEnvironment = yield* HostProcess.Environment;
+  const hostPlatform = yield* HostProcess.Platform;
+  const familyContained = Option.isSome(serverConfig) && (yield* PreviewSandboxCheck)(hostPlatform);
 
   const familyOn = Option.isSome(family) ? family.value.isEnabled : Effect.succeed(false);
   const grownUpSaid = (sessionId: string, requestId: string) =>
@@ -334,7 +348,12 @@ export const make = Effect.gen(function* () {
           : terminals.close({ threadId: entry.ownerThreadId, terminalId: PREVIEW_TERMINAL_ID });
     return close.pipe(
       Effect.ignoreCause({ log: true, message: "Could not stop a preview." }),
-      Effect.andThen(Effect.sync(() => running.delete(entry.folder))),
+      Effect.andThen(
+        Effect.sync(() => {
+          running.delete(entry.folder);
+          if (entry.tmpDir !== null) NodeFS.rmSync(entry.tmpDir, { recursive: true, force: true });
+        }),
+      ),
     );
   };
 
@@ -435,6 +454,7 @@ export const make = Effect.gen(function* () {
               command,
               runtimeMode: context.runtimeMode,
               familyOn: yield* familyOn,
+              familyContained,
               ctx: { projectRoot: context.folder, projectFolder: context.projectFolder },
             }),
       requestId,
@@ -509,10 +529,52 @@ export const make = Effect.gen(function* () {
             lastSeen: now,
             lastScanAt: 0,
             site: null,
+            tmpDir: null,
           };
           running.set(context.folder, entry);
           if (isPage) {
             yield* startPage(entry);
+            return describe(entry);
+          }
+          // In the Family profile the site runs inside the Family sandbox wherever it can; where
+          // it can't, startDecision already asked a grown-up.
+          const contained =
+            (yield* familyOn) && familyContained && Option.isSome(serverConfig)
+              ? yield* Effect.try(() => {
+                  const tmpDir = makeFamilyTempDir();
+                  entry.tmpDir = tmpDir;
+                  const config = serverConfig.value;
+                  const start = containedStart({
+                    filesystem: familyFilesystem({
+                      home: homeDir,
+                      engineHome: config.baseDir,
+                      stateDir: path.dirname(config.attachmentsDir),
+                      cwd: context.folder,
+                      tmpDir,
+                      pathEnv: hostEnvironment.PATH,
+                      platform: hostPlatform,
+                    }),
+                    runner: command.runner,
+                    tmpDir,
+                    port,
+                    env: hostEnvironment,
+                    folder: context.folder,
+                    dir: path.join(config.baseDir, "caches", "family-sandbox"),
+                  });
+                  writeContainedStart(path.dirname(start.profilePath), start);
+                  return start.line;
+                }).pipe(
+                  Effect.tapError((cause) =>
+                    Effect.logWarning("Could not prepare the Family sandbox for a preview.", {
+                      cause,
+                    }),
+                  ),
+                  Effect.option,
+                )
+              : Option.some(null);
+          if (Option.isNone(contained)) {
+            entry.exited = true;
+            entry.failure = "exited";
             return describe(entry);
           }
           const launched = yield* terminals
@@ -535,7 +597,7 @@ export const make = Effect.gen(function* () {
                 terminals.write({
                   threadId: input.threadId,
                   terminalId: PREVIEW_TERMINAL_ID,
-                  data: `${command.runner}; exit\r`,
+                  data: `${contained.value ?? command.runner}; exit\r`,
                 }),
               ),
               Effect.as(true),

@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFS from "node:fs";
 import * as NodeHttp from "node:http";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -20,6 +21,9 @@ import * as TestClock from "effect/testing/TestClock";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
+import * as HostProcess from "@t3tools/shared/HostProcess";
+
+import * as ServerConfig from "../../config.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import * as PortScanner from "../../preview/PortScanner.ts";
@@ -27,7 +31,8 @@ import * as TerminalManager from "../../terminal/Manager.ts";
 import * as SkycotFamily from "../SkycotFamily.ts";
 // nondev-seam: skycot-project-memory-preview-test
 import * as SkycotProjectMemory from "../SkycotProjectMemory.ts";
-import { IDLE_STOP_MS } from "./plan.ts";
+import { PreviewSandboxCheck } from "./familyContainment.ts";
+import { FAMILY_UNCONTAINED_REASON, IDLE_STOP_MS } from "./plan.ts";
 import * as SkycotPreview from "./SkycotPreview.ts";
 
 const CODE = "482913";
@@ -66,6 +71,8 @@ interface World {
   readonly preview: SkycotPreview.SkycotPreview["Service"];
   readonly family: SkycotFamily.SkycotFamily["Service"];
   readonly folder: string;
+  /** The engine's T3 home, where the Family sandbox's start files go. */
+  readonly engineHome: string;
   /** Every terminal call, in order: "open <cwd> PORT=<n>", "write <data>", "close <thread>". */
   readonly calls: Array<string>;
   readonly setPackageJson: (value: string) => Effect.Effect<void>;
@@ -81,6 +88,8 @@ const withPreview = <A, E>(
     /** Files written into the project folder: { "index.html": "<h1>hi</h1>" }. */
     readonly files?: Readonly<Record<string, string>>;
     readonly runtimeMode?: OrchestrationV2AppThread["runtimeMode"];
+    /** Whether this computer can start a site inside the Family sandbox (default: yes). */
+    readonly contained?: boolean;
   },
   use: (world: World) => Effect.Effect<A, E>,
 ) =>
@@ -137,6 +146,13 @@ const withPreview = <A, E>(
       ),
       SkycotFamily.layerAt(path.join(dir, SkycotFamily.FAMILY_FILE_NAME)),
       SkycotProjectMemory.layerAt(path.join(dir, SkycotProjectMemory.PROJECT_MEMORY_FILE)),
+      ServerConfig.layerTest(folder, path.join(dir, "t3")),
+      Layer.succeed(PreviewSandboxCheck, () => options.contained ?? true),
+      Layer.succeed(HostProcess.Environment, {
+        PATH: "/usr/bin:/bin",
+        HOME: "/Users/kid",
+        GITHUB_TOKEN: "the-parent's-token",
+      }),
     );
 
     return yield* Effect.gen(function* () {
@@ -146,6 +162,7 @@ const withPreview = <A, E>(
         preview,
         family,
         folder,
+        engineHome: path.join(dir, "t3"),
         setPackageJson: (value) =>
           fs.writeFileString(path.join(folder, "package.json"), value).pipe(Effect.orDie),
         calls,
@@ -597,6 +614,73 @@ it.layer(NodeServices.layer)("SkycotPreview", (it) => {
             )).reason,
             "needs-approval",
           );
+        }),
+      ),
+    );
+
+    it.effect(
+      "starts the child's site inside the Family sandbox, with none of the engine's keys",
+      () =>
+        withPreview({ packageJson: SITE }, ({ preview, family, calls, folder, engineHome }) =>
+          Effect.gen(function* () {
+            yield* family.enable({ code: CODE, childName: null });
+            const ready = yield* preview.status(THREAD);
+            assert.equal(ready.state === "ready" ? ready.decision.kind : null, "ask");
+            yield* preview.start({ threadId: THREAD, sessionId: SESSION, approved: true });
+            const write = calls.find((call) => call.startsWith("write "))!;
+            const typed = /^write \/bin\/zsh -f '(.+\/start-[0-9a-f]+\.sh)'; exit\r$/.exec(write);
+            assert.isNotNull(typed, write);
+            const startFile = typed![1]!;
+            assert.isTrue(startFile.startsWith(`${engineHome}/caches/family-sandbox/`));
+            const script = NodeFS.readFileSync(startFile, "utf8");
+            assert.include(script, "exec /usr/bin/sandbox-exec -f ");
+            assert.include(script, "/usr/bin/env -i ");
+            assert.include(script, "'PATH=/usr/bin:/bin'");
+            assert.include(script, "'GIT_CONFIG_GLOBAL=/dev/null'");
+            assert.include(script, "/bin/zsh -f -c 'npm run dev'");
+            assert.notInclude(script, "GITHUB_TOKEN");
+            const profile = NodeFS.readFileSync(/-f '([^']+\.sb)'/.exec(script)![1]!, "utf8");
+            assert.include(profile, "(deny default)");
+            const lines = profile.split("\n");
+            const real = NodeFS.realpathSync(folder);
+            assert.include(
+              lines.find((line) => line.startsWith("(allow file-write*")),
+              `(subpath "${real}")`,
+            );
+            assert.include(
+              lines.find((line) => line.startsWith("(deny file-write*")),
+              `(subpath "${real}/.git")`,
+            );
+            assert.include(profile, '(allow network-inbound (local ip "localhost:*"))');
+            assert.notInclude(profile, "network-outbound");
+            // Stopping takes the site's temporary folder away with it.
+            const tmpDir = /'TMPDIR=([^']+)'/.exec(script)![1]!;
+            assert.isTrue(NodeFS.existsSync(tmpDir));
+            yield* preview.stop(THREAD);
+            assert.isFalse(NodeFS.existsSync(tmpDir));
+          }),
+        ),
+    );
+
+    it.effect("asks a grown-up when this computer can't keep the site inside the project", () =>
+      withPreview({ packageJson: SITE, contained: false }, ({ preview, family, calls }) =>
+        Effect.gen(function* () {
+          yield* family.enable({ code: CODE, childName: null });
+          const ready = yield* preview.status(THREAD);
+          assert.deepEqual(ready.state === "ready" ? ready.decision : null, {
+            kind: "grown-up",
+            reasons: [FAMILY_UNCONTAINED_REASON],
+          });
+          const requestId = ready.state === "ready" ? ready.requestId : "";
+          assert.equal(
+            (yield* Effect.flip(
+              preview.start({ threadId: THREAD, sessionId: SESSION, approved: true }),
+            )).reason,
+            "needs-grown-up",
+          );
+          yield* family.verify({ code: CODE, purpose: "approve", sessionId: SESSION, requestId });
+          yield* preview.start({ threadId: THREAD, sessionId: SESSION, approved: true });
+          assert.include(calls, "write npm run dev; exit\r");
         }),
       ),
     );
