@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   ChildMakesList,
   childMakeBadge,
+  childProjectHref,
   nextChildProjectName,
   ProfileMenu,
   SidebarIdentity,
@@ -104,5 +105,21 @@ describe("Sidebar identity in the child view", () => {
     );
     expect(html).toContain("Mum");
     expect(html).not.toContain("Grown-up");
+  });
+});
+
+describe("childProjectHref", () => {
+  const row = (id: string, projectKey: string) =>
+    ({ projectKey, shell: { id, environmentId: "env-1" } }) as unknown as ConversationRow;
+  const project = { id: "p1", environmentId: "env-1" } as never;
+
+  it("opens the project's newest make", () => {
+    const href = childProjectHref([row("t-other", "env-1:p2"), row("t-new", "env-1:p1")], project);
+    expect(href).toBe("#/thread/env-1/t-new");
+  });
+
+  it("opens the project's files while nothing is made there", () => {
+    expect(childProjectHref([row("t-other", "env-1:p2")], project)).toBe("#/files/env-1/p1");
+    expect(childProjectHref([], project)).toBe("#/files/env-1/p1");
   });
 });

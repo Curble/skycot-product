@@ -104,20 +104,46 @@ export function asksForReply(text: string): boolean {
   return ASKS_FOR_REPLY.test(tail.join(" "));
 }
 
+function isLive(runtimeStatus: string): boolean {
+  return (
+    runtimeStatus === "preparing" ||
+    runtimeStatus === "queued" ||
+    runtimeStatus === "starting" ||
+    runtimeStatus === "running" ||
+    runtimeStatus === "waiting"
+  );
+}
+
+/**
+ * True while a turn really is running (or being stopped, or held on an ask): the one signal the
+ * header status, the Stop button and the plan's Build it buttons all read, so they switch
+ * together. A runtime that only reads "waiting" with nothing pending is the plan sitting there
+ * ready, not a turn underway.
+ */
+export function threadTurnUnderway(
+  shell: Pick<
+    EnvironmentThreadShell,
+    "runtime" | "source" | "hasPendingApprovals" | "hasPendingUserInput"
+  >,
+): boolean {
+  const runtimeStatus = shell.runtime?.status ?? "idle";
+  if (!isLive(runtimeStatus)) return false;
+  if (runtimeStatus !== "waiting") return true;
+  return (
+    shell.source.latestRunStopRequested === true ||
+    shell.hasPendingApprovals ||
+    shell.hasPendingUserInput
+  );
+}
+
 export function describeThreadStatus(
   shell: EnvironmentThreadShell,
   options: ThreadStatusOptions = {},
 ): ConversationStatus {
   const runtimeStatus = shell.runtime?.status ?? "idle";
-  const live =
-    runtimeStatus === "preparing" ||
-    runtimeStatus === "queued" ||
-    runtimeStatus === "starting" ||
-    runtimeStatus === "running" ||
-    runtimeStatus === "waiting";
   // Stop was pressed: the provider may take a while to confirm, but nothing
   // will run and no ask can be answered, so every surface says so at once.
-  if (live && shell.source.latestRunStopRequested === true) {
+  if (isLive(runtimeStatus) && shell.source.latestRunStopRequested === true) {
     return {
       kind: "stopped",
       headline: "Stopping…",
@@ -150,8 +176,7 @@ export function describeThreadStatus(
   }
   // While Sam is answering again the Build it buttons are hidden, so an older waiting plan
   // must not say "press Build it": the running turn speaks until it finishes.
-  const turnUnderway = live && runtimeStatus !== "waiting";
-  if (shell.hasActionableProposedPlan && !turnUnderway) {
+  if (shell.hasActionableProposedPlan && !threadTurnUnderway(shell)) {
     return {
       kind: "plan",
       headline: options.childView

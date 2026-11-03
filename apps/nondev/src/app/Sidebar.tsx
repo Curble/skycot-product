@@ -38,7 +38,7 @@ import {
   navigate,
   type Route,
 } from "../router";
-import { settingsHref, threadHref } from "../router";
+import { filesHref, settingsHref, threadHref } from "../router";
 import { enabledEnvironmentIdsAtom } from "../state/catalog";
 import { conversationRowsAtom, projectKeyOf, type ConversationRow } from "../state/conversations";
 import { environmentProjects, projectEnvironment } from "../state/projects";
@@ -386,7 +386,21 @@ export function AppSidebar({
                       count={countsByProject.get(key) ?? 0}
                       attention={attentionByProject.has(key)}
                       selected={conversationRoute && shell.projectKey === key}
-                      onClick={() => showList(() => shell.setProjectKey(key))}
+                      onClick={() => {
+                        if (!childView) {
+                          showList(() => shell.setProjectKey(key));
+                          return;
+                        }
+                        // A child has no list column: the project opens its newest make, or
+                        // its files while nothing is made there yet.
+                        const archived = new Set(archivedChildRows.map((row) => row.shell.id));
+                        const href = childProjectHref(
+                          childMakes.filter((row) => !archived.has(row.shell.id)),
+                          project,
+                        );
+                        shell.setProjectKey(key);
+                        select(() => navigate(href));
+                      }}
                       // Questions is SKYCOT's own space: nothing to rename or re-icon.
                       {...(project.isScratch === true
                         ? {}
@@ -589,6 +603,21 @@ export function AppSidebar({
       </nav>
     </>
   );
+}
+
+/**
+ * Where a child's click on a project goes: that project's newest make (`makes` is already limited
+ * to this child's own, newest first), or its files page while nothing is made there yet.
+ */
+export function childProjectHref(
+  makes: ReadonlyArray<ConversationRow>,
+  project: Pick<EnvironmentProject, "id" | "environmentId">,
+): string {
+  const key = projectKeyOf({ environmentId: project.environmentId, projectId: project.id });
+  const newest = makes.find((row) => row.projectKey === key);
+  return newest === undefined
+    ? filesHref(project.environmentId, project.id)
+    : threadHref(newest.shell.environmentId, newest.shell.id);
 }
 
 /** Who the footer stands for: the grown-up whose settings the gear opens, never the computer. */

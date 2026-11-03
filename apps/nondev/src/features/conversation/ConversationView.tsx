@@ -470,7 +470,7 @@ export function ConversationView({
           </span>
         </div>
         <div className="fm-conv-header__tools">
-          {active ? (
+          {active && status?.kind !== "plan" ? (
             <StopButton
               environmentId={environmentId}
               threadId={threadId}

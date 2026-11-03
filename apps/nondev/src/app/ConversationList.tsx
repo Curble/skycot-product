@@ -9,6 +9,7 @@ import { useChildFirst } from "../features/family-limits/useChildFirst";
 import { useChildView } from "./useChildView";
 import { projectsForChild, rowsForChild } from "../features/family-limits/order";
 import { useLimits } from "../features/family-limits/store";
+import { familyIdentityPending } from "../features/family/family";
 import { useFamily } from "../features/family/FamilyProvider";
 import { filesHref, navigate, threadHref } from "../router";
 import {
@@ -164,7 +165,7 @@ export function ConversationList({
         </div>
       ) : null}
       <div className="fm-list-column__scroll">
-        {waitingForData ? (
+        {waitingForData && familyIdentityPending(family.profile) ? null : waitingForData ? (
           <EmptyState icon={Laptop} title={old && connected ? "Looking…" : "Waiting for your Mac…"}>
             {old && connected ? null : "Your conversations appear as soon as it's reachable."}
           </EmptyState>

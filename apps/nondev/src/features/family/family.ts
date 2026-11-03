@@ -533,6 +533,15 @@ export interface FamilyView {
   readonly welcome: Welcome;
 }
 
+/**
+ * True until the engine (or a cached profile that is on) has said who is using SKYCOT here.
+ * While it holds, nothing may greet a person or say "Waiting for your Mac": the answer decides
+ * between a named child, the picker and a grown-up.
+ */
+export function familyIdentityPending(view: FamilyView): boolean {
+  return view.source === "cache" && !view.enabled;
+}
+
 export const EMPTY_VIEW: FamilyView = {
   enabled: false,
   childName: null,

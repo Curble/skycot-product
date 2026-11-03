@@ -4,7 +4,6 @@
 // normal mode (not plan mode) and its usual autonomy, so "Ask me first" still asks
 // before each step. The other two open a reply field inside the card so the
 // conversation stays in the stream; with plan first on, that reply plans again.
-import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import type { OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import { kidSafePlan } from "../kidSafeText";
 import { planMayNeedGrownUp } from "../planNeedsGrownUp";
 import { engineCaughtUp, useSendInFlight } from "../sendsInFlight";
 import { shownAgainLater, splitInlineSteps } from "../planText";
+import { threadTurnUnderway } from "../status";
 
 type PlanItem = Extract<OrchestrationV2TurnItem, { type: "proposed_plan" }>;
 
@@ -56,7 +56,7 @@ export function PlanCard({
     { planId: item.planId, writtenAt: item.completedAt ?? item.updatedAt },
     projection.runs,
   );
-  const busyThread = shell ? threadRuntimeIsActive(shell.runtime) : false;
+  const busyThread = shell ? threadTurnUnderway(shell) : false;
   const card = describeRuntimeRequest(item, projectName === null ? {} : { projectName });
   const dispatch = useDecisionDispatcher({ environmentId, threadId, shell });
   const [mode, setMode] = useState<Mode>("idle");

@@ -8,6 +8,7 @@ import {
   describeThreadStatus,
   hasReadyCheckpointPill,
   saysRefused,
+  threadTurnUnderway,
 } from "./status";
 
 function shell(fields: {
@@ -160,5 +161,33 @@ describe("describeThreadStatus after Take back (4o)", () => {
   it("still says Stopped when Stop was pressed before the run began", () => {
     const status = describeThreadStatus(withRun({ startedAt: null }, true));
     expect(status.kind).toBe("stopped");
+  });
+});
+
+describe("threadTurnUnderway (one signal for header, Stop and Build it)", () => {
+  const withPlan = (fields: Parameters<typeof shell>[0]) =>
+    ({ ...shell(fields), hasActionableProposedPlan: true }) as EnvironmentThreadShell;
+
+  it("is not underway when the runtime only reads waiting beside a ready plan", () => {
+    const planReady = withPlan({ runtime: "waiting" });
+    expect(threadTurnUnderway(planReady)).toBe(false);
+    expect(describeThreadStatus(planReady, { childView: true }).kind).toBe("plan");
+  });
+
+  it("is underway while running, and the header agrees", () => {
+    const running = withPlan({ runtime: "running" });
+    expect(threadTurnUnderway(running)).toBe(true);
+    expect(describeThreadStatus(running, { childView: true }).kind).toBe("working");
+  });
+
+  it("stays underway when Stop was pressed or a grown-up answer is pending", () => {
+    expect(threadTurnUnderway(withPlan({ runtime: "waiting", stopRequested: true }))).toBe(true);
+    const asking = { ...withPlan({ runtime: "waiting" }), hasPendingApprovals: true };
+    expect(threadTurnUnderway(asking as EnvironmentThreadShell)).toBe(true);
+  });
+
+  it("is not underway when nothing is live", () => {
+    expect(threadTurnUnderway(shell({ runtime: "idle" }))).toBe(false);
+    expect(threadTurnUnderway(shell({}))).toBe(false);
   });
 });

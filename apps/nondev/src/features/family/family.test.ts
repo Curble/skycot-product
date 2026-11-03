@@ -4,6 +4,7 @@ import {
   EMPTY_PROFILE,
   EMPTY_SETUP_DRAFT,
   EMPTY_VIEW,
+  familyIdentityPending,
   LOCKOUT_MS,
   MAX_ATTEMPTS,
   asksEachStep,
@@ -654,5 +655,13 @@ describe("grown-up grants", () => {
     expect(
       openGrantsSentence({ openUntil: { grownUpSession: 15 * 60_000, settings: 10 * 60_000 } }, 0),
     ).toBe("Grown-up mode for 15 more minutes.");
+  });
+});
+
+describe("familyIdentityPending", () => {
+  it("holds until the engine answers or a cached profile is on", () => {
+    expect(familyIdentityPending(EMPTY_VIEW)).toBe(true);
+    expect(familyIdentityPending({ ...EMPTY_VIEW, enabled: true, childName: "Ava" })).toBe(false);
+    expect(familyIdentityPending({ ...EMPTY_VIEW, source: "engine" })).toBe(false);
   });
 });

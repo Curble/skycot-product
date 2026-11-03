@@ -8,6 +8,7 @@ import { HOME_HREF, navigate, threadHref, WELCOME_HREF } from "../../router";
 import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
 import { familyCopy } from "../family/copy";
+import { familyIdentityPending } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { useChildView } from "../../app/useChildView";
 import { askWhoStarted, useLimits } from "../family-limits/store";
@@ -47,6 +48,8 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   const rows = useAtomValue(conversationRowsAtom);
   const connected = useConnected();
   const family = useFamily();
+  // Before the engine says who is here there is no honest greeting and no honest "waiting".
+  const identityPending = familyIdentityPending(family.profile);
   const childView = useChildView();
   const { today } = useLimits();
   useEffect(() => {
@@ -107,30 +110,34 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
             <div>
               <p className="fm-home__from">{mascotCopy.homeHello}</p>
               {/* No name unless the Family profile gave one: the only other label is the Mac's, and "Good evening, iMac" is worse than none. */}
-              <h2 className="fm-home__greeting">
-                <span className="fm-marker-underline">
-                  {greetingForHour(new Date().getHours())}
-                  {family.enabled && grownUpName
-                    ? `, ${grownUpName}`
-                    : family.enabled && grownUpId === null && family.profile.childName
-                      ? `, ${family.profile.childName}`
-                      : ""}
-                  .
-                </span>
-              </h2>
-              <p className="fm-home__sub">
-                {summarySentence(
-                  working,
-                  waiting,
-                  ready,
-                  active.length,
-                  connected,
-                  childView,
-                  needsGrownUp,
-                  failed,
-                  plansReady,
-                )}
-              </p>
+              {identityPending ? null : (
+                <h2 className="fm-home__greeting">
+                  <span className="fm-marker-underline">
+                    {greetingForHour(new Date().getHours())}
+                    {family.enabled && grownUpName
+                      ? `, ${grownUpName}`
+                      : family.enabled && grownUpId === null && family.profile.childName
+                        ? `, ${family.profile.childName}`
+                        : ""}
+                    .
+                  </span>
+                </h2>
+              )}
+              {identityPending ? null : (
+                <p className="fm-home__sub">
+                  {summarySentence(
+                    working,
+                    waiting,
+                    ready,
+                    active.length,
+                    connected,
+                    childView,
+                    needsGrownUp,
+                    failed,
+                    plansReady,
+                  )}
+                </p>
+              )}
             </div>
           </div>
           <StarterCards onPick={starterPick.pick} />
