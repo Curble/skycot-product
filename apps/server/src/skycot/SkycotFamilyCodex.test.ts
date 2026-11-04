@@ -442,6 +442,52 @@ describe("SkycotFamilyCodex containment profile", () => {
     assert.throws(() => SkycotFamilyCodex.everyOtherName("/Users/kid", new Set(["-x", ".y"])));
   });
 
+  it("never writes an accented or other non-ASCII name in a glob: refused instead (B1)", () => {
+    // macOS's sandbox folds accents its own way: with `élan` kept, `eve/` and `ève/` were readable.
+    for (const keep of ["élan", "ève", "café", "naïve", "日本", "élan", "tab\tname"]) {
+      assert.throws(
+        () => SkycotFamilyCodex.everyOtherName("/Users/kid/Projects", new Set([keep])),
+        SkycotFamilyCodex.FamilyCodexPathError,
+        undefined,
+        keep,
+      );
+    }
+    // An accented folder on the way down is refused too.
+    assert.throws(
+      () => SkycotFamilyCodex.everyOtherName("/Users/kid/Développement", new Set(["x"])),
+      SkycotFamilyCodex.FamilyCodexPathError,
+    );
+    // Only plain ASCII ever reaches a pattern.
+    const globs = SkycotFamilyCodex.everyOtherName(
+      "/Users/kid/Projects",
+      new Set(["elan", "My Game_2"]),
+    );
+    for (const glob of globs) assert.match(glob, /^[\x20-\x7E]+$/, glob);
+  });
+
+  it("refuses the whole profile for a project with an accent in it or above it (B1)", () => {
+    for (const cwd of ["/Users/kid/Projects/élan", "/Users/kid/Développement/x"]) {
+      assert.throws(
+        () => SkycotFamilyCodex.familyCodexThreadContainment(PLACES, cwd),
+        SkycotFamilyCodex.FamilyCodexPathError,
+        undefined,
+        cwd,
+      );
+    }
+    // A plain-ASCII project next to accented siblings is fine: their names are never written.
+    const config = SkycotFamilyCodex.familyCodexThreadContainment(PLACES, "/Users/kid/Projects/elan");
+    const profile = config[`permissions.${SkycotFamilyCodex.FAMILY_CODEX_PROFILE}`] as {
+      filesystem: Record<string, string>;
+    };
+    assert.strictEqual(profile.filesystem["/Users/kid/Projects/elan"], "write");
+    const globs = Object.keys(profile.filesystem).filter((key) => /[[*]/.test(key));
+    const closed = (path: string) => globs.some((glob) => globToRegExp(glob).test(path));
+    for (const sibling of ["eve/s.txt", "Eve2/s.txt", "elan2/s.txt", "elan-old/x"]) {
+      assert.isTrue(closed(`/Users/kid/Projects/${sibling}`), sibling);
+    }
+    assert.isFalse(closed("/Users/kid/Projects/elan/index.html"));
+  });
+
   it("gives a thread its project's profile, no internet, and a filtered environment", () => {
     const config = SkycotFamilyCodex.familyCodexThreadContainment(PLACES, "/workspace");
     const profile = config[`permissions.${SkycotFamilyCodex.FAMILY_CODEX_PROFILE}`] as {

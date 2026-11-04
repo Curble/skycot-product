@@ -183,17 +183,33 @@ export class FamilyCodexPathError extends Error {}
 const GLOB_SPECIAL = /[*?[{}]/g;
 /** Characters SKYCOT does not try to write in a glob at all. */
 const GLOB_REFUSED = /[\]\\]/;
+/**
+ * Only plain ASCII (letters, digits, space and printable punctuation) is ever written in a glob.
+ * macOS's sandbox folds accented and other non-ASCII letters its own way (pre-release review B1,
+ * checked live with codex-cli 0.160.1: with the project `Projects/élan`, the globs meant to close
+ * its siblings let `eve/`, `elan2/` and `ève/` be read). A name with any other character next to
+ * the project, the toolchains or the temporary folder, or on the way down to them, is not
+ * written at all: the profile is not built and Codex does not start (fail closed).
+ */
+const GLOB_SAFE = /^[\x20-\x7E]*$/;
 /** Characters that stand for themselves inside a class (checked live, codex-cli 0.160.1). */
-const CLASS_PLAIN = /^[\p{L}\p{N} _]$/u;
+const CLASS_PLAIN = /^[A-Za-z0-9 _]$/;
+
+const assertGlobSafe = (text: string) => {
+  if (!GLOB_SAFE.test(text)) {
+    throw new FamilyCodexPathError(`can't write ${JSON.stringify(text)} in a glob (not plain ASCII)`);
+  }
+  if (GLOB_REFUSED.test(text)) throw new FamilyCodexPathError(`can't write ${text} as a glob`);
+};
 
 const globLiteral = (text: string) => {
-  if (GLOB_REFUSED.test(text)) throw new FamilyCodexPathError(`can't write ${text} as a glob`);
+  assertGlobSafe(text);
   return text.replace(GLOB_SPECIAL, (char) => `[${char}]`);
 };
 
 /**
  * "Any one character except these, and never a folder separator". macOS's sandbox reads a
- * class its own way, so only the forms checked live are written: letters, digits, space and
+ * class its own way, so only the forms checked live are written: ASCII letters, digits, space and
  * `_` as themselves, `-` first, `.` as the range `.-/` (which also covers `/`), anything else as
  * a one-character range. `-` and `.` together have no form that works: refused.
  */
@@ -205,7 +221,7 @@ const notOneOf = (chars: ReadonlySet<string>) => {
     .filter((char) => char !== "-" && char !== ".")
     .sort()
     .map((char) => {
-      if (GLOB_REFUSED.test(char)) throw new FamilyCodexPathError(`can't write ${char} in a glob`);
+      assertGlobSafe(char);
       return CLASS_PLAIN.test(char) ? char : `${char}-${char}`;
     });
   return `[!${chars.has("-") ? "-" : ""}${members.join("")}${chars.has(".") ? ".-/" : "/"}]`;
@@ -237,6 +253,9 @@ const asGlob = (text: string) => {
  * (`p[!/]**`).
  */
 export function everyOtherName(folder: string, keep: ReadonlySet<string>): Array<string> {
+  // Before lower-casing: an accent must never reach a glob, whatever toLowerCase makes of it.
+  assertGlobSafe(folder);
+  for (const name of keep) assertGlobSafe(name);
   const kept = new Set([...keep].map((name) => name.toLowerCase()));
   const names = [...kept].map((name) => Array.from(name));
   const prefixes = new Map<string, Array<string>>();
