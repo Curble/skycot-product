@@ -105,6 +105,8 @@ describe("SkycotFamilyClaude.lockQueryOptions", () => {
       "/Users/kid/.skycot/bin",
       "/Users/kid/.skycot/origin-secret.txt",
       "/Users/kid/SKYCOT/my-game/.git",
+      "/Users/kid/SKYCOT/my-game/.codex",
+      "/Users/kid/SKYCOT/my-game/.agents",
       "/private/tmp/claude-501",
     ]) {
       assert.include(sandbox.filesystem?.denyWrite ?? [], place);
@@ -646,6 +648,12 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
       assert.isNull(refusal(dirs, "Grep", { pattern: "x" }));
       assert.isNull(refusal(dirs, "Read", { file_path: NodePath.join(dirs.attachments, "a.png") }));
       assert.isNull(refusal(dirs, "Bash", { command: "rm -rf /" }));
+      // Only the folders themselves: names that merely start the same way are the child's.
+      assert.isNull(refusal(dirs, "Write", { file_path: "codex/notes.md", content: "" }));
+      assert.isNull(refusal(dirs, "Write", { file_path: ".codexrc", content: "" }));
+      assert.isNull(refusal(dirs, "Write", { file_path: "src/.agents/x", content: "" }));
+      // Reading them is fine (Codex and SKYCOT read them anyway).
+      assert.isNull(refusal(dirs, "Read", { file_path: ".codex/config.toml" }));
     }));
 
   it("refuses a symlink, `..`, `~` or an absolute path that leaves the project", () =>
@@ -662,6 +670,11 @@ describe("SkycotFamilyClaude.fileToolRefusal", () => {
         ["NotebookEdit", { notebook_path: NodePath.join(dirs.outside, "n.ipynb") }],
         ["Write", { file_path: NodePath.join(dirs.attachments, "a.png"), content: "" }],
         ["Write", { file_path: NodePath.join(dirs.project, ".git", "hooks", "pre-commit") }],
+        // The assistants' own project settings (S1): Codex's config and hooks, skills.
+        ["Write", { file_path: NodePath.join(dirs.project, ".codex", "config.toml"), content: "" }],
+        ["Write", { file_path: NodePath.join(dirs.project, ".CODEX", "config.toml"), content: "" }],
+        ["Edit", { file_path: NodePath.join(dirs.project, ".Agents", "skills", "x", "SKILL.md") }],
+        ["Write", { file_path: NodePath.join(dirs.project, ".agents"), content: "" }],
         ["SomeNewTool", { path: dirs.outside }],
         // A link whose target is not there yet: a write would land wherever it points.
         ["Write", { file_path: NodePath.join(dirs.project, "dangling.plist"), content: "" }],

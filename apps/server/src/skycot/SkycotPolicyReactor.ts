@@ -143,8 +143,10 @@ export function mayAutoApprove(
   if (family?.relief !== undefined) return !family.needsGrownUp && family.base.decision !== "hold";
   if (options.codexNetworkLocked && family !== undefined) {
     const familyIds = family.family.map((match) => match.rule.id);
-    // Inline code that reaches files is not contained: Codex's sandbox still lets it read
-    // anything on the Mac (family.ts `reachesComputer`).
+    // Inline code that reaches files still waits for a person (family.ts `reachesComputer`):
+    // the network lock only proves "offline". A child's Codex thread now also keeps reads in
+    // the project (SkycotFamilyCodex's permission profile), but this test does not know which
+    // sandbox the turn has, and a governed grown-up's workspace sandbox reads the whole Mac.
     const internetContained =
       familyIds.length === 1 &&
       (familyIds[0] === "uses-internet" || familyIds[0] === "opaque-code") &&

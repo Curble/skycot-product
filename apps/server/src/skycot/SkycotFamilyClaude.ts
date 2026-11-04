@@ -48,7 +48,6 @@ import * as NodePath from "node:path";
 import type { PermissionMode, SandboxSettings } from "@anthropic-ai/claude-agent-sdk";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import type * as Scope from "effect/Scope";
 
 import type { FamilyLockdown } from "./SkycotFamilyLockdown.ts";
 import * as SkycotFamilySandbox from "./SkycotFamilySandbox.ts";
@@ -244,25 +243,8 @@ export const claudeVersionOutput = (
     });
   });
 
-/**
- * This conversation's own temporary folder (SkycotFamilySandbox.makeFamilyTempDir), removed
- * when the session ends; undefined when it could not be made, and the child's Claude is then
- * refused like a missing sandbox.
- */
-export const scopedFamilyTempDir: Effect.Effect<string | undefined, never, Scope.Scope> =
-  Effect.acquireRelease(
-    Effect.sync(() => {
-      try {
-        return SkycotFamilySandbox.makeFamilyTempDir();
-      } catch {
-        return undefined;
-      }
-    }),
-    (dir) =>
-      dir === undefined
-        ? Effect.void
-        : Effect.sync(() => NodeFS.rmSync(dir, { recursive: true, force: true })),
-  );
+/** This conversation's own temporary folder (SkycotFamilySandbox.scopedFamilyTempDir). */
+export const scopedFamilyTempDir = SkycotFamilySandbox.scopedFamilyTempDir;
 
 /** What the child sees when the installed Claude Code is older than that. */
 export const FAMILY_CLAUDE_TOO_OLD_REFUSAL = `The Family profile is on, and the Claude Code on this computer is too old for Claude's safe area (it keeps Claude's commands inside the project and off the internet), so Claude didn't start. A grown-up can update Claude Code to version ${FAMILY_CLAUDE_MIN_VERSION} or newer, choose Codex for this conversation, or switch the Family profile off.`;
@@ -388,7 +370,7 @@ export function fileToolRefusal(input: {
     if (real === null || !roots.some((root) => SkycotFamilySandbox.isWithin(root, real))) {
       return FAMILY_OUTSIDE_PROJECT_MESSAGE;
     }
-    if (writes && SkycotFamilySandbox.isWithin(NodePath.join(project, ".git"), real)) {
+    if (writes && SkycotFamilySandbox.projectNeverWritable(project, real)) {
       return FAMILY_OUTSIDE_PROJECT_MESSAGE;
     }
   }
@@ -397,7 +379,7 @@ export function fileToolRefusal(input: {
 
 /** What the assistant is told when one of its file tools points outside the project. */
 export const FAMILY_OUTSIDE_PROJECT_MESSAGE =
-  "In the Family profile SKYCOT keeps your work inside this project's folder, so this step was not done: it points outside the folder, or at the hidden .git folder where SKYCOT keeps the project's versions. Do not try it again. Carry on inside the project folder, or say in one short sentence that this part needs a grown-up.";
+  "In the Family profile SKYCOT keeps your work inside this project's folder, so this step was not done: it points outside the folder, at the hidden .git folder where SKYCOT keeps the project's versions, or at the hidden .codex or .agents folder that holds the assistants' own settings. Do not try it again. Carry on inside the project folder, or say in one short sentence that this part needs a grown-up.";
 
 /** The answers key that carries a note for the assistant with a "decline" (SkycotApprovedInstalls). */
 export const ASSISTANT_NOTE_ANSWER = "skycotAssistantNote";

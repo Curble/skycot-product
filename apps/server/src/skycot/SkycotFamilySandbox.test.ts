@@ -55,6 +55,8 @@ describe("SkycotFamilySandbox.familyFilesystem", () => {
     const rules = filesystem("/usr/bin");
     for (const place of [
       `${project}/.git`,
+      `${project}/.codex`,
+      `${project}/.agents`,
       "/Users/kid/.skycot/userdata",
       "/Users/kid/.skycot/caches",
       "/Users/kid/.skycot/origin-secret.txt",
