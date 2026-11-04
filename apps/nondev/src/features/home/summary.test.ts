@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
+import { homeListPending, homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 
 describe("summarySentence", () => {
   it("keeps the noun when only one kind of job exists", () => {
@@ -122,5 +122,26 @@ describe("Your things pins", () => {
     const { pinned, rest } = splitPinned(mine);
     expect(pinned.map((row) => row.shell.id)).toEqual(["mine-b"]);
     expect(rest.map((row) => row.shell.id)).toEqual(["mine-a"]);
+  });
+});
+
+describe("homeListPending", () => {
+  const base = { connected: true, listArrived: true, childView: false, ownersLoaded: false };
+
+  it("holds the sentence while connected but the first conversation list has not arrived", () => {
+    expect(homeListPending({ ...base, listArrived: false })).toBe(true);
+  });
+
+  it("holds it for a child until the engine has said which conversations are theirs", () => {
+    expect(homeListPending({ ...base, childView: true })).toBe(true);
+    expect(homeListPending({ ...base, childView: true, ownersLoaded: true })).toBe(false);
+  });
+
+  it("a grown-up does not wait for owners", () => {
+    expect(homeListPending(base)).toBe(false);
+  });
+
+  it("not connected: the waiting-for-your-Mac sentence speaks instead", () => {
+    expect(homeListPending({ ...base, connected: false, listArrived: false })).toBe(false);
   });
 });

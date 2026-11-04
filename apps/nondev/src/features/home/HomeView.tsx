@@ -5,13 +5,17 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { useShellState } from "../../app/ShellState";
 import { useConnected } from "../../app/useConnection";
 import { HOME_HREF, navigate, threadHref, WELCOME_HREF } from "../../router";
-import { conversationRowsAtom, type ConversationRow } from "../../state/conversations";
+import {
+  conversationListArrivedAtom,
+  conversationRowsAtom,
+  type ConversationRow,
+} from "../../state/conversations";
 import { useCrew } from "../../themes/useCrew";
 import { familyCopy } from "../family/copy";
 import { familyIdentityPending } from "../family/family";
 import { useFamily } from "../family/FamilyProvider";
 import { useChildView } from "../../app/useChildView";
-import { askWhoStarted, useLimits } from "../family-limits/store";
+import { askTodayOnce, askWhoStarted, useLimits } from "../family-limits/store";
 import { grownUpSessionFor, useGrownUpSessionId } from "../family/grownUpSession";
 import { Button, IconButton } from "../../ui/Button";
 import { Card, CardBody, CardFooter, CardHeader } from "../../ui/Card";
@@ -31,7 +35,7 @@ import { StarterCards, useStarters, type ComposerSeed } from "../starters/Starte
 import { useStarterPick } from "../starters/BuildHelpSheet";
 import { showsFamilySetupCard } from "../onboarding/onboarding";
 import { homeTip } from "./tip";
-import { homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
+import { homeListPending, homeRows, summarySentence, threadIdsWithoutOwner } from "./summary";
 import { greeting as greetingForHour } from "./greeting";
 
 /**
@@ -51,7 +55,17 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
   // Before the engine says who is here there is no honest greeting and no honest "waiting".
   const identityPending = familyIdentityPending(family.profile);
   const childView = useChildView();
-  const { today } = useLimits();
+  const { today, todayAnswered } = useLimits();
+  const listArrived = useAtomValue(conversationListArrivedAtom);
+  const listPending = homeListPending({
+    connected,
+    listArrived,
+    childView,
+    ownersLoaded: todayAnswered,
+  });
+  useEffect(() => {
+    if (childView && connected) askTodayOnce();
+  }, [childView, connected]);
   useEffect(() => {
     const unknown = threadIdsWithoutOwner(rows, today.threads);
     if (unknown.length > 0) askWhoStarted(unknown);
@@ -123,7 +137,12 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   </span>
                 </h2>
               )}
-              {identityPending ? null : (
+              {identityPending ? null : listPending ? (
+                // Same line height as the sentence, so nothing jumps when the real one lands.
+                <p className="fm-home__sub" aria-busy="true">
+                  {"\u00a0"}
+                </p>
+              ) : (
                 <p className="fm-home__sub">
                   {summarySentence(
                     working,
@@ -159,15 +178,17 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                       : "Today, across every project"
                   }
                   subtitle={
-                    active.length === 0
-                      ? connected
-                        ? family.enabled && family.profile.me.kind !== "grown-up"
-                          ? "Sam isn't making anything right now."
-                          : "Nothing is running or waiting on you right now."
-                        : "Your jobs appear once your Mac is reachable."
-                      : family.enabled && family.profile.me.kind !== "grown-up"
-                        ? "Tap any thing to see it."
-                        : "Tap any row to open its conversation."
+                    active.length === 0 && listPending
+                      ? "Looking…"
+                      : active.length === 0
+                        ? connected
+                          ? family.enabled && family.profile.me.kind !== "grown-up"
+                            ? "Sam isn't making anything right now."
+                            : "Nothing is running or waiting on you right now."
+                          : "Your jobs appear once your Mac is reachable."
+                        : family.enabled && family.profile.me.kind !== "grown-up"
+                          ? "Tap any thing to see it."
+                          : "Tap any row to open its conversation."
                   }
                 />
                 {active.length > 0 ? (

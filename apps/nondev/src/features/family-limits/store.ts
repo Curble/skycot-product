@@ -111,9 +111,11 @@ export function parseToday(body: unknown): FamilyToday | null {
 interface LimitsSnapshot {
   readonly session: SessionLimits | null;
   readonly today: FamilyToday;
+  /** A /today read has settled at least once in this window (answer or error): who started what is as known as it gets. */
+  readonly todayAnswered: boolean;
 }
 
-let snapshot: LimitsSnapshot = { session: null, today: EMPTY_TODAY };
+let snapshot: LimitsSnapshot = { session: null, today: EMPTY_TODAY, todayAnswered: false };
 const listeners = new Set<() => void>();
 
 function set(next: Partial<LimitsSnapshot>) {
@@ -166,7 +168,8 @@ export async function heartbeat(): Promise<void> {
 export async function refreshToday(): Promise<FamilyToday | null> {
   if (!readFamilyView().enabled) return null;
   const result = await request("GET", "/today", undefined, parseToday);
-  if (result.ok) set({ today: result.value });
+  if (result.ok) set({ today: result.value, todayAnswered: true });
+  else if (!snapshot.todayAnswered) set({ todayAnswered: true });
   return result.ok ? result.value : null;
 }
 
@@ -186,6 +189,15 @@ export function noteStartedHere(threadId: string): void {
 const askedAbout = new Set<string>();
 
 /** Reads who started what again when the list shows a conversation this device can't place. */
+/** Home's first read of who started what, when nothing else has asked yet (a child with no conversations asks nothing). */
+export function askTodayOnce(): void {
+  if (snapshot.todayAnswered || askedTodayOnce || !readFamilyView().enabled) return;
+  askedTodayOnce = true;
+  void refreshToday();
+}
+
+let askedTodayOnce = false;
+
 export function askWhoStarted(threadIds: ReadonlyArray<string>): void {
   const fresh = threadIds.filter((threadId) => !askedAbout.has(threadId));
   if (fresh.length === 0 || !readFamilyView().enabled) return;

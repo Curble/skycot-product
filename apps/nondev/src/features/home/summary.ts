@@ -28,6 +28,21 @@ export function homeRows<
   return mine;
 }
 
+/**
+ * Home's list is still on its way: connected, but the first conversation list has not arrived,
+ * or (for a child) the engine has not yet said which conversations are theirs. Meanwhile an
+ * empty list is not "nothing on the go", so Home says nothing rather than something untrue.
+ */
+export function homeListPending(input: {
+  readonly connected: boolean;
+  readonly listArrived: boolean;
+  readonly childView: boolean;
+  readonly ownersLoaded: boolean;
+}): boolean {
+  if (!input.connected) return false;
+  return !input.listArrived || (input.childView && !input.ownersLoaded);
+}
+
 export function summarySentence(
   working: number,
   waiting: number,

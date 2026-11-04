@@ -13,7 +13,9 @@ import {
 import { familyOn } from "../features/family/family";
 import { readFamilyView } from "../features/family/store";
 import { isQuestionsProject, projectForConversation } from "../features/questions/questions";
+import { enabledEnvironmentIdsAtom } from "./catalog";
 import { environmentProjects } from "./projects";
+import { environmentSnapshotAtom } from "./shell";
 import { environmentThreadShells } from "./threads";
 
 export interface ConversationRow {
@@ -113,6 +115,18 @@ export const conversationRowsAtom = Atom.make((get): ReadonlyArray<ConversationR
   const refusedRuns = get(refusedRunIdsAtom);
   return newestFirst(shells.map((shell) => toConversationRow(get, shell, refusedRuns)));
 }).pipe(Atom.withLabel("nondev-conversation-rows"));
+
+/**
+ * True once every enabled engine has sent its first conversation list. Before that an empty
+ * list means "not loaded yet", never "nothing here" (Home must not say "Nothing is on the go").
+ */
+export const conversationListArrivedAtom = Atom.make((get): boolean => {
+  const environmentIds = get(enabledEnvironmentIdsAtom);
+  return (
+    environmentIds.length > 0 &&
+    environmentIds.every((environmentId) => get(environmentSnapshotAtom(environmentId)) !== null)
+  );
+}).pipe(Atom.withLabel("nondev-conversation-list-arrived"));
 
 /** "old" lists the conversations that were put away (archived). */
 export type ConversationFilter = "all" | "waiting" | "ready" | "old";
