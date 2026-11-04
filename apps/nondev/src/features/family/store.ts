@@ -10,6 +10,7 @@ import { writeOnboardingState } from "../settings/localPrefs";
 import {
   EMPTY_VIEW,
   FAMILY_CACHE_KEY,
+  cachedViewForChild,
   FAMILY_KEY,
   parseCachedView,
   parseProfile,
@@ -174,6 +175,16 @@ export function saveOwnLook(input: { readonly look?: string; readonly largerText
  */
 export function saveOwnBuildHelp(buildHelp: BuildHelp | null) {
   return settle(familyApi.buildHelp({ buildHelp }), applyStatus);
+}
+
+/**
+ * Before the window restarts for another child: the first paint after the reload names the
+ * child the engine just accepted. Writes the first-paint cache only (this window is about to
+ * go, so nothing here re-renders with the new name over the previous child's things).
+ */
+export function cacheChosenChild(childId: string): void {
+  if (!view.enabled) return;
+  writeStorage(FAMILY_CACHE_KEY, serializeCachedView(cachedViewForChild(view, childId)));
 }
 
 /** The engine's answer about who is using this device, from a choice or a heartbeat. */

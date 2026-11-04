@@ -22,6 +22,7 @@ import {
   LOCKED_ACTIONS,
   isValidCode,
   lockoutSentence,
+  cachedViewForChild,
   parseCachedView,
   parseCodeLength,
   parseProfile,
@@ -540,6 +541,24 @@ describe("several children", () => {
       timeZone: "Australia/Melbourne",
       ...(session === undefined ? {} : { session }),
     })!;
+
+  it("names the picked child in the first-paint cache before the switch reloads", () => {
+    const ava = viewFromStatus(
+      status({ childId: "a", needsChoice: false, device: "shared" }),
+      T0,
+      false,
+    );
+    expect(ava.childName).toBe("Ava");
+    const leo = cachedViewForChild(ava, "l");
+    expect(leo.currentChildId).toBe("l");
+    expect(leo.childName).toBe("Leo");
+    expect(leo.needsChoice).toBe(false);
+    const painted = parseCachedView(serializeCachedView(leo), false);
+    expect(painted.childName).toBe("Leo");
+    expect(painted.currentChildId).toBe("l");
+    // An id the profile does not know changes nothing.
+    expect(cachedViewForChild(ava, "nobody")).toBe(ava);
+  });
 
   it("reads the children, dropping one it cannot read", () => {
     const read = status();

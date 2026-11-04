@@ -698,6 +698,18 @@ export function parseCachedView(raw: string | null, legacy: boolean): FamilyView
   }
 }
 
+/**
+ * Pure: the view the next page load should paint first after the engine accepted a pick of
+ * `childId` on the shared Mac. The switch reloads the window, and without this the cache still
+ * names the child from before ("Good evening, Ava" shown to Leo) until the engine answers.
+ * An unknown child changes nothing; this never decides anything, it only names who was picked.
+ */
+export function cachedViewForChild(view: FamilyView, childId: string): FamilyView {
+  const child = view.children.find((candidate) => candidate.id === childId);
+  if (child === undefined) return view;
+  return { ...view, currentChildId: child.id, needsChoice: false, childName: child.name };
+}
+
 export function serializeCachedView(view: FamilyView): string {
   return JSON.stringify({
     enabled: view.enabled,

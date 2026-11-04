@@ -11,7 +11,7 @@ import { grownUpSessionFor, readGrownUpSessionId } from "../family/grownUpSessio
 import { handoffUnlockProof } from "../family/unlockProof";
 
 import { isSetupOpen } from "../onboarding/onboarding";
-import { applySession, readFamilyView } from "../family/store";
+import { applySession, cacheChosenChild, readFamilyView } from "../family/store";
 import type { FamilyResult } from "../family/family";
 import { parseLimitState, type LimitState, type SessionLimits } from "./limits";
 import { withStarter } from "./order";
@@ -214,6 +214,7 @@ export async function chooseChild(childId: string): Promise<FamilyResult<Session
   // child's cache and every in-memory atom discarded before the new child's session is applied.
   if (result.ok && pickRestartsFresh(before, childId, grownUpSeen())) {
     clearGrownUpSeen();
+    cacheChosenChild(childId);
     startFreshWindow();
   } else if (result.ok) {
     applySessionLimits(result.value);
