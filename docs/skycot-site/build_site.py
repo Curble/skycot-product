@@ -336,7 +336,7 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 
 SITE = "https://skycot.com"
 LAST_UPDATED = "28 October 2026"
-TERMS_UPDATED = "3 November 2026"
+TERMS_UPDATED = "4 November 2026"
 H1 = "The family-friendly AI developer."
 LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
         "Plain English, on your own Mac, with the AI you already pay for.")
@@ -362,7 +362,7 @@ STRUCTURED = json.dumps({
          "operatingSystem": "macOS 13 Ventura or later", "processorRequirements": "Apple silicon (M1 or later)",
          "applicationCategory": "DeveloperApplication", "applicationSubCategory": "Family",
          "softwareVersion": "0.1.1 beta", "releaseNotes": SITE + "/#new",
-         "downloadUrl": "https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.40.beta-arm64.dmg",
+         "downloadUrl": "https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.43.beta-arm64.dmg",
          "fileSize": "160MB", "image": SITE + "/assets/brand/og-beta.png",
          "screenshot": SITE + "/assets/hero.jpg",
          "offers": {"@type": "Offer", "price": "0", "priceCurrency": "AUD",
@@ -759,7 +759,7 @@ def home_body():
     <h3>Try the beta.</h3>
     <p>For Apple silicon Macs (M1 or later) with macOS 13 Ventura or newer. About 160 MB. You'll need an account with at least one supported assistant.</p>
     <div class="actions">
-      <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.40.beta-arm64.dmg">Download the beta for Mac</a>
+      <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.43.beta-arm64.dmg">Download the beta for Mac</a>
       <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
     </div>
     <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/38gtBbywq6">Discord</a>. No newsletter, and the app sends us nothing.</p>
