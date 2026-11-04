@@ -668,6 +668,23 @@ can update Claude Code to version 2.1.276 or newer, choose Codex for this conver
 the Family profile off."_ Claude Code itself is also told to stop rather than run a command
 outside the sandbox.
 
+**Codex's commands stay in the project too.** A child's Codex runs every command, file edit,
+image it looks at and helper agent inside Codex's own safe area with a permission profile
+SKYCOT writes for that conversation, from the same rules as Claude's: it can read only the
+project, the conversation's private temporary folder and the programming tools (PATH folders,
+nvm, pnpm, Homebrew, Python, conda), change only the project (never its `.git`) and that
+folder, has no internet, and keeps only the environment variables a build needs. The family's
+Documents, the shell history, browser profiles, other people's accounts, a brother's or sister's
+project, SKYCOT's own files and every key and sign-in (Codex's own included: Codex itself still
+signs in, its commands can't read how) stay closed, including files saved there after the
+conversation started. Codex's shell snapshot of the grown-up's login shell is off. Before the
+child's first turn, Codex must answer that the profile is in force; if it doesn't (an older
+Codex), or the temporary folder can't be made, the conversation does not start and says:
+_"The Family profile is on, and SKYCOT could not start Codex's safe area on this computer (it
+keeps Codex's commands inside the project and off the internet), so Codex didn't start. A
+grown-up can choose Claude for this conversation or switch the Family profile off."_ Titles and
+other text SKYCOT writes with Codex run with no tools at all.
+
 **An assistant that was already running when the profile was switched on** is stopped the moment
 the child next sends anything, and a fresh one starts without the add-ons (a reply it was in the
 middle of stops). Until then it refuses new conversations, turns and follow-ups. After the profile
@@ -781,7 +798,7 @@ Honestly, so a parent can decide how nearby to stay:
   add-ons children use) is left half-installed. Any other step a grown-up allows that needs the
   internet (a `git push`, a script that downloads) still runs inside the offline sandbox and
   fails, for Codex and Claude alike.
-- **Claude's safe area can see the programming tools.** Folders on the Mac's PATH and the usual
+- **Claude's and Codex's safe areas can see the programming tools.** Folders on the Mac's PATH and the usual
   tool folders (nvm, pnpm, Homebrew, Python, conda) stay readable so builds work; a script in
   the grown-up's own `~/bin` is readable too. Their keys inside those folders (`~/.cargo`'s
   credentials, for example) are not.
@@ -795,9 +812,14 @@ Honestly, so a parent can decide how nearby to stay:
   copies, or one that runs when a conversation is tidied away) run outside the safe area, as the
   grown-up's own choice, in a folder whose files the child's assistant may have written. Leave
   them empty in a child's project.
-- **With Codex, a command can still read the Mac.** Codex's own sandbox keeps writes in the
-  project and the internet off, but it doesn't hide the family's files the way Claude's does;
-  inline programs that touch files already need a grown-up, and a project script does not.
+- **Folders on the way to the project can be listed.** Programs such as Node look up every
+  folder above the one they run in, so with Codex the names inside those folders (the home
+  folder, the projects folder, `/Users`) can be listed; what is in them stays closed. Claude's
+  safe area can look a name up but not list the folder. Codex treats names without regard to
+  case, as the Mac's disk does; on a disk set up to tell `Game` from `game` (rare), a folder whose
+  name differs from the project's only by case is not kept apart.
+- **A grown-up's yes to a Codex file change outside the project** is carried out by Codex outside
+  its safe area (as it was before): the engine holds every such change for a grown-up.
 - **A previewed page can load pictures and scripts from the internet**, as it would in any
   browser; only where the preview itself goes is checked. In the Mac app a link to the internet
   arrives before it is sent back, so the page may flash for a moment. In a web browser (not the

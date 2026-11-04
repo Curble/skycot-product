@@ -1,7 +1,8 @@
 // nondev-seam: skycot-policy-files
 // What a child's commands may read and write while the Family profile is on: one picture of
 // "inside the project", shared by Claude Code's sandbox around a child's Claude
-// (SkycotFamilyClaude.familySandbox) and the macOS sandbox SKYCOT puts around the programs it
+// (SkycotFamilyClaude.familySandbox), Codex's permission profile around a child's Codex
+// (SkycotFamilyCodex.familyCodexProfile) and the macOS sandbox SKYCOT puts around the programs it
 // starts in a child's project itself (the live preview, SkycotPreview).
 //
 // First principles (pre-open-source review F1-R1, 3 Nov 2026). A list of secret places is never
@@ -27,6 +28,9 @@
 import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- path arithmetic for sandbox rules.
 import * as NodePath from "node:path";
+
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 
 /** Where things are on this Mac, for one child's conversation. */
 export interface FamilyPlaces {
@@ -295,6 +299,17 @@ export function isAllowedChildEnv(name: string): boolean {
 }
 
 /**
+ * The same list as name patterns, for sandboxes that filter by glob (Codex's
+ * `shell_environment_policy.include_only`): every allowed name, and the families above.
+ */
+export const FAMILY_CHILD_ENV_PATTERNS: ReadonlyArray<string> = [
+  ...ALLOWED_ENV,
+  "LC_*",
+  "GIT_CONFIG_KEY_*",
+  "GIT_CONFIG_VALUE_*",
+];
+
+/**
  * Git inside a child's sandbox: the grown-up's ~/.gitconfig is unreadable (and may hold tokens
  * in `url.…insteadOf`), and git stops when it can't read it, so commands get no global config
  * and no global ignore file. SKYCOT's own git, outside the sandbox, is unchanged.
@@ -343,6 +358,26 @@ export function makeFamilyTempDir(
   }
   return dir;
 }
+
+/**
+ * One session's own temporary folder (`makeFamilyTempDir`), removed when the session ends;
+ * undefined when it could not be made, and the child's assistant is then refused like a missing
+ * sandbox (Claude and Codex alike).
+ */
+export const scopedFamilyTempDir: Effect.Effect<string | undefined, never, Scope.Scope> =
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      try {
+        return makeFamilyTempDir();
+      } catch {
+        return undefined;
+      }
+    }),
+    (dir) =>
+      dir === undefined
+        ? Effect.void
+        : Effect.sync(() => NodeFS.rmSync(dir, { recursive: true, force: true })),
+  );
 
 // ── macOS sandbox for programs SKYCOT starts in a child's project ───────────────────────────
 

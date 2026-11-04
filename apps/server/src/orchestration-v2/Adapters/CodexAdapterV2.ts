@@ -1755,8 +1755,20 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     }),
                 ),
               );
-        // nondev-seam: skycot-family-lockdown-codex (Family profile on: the process starts with plugins, apps, hooks, computer and browser use and notify off, and every thread with each MCP server and skill off)
+        // nondev-seam: skycot-family-lockdown-codex (Family profile on: the process starts with plugins, apps, hooks, computer and browser use and notify off, and every thread with each MCP server and skill off, its commands contained to the project)
         const skycotLockdown = yield* SkycotFamilyLockdown.sessionLockdown;
+        const skycotSettings = resolvedRuntime?.config ?? adapterOptions.settings;
+        const skycotEnvironment = resolvedRuntime?.environment ?? adapterOptions.environment;
+        const skycotPlaces =
+          skycotLockdown === null
+            ? undefined
+            : yield* SkycotFamilyCodex.sessionPlaces({
+                engineHome: serverConfig.baseDir,
+                stateDir: serverConfig.stateDir,
+                environment: skycotEnvironment,
+                codexHomePath: skycotSettings.homePath,
+                cwd: input.runtimePolicy.cwd,
+              });
         const client = SkycotFamilyCodex.lockClient(
           skycotLockdown,
           yield* clientFactory.open({
@@ -1764,11 +1776,13 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             threadId: input.threadId,
             providerSessionId: input.providerSessionId,
             runtimePolicy: input.runtimePolicy,
-            ...SkycotFamilyCodex.lockLaunch(skycotLockdown, {
-              settings: resolvedRuntime?.config ?? adapterOptions.settings,
-              environment: resolvedRuntime?.environment ?? adapterOptions.environment,
-            }),
+            ...SkycotFamilyCodex.lockLaunch(
+              skycotLockdown,
+              { settings: skycotSettings, environment: skycotEnvironment },
+              skycotPlaces,
+            ),
           }),
+          skycotPlaces,
         );
         const additionalContextByThread = yield* Ref.make(
           new Map<
