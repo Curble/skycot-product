@@ -44,10 +44,6 @@ export function FridgeScreen() {
   const [only, setOnly] = useState<string>("everyone");
   const openIt = useOpenIt(environmentId);
   const [problem, setProblem] = useState<string | null>(null);
-  useEffect(() => {
-    void refreshFridge();
-  }, []);
-
   const childView = useChildView();
   // A child changes only their own magnets (the engine refuses the rest).
   const viewer = childView
@@ -58,6 +54,12 @@ export function FridgeScreen() {
             : family.profile.currentChildId,
       }
     : null;
+  // The engine shows each child their own magnets plus the pinned ones, so ask again whenever
+  // someone else is looking (a child switch on the shared Mac, or the grown-up stepping in).
+  const viewerKey = viewer === null ? "grown-up" : (viewer.childId ?? "child");
+  useEffect(() => {
+    void refreshFridge();
+  }, [viewerKey]);
   const children = family.enabled ? family.profile.children : [];
   const nameOf = (childId: string | null) => {
     const index = children.findIndex((child) => child.id === childId);

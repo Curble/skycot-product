@@ -14,6 +14,10 @@ interface FridgeSnapshot {
 
 let snapshot: FridgeSnapshot = { items: [], loaded: false, problem: null };
 const listeners = new Set<() => void>();
+// The sidebar, the Home tile, the fridge and every pin ask at once; the engine's answer depends
+// on who is looking, so only the newest question may change what is shown (an older, slower
+// answer, perhaps for the child who was looking before, is dropped).
+let latest = 0;
 
 function set(next: FridgeSnapshot) {
   snapshot = next;
@@ -28,13 +32,20 @@ export function useFridge(): FridgeSnapshot {
         listeners.delete(listener);
       };
     },
-    () => snapshot,
-    () => snapshot,
+    fridgeSnapshot,
+    fridgeSnapshot,
   );
 }
 
+/** What this window last heard, outside React. */
+export function fridgeSnapshot(): FridgeSnapshot {
+  return snapshot;
+}
+
 export async function refreshFridge(): Promise<void> {
+  const asked = ++latest;
   const result = await request("GET", "/fridge", undefined, parseFridge).catch(() => null);
+  if (asked !== latest) return;
   set(
     result?.ok
       ? { items: result.value, loaded: true, problem: null }
@@ -51,13 +62,20 @@ export async function pinMagnet(threadId: string, pinned: boolean): Promise<stri
       item.threadId === threadId ? { ...item, pinnedAt: pinned ? Date.now() : null } : item,
     ),
   });
+  const asked = ++latest;
   const result = await request("POST", "/fridge/pin", { threadId, pinned }, parseFridge).catch(
     () => null,
   );
   if (result?.ok) {
-    set({ items: result.value, loaded: true, problem: null });
+    if (asked === latest) set({ items: result.value, loaded: true, problem: null });
     return null;
   }
   await refreshFridge();
   return "That didn't work just now.";
+}
+
+/** Tests only: forget what this window heard. */
+export function resetFridgeForTests(): void {
+  latest = 0;
+  snapshot = { items: [], loaded: false, problem: null };
 }
