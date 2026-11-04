@@ -31,6 +31,17 @@ describe("fridge SVG thumbnails", () => {
     expect(svg).toContain(">?</text>");
     expect(svg).not.toContain("alert(1)");
   });
+
+  it("reads character names in the title and heading once, so a card never shows &apos;", () => {
+    const svg = fridgeSvgThumbnail(
+      "<title>Ava&apos;s Quiz</title><h1>Ava&#39;s &lt;big&gt; quiz &amp;amp; more</h1>",
+      "Fallback",
+    );
+    expect(svg).toContain(">Ava&apos;s Quiz</text>");
+    expect(svg).toContain(">Ava&apos;s &lt;big&gt; quiz &amp;amp; more</text>");
+    expect(svg).not.toContain("&amp;apos;");
+    expect(fridgePageTitle("<title>Tom &amp;apos; s</title>")).toBe("Tom &apos; s");
+  });
 });
 
 const file = (path: string, kind = "modified") => ({ path, kind, additions: 1, deletions: 0 });

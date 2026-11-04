@@ -19,6 +19,18 @@ export interface FridgeItem {
   readonly pinnedAt: number | null;
 }
 
+/**
+ * Whether this viewer may pin or take down a magnet. The engine's /fridge/pin rule: a child (own
+ * device or the shared Mac) changes only their own magnets; a grown-up (viewer null) any. The
+ * screen hides the button otherwise, so a sibling never presses one that silently does nothing.
+ */
+export function mayPinMagnet(
+  item: Pick<FridgeItem, "childId">,
+  viewer: { readonly childId: string | null } | null,
+): boolean {
+  return viewer === null || (viewer.childId !== null && item.childId === viewer.childId);
+}
+
 export function childFridgeTitle(
   item: Pick<FridgeItem, "title" | "madeAt">,
   childName: string | null,

@@ -73,20 +73,23 @@ export function FridgeMagnet({
       <span className="fm-magnet__sticker" aria-hidden>
         <CrewAvatar role="builder" size="sm" />
       </span>
-      {compact || onPin === undefined ? null : (
+      {compact ? null : (
         <div className="fm-magnet__actions">
           <Button size="sm" icon={Play} onClick={onOpen}>
             Open it
           </Button>
-          <Button
-            size="sm"
-            variant="quiet"
-            icon={pinned ? PinOff : Pin}
-            onClick={() => onPin(!pinned)}
-            aria-pressed={pinned}
-          >
-            {pinned ? "Take it down" : "Pin to the fridge"}
-          </Button>
+          {/* No onPin: this viewer may not change this magnet (a sibling's), so no button. */}
+          {onPin === undefined ? null : (
+            <Button
+              size="sm"
+              variant="quiet"
+              icon={pinned ? PinOff : Pin}
+              onClick={() => onPin(!pinned)}
+              aria-pressed={pinned}
+            >
+              {pinned ? "Take it down" : "Pin to the fridge"}
+            </Button>
+          )}
         </div>
       )}
     </article>

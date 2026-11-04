@@ -141,7 +141,7 @@ function FamilyNoteCard({ item }: { readonly item: WaitingFamilyNote }) {
           />
         </ButtonRow>
       ) : (
-        <ButtonRow minWidthEach={95}>
+        <ButtonRow minWidthEach={130}>
           <Button
             title="15 min"
             kind="grey"

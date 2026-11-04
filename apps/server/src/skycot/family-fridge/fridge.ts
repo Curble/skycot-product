@@ -82,10 +82,7 @@ export function cardInk(mat: string): { readonly ink: string; readonly plate: st
 
 export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string {
   const title = fridgePageTitle(html) ?? fallbackTitle;
-  const heading = (html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ?? "")
-    .replace(/<[^>]*>/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
+  const heading = plainText(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ?? "");
   const colors = html.match(/#[\da-f]{3}(?:[\da-f]{3})?\b/giu) ?? [];
   const colorCounts = new Map<string, number>();
   for (const color of colors) colorCounts.set(color, (colorCounts.get(color) ?? 0) + 1);
@@ -108,21 +105,29 @@ export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string 
 
 /** A page's own name wins over the conversation's first request. */
 export function fridgePageTitle(html: string): string | null {
-  const text = (
+  const text = plainText(
     html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/iu)?.[1] ??
-    html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ??
-    ""
-  )
+      html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ??
+      "",
+  );
+  return text.length > 0 ? text.slice(0, 80) : null;
+}
+
+/**
+ * A title or heading's words: tags dropped, the common character names read once (`&amp;` last,
+ * so "&amp;apos;" stays the words "&apos;"), spaces tidied. The card escapes them again itself.
+ */
+function plainText(markup: string): string {
+  return markup
     .replace(/<[^>]*>/gu, " ")
     .replace(/&nbsp;|&#160;/giu, " ")
-    .replace(/&amp;/giu, "&")
     .replace(/&quot;|&#34;/giu, '"')
-    .replace(/&#39;|&apos;/giu, "'")
+    .replace(/&#39;|&#x27;|&apos;/giu, "'")
     .replace(/&lt;/giu, "<")
     .replace(/&gt;/giu, ">")
+    .replace(/&amp;/giu, "&")
     .replace(/\s+/gu, " ")
     .trim();
-  return text.length > 0 ? text.slice(0, 80) : null;
 }
 
 /** One magnet per conversation that made a page, newest first. */

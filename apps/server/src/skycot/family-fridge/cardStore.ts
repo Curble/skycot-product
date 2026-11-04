@@ -35,9 +35,16 @@ const CARD_HASH = /^[0-9a-f]{64}$/u;
 
 export const isCardHash = (value: string): boolean => CARD_HASH.test(value);
 
-/** What names a card: the page's content hash and the title the card falls back to. */
+/**
+ * Bumped whenever the card drawing changes, so cards saved by an older SKYCOT are drawn again
+ * (2: the heading line read "&apos;" as words).
+ */
+const CARD_DRAWING = "2";
+
+/** What names a card: the drawing version, the page's content hash and its fallback title. */
 export const cardHashOf = (contentHash: string, fallbackTitle: string): string =>
   NodeCrypto.createHash("sha256")
+    .update(`card-${CARD_DRAWING}\n`)
     .update(contentHash)
     .update("\n")
     .update(fallbackTitle)

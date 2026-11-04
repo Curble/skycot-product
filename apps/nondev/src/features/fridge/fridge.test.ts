@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  mayPinMagnet,
   fridgeOrder,
   childFridgeTitle,
   fridgeIcon,
@@ -117,5 +118,17 @@ describe("a magnet's page", () => {
     expect(parseMagnetPage({ html: null })).toEqual({ html: null });
     expect(parseMagnetPage({})).toBeNull();
     expect(parseMagnetPage({ html: 3 })).toBeNull();
+  });
+});
+
+describe("who may pin or take down a magnet", () => {
+  const ava = { childId: "child:ava" };
+  it("lets a grown-up change any magnet, and a child only their own", () => {
+    expect(mayPinMagnet({ childId: "child:leo" }, null)).toBe(true);
+    expect(mayPinMagnet({ childId: null }, null)).toBe(true);
+    expect(mayPinMagnet({ childId: "child:ava" }, ava)).toBe(true);
+    expect(mayPinMagnet({ childId: "child:leo" }, ava)).toBe(false);
+    expect(mayPinMagnet({ childId: null }, ava)).toBe(false);
+    expect(mayPinMagnet({ childId: null }, { childId: null })).toBe(false);
   });
 });

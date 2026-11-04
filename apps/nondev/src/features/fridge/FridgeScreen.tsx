@@ -6,6 +6,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { enabledEnvironmentIdsAtom } from "../../state/catalog";
+import { useChildView } from "../../app/useChildView";
 import { useColumns } from "../../app/useColumns";
 import { Banner } from "../../ui/Banner";
 import { Button } from "../../ui/Button";
@@ -16,7 +17,7 @@ import { ChildAvatar } from "../family/ChildAvatar";
 import { childLabel, type FamilyChild } from "../family/children";
 import { useFamily } from "../family/FamilyProvider";
 import { useOpenIt } from "../starters/PreviewSheet";
-import { fridgeShelves, type FridgeItem } from "./fridge";
+import { fridgeShelves, mayPinMagnet, type FridgeItem } from "./fridge";
 import { FridgeIcon } from "./FridgeIcon";
 import { FridgeMagnet } from "./FridgeMagnet";
 import { pinMagnet, refreshFridge, useFridge } from "./store";
@@ -47,6 +48,16 @@ export function FridgeScreen() {
     void refreshFridge();
   }, []);
 
+  const childView = useChildView();
+  // A child changes only their own magnets (the engine refuses the rest).
+  const viewer = childView
+    ? {
+        childId:
+          family.profile.me.kind === "child"
+            ? family.profile.me.childId
+            : family.profile.currentChildId,
+      }
+    : null;
   const children = family.enabled ? family.profile.children : [];
   const nameOf = (childId: string | null) => {
     const index = children.findIndex((child) => child.id === childId);
@@ -167,7 +178,9 @@ export function FridgeScreen() {
                         now={now}
                         maker={only === "everyone" && children.length > 1 ? name : null}
                         onOpen={() => openIt.openIt(item)}
-                        onPin={(pinned) => pin(item, pinned)}
+                        {...(mayPinMagnet(item, viewer)
+                          ? { onPin: (pinned: boolean) => pin(item, pinned) }
+                          : {})}
                       />
                     ))}
                   </div>

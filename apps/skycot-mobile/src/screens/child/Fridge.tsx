@@ -17,6 +17,7 @@ import {
   fridgeKindLabel,
   fridgeOrder,
   madeLabel,
+  mayPinMagnet,
   type FridgeItem,
 } from "../../../../nondev/src/features/fridge/fridge";
 import { friendlyTitle } from "../../../../nondev/src/plain/titles";
@@ -251,11 +252,20 @@ function MacFridge(props: {
             index={index}
             childName={props.childName}
             onOpen={() => open(props.mac, item)}
-            onPin={async (pinned) => {
-              await familyApi.pin(props.mac.transport, item.threadId, pinned);
-              await fridge.refresh();
-              setTick((tick) => tick + 1);
-            }}
+            // A child changes only their own magnets (the engine refuses a sibling's), so a
+            // sibling's pinned page has no "Take it down" here.
+            {...(mayPinMagnet(
+              item,
+              props.mac.me.kind === "child" ? { childId: props.mac.me.childId } : null,
+            )
+              ? {
+                  onPin: async (pinned: boolean) => {
+                    await familyApi.pin(props.mac.transport, item.threadId, pinned);
+                    await fridge.refresh();
+                    setTick((tick) => tick + 1);
+                  },
+                }
+              : {})}
           />
         ))}
       </View>
