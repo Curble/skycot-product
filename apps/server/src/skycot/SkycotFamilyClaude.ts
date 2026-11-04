@@ -370,7 +370,7 @@ export function fileToolRefusal(input: {
     if (real === null || !roots.some((root) => SkycotFamilySandbox.isWithin(root, real))) {
       return FAMILY_OUTSIDE_PROJECT_MESSAGE;
     }
-    if (writes && SkycotFamilySandbox.isWithin(NodePath.join(project, ".git"), real)) {
+    if (writes && SkycotFamilySandbox.projectNeverWritable(project, real)) {
       return FAMILY_OUTSIDE_PROJECT_MESSAGE;
     }
   }
@@ -379,7 +379,7 @@ export function fileToolRefusal(input: {
 
 /** What the assistant is told when one of its file tools points outside the project. */
 export const FAMILY_OUTSIDE_PROJECT_MESSAGE =
-  "In the Family profile SKYCOT keeps your work inside this project's folder, so this step was not done: it points outside the folder, or at the hidden .git folder where SKYCOT keeps the project's versions. Do not try it again. Carry on inside the project folder, or say in one short sentence that this part needs a grown-up.";
+  "In the Family profile SKYCOT keeps your work inside this project's folder, so this step was not done: it points outside the folder, at the hidden .git folder where SKYCOT keeps the project's versions, or at the hidden .codex or .agents folder that holds the assistants' own settings. Do not try it again. Carry on inside the project folder, or say in one short sentence that this part needs a grown-up.";
 
 /** The answers key that carries a note for the assistant with a "decline" (SkycotApprovedInstalls). */
 export const ASSISTANT_NOTE_ANSWER = "skycotAssistantNote";

@@ -22,7 +22,9 @@
 // wins in both sandboxes (checked live with Claude Code 2.1.296).
 //
 // Writes stay inside the project and the temporary folder; the project's `.git` (SKYCOT's saved
-// versions, the engine's own checkpoints) is never writable (F1-R5), nor SKYCOT's state.
+// versions, the engine's own checkpoints) is never writable (F1-R5), nor SKYCOT's state, nor
+// the project's `.codex` and `.agents` (review S1: Codex reads a project's own config, hooks
+// and skills from there, so a child's command must not be able to write them).
 
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- synchronous realpath and mkdtemp, called from the SDK's option builder.
 import * as NodeFS from "node:fs";
@@ -31,6 +33,21 @@ import * as NodePath from "node:path";
 
 import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
+
+/**
+ * Folders at the top of the project a child's assistant never writes: SKYCOT's saved versions
+ * (`.git`, whose hooks and config git would run), and the assistants' own project config
+ * (`.codex`: Codex's config.toml, hooks and rules; `.agents`: skills). Compared without regard
+ * to case, as the Mac's disk does (`projectNeverWritable`).
+ */
+export const PROJECT_NEVER_WRITABLE = [".git", ".codex", ".agents"] as const;
+
+/** Whether `real` is in one of the project's never-writable folders, in any case. */
+export function projectNeverWritable(project: string, real: string): boolean {
+  if (!isWithin(project, real)) return false;
+  const first = NodePath.relative(project, real).split(NodePath.sep)[0]?.toLowerCase();
+  return first !== undefined && (PROJECT_NEVER_WRITABLE as ReadonlyArray<string>).includes(first);
+}
 
 /** Where things are on this Mac, for one child's conversation. */
 export interface FamilyPlaces {
@@ -222,7 +239,9 @@ export function familyFilesystem(
         ? []
         : ENGINE_STATE.flatMap((name) => both(NodePath.join(places.engineHome!, name)))),
       ...(places.stateDir === undefined ? [] : both(places.stateDir)),
-      ...project.map((root) => NodePath.join(root, ".git")),
+      ...project.flatMap((root) =>
+        PROJECT_NEVER_WRITABLE.map((name) => NodePath.join(root, name)),
+      ),
       ...sharedClaudeTmp,
     ]),
   };

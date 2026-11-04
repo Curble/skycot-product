@@ -121,10 +121,29 @@ const T3CODE_CODEX_LAUNCH_ARGS_ENV = "T3CODE_CODEX_LAUNCH_ARGS";
 
 // ── Containment: Codex permission profiles generated from SkycotFamilySandbox ────────────────
 
-/** The profile a child's thread runs with: its project, readable and writable. */
+/**
+ * The profile a child's thread runs with: its project, readable and writable. A session's real
+ * ids carry a random part (`sessionPlaces`, review S1): Codex merges every config layer into a
+ * profile of the same name (the grown-up's ~/.codex/config.toml, a trusted project's
+ * `.codex/config.toml`), and a merged `"<project>/.git/hooks" = "write"` was confirmed live, so
+ * no other layer may know the name in advance. These fixed names are only the fallback.
+ */
 export const FAMILY_CODEX_PROFILE = "skycot_family";
 /** The process's default: the same reads with no project, and nothing writable. */
 export const FAMILY_CODEX_BASE_PROFILE = "skycot_family_base";
+
+/** The ids of a session's two profiles: the thread's, and the process's base (`<id>_base`). */
+export function familyProfileIds(places: Pick<FamilyCodexPlaces, "profileId"> | undefined): {
+  readonly thread: string;
+  readonly base: string;
+} {
+  const thread = places?.profileId ?? FAMILY_CODEX_PROFILE;
+  return { thread, base: `${thread}_base` };
+}
+
+/** A fresh profile id for one session: never guessable by another config layer. */
+export const randomFamilyProfileId = (): string =>
+  `${FAMILY_CODEX_PROFILE}_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
 
 /** Platforms whose Codex sandbox enforces read rules (seatbelt on macOS, bubblewrap on Linux). */
 const CONTAINED_PLATFORMS: ReadonlySet<NodeJS.Platform> = new Set(["darwin", "linux"]);
@@ -144,6 +163,8 @@ export interface FamilyCodexPlaces {
   /** Codex's own home (sign-in, history): never readable by a command, wherever it is. */
   readonly codexHome?: string | undefined;
   readonly uid?: number | undefined;
+  /** This session's profile id (`randomFamilyProfileId`); the fixed name when absent. */
+  readonly profileId?: string | undefined;
 }
 
 /**
@@ -171,6 +192,7 @@ export const sessionPlaces: (input: {
     platform: yield* HostProcess.Platform,
     cwd: input.cwd ?? undefined,
     codexHome,
+    profileId: randomFamilyProfileId(),
   };
 });
 
@@ -413,24 +435,26 @@ export function familyCodexThreadContainment(
   places: FamilyCodexPlaces,
   cwd: string,
 ): Record<string, Schema.Json> {
+  const id = familyProfileIds(places).thread;
   return {
-    [`permissions.${FAMILY_CODEX_PROFILE}`]: familyCodexProfile(
+    [`permissions.${id}`]: familyCodexProfile(
       sandboxFilesystem(places, cwd),
       "SKYCOT Family: this project only",
     ),
-    default_permissions: FAMILY_CODEX_PROFILE,
+    default_permissions: id,
     shell_environment_policy: familyCodexShellEnvironment(places.tmpDir),
   };
 }
 
 /** Config for the child's Codex process: the base profile as its default. */
 export function familyCodexBaseContainment(places: FamilyCodexPlaces): Record<string, Schema.Json> {
+  const id = familyProfileIds(places).base;
   return {
-    [`permissions.${FAMILY_CODEX_BASE_PROFILE}`]: familyCodexProfile(
+    [`permissions.${id}`]: familyCodexProfile(
       sandboxFilesystem(places, undefined),
       "SKYCOT Family: no project",
     ),
-    default_permissions: FAMILY_CODEX_BASE_PROFILE,
+    default_permissions: id,
     shell_environment_policy: familyCodexShellEnvironment(undefined),
   };
 }
@@ -585,19 +609,86 @@ export function familyThreadConfig(
   };
 }
 
-/** Pure: why a Family process's own default is not SKYCOT's base profile, or null when it is. */
-export function familyProcessContainmentProblem(configRead: unknown): string | null {
+/**
+ * A profile as `config/read` reports it, comparable with what SKYCOT sent: Codex fills in every
+ * field it knows with null (a table of nothing but nulls is then empty), and writes "none" as
+ * "deny".
+ */
+const comparableProfile = (value: unknown): unknown => {
+  if (value === "deny") return "none";
+  if (Array.isArray(value)) return value.map(comparableProfile);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, entry]) => [key, comparableProfile(entry)] as const)
+      .filter(
+        ([, entry]) =>
+          entry !== null &&
+          entry !== undefined &&
+          !(isRecord(entry) && Object.keys(entry).length === 0),
+      )
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+};
+
+/**
+ * Pure: whether the profiles Codex reports in a `config/read` answer are exactly the ones SKYCOT
+ * wrote, or null when they are. `expected` maps an id to its profile, or to `undefined` for one
+ * SKYCOT has not sent yet and no other layer may name (the thread's, before the thread starts).
+ * Anything another layer added, removed or changed (an `extends`, one more writable folder) is a
+ * problem (review S1).
+ */
+export function familyProfileProblems(
+  configRead: unknown,
+  expected: Readonly<Record<string, Schema.Json | undefined>>,
+): ReadonlyArray<string> {
+  const config = isRecord(configRead) ? configRead.config : undefined;
+  if (!isRecord(config)) return ["config unreadable"];
+  const reported = isRecord(config.permissions) ? config.permissions : {};
+  const problems: Array<string> = [];
+  for (const [id, profile] of Object.entries(expected)) {
+    const found = reported[id];
+    if (profile === undefined) {
+      if (found !== undefined) problems.push(`another config layer defines profile ${id}`);
+      continue;
+    }
+    if (JSON.stringify(comparableProfile(found)) !== JSON.stringify(comparableProfile(profile))) {
+      problems.push(`profile ${id} is not exactly the one SKYCOT wrote`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Pure: why a Family process's own default is not SKYCOT's base profile, exactly as SKYCOT wrote
+ * it, or null when it is.
+ */
+export function familyProcessContainmentProblem(
+  configRead: unknown,
+  places?: FamilyCodexPlaces,
+): string | null {
   const config = isRecord(configRead) ? configRead.config : undefined;
   const current = isRecord(config) ? config.default_permissions : undefined;
-  return current === FAMILY_CODEX_BASE_PROFILE
-    ? null
-    : `default permissions are ${JSON.stringify(current ?? null)}`;
+  const ids = familyProfileIds(places);
+  if (current !== ids.base) return `default permissions are ${JSON.stringify(current ?? null)}`;
+  if (places === undefined) return null;
+  let base: Schema.Json;
+  try {
+    base = familyCodexBaseContainment(places)[`permissions.${ids.base}`]!;
+  } catch (cause) {
+    return String(cause);
+  }
+  const problems = familyProfileProblems(configRead, { [ids.base]: base, [ids.thread]: undefined });
+  return problems.length === 0 ? null : problems.join("; ");
 }
 
 /** Pure: whether Codex says a thread it started, resumed or forked runs with the Family profile. */
-export function threadRunsContained(response: unknown): boolean {
+export function threadRunsContained(
+  response: unknown,
+  profileId: string = FAMILY_CODEX_PROFILE,
+): boolean {
   const active = isRecord(response) ? response.activePermissionProfile : undefined;
-  return isRecord(active) && active.id === FAMILY_CODEX_PROFILE;
+  return isRecord(active) && active.id === profileId;
 }
 
 /**
@@ -737,6 +828,7 @@ export function lockClient(
 ): Client {
   if (lockdown === null) return client;
   const rawRequest: RawRequest = client.raw.request;
+  const ids = familyProfileIds(places);
   let verified = false;
   let tainted: string | null = null;
   /** Native threads Codex confirmed run with the Family profile; only they may take a turn. */
@@ -762,7 +854,7 @@ export function lockClient(
       yield* Effect.logError("skycot-family.codex.process-not-locked", { problems });
       return yield* refusal("thread/start", problems.join("; "));
     }
-    const containment = familyProcessContainmentProblem(configRead);
+    const containment = familyProcessContainmentProblem(configRead, places);
     if (containment !== null) {
       yield* Effect.logError("skycot-family.codex.process-not-contained", { containment });
       return yield* sandboxRefusal("thread/start", containment);
@@ -809,10 +901,20 @@ export function lockClient(
         try: () => familyCodexThreadContainment(places, folder),
         catch: (cause) => sandboxRefusal(method, String(cause)),
       });
+      // Every layer at this folder (a trusted project's own config among them) must leave the
+      // base profile exactly as written and must not name the thread's (S1).
+      const layered = familyProcessContainmentProblem(configRead, places);
+      if (layered !== null) {
+        yield* Effect.logError("skycot-family.codex.profile-changed-by-config", {
+          method,
+          problem: layered,
+        });
+        return yield* sandboxRefusal(method, layered);
+      }
       const { sandbox: _legacySandbox, ...rest } = params;
       return {
         ...rest,
-        permissions: FAMILY_CODEX_PROFILE,
+        permissions: ids.thread,
         config: familyThreadConfig(
           isRecord(params.config) ? (params.config as Record<string, Schema.Json>) : undefined,
           found,
@@ -841,7 +943,7 @@ export function lockClient(
     );
     const thread = isRecord(response) && isRecord(response.thread) ? response.thread : undefined;
     const threadId = typeof thread?.id === "string" ? thread.id : null;
-    if (threadId === null || !threadRunsContained(response)) {
+    if (threadId === null || !threadRunsContained(response, ids.thread)) {
       yield* Effect.logError("skycot-family.codex.thread-not-contained", {
         method,
         threadId,
@@ -869,7 +971,7 @@ export function lockClient(
     }
     if (method !== "turn/start") return params;
     const { sandboxPolicy: _legacySandboxPolicy, ...rest } = params;
-    return { ...rest, permissions: FAMILY_CODEX_PROFILE };
+    return { ...rest, permissions: ids.thread };
   });
 
   const intercept = (method: string, payload: unknown, typed: boolean) => {

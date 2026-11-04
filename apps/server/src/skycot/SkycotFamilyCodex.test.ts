@@ -155,15 +155,59 @@ interface FakeCodex {
  * A pretend Codex app-server that behaves like the real one: Codex's switches show up in its
  * own `config/read`, and with plugins and apps off it lists none.
  */
+/** A `-c` value SKYCOT wrote (`tomlInline`: JSON strings with `=`) read back, as Codex would. */
+const fromTomlInline = (text: string): unknown =>
+  JSON.parse(text.replace(/("(?:[^"\\]|\\.)*")=/g, "$1:"));
+
+/** A profile as Codex 0.160.1's `config/read` reports it: "none" as "deny", unknown fields null. */
+const asCodexReportsIt = (profile: unknown): unknown => {
+  const record = profile as { filesystem: Record<string, string>; network: object };
+  return {
+    ...record,
+    extends: null,
+    workspace_roots: null,
+    filesystem: {
+      glob_scan_max_depth: null,
+      ...Object.fromEntries(
+        Object.entries(record.filesystem).map(([key, value]) => [
+          key,
+          value === "none" ? "deny" : value,
+        ]),
+      ),
+    },
+    network: { ...record.network, proxy_url: null, mode: null },
+  };
+};
+
 function fakeCodexClient(
   launchArgs: string,
   fake: FakeCodex,
-  overrides: { readonly configRead?: unknown; readonly ignoresProfiles?: boolean } = {},
+  overrides: {
+    readonly configRead?: unknown;
+    readonly ignoresProfiles?: boolean;
+    /** What another config layer (a grown-up's or project's config.toml) merges in. */
+    readonly mergedPermissions?: Record<string, unknown>;
+  } = {},
 ): CodexClient.CodexAppServerClient["Service"] {
   const locked = launchArgs.includes("features.plugins=false");
-  const baseDefault = launchArgs.includes(
-    `default_permissions="${SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE}"`,
+  const argv = tokenizeCliArgs(launchArgs);
+  const values = argv.filter((_, index) => argv[index - 1] === "-c");
+  const defaultId = values
+    .find((value) => value.startsWith("default_permissions="))
+    ?.slice("default_permissions=".length);
+  const baseId = defaultId === undefined ? undefined : (JSON.parse(defaultId) as string);
+  const launchedPermissions = Object.fromEntries(
+    values
+      .filter((value) => value.startsWith("permissions."))
+      .map((value) => {
+        const at = value.indexOf("=");
+        return [
+          value.slice("permissions.".length, at),
+          asCodexReportsIt(fromTomlInline(value.slice(at + 1))),
+        ];
+      }),
   );
+  const permissions = { ...launchedPermissions, ...overrides.mergedPermissions };
   // Codex reports the profile a thread asked for when it defines it (an older Codex: none).
   const activeProfile = (params: unknown) => {
     if (overrides.ignoresProfiles === true) return null;
@@ -171,8 +215,8 @@ function fakeCodexClient(
     const id = record?.permissions ?? record?.config?.default_permissions;
     return typeof id === "string" && record?.config?.[`permissions.${id}`] !== undefined
       ? { id, extends: null }
-      : baseDefault
-        ? { id: SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE, extends: null }
+      : baseId !== undefined
+        ? { id: baseId, extends: null }
         : { id: ":workspace", extends: null };
   };
   const answer = (method: string, params: unknown): unknown => {
@@ -195,9 +239,8 @@ function fakeCodexClient(
                     features: Object.fromEntries(
                       SkycotFamilyCodex.FAMILY_CODEX_FEATURES_OFF.map((name) => [name, false]),
                     ),
-                    ...(baseDefault
-                      ? { default_permissions: SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE }
-                      : {}),
+                    ...(baseId === undefined ? {} : { default_permissions: baseId }),
+                    ...(Object.keys(permissions).length === 0 ? {} : { permissions }),
                   }
                 : PARENT_CONFIG,
               origins: {},
@@ -836,6 +879,105 @@ describe("SkycotFamilyCodex.lockClient containment", () => {
     }),
   );
 
+  it.effect("refuses when another config layer changed the base profile (S1)", () =>
+    Effect.gen(function* () {
+      const fake = newFake();
+      const base = SkycotFamilyCodex.familyCodexBaseContainment(PLACES)[
+        `permissions.${SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE}`
+      ] as { filesystem: Record<string, string> };
+      // The grown-up's config.toml merged one more entry into SKYCOT's profile.
+      const merged = asCodexReportsIt({
+        ...base,
+        filesystem: { ...base.filesystem, "/workspace/.git/hooks": "write" },
+      });
+      const client = SkycotFamilyCodex.lockClient(
+        lockdown,
+        fakeCodexClient(lockedArgs, fake, {
+          mergedPermissions: { [SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE]: merged },
+        }),
+        PLACES,
+      );
+      const error = yield* client
+        .request("thread/start", { cwd: "/workspace" } as never)
+        .pipe(Effect.flip);
+      assert.strictEqual(error.message, SkycotFamilyCodex.FAMILY_CODEX_SANDBOX_REFUSAL);
+      assert.lengthOf(sent(fake, "thread/start"), 0);
+    }),
+  );
+
+  it.effect("refuses when another config layer names the thread's profile (S1)", () =>
+    Effect.gen(function* () {
+      const fake = newFake();
+      const client = SkycotFamilyCodex.lockClient(
+        lockdown,
+        fakeCodexClient(lockedArgs, fake, {
+          mergedPermissions: {
+            [SkycotFamilyCodex.FAMILY_CODEX_PROFILE]: {
+              filesystem: { "/workspace/.git": "write" },
+            },
+          },
+        }),
+        PLACES,
+      );
+      const error = yield* client
+        .request("thread/start", { cwd: "/workspace" } as never)
+        .pipe(Effect.flip);
+      assert.strictEqual(error.message, SkycotFamilyCodex.FAMILY_CODEX_SANDBOX_REFUSAL);
+      assert.lengthOf(sent(fake, "thread/start"), 0);
+    }),
+  );
+
+  it("compares profiles the way Codex reports them, and nothing looser (S1)", () => {
+    const sentProfile = { description: "d", filesystem: { ":root": "read", "/a": "none" } };
+    const id = "p";
+    const read = (profile: unknown) => ({ config: { permissions: { [id]: profile } } });
+    assert.deepEqual(
+      SkycotFamilyCodex.familyProfileProblems(read(asCodexReportsIt(sentProfile)), {
+        [id]: sentProfile,
+      }),
+      [],
+    );
+    for (const changed of [
+      { ...sentProfile, extends: ":workspace" },
+      { ...sentProfile, filesystem: { ...sentProfile.filesystem, "/b": "write" } },
+      { ...sentProfile, filesystem: { ":root": "read" } },
+      undefined,
+    ]) {
+      assert.lengthOf(
+        SkycotFamilyCodex.familyProfileProblems(read(changed), { [id]: sentProfile }),
+        1,
+        JSON.stringify(changed),
+      );
+    }
+    assert.deepEqual(SkycotFamilyCodex.familyProfileProblems(null, {}), ["config unreadable"]);
+  });
+
+  it.effect("gives every session its own random profile ids (S1)", () =>
+    Effect.gen(function* () {
+      const environment = {};
+      const one = yield* SkycotFamilyCodex.sessionPlaces({
+        engineHome: "/e",
+        stateDir: "/e/userdata",
+        environment,
+        codexHomePath: undefined,
+        cwd: "/workspace",
+      });
+      const two = yield* SkycotFamilyCodex.sessionPlaces({
+        engineHome: "/e",
+        stateDir: "/e/userdata",
+        environment,
+        codexHomePath: undefined,
+        cwd: "/workspace",
+      });
+      assert.match(one.profileId ?? "", /^skycot_family_[0-9a-f]{32}$/);
+      assert.notStrictEqual(one.profileId, two.profileId);
+      assert.deepEqual(SkycotFamilyCodex.familyProfileIds(one), {
+        thread: one.profileId!,
+        base: `${one.profileId!}_base`,
+      });
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("refuses a thread with no folder to work in", () =>
     Effect.gen(function* () {
       const fake = newFake();
@@ -952,12 +1094,11 @@ describe("CodexAdapterV2 under the Family lockdown", () => {
   it.effect("contains a Family session's commands to the project", () =>
     Effect.gen(function* () {
       const { launchArgs, threadConfig, threadPermissions } = yield* openAndStartThread(true);
-      assert.include(
-        launchArgs,
-        `'default_permissions="${SkycotFamilyCodex.FAMILY_CODEX_BASE_PROFILE}"'`,
-      );
-      assert.strictEqual(threadPermissions, SkycotFamilyCodex.FAMILY_CODEX_PROFILE);
-      const profile = threadConfig[`permissions.${SkycotFamilyCodex.FAMILY_CODEX_PROFILE}`] as {
+      // A random id for this session (S1): no other config layer can name it in advance.
+      assert.match(String(threadPermissions), /^skycot_family_[0-9a-f]{32}$/);
+      assert.include(launchArgs, `'default_permissions="${String(threadPermissions)}_base"'`);
+      assert.strictEqual(threadConfig.default_permissions, threadPermissions);
+      const profile = threadConfig[`permissions.${String(threadPermissions)}`] as {
         filesystem: Record<string, string>;
       };
       assert.strictEqual(profile.filesystem["/workspace"], "write");
