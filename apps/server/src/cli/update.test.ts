@@ -134,7 +134,7 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
   );
 });
 
-// nondev-seam: brand-cli-update-refuse
+// nondev-seam: brand-cli-update-refuse-test
 it("refuses to self-update a branded command and leaves upstream's alone", () => {
   assert.equal(brandedUpdateRefusal("t3", "T3 Code"), undefined);
   assert.equal(
