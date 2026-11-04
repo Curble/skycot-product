@@ -239,9 +239,7 @@ export function familyFilesystem(
         ? []
         : ENGINE_STATE.flatMap((name) => both(NodePath.join(places.engineHome!, name)))),
       ...(places.stateDir === undefined ? [] : both(places.stateDir)),
-      ...project.flatMap((root) =>
-        PROJECT_NEVER_WRITABLE.map((name) => NodePath.join(root, name)),
-      ),
+      ...project.flatMap((root) => PROJECT_NEVER_WRITABLE.map((name) => NodePath.join(root, name))),
       ...sharedClaudeTmp,
     ]),
   };

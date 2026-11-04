@@ -1,3 +1,4 @@
+// nondev-seam: skycot-policy-files
 // The live preview inside the Family sandbox (pre-open-source review F1-R3, 3 Nov 2026).
 //
 // Starting a preview runs the project's own start script on this Mac, and the files it runs

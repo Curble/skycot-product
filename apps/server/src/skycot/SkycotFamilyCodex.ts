@@ -32,9 +32,11 @@
 // command's writes in the project and the internet off, but let it read the whole Mac: the
 // family's Documents, browser profiles, ~/.ssh, a brother's project, ~/.skycot. Codex's own
 // permission profiles (`[permissions.<id>]`, codex-cli 0.160) restrict reads as well, inside
-// the same macOS sandbox Codex already puts around every command, its file edits
-// (apply_patch), its image viewer and its sub-agents. So a child's thread runs with a profile
-// generated from SkycotFamilySandbox, the rules Claude and the preview use:
+// the same macOS sandbox Codex already puts around every command and its file edits
+// (apply_patch). Its image viewer and helper agents are switched off instead (not shown to keep
+// to the profile, review S4), and so are the ways to ask for more (`request_permissions`, extra
+// permissions on a command: S2). So a child's thread runs with a profile generated from
+// SkycotFamilySandbox, the rules Claude and the preview use:
 //   - `familyCodexProfile`: the whole disk readable except homes, other accounts, external
 //     drives and the shared temporary folders; the project, the session's own temporary folder
 //     and the toolchains readable again; writes only in the project (never its `.git`) and that
@@ -56,9 +58,9 @@
 //     work in, or a Codex that does not report the profile, and the conversation is refused with
 //     a plain sentence (FAMILY_CODEX_SANDBOX_REFUSAL), as Claude's is.
 //
-// Limits (FAMILY.md): Codex's built-in tools (shell, file edits, web search, image generation,
-// sub-agents) stay; SKYCOT's command policy still asks before the risky ones. The parent's
-// AGENTS.md instructions are still read (text, not tools).
+// Limits (FAMILY.md): Codex's built-in shell, file edits, web search and image generation stay
+// (the image viewer and helper agents are off); SKYCOT's command policy still asks before the
+// risky ones. The parent's AGENTS.md instructions are still read (text, not tools).
 
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- path arithmetic for the permission profile.
 import * as NodePath from "node:path";
@@ -94,15 +96,32 @@ export const FAMILY_CODEX_FEATURES_OFF = [
   "memories",
   // Replays the grown-up's login shell (its exported keys included) into every command.
   "shell_snapshot",
+  // Ways for the AI to ask for more than the project profile gives (review S2): a
+  // `request_permissions` tool, and extra folders or internet attached to a command's approval.
+  "request_permissions_tool",
+  "exec_permission_approvals",
+  // Not shown to keep to the profile (review S4): the image viewer reads a file in Codex's own
+  // process, and helper agents are threads SKYCOT never starts or checks itself.
+  "view_image",
+  "multi_agent",
+  "multi_agent_v2",
 ] as const;
 
-/** The switches the process must report off before a child's thread starts. */
+/**
+ * The switches the process must report off before a child's thread starts (codex-cli 0.160.1
+ * reports each of them in `config/read`, checked live).
+ */
 export const FAMILY_CODEX_REQUIRED_OFF = [
   "plugins",
   "apps",
   "hooks",
   "computer_use",
   "browser_use",
+  "request_permissions_tool",
+  "exec_permission_approvals",
+  "view_image",
+  "multi_agent",
+  "multi_agent_v2",
 ] as const;
 
 /** Config every Family process and thread carries (dotted keys, Codex's `-c` form). */
@@ -143,6 +162,7 @@ export function familyProfileIds(places: Pick<FamilyCodexPlaces, "profileId"> | 
 
 /** A fresh profile id for one session: never guessable by another config layer. */
 export const randomFamilyProfileId = (): string =>
+  // @effect-diagnostics-next-line cryptoRandomUUID:off -- a synchronous, pure helper (Web Crypto is a CSPRNG); sessionPlaces must not need a new service upstream.
   `${FAMILY_CODEX_PROFILE}_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
 
 /** Platforms whose Codex sandbox enforces read rules (seatbelt on macOS, bubblewrap on Linux). */
@@ -219,7 +239,9 @@ const CLASS_PLAIN = /^[A-Za-z0-9 _]$/;
 
 const assertGlobSafe = (text: string) => {
   if (!GLOB_SAFE.test(text)) {
-    throw new FamilyCodexPathError(`can't write ${JSON.stringify(text)} in a glob (not plain ASCII)`);
+    throw new FamilyCodexPathError(
+      `can't write ${JSON.stringify(text)} in a glob (not plain ASCII)`,
+    );
   }
   if (GLOB_REFUSED.test(text)) throw new FamilyCodexPathError(`can't write ${text} as a glob`);
 };
@@ -519,13 +541,18 @@ export function lockLaunch<S extends { readonly launchArgs: string }>(
 /**
  * T3's text generation (`codex exec`: titles, commit messages) needs no tool, and runs in
  * Codex's read-only sandbox, which reads the whole Mac: while the profile is on it gets no
- * shell, no image viewer and no helper agents, on top of the add-on switches.
+ * shell, no image viewer, no helper agents and no image generation, on top of the add-on
+ * switches (the viewer and helpers are already in FAMILY_CODEX_FEATURES_OFF), and no web search.
+ * Codex 0.160.1 has no switch for its file-edit tool; the read-only sandbox refuses every
+ * write it would make.
  */
 export const FAMILY_CODEX_TEXT_TOOLS_OFF = [
   "shell_tool",
   "unified_exec",
   "view_image",
   "multi_agent",
+  "multi_agent_v2",
+  "image_generation",
 ] as const;
 
 /**
@@ -538,6 +565,8 @@ export function lockExecArgs(lockdown: FamilyLockdown | null): ReadonlyArray<str
     : [
         ...FAMILY_CODEX_LAUNCH_ARGS,
         ...FAMILY_CODEX_TEXT_TOOLS_OFF.flatMap((name) => ["-c", `features.${name}=false`]),
+        "-c",
+        `web_search="disabled"`,
       ];
 }
 
@@ -758,47 +787,75 @@ const isRefusal = (error: { readonly message: string }) =>
 const THREAD_METHODS = new Set(["thread/start", "thread/resume", "thread/fork"]);
 const TURN_METHODS = new Set(["turn/start", "turn/steer"]);
 /**
- * Never sent for a child: writing the parent's Codex config, installing, calling MCP tools, or
- * anything that runs a command, touches files or changes a thread's permissions outside a turn
- * (`thread/shellCommand` runs unsandboxed; `command/exec`, `process/*` and `fs/*` act with the
- * process's own access). SKYCOT's adapter sends none of these.
+ * The only requests a child's Codex is sent (review S3: an allow list, so a method Codex adds
+ * tomorrow is refused, not forwarded). Exactly what SKYCOT's adapter sends for a conversation
+ * (CodexAdapterV2, CodexThreadRevert; the test reads both files to keep this in step). The lock
+ * itself reads the process's config, skills, plugins and apps directly, outside this list.
  */
-const BLOCKED_METHODS = new Set([
-  "config/value/write",
-  "config/batchWrite",
-  "config/mcpServer/reload",
-  "skills/config/write",
-  "plugin/install",
-  "marketplace/add",
-  "marketplace/upgrade",
-  "experimentalFeature/enablement/set",
-  "externalAgentConfig/import",
-  "mcpServer/oauth/login",
+export const FAMILY_CODEX_ALLOWED_METHODS: ReadonlySet<string> = new Set([
+  "initialize",
+  "thread/start",
+  "thread/resume",
+  "thread/fork",
+  "thread/read",
+  "thread/turns/list",
+  "thread/revert",
+  "thread/unarchive",
+  "thread/unsubscribe",
+  "thread/inject_items",
+  "thread/compact/start",
+  "thread/goal/get",
+  "thread/goal/set",
+  "thread/goal/clear",
+  "thread/backgroundTerminals/list",
+  "thread/backgroundTerminals/terminate",
+  "turn/start",
+  "turn/steer",
+  "turn/interrupt",
+  "mcpServerStatus/list",
+]);
+/**
+ * Sent by the adapter for a grown-up, refused for a child on purpose: calling an MCP tool or
+ * reading an MCP resource (no MCP server runs for a child, F18), and uploading the
+ * conversation's logs to OpenAI as feedback.
+ */
+export const FAMILY_CODEX_REFUSED_ADAPTER_METHODS: ReadonlySet<string> = new Set([
   "mcpServer/tool/call",
   "mcpServer/resource/read",
-  "thread/shellCommand",
-  "thread/settings/update",
-  "turn/settings/update",
-  "review/start",
-  "command/exec",
-  "command/exec/write",
-  "command/exec/resize",
-  "command/exec/terminate",
-  "process/spawn",
-  "process/writeStdin",
-  "process/kill",
-  "process/resizePty",
-  "fs/readFile",
-  "fs/writeFile",
-  "fs/createDirectory",
-  "fs/getMetadata",
-  "fs/readDirectory",
-  "fs/remove",
-  "fs/copy",
-  "fs/watch",
+  "feedback/upload",
 ]);
 
+/**
+ * Requests that set a model to work on a thread outside `turn/start`/`turn/steer` (review M2):
+ * a compaction, and a goal Codex then pursues turn after turn. Like a turn, only on a confirmed
+ * thread and never once an MCP server started. Pausing a goal is always allowed.
+ */
+const startsWork = (method: string, payload: unknown): boolean =>
+  TURN_METHODS.has(method) ||
+  method === "thread/compact/start" ||
+  (method === "thread/goal/set" && !(isRecord(payload) && payload.status === "paused"));
+
 type Client = CodexClient.CodexAppServerClient["Service"];
+
+/**
+ * Pure: whether a command approval asks for more than the thread's profile gives: extra folders
+ * or internet for this command (`additionalPermissions`, sent by Codex versions SKYCOT's schema
+ * does not know yet, so read whenever present), a host on the internet (`networkApprovalContext`)
+ * or a standing rule allowing one (`proposedNetworkPolicyAmendments`). Answered no in Family,
+ * before any card (review S2).
+ */
+export function commandApprovalAsksForMore(payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  const additional = payload.additionalPermissions;
+  if (additional !== undefined && additional !== null) return true;
+  const network = payload.networkApprovalContext;
+  if (network !== undefined && network !== null) return true;
+  const amendments = payload.proposedNetworkPolicyAmendments;
+  return Array.isArray(amendments) && amendments.length > 0;
+}
+
+/** Family's only answer to Codex's `request_permissions`: nothing granted (review S2). */
+export const FAMILY_PERMISSIONS_DECLINED = { permissions: {}, scope: "turn" } as const;
 type RawRequest = (
   method: string,
   payload?: unknown,
@@ -933,6 +990,13 @@ export function lockClient(
     method: string,
     payload: unknown,
   ) {
+    // A thread that is resumed must be confirmed again (review M3): until Codex says it runs
+    // with the profile, it takes no turn, whatever it did before.
+    const resumed =
+      method === "thread/resume" && isRecord(payload) && typeof payload.threadId === "string"
+        ? payload.threadId
+        : null;
+    if (resumed !== null) contained.delete(resumed);
     const locked = yield* lockThreadParams(method, payload);
     const response = yield* rawRequest(method, locked).pipe(
       // Codex checks the profile with macOS's sandbox before the thread starts (it reads
@@ -944,6 +1008,7 @@ export function lockClient(
     const thread = isRecord(response) && isRecord(response.thread) ? response.thread : undefined;
     const threadId = typeof thread?.id === "string" ? thread.id : null;
     if (threadId === null || !threadRunsContained(response, ids.thread)) {
+      if (threadId !== null) contained.delete(threadId);
       yield* Effect.logError("skycot-family.codex.thread-not-contained", {
         method,
         threadId,
@@ -955,7 +1020,10 @@ export function lockClient(
     return response;
   });
 
-  /** A turn: only on a confirmed thread, told to use the Family profile, never a sandbox policy. */
+  /**
+   * A turn (or other work, `startsWork`): only on a confirmed thread; a turn is told to use the
+   * Family profile, never a sandbox policy.
+   */
   const lockTurnParams = Effect.fn("SkycotFamilyCodex.lockTurnParams")(function* (
     method: string,
     payload: unknown,
@@ -975,19 +1043,19 @@ export function lockClient(
   });
 
   const intercept = (method: string, payload: unknown, typed: boolean) => {
-    if (BLOCKED_METHODS.has(method)) {
+    if (!FAMILY_CODEX_ALLOWED_METHODS.has(method)) {
       return Effect.logWarning("skycot-family.codex.blocked-request", { method }).pipe(
-        Effect.andThen(Effect.fail(refusal(method, "blocked while the Family profile is on"))),
+        Effect.andThen(Effect.fail(refusal(method, "not allowed while the Family profile is on"))),
       );
     }
-    if (TURN_METHODS.has(method) && tainted !== null) {
+    if ((startsWork(method, payload) || THREAD_METHODS.has(method)) && tainted !== null) {
       return Effect.fail(refusal(method, `MCP server ${tainted} started`));
     }
     const answer = (raw: unknown) => (typed ? decodeResponse(method, raw) : Effect.succeed(raw));
     if (THREAD_METHODS.has(method)) {
       return startThread(method, payload).pipe(Effect.flatMap(answer));
     }
-    if (TURN_METHODS.has(method)) {
+    if (startsWork(method, payload)) {
       return lockTurnParams(method, payload).pipe(
         Effect.flatMap((locked) => rawRequest(method, locked)),
         Effect.flatMap(answer),
@@ -996,12 +1064,38 @@ export function lockClient(
     return typed ? client.request(method as never, payload as never) : rawRequest(method, payload);
   };
 
+  /**
+   * Requests for more than the profile (review S2): `request_permissions` is answered "nothing
+   * granted" without ever reaching the adapter (no card, no automatic yes on the AI's reason
+   * text), and a command approval that carries extra permissions or internet is declined. The
+   * features behind both are off as well (FAMILY_CODEX_FEATURES_OFF); this is the fail-closed
+   * half. Every other server request reaches the adapter's handler unchanged.
+   */
+  const handleServerRequest = ((method: string, handler: (payload: unknown) => unknown) => {
+    if (method === "item/permissions/requestApproval") {
+      return client.handleServerRequest(method, ((payload: { readonly threadId?: string }) =>
+        Effect.logWarning("skycot-family.codex.permissions-request-declined", {
+          threadId: payload?.threadId ?? null,
+        }).pipe(Effect.as(FAMILY_PERMISSIONS_DECLINED))) as never);
+    }
+    if (method === "item/commandExecution/requestApproval") {
+      return client.handleServerRequest(method, ((payload: { readonly threadId?: string }) =>
+        commandApprovalAsksForMore(payload)
+          ? Effect.logWarning("skycot-family.codex.command-extra-permissions-declined", {
+              threadId: payload?.threadId ?? null,
+            }).pipe(Effect.as({ decision: "decline" as const }))
+          : handler(payload)) as never);
+    }
+    return client.handleServerRequest(method as never, handler as never);
+  }) as Client["handleServerRequest"];
+
   const raw = {
     ...client.raw,
     request: (method: string, payload?: unknown) => intercept(method, payload, false),
   };
   return {
     ...client,
+    handleServerRequest,
     raw,
     request: ((method: string, payload: unknown) =>
       intercept(method, payload, true)) as Client["request"],
