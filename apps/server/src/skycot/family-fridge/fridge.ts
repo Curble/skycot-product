@@ -80,6 +80,19 @@ export function cardInk(mat: string): { readonly ink: string; readonly plate: st
   return { ink, plate: midTone ? (ink === "#ffffff" ? "#000000" : "#ffffff") : null };
 }
 
+/**
+ * One line of a card: whole as long as it fits, else cut at the last whole word with "…"
+ * ("A little pond…", never "A little pond advent"). A single very long word is cut with "…".
+ */
+export function fitLine(text: string, max: number): string {
+  const line = text.trim();
+  if (line.length <= max) return line;
+  const room = line.slice(0, max - 1);
+  const space = room.lastIndexOf(" ");
+  const cut = space >= Math.floor(max / 2) ? room.slice(0, space) : room;
+  return `${cut.replace(/[\s,.;:!?–—-]+$/u, "")}…`;
+}
+
 export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string {
   const title = fridgePageTitle(html) ?? fallbackTitle;
   const heading = plainText(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/iu)?.[1] ?? "");
@@ -100,7 +113,7 @@ export function fridgeSvgThumbnail(html: string, fallbackTitle: string): string 
       ? ""
       : `<rect x="8" y="112" width="304" height="58" rx="12" fill="${plate}" fill-opacity=".38"/>`;
   const sparkle = ink === "#ffffff" ? "#ffffff" : "#000000";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="20" fill="${background}"/><circle cx="160" cy="65" r="38" fill="${sparkle}" fill-opacity=".18"/><text x="160" y="79" text-anchor="middle" font-size="44" fill="${ink}">${kind}</text>${plateRect}<text x="18" y="137" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="${ink}">${xmlText(title.slice(0, 30))}</text><text x="18" y="161" font-family="system-ui,sans-serif" font-size="12" fill="${ink}">${xmlText(heading.slice(0, 42))}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="20" fill="${background}"/><circle cx="160" cy="65" r="38" fill="${sparkle}" fill-opacity=".18"/><text x="160" y="79" text-anchor="middle" font-size="44" fill="${ink}">${kind}</text>${plateRect}<text x="18" y="137" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="${ink}">${xmlText(fitLine(title, 30))}</text><text x="18" y="161" font-family="system-ui,sans-serif" font-size="12" fill="${ink}">${xmlText(fitLine(heading, 42))}</text></svg>`;
 }
 
 /** A page's own name wins over the conversation's first request. */

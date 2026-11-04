@@ -5,11 +5,29 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   cardInk,
   colorLuminance,
+  fitLine,
   fridgeItems,
   fridgePageTitle,
   fridgeSvgThumbnail,
   type FridgeThread,
 } from "./fridge.ts";
+
+describe("card lines", () => {
+  it("keeps a line that fits and ends a long one on a whole word", () => {
+    expect(fitLine("A little pond", 30)).toBe("A little pond");
+    expect(fitLine("A little pond adventure with frogs", 30)).toBe("A little pond adventure with…");
+    expect(fitLine("A little pond adventure, with frogs", 30)).toBe("A little pond adventure…");
+    expect(fitLine("Supercalifragilisticexpialidocious!!", 30)).toBe(
+      "Supercalifragilisticexpialido…",
+    );
+    expect(fitLine("A little pond adventure with frogs", 30).length).toBeLessThanOrEqual(30);
+  });
+
+  it("draws the card title through it", () => {
+    const svg = fridgeSvgThumbnail("<title>A little pond adventure with frogs</title>", "x");
+    expect(svg).toContain(">A little pond adventure with…<");
+  });
+});
 
 describe("fridge page titles", () => {
   it("uses a page title or first heading and cleans up its text", () => {

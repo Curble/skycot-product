@@ -37,9 +37,9 @@ export const isCardHash = (value: string): boolean => CARD_HASH.test(value);
 
 /**
  * Bumped whenever the card drawing changes, so cards saved by an older SKYCOT are drawn again
- * (2: the heading line read "&apos;" as words).
+ * (2: the heading line read "&apos;" as words; 3: long titles end on a whole word with "…").
  */
-const CARD_DRAWING = "2";
+const CARD_DRAWING = "3";
 
 /** What names a card: the drawing version, the page's content hash and its fallback title. */
 export const cardHashOf = (contentHash: string, fallbackTitle: string): string =>
