@@ -467,16 +467,22 @@ describe("sentences", () => {
 });
 
 describe("setup draft", () => {
-  it("is ready only when both codes are valid and match", () => {
+  it("is ready only when both codes are valid and match and the grown-up has ticked the box", () => {
     expect(setupReady(EMPTY_SETUP_DRAFT)).toBe(false);
-    expect(setupProblem({ childName: "", code: "12", confirm: "" })).toMatch(/4 to 6 digits/);
-    expect(setupProblem({ childName: "", code: "2580", confirm: "" })).toBe(
+    expect(setupProblem({ ...EMPTY_SETUP_DRAFT, code: "12" })).toMatch(/4 to 6 digits/);
+    expect(setupProblem({ ...EMPTY_SETUP_DRAFT, code: "2580" })).toBe(
       "Type the code a second time.",
     );
-    expect(setupProblem({ childName: "", code: "2580", confirm: "2581" })).toBe(
+    expect(setupProblem({ ...EMPTY_SETUP_DRAFT, code: "2580", confirm: "2581" })).toBe(
       "The two codes don't match yet.",
     );
-    expect(setupReady({ childName: "Ava", code: "2580", confirm: "2580" })).toBe(true);
+    // The grown-up's tick is required: matching codes alone are not enough.
+    expect(
+      setupReady({ childName: "Ava", code: "2580", confirm: "2580", staysWithChild: false }),
+    ).toBe(false);
+    expect(
+      setupReady({ childName: "Ava", code: "2580", confirm: "2580", staysWithChild: true }),
+    ).toBe(true);
   });
 });
 

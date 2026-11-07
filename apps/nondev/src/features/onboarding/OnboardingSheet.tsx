@@ -418,8 +418,8 @@ export function OnboardingSheet({
         <>
           <FamilySetupForm draft={draft} onDraft={setDraft} autoFocus foldHonesty />
           <p className="fm-help">
-            Bedtime and daily time limits start off. Set them in Settings → Family before your child
-            uses SKYCOT.
+            Bedtime and daily time limits start off. Set them in Settings → Family before you and
+            your child use SKYCOT together.
           </p>
         </>
       ) : null}

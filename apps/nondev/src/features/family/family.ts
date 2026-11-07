@@ -1073,14 +1073,28 @@ export function wrongCodeSentence(left: number): string {
     : `That's not the parent code. ${left} tries left.`;
 }
 
-/** The set-up form (onboarding and Settings share it): child's name, the code typed twice. */
+/**
+ * The set-up form (onboarding and Settings share it): child's name, the code typed twice, and
+ * the grown-up's tick that they stay with the child for the whole session.
+ */
 export interface FamilySetupDraft {
   readonly childName: string;
   readonly code: string;
   readonly confirm: string;
+  /** Ticked: "I'll stay with my child the whole time they use SKYCOT." Required before turning on. */
+  readonly staysWithChild: boolean;
 }
 
-export const EMPTY_SETUP_DRAFT: FamilySetupDraft = { childName: "", code: "", confirm: "" };
+export const EMPTY_SETUP_DRAFT: FamilySetupDraft = {
+  childName: "",
+  code: "",
+  confirm: "",
+  staysWithChild: false,
+};
+
+/** The tick-box a grown-up must tick before the Family profile can be turned on. */
+export const STAYS_WITH_CHILD_LABEL =
+  "I'll stay with my child the whole time they use SKYCOT. A child never uses SKYCOT on their own.";
 
 /** Why the draft cannot be saved yet, or null when it can. Only said once the person has typed enough to be told. */
 export function setupProblem(draft: FamilySetupDraft): string | null {
@@ -1091,5 +1105,5 @@ export function setupProblem(draft: FamilySetupDraft): string | null {
 }
 
 export function setupReady(draft: FamilySetupDraft): boolean {
-  return setupProblem(draft) === null;
+  return setupProblem(draft) === null && draft.staysWithChild;
 }

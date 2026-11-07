@@ -672,6 +672,11 @@
   font-size: calc(14px * var(--fm-text-scale));
   color: var(--fm-label-2);
 }
+.fm-home__note {
+  margin: 4px 0 0;
+  font-size: calc(13px * var(--fm-text-scale));
+  color: var(--fm-label-3);
+}
 .fm-home__privacy {
   margin: 14px 2px 0;
   font-size: calc(12px * var(--fm-text-scale));

@@ -12,6 +12,7 @@ import {
   codeStrength,
   digitsOnly,
   setupProblem,
+  STAYS_WITH_CHILD_LABEL,
   strengthHint,
   type FamilySetupDraft,
 } from "./family";
@@ -80,6 +81,15 @@ export function FamilySetupForm({
         </p>
         {showProblem ? <Banner tone="warning">{problem}</Banner> : null}
       </div>
+      {/* Required: SKYCOT is for a child and a grown-up together, so the host's button waits for this. */}
+      <label className="fm-browse__toggle fm-family-setup__stays">
+        <input
+          type="checkbox"
+          checked={draft.staysWithChild}
+          onChange={(event) => onDraft({ ...draft, staysWithChild: event.currentTarget.checked })}
+        />
+        <span>{STAYS_WITH_CHILD_LABEL}</span>
+      </label>
       {/* The form always sits under a sheet's h2, so its sub-headings are h3. */}
       {foldHonesty ? (
         <>

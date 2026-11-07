@@ -335,17 +335,18 @@ pre.licence{background:var(--bg2);border:1px solid var(--line);border-radius:14p
 '''
 
 SITE = "https://skycot.com"
-LAST_UPDATED = "28 October 2026"
-TERMS_UPDATED = "4 November 2026"
-H1 = "The family-friendly AI developer."
-LEDE = ("Kids dream it up. SKYCOT builds it. Nothing goes online without a grown-up's code. "
-        "Plain English, on your own Mac, with the AI you already pay for.")
+LAST_UPDATED = "7 November 2026"
+TERMS_UPDATED = "7 November 2026"
+H1 = "Do AI with your kids. Safely."
+LEDE = ("Kids dream it up. You build it together. A grown-up is always in the room, and nothing leaves "
+        "the Mac without your code. Plain English, on your own Mac, with the AI you already pay for.")
 LEDE2 = "Grown-ups use it for their business too: no code, no jargon, nothing live until you say so."
-TITLE = "SKYCOT · The family-friendly AI developer"
-DESC = ("Kids dream it up, SKYCOT builds it, and nothing goes online without a grown-up's code. A plain-English AI "
-        "developer for families and small businesses, on your own Mac, with the AI you already pay for.")
-OG_ALT = ("SKYCOT. Free beta, out now. The family-friendly AI developer. Kids say what they want to make, SKYCOT builds it on your Mac, "
-          "asks before every change, and nothing goes online without a grown-up's code. skycot.com. Beside it, the SKYCOT app's Home screen and a cheering cloud.")
+TITLE = "SKYCOT · Do AI with your kids. Safely."
+DESC = ("A safe way to do AI with your kids: a workshop for a parent and a child to make things together, on your own "
+        "Mac, with the AI you already pay for. A grown-up is always in the room, and nothing leaves the Mac without "
+        "your code. Grown-ups use it for their small business too.")
+OG_ALT = ("SKYCOT. Free beta, out now. Do AI with your kids. Safely. A parent and a child make things with AI together on your Mac; "
+          "it asks before every change, and nothing leaves the Mac without a grown-up's code. skycot.com. Beside it, the SKYCOT app's Home screen and a cheering cloud.")
 
 # Identity metadata for search engines. Never add an address here (standing rule: no street, postal
 # or registered address anywhere on skycot.com).
@@ -357,8 +358,9 @@ STRUCTURED = json.dumps({
         {"@type": "WebSite", "@id": SITE + "/#website", "name": "SKYCOT", "url": SITE + "/",
          "publisher": {"@id": SITE + "/#organization"}},
         {"@type": "SoftwareApplication", "@id": SITE + "/#app", "name": "SKYCOT", "url": SITE + "/",
-         "description": "The family-friendly AI developer. Kids dream it up, SKYCOT builds it, and nothing "
-                        "goes online without a grown-up's code. Free beta for Mac.",
+         "description": "Do AI with your kids. Safely. A workshop for a parent and a child to make things with AI "
+                        "together on your Mac. A grown-up is always in the room, and nothing leaves the Mac without "
+                        "your code. Free beta for Mac.",
          "operatingSystem": "macOS 13 Ventura or later", "processorRequirements": "Apple silicon (M1 or later)",
          "applicationCategory": "DeveloperApplication", "applicationSubCategory": "Family",
          "softwareVersion": "0.1.1 beta", "releaseNotes": SITE + "/#new",
@@ -620,7 +622,7 @@ def home_body():
   <div class="trio">
     <div><h3>Kids dream it up</h3><p>A game for a friend, the school-fair website, a quiz for a little brother. Said in plain English, like a message.</p></div>
     <div><h3>Sam builds it, carefully</h3><p>The assistant shows a plan and asks before every change. Undo puts every file back, any time.</p></div>
-    <div><h3>A grown-up holds the keys</h3><p>Nothing goes online without the parent code. It runs on your Mac, with your own AI account, with you nearby.</p></div>
+    <div><h3>A grown-up holds the keys</h3><p>Nothing goes online without the parent code. It runs on your Mac, with your own AI account, with you in the room for the whole session.</p></div>
   </div>
 </div></section>
 
@@ -871,7 +873,7 @@ PRIVACY = f'''{nav(True)}
     <li><b>Google Workspace</b> runs our email.</li>
     <li><b>Discord</b> runs our community, if you choose to join it.</li>
   </ul>
-  <p><b>SKYCOT Relay, for reaching your Mac away from home (optional, off until you turn it on).</b> If a grown-up turns on <i>Reach this Mac from anywhere</i> in SKYCOT's Family settings, your Mac keeps a connection to SKYCOT Relay, a small service we run on Cloudflare, so the family's linked phones and iPads can reach it when they are not on your home Wi-Fi. Everything between a device and your Mac is sealed on the device and opened only on your Mac; the relay passes it along and cannot read it, and it never receives names, messages, files or projects. It does see a random id for your home and for each linked device, when devices connect, roughly how much they send, and their network addresses, and it keeps only what it needs to connect them. If phone notifications are turned on, Apple delivers them, and they only ever say that SKYCOT needs a grown-up or that something has finished. The sealing follows the open Noise protocol standard (Noise_IK_25519_ChaChaPoly_SHA256) and has been checked against that standard's official test vectors, but it has not been independently audited: SKYCOT is a beta, and we make no promise that the relay is secure. Turn the switch off and your Mac stops connecting to it.</p>
+  <p><b>SKYCOT Relay, for reaching your Mac away from home (optional, off until you turn it on).</b> If a grown-up turns on <i>Reach this Mac from your phone</i> in SKYCOT's Family settings, your Mac keeps a connection to SKYCOT Relay, a small service we run on Cloudflare, so the family's linked phones and iPads can reach it when they are not on your home Wi-Fi. Everything between a device and your Mac is sealed on the device and opened only on your Mac; the relay passes it along and cannot read it, and it never receives names, messages, files or projects. It does see a random id for your home and for each linked device, when devices connect, roughly how much they send, and their network addresses, and it keeps only what it needs to connect them. If phone notifications are turned on, Apple delivers them, and they only ever say that SKYCOT needs a grown-up or that something has finished. The sealing follows the open Noise protocol standard (Noise_IK_25519_ChaChaPoly_SHA256) and has been checked against that standard's official test vectors, but it has not been independently audited: SKYCOT is a beta, and we make no promise that the relay is secure. Turn the switch off and your Mac stops connecting to it.</p>
   <p>These companies may store information outside Australia, including in the United States. We do not share personal information with anyone else, except where the law requires it, where it is needed to protect people or our rights against fraud or harm, or if the SKYCOT business is sold or reorganised, in which case this policy continues to apply to what we hold.</p>
 
   <h2>6. Security</h2>
@@ -881,7 +883,7 @@ PRIVACY = f'''{nav(True)}
   <p>You can ask us what we hold about you, ask us to correct or delete it, or complain about how we handled it, by emailing <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We will respond within 30 days. If you are not satisfied you can contact the Office of the Australian Information Commissioner (oaic.gov.au). If you are in the UK or the European Union, you have equivalent rights under the UK GDPR and the EU GDPR, including the right to lodge a complaint with your local supervisory authority.</p>
 
   <h2>8. Children and the Family profile</h2>
-  <p>SKYCOT is designed so that a child uses it only on a parent's or guardian's own Mac, signed in to that adult's own AI account, with the Family profile turned on and the adult supervising. The adult installs SKYCOT, accepts our terms and the AI service's terms, and is responsible for the child's use. A child does not need, and should not create, an account with us or with an AI service to use SKYCOT; SKYCOT has no account of its own.</p>
+  <p>SKYCOT is for a child and an adult together. A child must not use SKYCOT on their own: the adult stays present and supervising for the whole session, the way you would at a pool, and is responsible for everything asked and made. SKYCOT is designed so that a child uses it only on a parent's or guardian's own Mac, signed in to that adult's own AI account, with the Family profile turned on and the adult supervising. The adult installs SKYCOT, accepts our terms and the AI service's terms, and is responsible for the child's use. A child does not need, and should not create, an account with us or with an AI service to use SKYCOT; SKYCOT has no account of its own.</p>
   <p>We do not knowingly collect personal information from children, and the Family profile does not change what we receive, which is nothing (unless a grown-up turns on SKYCOT Relay, which passes along sealed traffic it cannot read; see section 5). Everything the Family profile keeps stays in SKYCOT's own storage on your Mac and is never sent to us or to the AI service: for each child, a first name (if you give one), a picture, look, text size, voice settings, bedtime and daily limits; the household's time zone, used for bedtime; and a scrambled version of the parent code, never the code itself. To run the limits and the grown-up recap it also keeps, on the Mac, each child's time and counts for the last five weeks, who started each conversation, any extra time a grown-up gave, and a log of what needed a grown-up, which records only the kind of detail involved and is kept for 30 days. Earned stickers and the pages pinned to the family fridge are kept there too. The recap is built on the Mac and shown only after the parent code; printing it or saving it as a PDF uses your browser's print dialog, and nothing is emailed or uploaded. Turning the Family profile off forgets the children, their limits and the parent code.</p>
   <p>Before a child's message goes, SKYCOT looks for personal details such as a full name, school, address, phone number, email or birthday, and suggests leaving them out. This check runs on the Mac. It spots common patterns, so it can miss a detail written in an unusual way.</p>
   <p>We do not collect children's names or work through the counter. It records anonymous daily totals for update checks and optional relay connections, with no name or account attached. If you believe a child has sent us personal information, for example by email, tell us and we will delete it.</p>
@@ -903,7 +905,7 @@ TERMS = f'''{nav(True)}
   <p>SKYCOT is software that runs on your computer and helps you direct AI coding assistants made by other companies. It has no account of its own: you do not sign up with us to use it. It is a beta: features may change, be incomplete, contain mistakes, lose work or stop working between versions, so do not rely on SKYCOT as the only copy of anything important. <em>Summary: it is new, and we say so.</em></p>
 
   <h2>2. Who can use SKYCOT</h2>
-  <p>You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer, signed in to that adult's own AI account, and under that adult's supervision; we recommend turning on the Family profile first. The adult accepts these terms for the child and is responsible for that use, including what the child asks the assistant to do and anything put online. A child does not need, and should not create, an account with us or with an AI service in order to use SKYCOT.</p>
+  <p>SKYCOT is for a child and an adult together. A child must not use SKYCOT on their own. The adult stays present and supervising for the whole session, the way you would at a pool, and is responsible for everything asked and made. You must be 18 or over to accept these terms. A child may use SKYCOT only on a parent's or guardian's computer, signed in to that adult's own AI account, and under that adult's supervision; we recommend turning on the Family profile first. The adult accepts these terms for the child and is responsible for that use, including what the child asks the assistant to do and anything put online. A child does not need, and should not create, an account with us or with an AI service in order to use SKYCOT.</p>
   <p>Each AI service sets its own minimum age and its own rules on who may use an account, and you must follow them; some require every user to be 18 or over. The Family profile is a set of guardrails inside SKYCOT, not a parental-control or security product: it does not filter the web, lock the Mac or limit anything outside SKYCOT, it cannot control what the AI service says, and it can be got round. <em>Summary: a grown-up sets it up, signs in, and stays in charge; the AI service's own age rules still apply.</em></p>
 
   <h2>3. Your AI assistant is a separate agreement</h2>
@@ -1033,7 +1035,7 @@ shutil.copyfile(HERE + "assets/skycot-og-beta.png", OUT + "assets/brand/og-beta.
 os.makedirs(OUT + "assets/video", exist_ok=True)
 shutil.copyfile(HERE + "assets/poster-hero.jpg", OUT + "assets/video/poster-hero.jpg")
 # A manifest cannot change with the time of day, so installed icons stay day (brand guide section 9).
-MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "The family-friendly AI developer.",
+MANIFEST = {"name": "SKYCOT", "short_name": "SKYCOT", "description": "Do AI with your kids. Safely.",
             "start_url": "/", "display": "minimal-ui", "background_color": "#ffffff", "theme_color": "#0071e3",
             "icons": [{"src": f"/assets/brand/icon-{k}{n}-day.png", "sizes": f"{n}x{n}", "type": "image/png",
                        "purpose": "maskable" if k else "any"} for k in ("", "maskable-") for n in (192, 512)]}

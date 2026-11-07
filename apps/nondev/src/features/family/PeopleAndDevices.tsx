@@ -573,7 +573,7 @@ function LinkDeviceSheet({ onClose }: { readonly onClose: () => void }) {
           <div>
             {relayStatus?.available ? (
               <>
-                <p>Phones need a way to reach this Mac. Turn on Reach this Mac from anywhere?</p>
+                <p>Phones need a way to reach this Mac. Turn on Reach this Mac from your phone?</p>
                 <ul className="fm-relay-points">
                   <li>{RELAY_FOOTER}</li>
                 </ul>

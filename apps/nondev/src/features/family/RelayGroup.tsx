@@ -1,4 +1,4 @@
-// Settings › Family on the family's Mac: "Reach this Mac from anywhere" (SKYCOT Relay). One row
+// Settings › Family on the family's Mac: "Reach this Mac from your phone" (SKYCOT Relay). One row
 // with a switch, the state in plain words, and a confirmation sheet before it goes on. Changing
 // it asks for the parent code, like every other Family setting.
 import { Globe, LockKeyhole } from "lucide-react";
@@ -52,7 +52,7 @@ export function RelayGroup() {
   const summary = relaySummary(status);
   return (
     <>
-      <SettingsGroup title="Away from home" footer={RELAY_FOOTER}>
+      <SettingsGroup title="From your phone" footer={RELAY_FOOTER}>
         <ListRow
           leading={<StepBadge state={summary.badge} icon={Globe} />}
           title={<span id="fm-relay-title">{RELAY_TITLE}</span>}
@@ -73,8 +73,8 @@ export function RelayGroup() {
         open={confirming}
         onClose={() => setConfirming(false)}
         icon={LockKeyhole}
-        title="Reach this Mac from anywhere?"
-        description="Phones and iPads you link can then use SKYCOT away from home, through SKYCOT Relay."
+        title="Reach this Mac from your phone?"
+        description="Phones and iPads you link can then reach SKYCOT through SKYCOT Relay, even off your home Wi-Fi. Meant for the next room, not for leaving a child on their own."
         sober
         actions={
           <>
@@ -91,7 +91,7 @@ export function RelayGroup() {
             Each device works only as the person it was linked for, with the same rules as at home.
           </li>
           <li>Remove a device here and it stops at once, at home and away.</li>
-          <li>Devices linked before need linking once more to work away from home.</li>
+          <li>Devices linked before need linking once more to work off your home Wi-Fi.</li>
           <li>This Mac has to be on and awake for them to reach it.</li>
         </ul>
       </Sheet>

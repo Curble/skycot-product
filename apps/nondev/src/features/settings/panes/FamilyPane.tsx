@@ -76,6 +76,18 @@ import { SettingsGroup } from "../SettingsGroup";
  * code inline, never in a separate popup), the one way into Advanced mode, and
  * the way out. Every code prompt is sober, whatever the theme.
  */
+/** One calm line at the top of the pane, on or off: SKYCOT is for a child and a grown-up together. */
+const TOGETHER_LINE =
+  "SKYCOT is for using together: a grown-up stays with the child for the whole session.";
+
+function TogetherNote() {
+  return (
+    <ListExtra>
+      <p className="fm-help fm-family-together">{TOGETHER_LINE}</p>
+    </ListExtra>
+  );
+}
+
 export function FamilyPane({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const family = useFamily();
   const [setupOpen, setSetupOpen] = useState(false);
@@ -89,6 +101,7 @@ export function FamilyPane({ environmentId }: { readonly environmentId: Environm
           title={familyCopy.title}
           footer="For a child you look after. Turning it on applies the Workshop look (unless you've already picked another), lets safe steps run by themselves while anything risky waits for a grown-up, hides Advanced mode, and guards publishing and automations with a parent code."
         >
+          <TogetherNote />
           <ListRow
             leading={<StepBadge state="todo" icon={Users} />}
             title={`Set up the ${familyCopy.title}`}
@@ -139,6 +152,7 @@ function FamilyOnPane({ environmentId }: { readonly environmentId: EnvironmentId
   return (
     <>
       <SettingsGroup title="Status">
+        <TogetherNote />
         <ListExtra>
           <div className="fm-family-status">
             <span className="fm-family-status__glyph" aria-hidden>
@@ -339,7 +353,13 @@ function ChangeCodeForm({ onDone }: { readonly onDone: () => void }) {
   // code is only held here between the two steps.
   const [current, setCurrent] = useState<string | null>(null);
   const [currentDraft, setCurrentDraft] = useState("");
-  const [draft, setDraft] = useState<FamilySetupDraft>({ childName: "", code: "", confirm: "" });
+  const [draft, setDraft] = useState<FamilySetupDraft>({
+    childName: "",
+    code: "",
+    confirm: "",
+    // The code-change form never turns the profile on, so the set-up tick plays no part here.
+    staysWithChild: true,
+  });
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);

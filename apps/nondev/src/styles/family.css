@@ -332,3 +332,15 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* The required "I'll stay with my child" tick in the set-up form. */
+.fm-family-setup__stays {
+  align-items: flex-start;
+  gap: 10px;
+}
+.fm-family-setup__stays input {
+  margin-top: 3px;
+}
+.fm-family-together {
+  margin: 0;
+}

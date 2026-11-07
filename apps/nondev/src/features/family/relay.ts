@@ -46,10 +46,10 @@ export function parseRelayStatus(body: unknown): RelayStatus | null {
   };
 }
 
-export const RELAY_TITLE = "Reach this Mac from anywhere";
+export const RELAY_TITLE = "Reach this Mac from your phone";
 
 export const RELAY_FOOTER =
-  "Phones and iPads you link here can reach this Mac away from home through SKYCOT Relay. Everything is sealed on your devices and on this Mac, so the relay passes it along without being able to read it. No accounts, and nothing is kept. Notifications only ever say “SKYCOT needs a grown-up” or “Sam has finished”.";
+  "Phones and iPads you link here can reach this Mac through SKYCOT Relay, even off your home Wi-Fi. It is for the moment you step into the next room: SKYCOT is for using together, so stay close. Everything is sealed on your devices and on this Mac, so the relay passes it along without being able to read it. No accounts, and nothing is kept. Notifications only ever say “SKYCOT needs a grown-up” or “Sam has finished”.";
 
 export interface RelaySummary {
   readonly subtitle: string;
@@ -94,7 +94,7 @@ export function relaySummary(status: RelayStatus | null): RelaySummary {
       };
     case "connected":
       return {
-        subtitle: `On. Linked phones and iPads can reach this Mac from anywhere. ${devicesPhrase(status.devicesOnline)}`,
+        subtitle: `On. Linked phones and iPads can reach this Mac from the next room, or further. ${devicesPhrase(status.devicesOnline)}`,
         badge: "ok",
         switchOn: true,
         switchDisabled: false,

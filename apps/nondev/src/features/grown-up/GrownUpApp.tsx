@@ -764,7 +764,7 @@ function ThisDeviceTab() {
         footer={
           possible
             ? "Face ID (or Touch ID, or this device's passcode) says yes instead of typing the parent code. It stays on this device; SKYCOT keeps only a public key."
-            : "Face ID needs a secure connection to the Mac, which this address isn't. Use the parent code for now; SKYCOT Relay will bring Face ID to phones away from the Mac."
+            : "Face ID needs a secure connection to the Mac, which this address isn't. Use the parent code for now; SKYCOT Relay will bring Face ID to phones off the home Wi-Fi."
         }
       >
         <ListRow

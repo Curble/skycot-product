@@ -157,6 +157,10 @@ export function HomeView({ showBack = false }: { readonly showBack?: boolean }) 
                   )}
                 </p>
               )}
+              {/* Low-key, for the child's Home only: SKYCOT is for using together. */}
+              {childView && !identityPending ? (
+                <p className="fm-home__note">Keep a grown-up nearby.</p>
+              ) : null}
             </div>
           </div>
           <StarterCards onPick={starterPick.pick} />

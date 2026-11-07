@@ -46,7 +46,7 @@ describe("SKYCOT Relay in the Family settings", () => {
   it("says plainly what each state means for the family", () => {
     expect(relaySummary(status("off")).subtitle).toMatch(/only on your home network/);
     expect(relaySummary(status("connected")).subtitle).toMatch(
-      /from anywhere\. 1 device is connected/,
+      /from the next room, or further\. 1 device is connected/,
     );
     expect(relaySummary(status("unreachable")).badge).toBe("warn");
     expect(relaySummary(status("refused")).badge).toBe("fail");
