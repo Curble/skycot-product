@@ -38,6 +38,10 @@
   top: 6px;
   right: 8px;
 }
+/* While the Mac app takes the page's fridge picture, SKYCOT's own button stays out of it. */
+html[data-fm-capturing] .fm-fullscreen-page__enter {
+  visibility: hidden;
+}
 .fm-preview-fullscreen .fm-fullscreen-page__enter {
   right: 98px;
 }
