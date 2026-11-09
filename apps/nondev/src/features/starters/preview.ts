@@ -180,23 +180,32 @@ export async function offlinePreviewDocument(
   return withHeadStart(withHelpers, policy);
 }
 
+/**
+ * The sealed document for `html`, or "" while it is being made. Never an earlier page's
+ * document: a frame must be given its page in one go (see SealedPreviewFrame), so callers show
+ * nothing until the answer is for the page they asked about.
+ */
 export function useOfflinePreviewDocument(
   html: string,
   sites: ReadonlyArray<string> = [],
   familyOn = false,
 ): string {
-  const [document, setDocument] = useState("");
+  const [made, setMade] = useState<{ readonly key: string; readonly document: string } | null>(
+    null,
+  );
   const siteKey = sites.join("\n");
+  const key = `${familyOn ? "1" : "0"}\u0000${siteKey}\u0000${html}`;
   useEffect(() => {
+    if (html === "") return;
     let current = true;
     void offlinePreviewDocument(html, siteKey ? siteKey.split("\n") : [], familyOn).then(
       (value) => {
-        if (current) setDocument(value);
+        if (current) setMade({ key, document: value });
       },
     );
     return () => {
       current = false;
     };
-  }, [html, siteKey, familyOn]);
-  return document;
+  }, [html, siteKey, familyOn, key]);
+  return html !== "" && made?.key === key ? made.document : "";
 }
