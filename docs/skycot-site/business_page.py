@@ -9,7 +9,7 @@ import html, json
 # Where "Get it for Mac" points. None until Mark says the Business download is public; until then the
 # button asks for early access by email.
 BIZ_DOWNLOAD = None
-EARLY_ACCESS = "mailto:markhallam@skycot.com?subject=SKYCOT%20Business%20early%20access"
+EARLY_ACCESS = "mailto:info@skycot.com?subject=SKYCOT%20Business%20early%20access"
 
 TITLE = "SKYCOT Business · Help with the busywork, on your Mac"
 DESC = ("SKYCOT Business learns how your business works, then drafts quotes, reminders, review requests and "

@@ -7,7 +7,7 @@ This repository is SKYCOT, made by Curble Pty Ltd (trading as SKYCOT), Melbourne
 Please report it privately, not in a public issue or pull request:
 
 - use GitHub's **Report a vulnerability** button on this repository's Security tab, or
-- email markhallam@skycot.com with "SKYCOT security" in the subject.
+- email info@skycot.com with "SKYCOT security" in the subject.
 
 Tell us what you found, how to reproduce it and which SKYCOT version you used. We will reply within 5 business days and keep you updated until it is fixed. Please give us a reasonable time to fix it before you disclose it publicly.
 

@@ -354,7 +354,7 @@ STRUCTURED = json.dumps({
     "@context": "https://schema.org",
     "@graph": [
         {"@type": "Organization", "@id": SITE + "/#organization", "name": "SKYCOT",
-         "legalName": "Curble Pty Ltd", "url": SITE + "/", "email": "markhallam@skycot.com"},
+         "legalName": "Curble Pty Ltd", "url": SITE + "/", "email": "info@skycot.com"},
         {"@type": "WebSite", "@id": SITE + "/#website", "name": "SKYCOT", "url": SITE + "/",
          "publisher": {"@id": SITE + "/#organization"}},
         {"@type": "SoftwareApplication", "@id": SITE + "/#app", "name": "SKYCOT", "url": SITE + "/",
@@ -449,7 +449,7 @@ FOOTER = '''<footer><div class="wrap">
       <li><a href="/privacy">Privacy</a></li>
       <li><a href="/terms">Terms</a></li>
       <li><a href="/open-source">Open source</a></li>
-      <li><a href="mailto:markhallam@skycot.com">Contact</a></li>
+      <li><a href="mailto:info@skycot.com">Contact</a></li>
     </ul>
   </div>
   <p class="legal">SKYCOT is based on <a href="https://github.com/pingdotgg/t3code">T3 Code</a>, © T3 Tools Inc., used under the MIT licence. SKYCOT is not affiliated with or endorsed by T3 Tools Inc. Claude, Codex, Cursor and Gemini are products of their respective owners; SKYCOT is not affiliated with Anthropic, OpenAI, Anysphere or Google. Screenshots show an early build with a sample project.<br>
@@ -762,7 +762,7 @@ def home_body():
     <p>For Apple silicon Macs (M1 or later) with macOS 13 Ventura or newer. About 160 MB. You'll need an account with at least one supported assistant.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://downloads.skycot.com/mac/SKYCOT-0.1.1-nondev.45.beta-arm64.dmg">Download the beta for Mac</a>
-      <a class="btn btn-secondary" href="mailto:markhallam@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
+      <a class="btn btn-secondary" href="mailto:info@skycot.com?subject=SKYCOT%20beta%20feedback">Tell us what you think</a>
     </div>
     <p class="hero-note">It's a beta, so some things will be rough. Tell us what breaks by email or on <a href="https://discord.gg/38gtBbywq6">Discord</a>. No newsletter, and the app sends us nothing.</p>
     <div class="status">
@@ -791,7 +791,7 @@ def home_body():
     <details><summary>Can I get at the developer tools?</summary><p>Yes. Advanced mode is a switch at the bottom of the sidebar. It opens the full developer interface SKYCOT is built on (T3 Code's) in the same window: every panel, terminal and setting, nothing removed. Flip it back and the plain-language view returns. In a Family profile the switch is hidden and opening it needs the parent code.</p></details>
     <details><summary>Is it open source?</summary><p>SKYCOT is built on T3 Code, an open-source project by T3 Tools Inc. released under the MIT licence. What we added is open too, under the Apache License 2.0. The SKYCOT name, logo and characters are trademarks of Curble Pty Ltd and are not covered by either licence. We say so in the app and on our <a href="/open-source">open source page</a>. SKYCOT is not affiliated with T3 Tools.</p></details>
     <details><summary>Does it work on Windows or iPhone?</summary><p>Mac first. The engine SKYCOT is built on also runs on Windows and has a phone companion, so both are on the list; dates will be honest ones.</p></details>
-    <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p></details>
+    <details><summary>Who makes it?</summary><p>SKYCOT is a registered business name of Curble Pty Ltd, a Melbourne company run by Mark Hallam. Questions: <a href="mailto:info@skycot.com">info@skycot.com</a>.</p></details>
   </div>
 </div></section>
 '''
@@ -843,7 +843,7 @@ PRIVACY = f'''{nav(True)}
   </ul>
 
   <h2>1. Who we are</h2>
-  <p>SKYCOT is a registered business name of Curble Pty Ltd (ABN 71 605 512 776), Melbourne, Australia. You can reach us at <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We are bound by the Australian Privacy Act 1988 and the Australian Privacy Principles to the extent they apply to us, and we aim to meet them in any case.</p>
+  <p>SKYCOT is a registered business name of Curble Pty Ltd (ABN 71 605 512 776), Melbourne, Australia. You can reach us at <a href="mailto:info@skycot.com">info@skycot.com</a>. We are bound by the Australian Privacy Act 1988 and the Australian Privacy Principles to the extent they apply to us, and we aim to meet them in any case.</p>
 
   <h2>2. The SKYCOT app</h2>
   <h3>What stays on your Mac</h3>
@@ -877,10 +877,10 @@ PRIVACY = f'''{nav(True)}
   <p>These companies may store information outside Australia, including in the United States. We do not share personal information with anyone else, except where the law requires it, where it is needed to protect people or our rights against fraud or harm, or if the SKYCOT business is sold or reorganised, in which case this policy continues to apply to what we hold.</p>
 
   <h2>6. Security</h2>
-  <p>We keep what we hold to a minimum and protect it with the security of the services above, with access limited to the people who need it. No system is perfectly secure. The security of your Mac, your AI accounts and anything you connect to SKYCOT is in your hands, so keep them up to date and protected. If you find a security problem in SKYCOT or skycot.com, please email <a href="mailto:markhallam@skycot.com?subject=Security">markhallam@skycot.com</a> with "Security" in the subject before telling anyone else, and do not include passwords or keys.</p>
+  <p>We keep what we hold to a minimum and protect it with the security of the services above, with access limited to the people who need it. No system is perfectly secure. The security of your Mac, your AI accounts and anything you connect to SKYCOT is in your hands, so keep them up to date and protected. If you find a security problem in SKYCOT or skycot.com, please email <a href="mailto:info@skycot.com?subject=Security">info@skycot.com</a> with "Security" in the subject before telling anyone else, and do not include passwords or keys.</p>
 
   <h2>7. Your rights</h2>
-  <p>You can ask us what we hold about you, ask us to correct or delete it, or complain about how we handled it, by emailing <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. We will respond within 30 days. If you are not satisfied you can contact the Office of the Australian Information Commissioner (oaic.gov.au). If you are in the UK or the European Union, you have equivalent rights under the UK GDPR and the EU GDPR, including the right to lodge a complaint with your local supervisory authority.</p>
+  <p>You can ask us what we hold about you, ask us to correct or delete it, or complain about how we handled it, by emailing <a href="mailto:info@skycot.com">info@skycot.com</a>. We will respond within 30 days. If you are not satisfied you can contact the Office of the Australian Information Commissioner (oaic.gov.au). If you are in the UK or the European Union, you have equivalent rights under the UK GDPR and the EU GDPR, including the right to lodge a complaint with your local supervisory authority.</p>
 
   <h2>8. Children and the Family profile</h2>
   <p>SKYCOT is for a child and an adult together. A child must not use SKYCOT on their own: the adult stays present and supervising for the whole session, the way you would at a pool, and is responsible for everything asked and made. SKYCOT is designed so that a child uses it only on a parent's or guardian's own Mac, signed in to that adult's own AI account, with the Family profile turned on and the adult supervising. The adult installs SKYCOT, accepts our terms and the AI service's terms, and is responsible for the child's use. A child does not need, and should not create, an account with us or with an AI service to use SKYCOT; SKYCOT has no account of its own.</p>
@@ -948,7 +948,7 @@ TERMS = f'''{nav(True)}
   <p>These terms and the privacy page are the whole agreement between you and us about SKYCOT. If any part is found unenforceable, the rest still applies. If we do not enforce a term straight away, we have not given it up. We are not responsible for delays or failures caused by events outside our reasonable control.</p>
 
   <h2>16. Contact</h2>
-  <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>.</p>
+  <p>Curble Pty Ltd (ABN 71 605 512 776, ACN 605 512 776), trading as SKYCOT, Melbourne, Australia. <a href="mailto:info@skycot.com">info@skycot.com</a>.</p>
 </div></main>
 '''
 write("terms.html", head("Terms of use · SKYCOT", "Terms of use for the SKYCOT app and the skycot.com website, made by Curble Pty Ltd, Melbourne, Australia.", "/terms") + TERMS + footer(True))
@@ -980,14 +980,14 @@ OSS = f'''{nav()}
 
   <h2 id="themes">Themes are open</h2>
   <p>Every SKYCOT theme is a plain data file: a short list of colours, a few "flavour" choices (borders, headings, tip cards, button shape, motion) and optional crew names. A theme contains no code, and you can read one in any text editor. The four themes that ship with SKYCOT (Workshop, the default, plus Classic, Paper and Night Ops) are published with the app, and the format will be documented here.</p>
-  <p>Community themes are welcome. Duplicate a theme in Settings → Appearance, edit it, export it, and contribute it through the SKYCOT repository (the address will be published here) or by email to <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a>. Themes we include are credited to their author. A theme changes how SKYCOT looks, never what it does: the permission, undo and publish moments stay plain in every theme.</p>
+  <p>Community themes are welcome. Duplicate a theme in Settings → Appearance, edit it, export it, and contribute it through the SKYCOT repository (the address will be published here) or by email to <a href="mailto:info@skycot.com">info@skycot.com</a>. Themes we include are credited to their author. A theme changes how SKYCOT looks, never what it does: the permission, undo and publish moments stay plain in every theme.</p>
 
   <h2>Third-party licences</h2>
   <p>SKYCOT bundles many other open-source packages (for example React, Electron and the libraries T3 Code depends on), each under its own licence, mostly MIT, Apache 2.0, BSD and ISC. The complete list, with each licence text and copyright holder, is generated at build time and included in every download; in the app it is under Settings → About → Open-source licences. A copy for the current public version will be published at this address.</p>
   <p>The AI assistants SKYCOT works with (Codex from ChatGPT, Antigravity from Google, Claude Code, Cursor and others) are separate products that you install and sign in to under their owners' terms. They are not part of SKYCOT and are not open source unless their owners say so.</p>
 
   <h2>Reporting a problem</h2>
-  <p>If you believe an attribution is missing or wrong, email <a href="mailto:markhallam@skycot.com">markhallam@skycot.com</a> and we will fix it.</p>
+  <p>If you believe an attribution is missing or wrong, email <a href="mailto:info@skycot.com">info@skycot.com</a> and we will fix it.</p>
 </div></main>
 '''
 write("open-source.html", head("Open source · SKYCOT", "SKYCOT is based on T3 Code, © T3 Tools Inc., MIT licence. Full licence text, non-affiliation statement and third-party licences.", "/open-source") + OSS + footer())
@@ -997,7 +997,7 @@ NOTFOUND = f'''{nav()}
 <main class="notfound"><div class="narrow">
   <h1>That page isn't here.</h1>
   <p>The SKYCOT website was rebuilt in October 2026, so the page you were looking for may have moved or been retired.</p>
-  <div class="actions"><a class="btn btn-primary" href="/">Go to the home page</a><a class="btn btn-secondary" href="mailto:markhallam@skycot.com">Email us</a></div>
+  <div class="actions"><a class="btn btn-primary" href="/">Go to the home page</a><a class="btn btn-secondary" href="mailto:info@skycot.com">Email us</a></div>
 </div></main>
 '''
 write("404.html", head("Page not found · SKYCOT", "This page is not on skycot.com.", "/404", robots="noindex") + NOTFOUND + footer())
