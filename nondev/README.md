@@ -46,6 +46,7 @@ Our code lives **only** in paths upstream does not own. Anything there can never
 | `docs/nondev/**`                                                         | design docs for the fork                                                        |
 | `docs/legal/**`, `docs/security/**`, `docs/qa/**`, `docs/skycot-site/**` | legal, security-audit, QA and website documents                                 |
 | `.github/workflows/nondev-*.yml`                                         | our GitHub Actions                                                              |
+| `.github/README.md`                                                      | SKYCOT's front page on GitHub (shown ahead of the root `README.md`)             |
 | `SEAM-MANIFEST.md` (repo root)                                           | the list of upstream files we were forced to edit                               |
 | `NOTICE`, `CONTRIBUTING-THEMES.md` (repo root)                           | our attribution notice and theme-contribution guide                             |
 

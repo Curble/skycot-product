@@ -26,6 +26,7 @@ export const OUR_PATH_GLOBS = [
   "docs/brand/**",
   "docs/marketing/**",
   ".github/workflows/nondev-*.yml",
+  ".github/README.md",
   "SEAM-MANIFEST.md",
   "NOTICE",
   "CONTRIBUTING-THEMES.md",
